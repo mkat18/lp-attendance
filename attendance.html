@@ -688,6 +688,13 @@ tr.flagged-row:hover td { background: #FFEAEA; }
       <p style="font-size:13px;color:var(--text-2);margin-bottom:12px">Download all records as a CSV file you can open in Excel.</p>
       <button class="btn-primary" onclick="exportCSV()">⬇ Download CSV</button>
     </div>
+
+    <div class="card" id="auditLogCard" style="display:none">
+      <div class="section-label">Audit log</div>
+      <p style="font-size:13px;color:var(--text-2);margin-bottom:12px">All PIN resets, role changes and account changes.</p>
+      <button class="btn-primary" onclick="loadAuditLog()">View audit log</button>
+      <div id="auditLogList" style="margin-top:12px"></div>
+    </div>
   </div>
 
 </main>
@@ -1487,7 +1494,7 @@ function submitCheckin() {
   captureGeoAndSubmit(function(geo) {
     const recs2=getRecords();
     if (recs2.findIndex(r=>r.date===today&&r.name===currentUser.name)>=0) return;
-    const newRec={name:currentUser.name,date:today,status:selectedStatus,reason,clockIn,clockOut:null,geo:geo||null,submittedBy:currentUser.name,ts:Date.now()};
+    const newRec={name:currentUser.name,date:today,status:selectedStatus,reason,clockIn,clockOut:null,geo:geo||null,submittedBy:currentUser.name,msAccount:msalAccount?msalAccount.username:'',ts:Date.now()};
     recs2.push(newRec);
     saveRecords(recs2);
     // Write to SharePoint asynchronously
@@ -1690,6 +1697,18 @@ function renderMetrics() {
     return flag && !flag.ok;
   });
 
+  // Suspicious activity — M365 account doesn't match staff name
+  // e.g. mayur@loanprocessor.com.au clocked in as Nikki Jain
+  const suspicious = isSuperAdmin() ? dayRecs.filter(r => {
+    if (!r.msAccount) return false;
+    const msName = r.msAccount.split('@')[0].toLowerCase().replace(/[._]/g,' ');
+    const staffName = r.name.toLowerCase();
+    // Check if MS account first name roughly matches staff name
+    const msFirst = msName.split(' ')[0];
+    const staffFirst = staffName.split(' ')[0];
+    return msFirst !== staffFirst && !staffName.includes(msFirst) && !msName.includes(staffFirst);
+  }) : [];
+
   document.getElementById('metrics').innerHTML=`
     <div class="met clickable" style="grid-column:1/-1;${missing.length>0?'border-color:#FECACA':''}" onclick="cardTap('missing')">
       <div class="met-lbl">Not submitted</div>
@@ -1741,7 +1760,13 @@ function renderMetrics() {
       <div class="met-lbl">📍 Location issues</div>
       <div class="met-val" style="color:${locationFlagged.length>0?'var(--danger)':'var(--success)'}">${locationFlagged.length}</div>
       <div class="met-sub">${locationFlagged.length>0?locationFlagged.slice(0,3).map(r=>r.name.split(' ')[0]).join(', ')+(locationFlagged.length>3?' +more':''):'all locations verified ✓'}</div>
-    </div>`;
+    </div>
+    ${isSuperAdmin()?`
+    <div class="met" style="grid-column:1/-1;${suspicious.length>0?'border-color:#F59E0B;background:#FFFBEB':''}">
+      <div class="met-lbl">🔍 Suspicious activity</div>
+      <div class="met-val" style="color:${suspicious.length>0?'#B45309':'var(--success)'}">${suspicious.length}</div>
+      <div class="met-sub" style="white-space:normal">${suspicious.length>0?suspicious.map(r=>`${esc(r.name.split(' ')[0])} via <b>${esc(r.msAccount)}</b>`).join(' &nbsp;·&nbsp; '):'no anomalies detected ✓'}</div>
+    </div>`:''}`;
 }
 
 function cardTap(status) {
@@ -1806,7 +1831,7 @@ function confirmOnBehalf() {
   const recs = getRecords();
   const existing = recs.findIndex(r=>r.date===date&&r.name===name);
   if (existing>=0) { showToast(name.split(' ')[0]+' already has a record for this date.','err'); return; }
-  recs.push({name, date, status, reason, clockIn:null, clockOut:null, submittedBy:currentUser.name, ts:Date.now()});
+  recs.push({name, date, status, reason, clockIn:null, clockOut:null, submittedBy:currentUser.name, msAccount:msalAccount?msalAccount.username:'', ts:Date.now()});
   saveRecords(recs);
   closeOnBehalfModal();
   showToast('✓ Submitted for '+name.split(' ')[0]+'.','ok');
@@ -2256,6 +2281,8 @@ function renderAdmin() {
   document.getElementById('addManagerCard').style.display=sa?'block':'none';
   const addStaffCard=document.getElementById('addStaffCard');
   if(addStaffCard) addStaffCard.style.display=canAddStaff()?'block':'none';
+  const auditCard=document.getElementById('auditLogCard');
+  if(auditCard) auditCard.style.display=sa?'block':'none';
 
   document.getElementById('staffList').innerHTML = staff.length
     ? staff.map((s,i)=>{
@@ -2298,6 +2325,47 @@ function renderAdmin() {
     : '<div class="empty-state">No accounts yet.</div>';
 }
 
+async function loadAuditLog() {
+  const el = document.getElementById('auditLogList');
+  el.innerHTML = '<div style="color:var(--text-3);font-size:13px">Loading…</div>';
+  try {
+    const token = await getToken();
+    const r = await fetch(SP_API + "('AuditLog')/items?$top=200&$orderby=Created desc&$select=Action,TargetName,PerformedBy,Detail,ActionDate", {
+      headers: {'Authorization':'Bearer '+token, 'Accept':'application/json;odata=nometadata'}
+    });
+    const d = await r.json();
+    if (!d.value || !d.value.length) {
+      el.innerHTML = '<div style="color:var(--text-3);font-size:13px">No audit entries yet.</div>';
+      return;
+    }
+    el.innerHTML = d.value.map(e=>`
+      <div style="padding:8px 0;border-bottom:1px solid var(--border);font-size:13px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-weight:600;color:var(--text)">${esc(e.Action||'')} — ${esc(e.TargetName||'')}</span>
+          <span style="font-size:11px;color:var(--text-3)">${esc(e.ActionDate||'')}</span>
+        </div>
+        <div style="color:var(--text-2);margin-top:2px">${esc(e.Detail||'')} &nbsp;<span style="color:var(--text-3)">by ${esc(e.PerformedBy||'')}</span></div>
+      </div>`).join('');
+  } catch(e) {
+    el.innerHTML = '<div style="color:var(--danger);font-size:13px">Failed to load audit log.</div>';
+  }
+}
+
+async function writeAuditLog(action, targetName, detail) {
+  try {
+    await spPostDirect(SP_API + "('AuditLog')/items", {
+      Title: action,
+      Action: action,
+      TargetName: targetName||'',
+      PerformedBy: currentUser ? currentUser.name : 'System',
+      Detail: detail||'',
+      ActionDate: new Date().toLocaleString('en-AU', {timeZone:'Asia/Kolkata'})
+    });
+  } catch(e) {
+    console.error('Audit log failed:', e);
+  }
+}
+
 function changeRole(i, newRole) {
   if (!canChangeRole()) { showToast('Only Super Admins can change roles.','err'); return; }
   const staff=getStaff();
@@ -2305,14 +2373,76 @@ function changeRole(i, newRole) {
   const oldRole=staff[i].role;
   if (oldRole===newRole) return;
   staff[i].role=newRole;
-  // Audit trail
   staff[i].roleChangedBy=currentUser.name;
   staff[i].roleChangedAt=new Date().toLocaleString('en-AU');
   staff[i].roleChangedFrom=oldRole;
   saveStaff(staff);
   spSaveStaffMember(staff[i]);
+  writeAuditLog('Role Change', name, `Changed from ${ROLE_LABEL[oldRole]} to ${ROLE_LABEL[newRole]}`);
   renderAdmin();
   showToast(`${name.split(' ')[0]} is now ${ROLE_LABEL[newRole]}.`,'ok');
+}
+
+function addPerson(role) {
+  if (!canAddStaff()) { showToast('Permission denied.','err'); return; }
+  const name=document.getElementById('newName').value.trim();
+  if(!name){showToast('Enter a name.','err');return;}
+  const staff=getStaff();
+  if(staff.find(s=>s.name.toLowerCase()===name.toLowerCase())){showToast('Name already exists.','err');return;}
+  const tempPin=genTempPin();
+  const newMember={name,role:'staff',pin:null,tempPin:hashPin(tempPin),addedBy:currentUser.name,addedAt:new Date().toLocaleString('en-AU')};
+  staff.push(newMember);
+  saveStaff(staff); document.getElementById('newName').value='';
+  spSaveStaffMember(newMember);
+  writeAuditLog('Staff Added', name, `Added as Staff by ${currentUser.name}`);
+  renderAdmin(); populateNameDropdown();
+  showTempPin(name, tempPin);
+}
+
+function addPrivilegedPerson() {
+  if (!isSuperAdmin()) { showToast('Only Super Admins can add managers and above.','err'); return; }
+  const name=document.getElementById('newManagerName').value.trim();
+  const role=document.getElementById('newManagerRole').value;
+  if(!name){showToast('Enter a name.','err');return;}
+  const staff=getStaff();
+  if(staff.find(s=>s.name.toLowerCase()===name.toLowerCase())){showToast('Name already exists.','err');return;}
+  const tempPin=genTempPin();
+  const newMember={name,role,pin:null,tempPin:hashPin(tempPin),addedBy:currentUser.name,addedAt:new Date().toLocaleString('en-AU')};
+  staff.push(newMember);
+  saveStaff(staff); document.getElementById('newManagerName').value='';
+  spSaveStaffMember(newMember);
+  writeAuditLog('Account Added', name, `Added as ${ROLE_LABEL[role]} by ${currentUser.name}`);
+  renderAdmin(); populateNameDropdown();
+  showTempPin(name, tempPin);
+}
+
+function removePerson(i) {
+  if (!canDeleteStaff()) { showToast('Only Super Admins can remove accounts.','err'); return; }
+  const staff=getStaff(); const s=staff[i];
+  if (s.name===currentUser.name) { showToast("You can't remove your own account.",'err'); return; }
+  if(!confirm('Remove '+s.name+'? This cannot be undone.'))return;
+  const spId=s.id;
+  writeAuditLog('Account Removed', s.name, `Removed by ${currentUser.name}`);
+  staff.splice(i,1); saveStaff(staff);
+  if (spId) spDeleteStaff(spId);
+  renderAdmin(); populateNameDropdown();
+  showToast(s.name+' removed.','ok');
+}
+
+function resetPin(i) {
+  const staff=getStaff(); const s=staff[i];
+  if (!isSuperAdmin() && !(currentUser.role==='manager' && s.role==='staff')) {
+    showToast('Permission denied.','err'); return;
+  }
+  if(!confirm('Reset PIN for '+s.name+'? A new temporary PIN will be generated.'))return;
+  const tempPin=genTempPin();
+  staff[i].pin=null; staff[i].tempPin=hashPin(tempPin);
+  staff[i].pinResetBy=currentUser.name; staff[i].pinResetAt=new Date().toLocaleString('en-AU');
+  saveStaff(staff);
+  spSaveStaffMember(staff[i]);
+  writeAuditLog('PIN Reset', s.name, `PIN reset by ${currentUser.name}`);
+  renderAdmin();
+  showTempPin(s.name, tempPin);
 }
 
 function fmt12(t) {
@@ -2357,64 +2487,6 @@ function closeTempPinModal() {
   document.getElementById('tempPinModal').style.display='none';
 }
 
-function addPerson(role) {
-  if (!canAddStaff()) { showToast('Permission denied.','err'); return; }
-  const name=document.getElementById('newName').value.trim();
-  if(!name){showToast('Enter a name.','err');return;}
-  const staff=getStaff();
-  if(staff.find(s=>s.name.toLowerCase()===name.toLowerCase())){showToast('Name already exists.','err');return;}
-  const tempPin=genTempPin();
-  const newMember={name,role:'staff',pin:null,tempPin:hashPin(tempPin),addedBy:currentUser.name,addedAt:new Date().toLocaleString('en-AU')};
-  staff.push(newMember);
-  saveStaff(staff); document.getElementById('newName').value='';
-  spSaveStaffMember(newMember);
-  renderAdmin(); populateNameDropdown();
-  showTempPin(name, tempPin);
-}
-
-function addPrivilegedPerson() {
-  if (!isSuperAdmin()) { showToast('Only Super Admins can add managers and above.','err'); return; }
-  const name=document.getElementById('newManagerName').value.trim();
-  const role=document.getElementById('newManagerRole').value;
-  if(!name){showToast('Enter a name.','err');return;}
-  const staff=getStaff();
-  if(staff.find(s=>s.name.toLowerCase()===name.toLowerCase())){showToast('Name already exists.','err');return;}
-  const tempPin=genTempPin();
-  const newMember={name,role,pin:null,tempPin:hashPin(tempPin),addedBy:currentUser.name,addedAt:new Date().toLocaleString('en-AU')};
-  staff.push(newMember);
-  saveStaff(staff); document.getElementById('newManagerName').value='';
-  spSaveStaffMember(newMember);
-  renderAdmin(); populateNameDropdown();
-  showTempPin(name, tempPin);
-}
-
-function removePerson(i) {
-  if (!canDeleteStaff()) { showToast('Only Super Admins can remove accounts.','err'); return; }
-  const staff=getStaff(); const s=staff[i];
-  if (s.name===currentUser.name) { showToast("You can't remove your own account.",'err'); return; }
-  if(!confirm('Remove '+s.name+'? This cannot be undone.'))return;
-  const spId=s.id;
-  staff.splice(i,1); saveStaff(staff);
-  if (spId) spDeleteStaff(spId);
-  renderAdmin(); populateNameDropdown();
-  showToast(s.name+' removed.','ok');
-}
-
-function resetPin(i) {
-  const staff=getStaff(); const s=staff[i];
-  if (!isSuperAdmin() && !(currentUser.role==='manager' && s.role==='staff')) {
-    showToast('Permission denied.','err'); return;
-  }
-  if(!confirm('Reset PIN for '+s.name+'? A new temporary PIN will be generated.'))return;
-  const tempPin=genTempPin();
-  staff[i].pin=null; staff[i].tempPin=hashPin(tempPin);
-  staff[i].pinResetBy=currentUser.name; staff[i].pinResetAt=new Date().toLocaleString('en-AU');
-  saveStaff(staff);
-  spSaveStaffMember(staff[i]);
-  renderAdmin();
-  showTempPin(s.name, tempPin);
-}
-
 
 
 // ── Microsoft Authentication (MSAL) ──────────────────────────────────────
@@ -2433,6 +2505,7 @@ const msalConfig = {
 
 let msalInstance = null;
 let msalToken = null;
+let msalAccount = null; // Stores the logged-in M365 account
 
 const SP_SCOPES = ['https://loanprocessorau.sharepoint.com/Sites.ReadWrite.All', 'User.Read'];
 
@@ -2469,11 +2542,11 @@ async function getToken() {
 }
 
 async function onMsLogin(account) {
+  msalAccount = account; // Store M365 account for audit trail
+  populateNameDropdown();
   showScreen('geoblocked');
-  // Load data from SharePoint
-  await loadFromSharePoint();
-  // Then request geo
   requestGeo();
+  loadFromSharePoint().then(() => populateNameDropdown());
 }
 
 async function spGet(url) {
@@ -2570,7 +2643,8 @@ async function spSaveRecord(rec) {
     GeoLng: rec.geo?String(rec.geo.lng):'',
     GeoAccuracy: rec.geo?String(rec.geo.accuracy)+'m':'',
     DistanceKm: distKm,
-    SubmittedBy: rec.submittedBy||rec.name||''
+    SubmittedBy: rec.submittedBy||rec.name||'',
+    MsAccount: rec.msAccount||''
   };
   if (rec.id) {
     await spPatch(SP_API + "('AttendanceRecords')/items(" + rec.id + ")", payload);
@@ -2597,15 +2671,20 @@ async function spSaveBreak(brk) {
 
 async function spSaveStaffMember(s) {
   const payload = {
-    Title: s.name, Role: s.role||'staff',
-    Pin: s.pin||'', TempPin: s.tempPin||'',
-    StartTime: s.startTime||'', EndTime: s.endTime||'', Office: s.office||''
+    Title: s.name,
+    Role: s.role||'staff',
+    Pin: s.pin||'',
+    TempPin: s.tempPin||'',
+    StartTime: s.startTime||'',
+    EndTime: s.endTime||'',
+    Office: s.office||''
   };
   if (s.id) {
-    await spPatch(SP_API + "('AttendanceStaff')/items(" + s.id + ")", payload);
+    return await spPatch(SP_API + "('AttendanceStaff')/items(" + s.id + ")", payload);
   } else {
     const res = await spPostDirect(SP_API + "('AttendanceStaff')/items", payload);
     if (res && res.ID) s.id = res.ID;
+    return res;
   }
 }
 
