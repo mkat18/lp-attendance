@@ -701,6 +701,23 @@ tr.flagged-row:hover td { background: #FFEAEA; }
 
 
 
+<!-- Camera modal for selfie capture -->
+<div id="cameraModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.95);z-index:300;flex-direction:column;align-items:center;justify-content:center;padding:1.5rem">
+  <div style="font-size:14px;color:#fff;margin-bottom:1rem;font-weight:600">Take a quick selfie to confirm attendance</div>
+  <div style="position:relative;width:100%;max-width:320px;border-radius:16px;overflow:hidden;background:#000">
+    <video id="cameraFeed" autoplay playsinline style="width:100%;display:block;transform:scaleX(-1)"></video>
+    <canvas id="cameraCanvas" style="display:none"></canvas>
+  </div>
+  <div style="margin-top:1.25rem;display:flex;gap:12px">
+    <button onclick="capturePhoto()" style="background:var(--brand);color:#fff;border:none;border-radius:50px;padding:14px 32px;font-size:16px;font-weight:700;cursor:pointer">📸 Take photo</button>
+    <button onclick="skipPhoto()" style="background:transparent;color:#aaa;border:1.5px solid #444;border-radius:50px;padding:14px 24px;font-size:14px;cursor:pointer">Skip</button>
+  </div>
+  <div style="font-size:11px;color:#666;margin-top:12px;text-align:center">Photo is stored securely and auto-deleted after 30 days</div>
+</div>
+
+<video id="cameraFeedHidden" style="display:none;position:fixed;top:-9999px"></video>
+<canvas id="cameraCanvasHidden" style="display:none;position:fixed;top:-9999px"></canvas>
+
 <div id="tempPinModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:200;align-items:center;justify-content:center;backdrop-filter:blur(2px)">
   <div class="modal-box">
     <div class="modal-title">Temporary PIN</div>
@@ -1489,17 +1506,70 @@ function submitCheckin() {
   const recs=getRecords();
   const idx=recs.findIndex(r=>r.date===today&&r.name===currentUser.name);
   if (idx>=0) { showToast('Already submitted for today.','err'); return; }
-  const reason=selectedStatus==='leave'?document.getElementById('leaveReason').value.trim():'';
+  // Open camera first
+  openCamera();
+}
+
+let _cameraStream = null;
+let _pendingSubmit = false;
+
+function openCamera() {
+  _pendingSubmit = true;
+  const modal = document.getElementById('cameraModal');
+  const video = document.getElementById('cameraFeed');
+  modal.style.display = 'flex';
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false })
+    .then(stream => {
+      _cameraStream = stream;
+      video.srcObject = stream;
+    })
+    .catch(err => {
+      console.warn('Camera unavailable:', err);
+      closeCameraAndSubmit(null); // Skip photo if camera denied
+    });
+}
+
+function capturePhoto() {
+  const video = document.getElementById('cameraFeed');
+  const canvas = document.getElementById('cameraCanvas');
+  canvas.width = video.videoWidth || 320;
+  canvas.height = video.videoHeight || 240;
+  const ctx = canvas.getContext('2d');
+  ctx.save();
+  ctx.scale(-1, 1); // Mirror to match preview
+  ctx.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
+  ctx.restore();
+  const photoDataUrl = canvas.toDataURL('image/jpeg', 0.7);
+  closeCameraAndSubmit(photoDataUrl);
+}
+
+function skipPhoto() {
+  closeCameraAndSubmit(null);
+}
+
+function closeCameraAndSubmit(photoDataUrl) {
+  // Stop camera
+  if (_cameraStream) {
+    _cameraStream.getTracks().forEach(t => t.stop());
+    _cameraStream = null;
+  }
+  document.getElementById('cameraModal').style.display = 'none';
+  if (!_pendingSubmit) return;
+  _pendingSubmit = false;
+
+  const reason = selectedStatus==='leave'||selectedStatus==='halfday' ? document.getElementById('leaveReason').value.trim() : '';
   const clockIn = (selectedStatus==='leave') ? null : Date.now();
   showToast('Getting your location…', 'ok');
+
   captureGeoAndSubmit(function(geo) {
     const recs2=getRecords();
     if (recs2.findIndex(r=>r.date===today&&r.name===currentUser.name)>=0) return;
-    const newRec={name:currentUser.name,date:today,status:selectedStatus,reason,clockIn,clockOut:null,geo:geo||null,submittedBy:currentUser.name,msAccount:msalAccount?msalAccount.username:'',ts:Date.now()};
+    const newRec={name:currentUser.name,date:today,status:selectedStatus,reason,clockIn,clockOut:null,geo:geo||null,submittedBy:currentUser.name,msAccount:msalAccount?msalAccount.username:'',hasPhoto:!!photoDataUrl,ts:Date.now()};
     recs2.push(newRec);
     saveRecords(recs2);
-    // Write to SharePoint asynchronously
     spSaveRecord(newRec);
+    // Upload photo to SharePoint in background
+    if (photoDataUrl) uploadPhoto(photoDataUrl, newRec);
     showToast('✓ Submitted!','ok');
     lockCheckin();
     if (selectedStatus==='office'||selectedStatus==='wfh'||selectedStatus==='halfday') {
@@ -1511,17 +1581,26 @@ function submitCheckin() {
     }
     updateBreakUI();
     updateClockOutUI();
-    // Show geo warning if flagged
-    if (geo && (selectedStatus==='office'||selectedStatus==='halfday')) {
-      const staff=getStaff().find(s=>s.name===currentUser.name);
-      if (staff&&staff.office&&staff.office!=='WFH'&&CONFIG.offices[staff.office]) {
-        const dist=haversineKm(geo.lat,geo.lng,CONFIG.offices[staff.office].lat,CONFIG.offices[staff.office].lng);
-        if (dist>CONFIG.geoThresholdKm) {
-          // Location flag recorded silently — managers see it on dashboard
-        }
-      }
-    }
   });
+}
+
+async function uploadPhoto(dataUrl, rec) {
+  try {
+    const token = await getToken();
+    // Convert base64 to blob
+    const res = await fetch(dataUrl);
+    const blob = await res.blob();
+    const filename = `${rec.date}_${rec.name.replace(/\s+/g,'_')}_${Date.now()}.jpg`;
+    const uploadUrl = `https://loanprocessorau.sharepoint.com/sites/lpattendance/_api/web/lists/getbytitle('AttendancePhotos')/RootFolder/Files/Add(url='${encodeURIComponent(filename)}',overwrite=true)`;
+    await fetch(uploadUrl, {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json;odata=nometadata' },
+      body: blob
+    });
+    console.log('Photo uploaded:', filename);
+  } catch(e) {
+    console.warn('Photo upload failed:', e);
+  }
 }
 
 function clockOut() {
@@ -1699,15 +1778,19 @@ function renderMetrics() {
   });
 
   // Suspicious activity — M365 account doesn't match staff name
-  // e.g. mayur@loanprocessor.com.au clocked in as Nikki Jain
   const suspicious = isSuperAdmin() ? dayRecs.filter(r => {
     if (!r.msAccount) return false;
     const msName = r.msAccount.split('@')[0].toLowerCase().replace(/[._]/g,' ');
     const staffName = r.name.toLowerCase();
-    // Check if MS account first name roughly matches staff name
     const msFirst = msName.split(' ')[0];
     const staffFirst = staffName.split(' ')[0];
     return msFirst !== staffFirst && !staffName.includes(msFirst) && !msName.includes(staffFirst);
+  }) : [];
+
+  // No photo — submitted without a selfie (only for office/wfh/halfday)
+  const noPhoto = isManager() ? dayRecs.filter(r => {
+    if (r.status === 'leave') return false;
+    return !r.hasPhoto;
   }) : [];
 
   document.getElementById('metrics').innerHTML=`
@@ -1767,6 +1850,12 @@ function renderMetrics() {
       <div class="met-lbl">🔍 Suspicious activity</div>
       <div class="met-val" style="color:${suspicious.length>0?'#B45309':'var(--success)'}">${suspicious.length}</div>
       <div class="met-sub" style="white-space:normal">${suspicious.length>0?suspicious.map(r=>`${esc(r.name.split(' ')[0])} via <b>${esc(r.msAccount)}</b>`).join(' &nbsp;·&nbsp; '):'no anomalies detected ✓'}</div>
+    </div>`:''}
+    ${isManager()?`
+    <div class="met" style="grid-column:1/-1;${noPhoto.length>0?'border-color:#FECACA':''}">
+      <div class="met-lbl">📷 No selfie</div>
+      <div class="met-val" style="color:${noPhoto.length>0?'var(--danger)':'var(--success)'}">${noPhoto.length}</div>
+      <div class="met-sub">${noPhoto.length>0?noPhoto.slice(0,3).map(r=>r.name.split(' ')[0]).join(', ')+(noPhoto.length>3?' +more':''):'all selfies captured ✓'}</div>
     </div>`:''}`;
 }
 
