@@ -717,6 +717,34 @@ tr.flagged-row:hover td { background: #FFEAEA; }
   <div style="font-size:11px;color:#555;margin-top:12px;text-align:center">Your photo is stored securely and deleted after a stipulated time period.</div>
 </div>
 
+<div id="scheduleModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:200;align-items:center;justify-content:center;backdrop-filter:blur(2px)">
+  <div class="modal-box" style="width:100%;max-width:340px">
+    <div class="modal-title" id="scheduleModalTitle">Edit Schedule & Office</div>
+    <div class="field" style="margin-top:1rem">
+      <label style="font-size:12px;font-weight:600;color:var(--text-3);text-transform:uppercase">Start time</label>
+      <input type="time" id="scheduleStart" style="font-size:15px;margin-top:4px"/>
+    </div>
+    <div class="field">
+      <label style="font-size:12px;font-weight:600;color:var(--text-3);text-transform:uppercase">End time</label>
+      <input type="time" id="scheduleEnd" style="font-size:15px;margin-top:4px"/>
+    </div>
+    <div class="field">
+      <label style="font-size:12px;font-weight:600;color:var(--text-3);text-transform:uppercase">Office</label>
+      <select id="scheduleOffice" style="font-size:15px;margin-top:4px">
+        <option value="Goregaon">Goregaon</option>
+        <option value="Borivali">Borivali</option>
+        <option value="Virar">Virar</option>
+        <option value="WFH">WFH</option>
+      </select>
+    </div>
+    <div id="scheduleErr" class="err-msg"></div>
+    <div style="display:flex;gap:8px;margin-top:1.25rem">
+      <button class="btn-primary" style="flex:1" onclick="saveSchedule()">Save</button>
+      <button class="modal-cancel" onclick="closeScheduleModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <div id="tempPinModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:200;align-items:center;justify-content:center;backdrop-filter:blur(2px)">
   <div class="modal-box">
     <div class="modal-title">Temporary PIN</div>
@@ -2568,31 +2596,45 @@ function fmt12(t) {
   return `${h12}:${String(m).padStart(2,'0')}${ampm}`;
 }
 
+let _editScheduleIdx = null;
+
 function editSchedule(i) {
   const staff = getStaff();
   const s = staff[i];
-  const start = prompt(`Start time for ${s.name} (e.g. 06:00 or 10:00):`, s.startTime||'');
-  if (start === null) return;
-  const end = prompt(`End time for ${s.name} (e.g. 14:30 or 18:30):`, s.endTime||'');
-  if (end === null) return;
-  const office = prompt(`Office for ${s.name} (Goregaon / Borivali / Virar / WFH):`, s.office||'');
-  if (office === null) return;
-  // Validate time format
-  const valid = /^\d{1,2}:\d{2}$/.test(start.trim()) && /^\d{1,2}:\d{2}$/.test(end.trim());
-  if (!valid) { showToast('Use HH:MM format e.g. 06:00', 'err'); return; }
-  // Validate office
-  const validOffices = ['Goregaon','Borivali','Virar','WFH'];
-  if (office.trim() && !validOffices.includes(office.trim())) {
-    showToast('Office must be Goregaon, Borivali, Virar or WFH', 'err'); return;
+  _editScheduleIdx = i;
+  document.getElementById('scheduleModalTitle').textContent = `Edit — ${s.name.split(' ')[0]}`;
+  document.getElementById('scheduleStart').value = s.startTime||'';
+  document.getElementById('scheduleEnd').value = s.endTime||'';
+  document.getElementById('scheduleOffice').value = s.office||'Goregaon';
+  document.getElementById('scheduleErr').textContent = '';
+  document.getElementById('scheduleModal').style.display = 'flex';
+}
+
+function closeScheduleModal() {
+  document.getElementById('scheduleModal').style.display = 'none';
+  _editScheduleIdx = null;
+}
+
+function saveSchedule() {
+  const i = _editScheduleIdx;
+  if (i === null) return;
+  const start = document.getElementById('scheduleStart').value;
+  const end = document.getElementById('scheduleEnd').value;
+  const office = document.getElementById('scheduleOffice').value;
+  if (!start || !end) {
+    document.getElementById('scheduleErr').textContent = 'Please set both start and end time.';
+    return;
   }
-  staff[i].startTime = start.trim().padStart(5,'0');
-  staff[i].endTime = end.trim().padStart(5,'0');
-  if (office.trim()) staff[i].office = office.trim();
+  const staff = getStaff();
+  staff[i].startTime = start;
+  staff[i].endTime = end;
+  staff[i].office = office;
   saveStaff(staff);
   spSaveStaffMember(staff[i]);
-  writeAuditLog('Schedule Updated', s.name, `Schedule/office updated by ${currentUser.name}: ${start}-${end}, ${office}`);
+  writeAuditLog('Schedule Updated', staff[i].name, `Updated by ${currentUser.name}: ${start}–${end}, ${office}`);
+  closeScheduleModal();
   renderAdmin();
-  showToast(`Schedule updated for ${s.name.split(' ')[0]}.`, 'ok');
+  showToast(`Updated for ${staff[i].name.split(' ')[0]}.`, 'ok');
 }
 
 function genTempPin() {
