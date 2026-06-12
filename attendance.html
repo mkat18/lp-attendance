@@ -748,7 +748,7 @@ const CONFIG = {
     Borivali:  { lat: 19.2340345, lng: 72.8585346 },
     Virar:     { lat: 19.4416228, lng: 72.8098234 },
   },
-  geoThresholdKm: 1.2,   // green within this distance, red beyond
+  geoThresholdKm: 0.75,   // green within this distance, red beyond
   greetings: {                     // login greeting by time of day
     morning:   'Good morning 👋',
     afternoon: 'Good afternoon 👋',
@@ -813,31 +813,42 @@ function spToStaff(item) {
   };
 }
 
+// Convert HH:MM string to today's timestamp for internal use
+function hhmmToTs(hhmm, dateStr) {
+  if (!hhmm) return null;
+  const [h, m] = hhmm.split(':').map(Number);
+  const d = new Date(dateStr || new Date().toISOString().split('T')[0]);
+  d.setHours(h, m, 0, 0);
+  return d.getTime();
+}
+
 // Map SharePoint item to record object
 function spToRecord(item) {
+  const dateStr = item.RecordDate ? item.RecordDate.split('T')[0] : '';
   return {
     id: item.ID||item.id,
     name: item.StaffName||'',
-    date: item.RecordDate ? item.RecordDate.split('T')[0] : '',
+    date: dateStr,
     status: item.Status||'',
     reason: item.Reason||'',
-    clockIn: item.ClockIn||null,
-    clockOut: item.ClockOut||null,
+    clockIn: hhmmToTs(item.ClockIn, dateStr),
+    clockOut: hhmmToTs(item.ClockOut, dateStr),
     geo: (item.GeoLat && item.GeoLng) ? {lat:parseFloat(item.GeoLat),lng:parseFloat(item.GeoLng),accuracy:parseFloat(item.GeoAccuracy||0)} : null,
     submittedBy: item.SubmittedBy||null,
-    ts: item.ClockIn||Date.now(),
+    ts: hhmmToTs(item.ClockIn, dateStr)||Date.now(),
   };
 }
 
 // Map SharePoint item to break object
 function spToBreak(item) {
+  const dateStr = item.BreakDate ? item.BreakDate.split('T')[0] : '';
   return {
     id: item.ID||item.id,
     name: item.StaffName||'',
-    date: item.BreakDate ? item.BreakDate.split('T')[0] : '',
-    startTime: item.StartTime||null,
-    endTime: item.EndTime||null,
-    durationMs: item.DurationMs||0,
+    date: dateStr,
+    startTime: hhmmToTs(item.StartTime, dateStr),
+    endTime: hhmmToTs(item.EndTime, dateStr),
+    durationMs: item.DurationMs ? parseInt(item.DurationMs)*60000 : 0,
   };
 }
 
@@ -940,7 +951,7 @@ const tag = s => { const t=TAG[s]||TAG.office; return `<span class="tag ${t.cls}
 const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 const initials = name => name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
 const fmtMs = ms => { const t=Math.floor(ms/1000),m=Math.floor(t/60),s=t%60; return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`; };
-const fmtTime = ts => ts ? new Date(ts).toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit',hour12:true}) : '—';
+const fmtTime = ts => ts ? new Date(ts).toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit',hour12:true,timeZone:'Asia/Kolkata'}) : '—';
 const fmtDur = ms => { const m=Math.round(ms/60000); return m<60?m+'m':Math.floor(m/60)+'h '+(m%60)+'m'; };
 
 // ── Toast ─────────────────────────────────────────────────────────────────
@@ -965,7 +976,7 @@ function getGreeting() {
 (function(){ LS.set('ci_seeded12', true); })();
 
 // ── State ─────────────────────────────────────────────────────────────────
-const today = new Date().toISOString().split('T')[0];
+const today = new Date().toLocaleDateString('en-CA', {timeZone:'Asia/Kolkata'}); // YYYY-MM-DD in AU time
 let currentUser = null;
 let pinBuffer=''; let pinStage='login'; let pinFirst='';
 let selectedStatus = null;
@@ -1355,7 +1366,7 @@ function submitCheckin() {
   captureGeoAndSubmit(function(geo) {
     const recs2=getRecords();
     if (recs2.findIndex(r=>r.date===today&&r.name===currentUser.name)>=0) return;
-    const newRec={name:currentUser.name,date:today,status:selectedStatus,reason,clockIn,clockOut:null,geo:geo||null,ts:Date.now()};
+    const newRec={name:currentUser.name,date:today,status:selectedStatus,reason,clockIn,clockOut:null,geo:geo||null,submittedBy:currentUser.name,ts:Date.now()};
     recs2.push(newRec);
     saveRecords(recs2);
     // Write to SharePoint asynchronously
@@ -1550,7 +1561,7 @@ function renderMetrics() {
     return rec.clockOut < scheduledEndMs - 15*60*1000;
   }) : [];
 
-  // Location flagged — submitted "In office" or "Half day" but geo shows >1.2km from their office
+  // Location flagged — submitted "In office" or "Half day" but geo shows >0.75km from their office
   const locationFlagged=dayRecs.filter(r=>{
     if (r.status!=='office' && r.status!=='halfday') return false;
     if (!r.geo) return false;
@@ -2400,17 +2411,35 @@ async function loadFromSharePoint() {
 }
 
 async function spSaveRecord(rec) {
+  const toHHMM = ts => {
+    if (!ts) return null;
+    // Always use Indian Standard Time
+    const str = new Date(ts).toLocaleTimeString('en-AU', {hour:'2-digit', minute:'2-digit', hour12:false, timeZone:'Asia/Kolkata'});
+    return str;
+  };
+
+  // Calculate distance from assigned office
+  let distKm = '';
+  if (rec.geo) {
+    const staff = getStaff().find(s => s.name === rec.name);
+    if (staff && staff.office && staff.office !== 'WFH' && CONFIG.offices[staff.office]) {
+      const dist = haversineKm(rec.geo.lat, rec.geo.lng, CONFIG.offices[staff.office].lat, CONFIG.offices[staff.office].lng);
+      distKm = Math.round(dist * 10) / 10 + ' km';
+    }
+  }
+
   const payload = {
     StaffName: rec.name,
     RecordDate: rec.date + 'T00:00:00Z',
     Status: rec.status||'',
     Reason: rec.reason||'',
-    ClockIn: rec.clockIn ? String(rec.clockIn) : null,
-    ClockOut: rec.clockOut ? String(rec.clockOut) : null,
+    ClockIn: toHHMM(rec.clockIn),
+    ClockOut: toHHMM(rec.clockOut),
     GeoLat: rec.geo?String(rec.geo.lat):'',
     GeoLng: rec.geo?String(rec.geo.lng):'',
-    GeoAccuracy: rec.geo?String(rec.geo.accuracy):'',
-    SubmittedBy: rec.submittedBy||''
+    GeoAccuracy: rec.geo?String(rec.geo.accuracy)+'m':'',
+    DistanceKm: distKm,
+    SubmittedBy: rec.submittedBy||rec.name||''
   };
   if (rec.id) {
     await spPatch(SP_API + "('AttendanceRecords')/items(" + rec.id + ")", payload);
@@ -2421,12 +2450,17 @@ async function spSaveRecord(rec) {
 }
 
 async function spSaveBreak(brk) {
+  const toHHMM = ts => {
+    if (!ts) return '';
+    return new Date(ts).toLocaleTimeString('en-AU', {hour:'2-digit', minute:'2-digit', hour12:false, timeZone:'Asia/Kolkata'});
+  };
+  const durMins = brk.durationMs ? Math.round(brk.durationMs/60000) + ' mins' : '';
   await spPostDirect(SP_API + "('AttendanceBreaks')/items", {
     StaffName: brk.name,
     BreakDate: brk.date + 'T00:00:00Z',
-    StartTime: brk.startTime ? String(brk.startTime) : null,
-    EndTime: brk.endTime ? String(brk.endTime) : null,
-    DurationMs: brk.durationMs ? String(brk.durationMs) : null
+    StartTime: toHHMM(brk.startTime),
+    EndTime: toHHMM(brk.endTime),
+    DurationMs: durMins
   });
 }
 
