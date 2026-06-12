@@ -2415,7 +2415,7 @@ function renderAdmin() {
         const canResetThis = sa || (mgr && s.role==='staff');
         const canDeleteThis = sa && s.name!==currentUser.name; // can't delete yourself
         const canChangeRoleThis = sa && s.name!==currentUser.name;
-        const canEditScheduleThis = sa || (mgr && s.role==='staff');
+        const canEditScheduleThis = sa || (mgr && (s.role==='staff' || s.name===currentUser.name)) || (isAssistant() && s.name===currentUser.name);
 
         return `<div class="staff-row" style="flex-wrap:wrap;gap:6px">
           <div class="staff-avatar ${['superadmin','manager'].includes(s.role)?'mgr':''}">${initials(s.name)}</div>
@@ -2431,7 +2431,7 @@ function renderAdmin() {
               <option value="assistant"${s.role==='assistant'?' selected':''}>Assistant</option>
               <option value="staff"${s.role==='staff'?' selected':''}>Staff</option>
             </select>`:''}
-            ${canEditScheduleThis?`<button class="btn-sm" onclick="editSchedule(${i})">Schedule</button>`:''}
+            ${canEditScheduleThis?`<button class="btn-sm" onclick="editSchedule(${i})">Schedule & Office</button>`:''}
             ${canResetThis?`<button class="btn-sm" onclick="resetPin(${i})">Reset PIN</button>`:''}
             ${canDeleteThis?`<button class="btn-sm btn-danger" onclick="removePerson(${i})">Remove</button>`:''}
           </div>
@@ -2575,12 +2575,22 @@ function editSchedule(i) {
   if (start === null) return;
   const end = prompt(`End time for ${s.name} (e.g. 14:30 or 18:30):`, s.endTime||'');
   if (end === null) return;
-  // Basic validation HH:MM
+  const office = prompt(`Office for ${s.name} (Goregaon / Borivali / Virar / WFH):`, s.office||'');
+  if (office === null) return;
+  // Validate time format
   const valid = /^\d{1,2}:\d{2}$/.test(start.trim()) && /^\d{1,2}:\d{2}$/.test(end.trim());
   if (!valid) { showToast('Use HH:MM format e.g. 06:00', 'err'); return; }
+  // Validate office
+  const validOffices = ['Goregaon','Borivali','Virar','WFH'];
+  if (office.trim() && !validOffices.includes(office.trim())) {
+    showToast('Office must be Goregaon, Borivali, Virar or WFH', 'err'); return;
+  }
   staff[i].startTime = start.trim().padStart(5,'0');
   staff[i].endTime = end.trim().padStart(5,'0');
+  if (office.trim()) staff[i].office = office.trim();
   saveStaff(staff);
+  spSaveStaffMember(staff[i]);
+  writeAuditLog('Schedule Updated', s.name, `Schedule/office updated by ${currentUser.name}: ${start}-${end}, ${office}`);
   renderAdmin();
   showToast(`Schedule updated for ${s.name.split(' ')[0]}.`, 'ok');
 }
