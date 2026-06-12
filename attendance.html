@@ -760,6 +760,127 @@ const CONFIG = {
 // ── Storage helpers ───────────────────────────────────────────────────────
 function hashPin(p){ let h=0; for(let i=0;i<p.length;i++) h=(Math.imul(31,h)+p.charCodeAt(i))|0; return h.toString(36); }
 
+
+// ── Built-in staff list (fallback if SharePoint unavailable) ──────────────
+const BUILTIN_STAFF = [
+    { name:'Mayur', role:'superadmin', pin:hashPin('284716'), tempPin:null, startTime:null, endTime:null, office:null },
+    { name:'Divit', role:'superadmin', pin:hashPin('539182'), tempPin:null, startTime:null, endTime:null, office:null },
+    { name:'Yug Kanojia', role:'manager', pin:hashPin('617394'), tempPin:null, startTime:'06:00', endTime:'14:30', office:'Goregaon' },
+    { name:'Krutika Natki', role:'manager', pin:hashPin('492851'), tempPin:null, startTime:'06:00', endTime:'14:30', office:'Goregaon' },
+    { name:'Ankita Lokhande', role:'assistant', pin:hashPin('736429'), tempPin:null, startTime:'06:00', endTime:'14:30', office:'Goregaon' },
+
+    { name:'Nikki Jain', role:'staff', pin:hashPin('473829'), tempPin:null, startTime:'06:00', endTime:'14:30', office:'Borivali' },
+    { name:'Nehal Poojari', role:'staff', pin:hashPin('916274'), tempPin:null, startTime:'06:00', endTime:'14:30', office:'Borivali' },
+    { name:'Vianney Romeo', role:'manager', pin:hashPin('739284'), tempPin:null, startTime:'06:00', endTime:'14:30', office:'Goregaon' },
+    { name:'Shruti Rathod', role:'staff', pin:null, tempPin:null, startTime:'05:00', endTime:'13:30', office:'Goregaon' },
+    { name:'Athmika Shetty', role:'staff', pin:null, tempPin:null, startTime:'05:00', endTime:'13:30', office:'Goregaon' },
+    { name:'Tushar Goud', role:'staff', pin:null, tempPin:null, startTime:'05:00', endTime:'13:30', office:'Borivali' },
+    { name:'Saloni Pariwala', role:'staff', pin:null, tempPin:null, startTime:'05:00', endTime:'13:30', office:'Virar' },
+    { name:'Sonali Vasaikar', role:'staff', pin:null, tempPin:null, startTime:'10:00', endTime:'18:30', office:'Borivali' },
+    { name:'Adwita Gokhe', role:'staff', pin:null, tempPin:null, startTime:'10:00', endTime:'18:30', office:'Virar' },
+    { name:'Marlyn Coutinho', role:'staff', pin:null, tempPin:null, startTime:'10:00', endTime:'18:30', office:'Virar' },
+    { name:'Tejas Sojitra', role:'staff', pin:null, tempPin:null, startTime:'13:00', endTime:'16:00', office:'WFH' },
+    { name:'Ansel David', role:'staff', pin:null, tempPin:null, startTime:'13:00', endTime:'16:00', office:'Goregaon' },
+    { name:'Praneet Shetty', role:'staff', pin:null, tempPin:null, startTime:'06:00', endTime:'14:30', office:'Goregaon' },
+    { name:'Dipanshu Jain', role:'staff', pin:null, tempPin:null, startTime:'06:00', endTime:'14:30', office:'WFH' },
+    { name:'Harsh Malhotra', role:'staff', pin:null, tempPin:null, startTime:'06:00', endTime:'14:30', office:'Goregaon' },
+    { name:'Maitheeli Nikam', role:'staff', pin:null, tempPin:null, startTime:'05:00', endTime:'13:30', office:'Goregaon' },
+    { name:'Ravi Barai', role:'staff', pin:null, tempPin:null, startTime:'05:00', endTime:'13:30', office:'Borivali' },
+    { name:'Soham Kawalkar', role:'staff', pin:null, tempPin:null, startTime:'05:00', endTime:'13:30', office:'Borivali' },
+    { name:'Aryan Bodas', role:'staff', pin:null, tempPin:null, startTime:'05:00', endTime:'13:30', office:'Goregaon' },
+    { name:'Aditi Saeev', role:'staff', pin:null, tempPin:null, startTime:'10:00', endTime:'18:30', office:'Goregaon' },
+    { name:'Shruti singh', role:'staff', pin:null, tempPin:null, startTime:'10:00', endTime:'18:30', office:'Goregaon' },
+    { name:'Siddhi Ghadi', role:'staff', pin:null, tempPin:null, startTime:'10:00', endTime:'18:30', office:'Borivali' },
+    { name:'Christina Jennifer', role:'staff', pin:null, tempPin:null, startTime:'13:00', endTime:'16:00', office:'Virar' },
+    { name:'Sakshi Tak', role:'staff', pin:null, tempPin:null, startTime:'13:00', endTime:'16:00', office:'Borivali' },
+    { name:'Shaurya Mathur', role:'staff', pin:null, tempPin:null, startTime:'06:00', endTime:'14:30', office:'Virar' },
+    { name:'Dhanshree Patil', role:'staff', pin:null, tempPin:null, startTime:'06:00', endTime:'14:30', office:'Virar' },
+    { name:'Lekhana Divakar', role:'staff', pin:null, tempPin:null, startTime:'06:00', endTime:'14:30', office:'WFH' },
+    { name:'Rhea Soares', role:'staff', pin:null, tempPin:null, startTime:'05:00', endTime:'13:30', office:'Goregaon' },
+    { name:'Durga S', role:'staff', pin:null, tempPin:null, startTime:'05:00', endTime:'13:30', office:'Goregaon' },
+    { name:'Jatin Parmar', role:'staff', pin:null, tempPin:null, startTime:'05:00', endTime:'13:30', office:'WFH' },
+    { name:'Hetain Khanna', role:'staff', pin:null, tempPin:null, startTime:'05:00', endTime:'13:30', office:'Goregaon' },
+    { name:'Mahavir Jain', role:'staff', pin:null, tempPin:null, startTime:'10:00', endTime:'18:30', office:'Goregaon' },
+    { name:'Sarvesh Mhatre', role:'staff', pin:null, tempPin:null, startTime:'10:00', endTime:'18:30', office:'Borivali' },
+    { name:'Mehul Dhapare', role:'staff', pin:null, tempPin:null, startTime:'10:00', endTime:'18:30', office:'Borivali' },
+    { name:'Krish Jethva', role:'staff', pin:null, tempPin:null, startTime:'13:00', endTime:'16:00', office:'Goregaon' },
+    { name:'Kashish Akre', role:'staff', pin:null, tempPin:null, startTime:'13:00', endTime:'16:00', office:'Goregaon' },
+    { name:'Vaibhav Hate', role:'staff', pin:null, tempPin:null, startTime:'06:00', endTime:'14:30', office:'Goregaon' },
+    { name:'Sneha Singh', role:'staff', pin:null, tempPin:null, startTime:'06:00', endTime:'14:30', office:'Borivali' },
+    { name:'Abhishek Yadav', role:'staff', pin:null, tempPin:null, startTime:'06:00', endTime:'14:30', office:'Virar' },
+    { name:'Esha Gupta', role:'staff', pin:null, tempPin:null, startTime:'05:00', endTime:'13:30', office:'Borivali' },
+    { name:'Nikhil Bohra', role:'staff', pin:null, tempPin:null, startTime:'05:00', endTime:'13:30', office:'Virar' },
+    { name:'Khushi Mishra', role:'staff', pin:null, tempPin:null, startTime:'05:00', endTime:'13:30', office:'Virar' },
+    { name:'Arjun S', role:'staff', pin:null, tempPin:null, startTime:'05:00', endTime:'13:30', office:'WFH' },
+    { name:'Kshitij Parab', role:'staff', pin:null, tempPin:null, startTime:'10:00', endTime:'18:30', office:'Goregaon' },
+    { name:'Ayush Chavan', role:'staff', pin:null, tempPin:null, startTime:'10:00', endTime:'18:30', office:'Goregaon' },
+    { name:'Rahul Prajapat', role:'staff', pin:null, tempPin:null, startTime:'10:00', endTime:'18:30', office:'WFH' },
+    { name:'Tanvi Akre', role:'staff', pin:null, tempPin:null, startTime:'13:00', endTime:'16:00', office:'Goregaon' },
+    { name:'Sakshi Pallav', role:'staff', pin:null, tempPin:null, startTime:'13:00', endTime:'16:00', office:'Goregaon' },
+    { name:'Rutik Kansare', role:'staff', pin:null, tempPin:null, startTime:'06:00', endTime:'14:30', office:'Borivali' },
+    { name:'Megha Mutha', role:'staff', pin:null, tempPin:null, startTime:'06:00', endTime:'14:30', office:'Borivali' },
+    { name:'Anusha Achari', role:'staff', pin:null, tempPin:null, startTime:'06:00', endTime:'14:30', office:'Goregaon' },
+    { name:'Rishi Merchant', role:'staff', pin:null, tempPin:null, startTime:'05:00', endTime:'13:30', office:'Goregaon' },
+    { name:'Akshita Tarange', role:'staff', pin:null, tempPin:null, startTime:'05:00', endTime:'13:30', office:'Goregaon' },
+    { name:'Kartik Mehendiratta', role:'staff', pin:null, tempPin:null, startTime:'05:00', endTime:'13:30', office:'Borivali' },
+    { name:'Pratham Patel', role:'staff', pin:null, tempPin:null, startTime:'05:00', endTime:'13:30', office:'Virar' },
+    { name:'Sahil Nandoskar', role:'staff', pin:null, tempPin:null, startTime:'10:00', endTime:'18:30', office:'Borivali' },
+    { name:'Shreyas Lingayat', role:'staff', pin:null, tempPin:null, startTime:'10:00', endTime:'18:30', office:'Virar' },
+    { name:'Tanmay Dave', role:'staff', pin:null, tempPin:null, startTime:'10:00', endTime:'18:30', office:'Virar' },
+    { name:'Austin Fernandes', role:'staff', pin:null, tempPin:null, startTime:'13:00', endTime:'16:00', office:'WFH' },
+    { name:'Sourav Saha', role:'staff', pin:null, tempPin:null, startTime:'13:00', endTime:'16:00', office:'Goregaon' },
+    { name:'Dinkal Bohra', role:'staff', pin:null, tempPin:null, startTime:'06:00', endTime:'14:30', office:'Goregaon' },
+    { name:'Sneha Thorat', role:'staff', pin:null, tempPin:null, startTime:'06:00', endTime:'14:30', office:'WFH' },
+    { name:'Harsh kumar', role:'staff', pin:null, tempPin:null, startTime:'06:00', endTime:'14:30', office:'Goregaon' },
+    { name:'Ansh Naik', role:'staff', pin:null, tempPin:null, startTime:'05:00', endTime:'13:30', office:'Goregaon' },
+    { name:'Uday Tandel', role:'staff', pin:null, tempPin:null, startTime:'05:00', endTime:'13:30', office:'Borivali' },
+    { name:'Aishwarya Shelke', role:'staff', pin:null, tempPin:null, startTime:'05:00', endTime:'13:30', office:'Borivali' },
+    { name:'Satyam Jha', role:'staff', pin:null, tempPin:null, startTime:'05:00', endTime:'13:30', office:'Goregaon' },
+    { name:'Khushi Pandey', role:'staff', pin:null, tempPin:null, startTime:'10:00', endTime:'18:30', office:'Goregaon' },
+    { name:'Hiya Doshi', role:'staff', pin:null, tempPin:null, startTime:'10:00', endTime:'18:30', office:'Goregaon' },
+    { name:'Yash Jhobalia', role:'staff', pin:null, tempPin:null, startTime:'10:00', endTime:'18:30', office:'Borivali' },
+    { name:'Aryan Sharma', role:'staff', pin:null, tempPin:null, startTime:'13:00', endTime:'16:00', office:'Virar' },
+    { name:'Cherry Jain', role:'staff', pin:null, tempPin:null, startTime:'13:00', endTime:'16:00', office:'Borivali' },
+    { name:'Mahima Kunder', role:'staff', pin:null, tempPin:null, startTime:'06:00', endTime:'14:30', office:'Virar' },
+    { name:'Saurabh Kalshetty', role:'staff', pin:null, tempPin:null, startTime:'06:00', endTime:'14:30', office:'Virar' },
+    { name:'Anjali Sharma', role:'staff', pin:null, tempPin:null, startTime:'06:00', endTime:'14:30', office:'WFH' },
+    { name:'Smit Sawant', role:'staff', pin:null, tempPin:null, startTime:'05:00', endTime:'13:30', office:'Goregaon' },
+    { name:'Yukta Sawant', role:'staff', pin:null, tempPin:null, startTime:'05:00', endTime:'13:30', office:'Goregaon' },
+    { name:'Ishita Jagtap', role:'staff', pin:null, tempPin:null, startTime:'05:00', endTime:'13:30', office:'WFH' },
+    { name:'Sneha Bhomia', role:'staff', pin:null, tempPin:null, startTime:'05:00', endTime:'13:30', office:'Goregaon' },
+    { name:'Tushar Salian', role:'staff', pin:null, tempPin:null, startTime:'10:00', endTime:'18:30', office:'Goregaon' },
+    { name:'Aditya Mishra', role:'staff', pin:null, tempPin:null, startTime:'10:00', endTime:'18:30', office:'Borivali' },
+    { name:'Komal Gupta', role:'staff', pin:null, tempPin:null, startTime:'10:00', endTime:'18:30', office:'Borivali' },
+    { name:'Vaidhavi Singh', role:'staff', pin:null, tempPin:null, startTime:'13:00', endTime:'16:00', office:'Goregaon' },
+    { name:'Pratheek Poojary', role:'staff', pin:null, tempPin:null, startTime:'13:00', endTime:'16:00', office:'Goregaon' },
+    { name:'Yukta Champanekar', role:'staff', pin:null, tempPin:null, startTime:'06:00', endTime:'14:30', office:'Goregaon' },
+    { name:'Bharat Kanodia', role:'staff', pin:null, tempPin:null, startTime:'06:00', endTime:'14:30', office:'Borivali' },
+    { name:'Swapnil Patil', role:'staff', pin:null, tempPin:null, startTime:'06:00', endTime:'14:30', office:'Virar' },
+    { name:'Jai Bane', role:'staff', pin:null, tempPin:null, startTime:'05:00', endTime:'13:30', office:'Borivali' },
+    { name:'Mansi Mourya', role:'staff', pin:null, tempPin:null, startTime:'05:00', endTime:'13:30', office:'Virar' },
+    { name:'Sayali Tondekar', role:'staff', pin:null, tempPin:null, startTime:'05:00', endTime:'13:30', office:'Virar' },
+    { name:'Joshua Arora', role:'staff', pin:null, tempPin:null, startTime:'05:00', endTime:'13:30', office:'WFH' },
+    { name:'Sakhi Patwardhan', role:'staff', pin:null, tempPin:null, startTime:'10:00', endTime:'18:30', office:'Goregaon' },
+    { name:'Rahul Sharma', role:'staff', pin:null, tempPin:null, startTime:'10:00', endTime:'18:30', office:'Goregaon' },
+    { name:'Aniket Chand', role:'staff', pin:null, tempPin:null, startTime:'10:00', endTime:'18:30', office:'WFH' },
+    { name:'Kunal Choksi', role:'staff', pin:null, tempPin:null, startTime:'13:00', endTime:'16:00', office:'Goregaon' },
+    { name:'Krutika Natki', role:'staff', pin:null, tempPin:null, startTime:'13:00', endTime:'16:00', office:'Goregaon' },
+    { name:'Yug Kanojia', role:'staff', pin:null, tempPin:null, startTime:'06:00', endTime:'14:30', office:'Borivali' },
+    { name:'Craige', role:'staff', pin:null, tempPin:null, startTime:'06:00', endTime:'14:30', office:'Borivali' },
+    { name:'Divya Mahale', role:'staff', pin:null, tempPin:null, startTime:'06:00', endTime:'14:30', office:'Goregaon' },
+    { name:'Bhavesh', role:'staff', pin:null, tempPin:null, startTime:'05:00', endTime:'13:30', office:'Goregaon' },
+    { name:'Ramesh Kaka', role:'staff', pin:null, tempPin:null, startTime:'05:00', endTime:'13:30', office:'Goregaon' },
+    { name:'Pooja', role:'staff', pin:null, tempPin:null, startTime:'05:00', endTime:'13:30', office:'Borivali' },
+    { name:'Tea Person', role:'staff', pin:null, tempPin:null, startTime:'05:00', endTime:'13:30', office:'Virar' },
+    { name:'Auto Driver', role:'staff', pin:null, tempPin:null, startTime:'10:00', endTime:'18:30', office:'Virar' },
+    { name:'Chirag Seo', role:'staff', pin:null, tempPin:null, startTime:'10:00', endTime:'18:30', office:'Virar' },
+    { name:'Ankita Lokhande', role:'staff', pin:null, tempPin:null, startTime:'13:00', endTime:'16:00', office:'WFH' },
+    { name:'Samyak Dani', role:'staff', pin:null, tempPin:null, startTime:'13:00', endTime:'16:00', office:'Goregaon' },
+    { name:'Kirti Prajapati', role:'staff', pin:null, tempPin:null, startTime:'13:00', endTime:'16:00', office:'Goregaon' },
+    { name:'Cherisha Jain', role:'staff', pin:null, tempPin:null, startTime:'13:00', endTime:'16:00', office:'WFH' },
+  
+];
+
 // ── SharePoint Flow URLs ──────────────────────────────────────────────────
 const FLOW = {
   GET_STAFF:     'https://defaultc8838da3903c4e2dae8ade9fc6f28d.35.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/4eab54da7360447495701d93edd8b3c5/triggers/manual/paths/invoke?api-version=1',
@@ -853,7 +974,7 @@ function spToBreak(item) {
 }
 
 // ── Data access functions ─────────────────────────────────────────────────
-function getStaff()   { return _staff   || LS.get('ci_staff')   || []; }
+function getStaff()   { return _staff && _staff.length > 0 ? _staff : (LS.get('ci_staff') || BUILTIN_STAFF || []); }
 function getRecords() { return _records || LS.get('ci_records') || []; }
 function getBreaks()  { return _breaks  || LS.get('ci_breaks')  || []; }
 
@@ -2302,8 +2423,12 @@ const msalConfig = {
     clientId: 'a16413fb-880c-4ae0-948d-a6e8e7b833ba',
     authority: 'https://login.microsoftonline.com/c8838da3-903c-4e2d-ae8a-de9fc6f28d35',
     redirectUri: 'https://mkat18.github.io/lp-attendance/attendance.html',
+    navigateToLoginRequestUrl: true,
   },
-  cache: { cacheLocation: 'sessionStorage' }
+  cache: { 
+    cacheLocation: 'localStorage',
+    storeAuthStateInCookie: true, // Required for iOS Safari
+  }
 };
 
 let msalInstance = null;
@@ -2314,9 +2439,18 @@ const SP_SCOPES = ['https://loanprocessorau.sharepoint.com/Sites.ReadWrite.All',
 async function msSignIn() {
   if (!msalInstance) { showToast('Auth not ready, please refresh.','err'); return; }
   try {
-    await msalInstance.loginRedirect({ scopes: SP_SCOPES });
+    const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+    if (isIOS) {
+      // iOS Safari needs redirect with specific settings
+      await msalInstance.loginRedirect({ 
+        scopes: SP_SCOPES,
+        prompt: 'select_account'
+      });
+    } else {
+      await msalInstance.loginRedirect({ scopes: SP_SCOPES });
+    }
   } catch(e) {
-    document.getElementById('msLoginErr').textContent = 'Sign in failed. Please try again.';
+    document.getElementById('msLoginErr').textContent = 'Sign in failed: ' + (e.message||'Please try again.');
     console.error('MSAL error:', e);
   }
 }
