@@ -545,6 +545,29 @@ tr.flagged-row:hover td { background: #FFEAEA; }
       </div>
     </div>
 
+
+    <div class="card" id="floorCard" style="display:none">
+      <div class="card-label">📍 Floor check-in</div>
+      <div style="font-size:13px;color:var(--text-2);margin-bottom:12px">Confirm you're physically at the office today.</div>
+      <button class="btn-primary" id="floorBtn" onclick="confirmFloor()" style="background:var(--success)">✅ I'm here — confirm presence</button>
+      <div id="floorConfirmed" style="display:none;text-align:center;font-size:13px;font-weight:600;color:var(--success);padding:6px 0">✓ Presence confirmed</div>
+    </div>
+
+    <div class="card" id="fileLogCard" style="display:none">
+      <div class="card-label">📁 My files today</div>
+      <div id="fileLogList" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px"></div>
+      <button onclick="openFileModal(null)" class="btn-primary" style="font-size:13px;padding:10px">+ Add / update a file</button>
+    </div>
+
+    <div class="card" id="workloadNoteCard" style="display:none">
+      <div class="card-label">📝 Observation note</div>
+      <div style="font-size:13px;color:var(--text-2);margin-bottom:10px">Private note visible to managers only.</div>
+      <select id="workloadNoteTarget" style="width:100%;font-size:14px;margin-bottom:8px">
+        <option value="">— select a staff member —</option>
+      </select>
+      <textarea id="workloadNoteText" placeholder="e.g. Seemed disengaged today, may need a check-in…" style="width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:14px;color:var(--text);background:var(--surface-2);outline:none;resize:none;min-height:68px;line-height:1.5"></textarea>
+      <button class="btn-primary" onclick="saveObservationNote()" style="margin-top:8px">Save note</button>
+    </div>
     <div class="card" id="clockOutCard" style="display:none">
       <div class="card-label">Clock out</div>
       <div class="break-box">
@@ -574,6 +597,7 @@ tr.flagged-row:hover td { background: #FFEAEA; }
           <input type="date" id="selectedDate" style="width:auto;min-width:0;padding:5px 8px;font-size:12px"/>
         </div>
       </div>
+      <div id="publicHolidayBanner" style="display:none;background:#FEF3C7;border:1.5px solid #FDE68A;border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:10px;font-size:13px;font-weight:600;color:#92400E;text-align:center"></div>
       <div class="metrics" id="metrics" style="margin-bottom:0"></div>
     </div>
 
@@ -664,6 +688,7 @@ tr.flagged-row:hover td { background: #FFEAEA; }
     <div class="card" id="addStaffCard">
       <div class="section-label">Add staff member</div>
       <div class="field"><label for="newName">Full name</label><input type="text" id="newName" placeholder="e.g. Jake Thompson"/></div>
+      <div class="field"><label for="newJoinDate">Join date (optional)</label><input type="date" id="newJoinDate"/></div>
       <button class="btn-primary" onclick="addPerson('staff')">Add staff member</button>
       <p style="font-size:12px;color:var(--text-3);margin-top:8px">A temp PIN will be generated — share it with them privately.</p>
     </div>
@@ -697,6 +722,29 @@ tr.flagged-row:hover td { background: #FFEAEA; }
     </div>
   </div>
 
+
+  <!-- ── MY TEAM ─────────────────────────────────────────────────────────── -->
+  <div id="screen-myteam" class="screen">
+    <div class="page-header">
+      <h1>My Team</h1>
+      <p id="myteamSubtitle">Live status of your team today</p>
+    </div>
+    <div id="myteamContent"></div>
+  </div>
+
+  <!-- ── FILES SCREEN (Team Lead only) ───────────────────────────────────── -->
+  <div id="screen-files" class="screen">
+    <div class="page-header">
+      <h1>📁 Files</h1>
+      <p>Client applications across your team</p>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap">
+      <button class="tab active" id="ftab-today" onclick="switchFilesTab('today',this)">Today's activity</button>
+      <button class="tab" id="ftab-active" onclick="switchFilesTab('active',this)">All active files</button>
+      <button class="tab" id="ftab-analytics" onclick="switchFilesTab('analytics',this)">📊 Analytics</button>
+    </div>
+    <div id="filesContent"></div>
+  </div>
 </main>
 
 
@@ -786,6 +834,97 @@ tr.flagged-row:hover td { background: #FFEAEA; }
     <button class="modal-cancel" onclick="closeOnBehalfModal()">Cancel</button>
   </div>
 </div>
+
+<div id="manageTeamModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.6);z-index:200;align-items:center;justify-content:center;backdrop-filter:blur(4px)">
+  <div style="background:var(--surface);border-radius:20px;padding:1.5rem;width:calc(100% - 2rem);max-width:420px;max-height:85vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.25)">
+    <div style="font-size:17px;font-weight:700;color:var(--text);margin-bottom:4px" id="manageTeamTitle">Manage Team</div>
+    <div style="font-size:13px;color:var(--text-3);margin-bottom:1.25rem" id="manageTeamTLName"></div>
+
+    <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Current team members</div>
+    <div id="manageTeamCurrentList" style="margin-bottom:1.25rem"></div>
+
+    <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Add staff to team</div>
+    <div style="display:flex;gap:8px;margin-bottom:1.25rem">
+      <select id="manageTeamAddSelect" style="flex:1;font-size:14px;padding:8px 12px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:var(--surface-2)">
+        <option value="">— select staff member —</option>
+      </select>
+      <button onclick="addToTeam()" style="padding:8px 16px;background:var(--brand);color:#fff;border:none;border-radius:var(--radius-sm);font-size:14px;font-weight:600;cursor:pointer">Add</button>
+    </div>
+
+    <button onclick="closeManageTeamModal()" style="width:100%;padding:12px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:transparent;color:var(--text-2);font-size:15px;cursor:pointer">Done</button>
+  </div>
+</div>
+
+
+<div id="fileModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.65);z-index:250;align-items:flex-start;justify-content:center;backdrop-filter:blur(4px);overflow-y:auto;padding:1rem">
+  <div style="background:var(--surface);border-radius:20px;padding:1.5rem;width:calc(100% - 2rem);max-width:480px;margin:auto;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+    <div style="font-size:17px;font-weight:700;color:var(--text);margin-bottom:1.25rem" id="fileModalTitle">Add client file</div>
+
+    <div class="field">
+      <label>Client name <span style="color:var(--danger)">*</span></label>
+      <input type="text" id="fm_client" placeholder="e.g. Johnson Family"/>
+    </div>
+    <div class="field">
+      <label>Broker name <span style="color:var(--danger)">*</span></label>
+      <input type="text" id="fm_broker" placeholder="e.g. Sarah Mitchell"/>
+    </div>
+    <div class="field">
+      <label>Application type</label>
+      <select id="fm_type" style="font-size:14px">
+        <option value="Home Loan">Home Loan</option>
+        <option value="Refinance">Refinance</option>
+        <option value="Investment Loan">Investment Loan</option>
+        <option value="Commercial">Commercial</option>
+        <option value="SMSF">SMSF</option>
+        <option value="Personal Loan">Personal Loan</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Stage</label>
+      <select id="fm_status" style="font-size:14px" onchange="toggleLoanAmountField()">
+        <option value="Data Collection">Data Collection</option>
+        <option value="Pre-Qualification">Pre-Qualification</option>
+        <option value="Application Start">Application Start</option>
+        <option value="Pending Info">Pending Info</option>
+        <option value="Submitted to Lender">Submitted to Lender</option>
+        <option value="MIR">MIR</option>
+        <option value="Conditionally Approved">Conditionally Approved</option>
+        <option value="Unconditionally Approved">Unconditionally Approved</option>
+        <option value="Loan Documents">Loan Documents</option>
+        <option value="Settlement">Settlement</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>What's been done</label>
+      <textarea id="fm_done" placeholder="e.g. ID verified, payslips received, valuation ordered…" style="width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:14px;color:var(--text);background:var(--surface-2);outline:none;resize:none;min-height:72px;line-height:1.5"></textarea>
+    </div>
+    <div class="field">
+      <label>What's pending / next steps</label>
+      <textarea id="fm_pending" placeholder="e.g. Waiting on bank statements, need to call client re: rates…" style="width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:14px;color:var(--text);background:var(--surface-2);outline:none;resize:none;min-height:72px;line-height:1.5"></textarea>
+    </div>
+    <div class="field" id="fm_loanAmountField" style="display:none">
+      <label>Loan amount ($) <span style="font-size:11px;color:var(--text-3)">— enter when at Settlement or Unconditionally Approved</span></label>
+      <input type="number" id="fm_loanAmount" placeholder="e.g. 650000" min="0" style="font-size:14px"/>
+    </div>
+    <div class="field" id="fm_ownerField" style="display:none">
+      <label>Assigned to (TL can reassign)</label>
+      <select id="fm_owner" style="font-size:14px"></select>
+    </div>
+    <div class="field">
+      <label>Attachment <span style="font-size:11px;color:var(--text-3)">(auto-deleted after 14 days)</span></label>
+      <input type="file" id="fm_attachment" style="font-size:13px"/>
+      <div id="fm_attachmentStatus" style="font-size:12px;color:var(--text-3);margin-top:4px"></div>
+      <div id="fm_existingAttachments" style="margin-top:6px"></div>
+    </div>
+    <div id="fm_stageHistory" style="margin-bottom:12px;display:none"></div>
+    <input type="hidden" id="fm_fileId"/>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px">
+      <button onclick="closeFileModal()" style="padding:12px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:transparent;color:var(--text-2);font-size:15px;cursor:pointer">Cancel</button>
+      <button onclick="saveFileEntry()" style="padding:12px;border-radius:var(--radius-sm);border:none;background:var(--brand);color:#fff;font-size:15px;font-weight:700;cursor:pointer">Save</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast" role="status" aria-live="polite"></div>
 
 <script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
@@ -1179,14 +1318,15 @@ function showScreen(name) {
 }
 
 // ── Role helpers ──────────────────────────────────────────────────────────
-const ROLE_LABEL = { superadmin:'Super Admin', manager:'Manager', assistant:'Assistant', staff:'Staff' };
+const ROLE_LABEL = { superadmin:'Super Admin', manager:'Manager', assistant:'Assistant', teamlead:'Team Lead', staff:'Staff' };
 
 function isSuperAdmin() { return currentUser&&currentUser.role==='superadmin'; }
 function isManager()    { return currentUser&&(currentUser.role==='manager'||currentUser.role==='superadmin'); }
 function isAssistant()  { return currentUser&&currentUser.role==='assistant'; }
+function isTeamLead()   { return currentUser&&currentUser.role==='teamlead'; }
 function hasDashboard() { return currentUser&&['superadmin','manager','assistant'].includes(currentUser.role); }
 function canEdit()      { return currentUser&&['superadmin','manager'].includes(currentUser.role); }
-function canAddStaff()  { return currentUser&&['superadmin','manager'].includes(currentUser.role); }
+function canAddStaff()  { return currentUser&&['superadmin','manager','teamlead'].includes(currentUser.role); }
 function canDeleteStaff(){ return isSuperAdmin(); }
 function canChangeRole(){ return isSuperAdmin(); }
 function canEditRecords(){ return isSuperAdmin(); }
@@ -1199,10 +1339,12 @@ function buildNav() {
     tabs = [['checkin','Check in'],['profile','PIN']];
   } else if (currentUser.role==='assistant') {
     tabs = [['checkin','Check in'],['dashboard','Dashboard'],['profile','PIN']];
+  } else if (currentUser.role==='teamlead') {
+    tabs = [['checkin','Check in'],['myteam','My Team'],['files','Files'],['profile','PIN']];
   } else if (currentUser.role==='manager') {
     tabs = [['checkin','Check in'],['dashboard','Dashboard'],['admin','Staff'],['profile','PIN']];
   } else if (currentUser.role==='superadmin') {
-    tabs = [['dashboard','Dashboard'],['admin','Admin'],['profile','PIN']];
+    tabs = [['dashboard','Dashboard'],['admin','Admin'],['files','Files'],['profile','PIN']];
   }
   nav.innerHTML = `
     <div class="nav-tabs">${tabs.map(([k,l])=>`<button class="nav-tab" onclick="goTab('${k}',this)">${l}</button>`).join('')}</div>
@@ -1216,6 +1358,8 @@ function goTab(name, btn) {
   showScreen(name);
   if (name==='checkin')   initCheckin();
   if (name==='dashboard') loadDashboard();
+  if (name==='myteam')    renderMyTeam();
+  if (name==='files')     renderFilesScreen();
   if (name==='admin')     renderAdmin();
   if (name==='profile')   initCp();
 }
@@ -1452,7 +1596,7 @@ function loginAs(member) {
   if (member.role==='superadmin') {
     loadDashboard(); showScreen('dashboard');
   } else {
-    // staff, assistant, manager all check in
+    // staff, assistant, manager, teamlead all check in
     initCheckin(); showScreen('checkin');
   }
   setTimeout(()=>{ const t=document.querySelectorAll('.nav-tab'); if(t[0]) t[0].classList.add('active'); }, 50);
@@ -1803,6 +1947,9 @@ function renderMetrics() {
   const halfday=dayRecs.filter(r=>r.status==='halfday').length;
   const isWeekend=[0,6].includes(new Date(date).getDay());
   const isToday=date===today;
+  const phName = getPublicHoliday(date);
+  const phBanner = document.getElementById('publicHolidayBanner');
+  if (phBanner) { if(phName){phBanner.style.display='block';phBanner.textContent='🎉 Public Holiday: '+phName+' — not counted as absent';}else{phBanner.style.display='none';} }
 
   // Break status
   const ongoingBreaks=LS.get('ci_ongoingBreaks')||{};
@@ -1917,9 +2064,17 @@ function renderMetrics() {
     ${isManager()?`
     <div class="met" style="grid-column:1/-1;${noPhoto.length>0?'border-color:#FECACA':''}">
       <div class="met-lbl">📷 No selfie</div>
-      <div class="met-val" style="color:${noPhoto.length>0?'var(--danger)':'var(--success)'}">${noPhoto.length}</div>
+      <div class="met-val" style="color:${noPhoto.length>0?'var(--danger)':'var(--success)'}">$\{noPhoto.length}</div>
       <div class="met-sub">${noPhoto.length>0?noPhoto.slice(0,3).map(r=>r.name.split(' ')[0]).join(', ')+(noPhoto.length>3?' +more':''):'all selfies captured ✓'}</div>
-    </div>`:''}`;
+    </div>
+    <div class="met" style="grid-column:1/-1">
+      <div class="met-lbl">✅ Floor confirmed</div>
+      <div class="met-val" style="color:var(--success)">${dayRecs.filter(r=>r.floorConfirmed).length}</div>
+      <div class="met-sub">${dayRecs.filter(r=>r.floorConfirmed).length>0?dayRecs.filter(r=>r.floorConfirmed).slice(0,3).map(r=>r.name.split(' ')[0]).join(', ')+(dayRecs.filter(r=>r.floorConfirmed).length>3?' +more':''):'none confirmed yet'}</div>
+    </div>`:''}
+    ${isManager()?renderAbsencePatternCard():''}
+    ${isManager()?renderCoverageCard(date):''}
+    `;
 }
 
 function cardTap(status) {
@@ -2446,6 +2601,7 @@ function renderAdmin() {
           superadmin: '<span class="tag" style="background:#EDE9FE;color:#5B21B6">Super Admin</span>',
           manager:    '<span class="tag tag-manager">Manager</span>',
           assistant:  '<span class="tag" style="background:#E0F2FE;color:#0369A1">Assistant</span>',
+          teamlead:   '<span class="tag" style="background:#FEF3C7;color:#92400E">Team Lead</span>',
           staff:      '',
         }[s.role]||'';
 
@@ -2454,6 +2610,7 @@ function renderAdmin() {
         const canDeleteThis = sa && s.name!==currentUser.name; // can't delete yourself
         const canChangeRoleThis = sa && s.name!==currentUser.name;
         const canEditScheduleThis = sa || (mgr && (s.role==='staff' || s.name===currentUser.name)) || (isAssistant() && s.name===currentUser.name);
+        const canManageTeam = (sa || mgr) && s.role==='teamlead';
 
         return `<div class="staff-row" style="flex-wrap:wrap;gap:6px">
           <div class="staff-avatar ${['superadmin','manager'].includes(s.role)?'mgr':''}">${initials(s.name)}</div>
@@ -2461,14 +2618,17 @@ function renderAdmin() {
             <div class="staff-name-txt">${esc(s.name)} ${roleTag}</div>
             <div class="staff-pin-status" style="color:${pinColor}">${pinStatus}</div>
             <div style="font-size:11px;color:var(--text-3);margin-top:2px">🕐 ${schedule}${s.office?` &nbsp;📍 ${s.office}`:''}</div>
+            <div style="font-size:11px;color:var(--text-3);margin-top:1px">${s.joinDate?'📅 '+calcTenureLabel(s.joinDate):''}</div>
           </div>
           <div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center">
             ${canChangeRoleThis?`<select onchange="changeRole(${i},this.value)" style="font-size:12px;padding:3px 6px;border-radius:var(--radius-sm);border:1.5px solid var(--border)">
               <option value="superadmin"${s.role==='superadmin'?' selected':''}>Super Admin</option>
               <option value="manager"${s.role==='manager'?' selected':''}>Manager</option>
               <option value="assistant"${s.role==='assistant'?' selected':''}>Assistant</option>
+              <option value="teamlead"${s.role==='teamlead'?' selected':''}>Team Lead</option>
               <option value="staff"${s.role==='staff'?' selected':''}>Staff</option>
             </select>`:''}
+            ${canManageTeam?`<button class="btn-sm" style="background:#FEF3C7;color:#92400E;border-color:#FDE68A" onclick="openManageTeam('${s.name}')">👥 Manage Team</button>`:''}
             ${canEditScheduleThis?`<button class="btn-sm" onclick="editSchedule(${i})">Schedule & Office</button>`:''}
             ${canResetThis?`<button class="btn-sm" onclick="resetPin(${i})">Reset PIN</button>`:''}
             ${canDeleteThis?`<button class="btn-sm btn-danger" onclick="removePerson(${i})">Remove</button>`:''}
@@ -2543,7 +2703,8 @@ function addPerson(role) {
   const staff=getStaff();
   if(staff.find(s=>s.name.toLowerCase()===name.toLowerCase())){showToast('Name already exists.','err');return;}
   const tempPin=genTempPin();
-  const newMember={name,role:'staff',pin:null,tempPin:hashPin(tempPin),addedBy:currentUser.name,addedAt:new Date().toLocaleString('en-AU')};
+  const joinDateVal = (document.getElementById('newJoinDate')&&document.getElementById('newJoinDate').value)||new Date().toISOString().split('T')[0];
+  const newMember={name,role:'staff',pin:null,tempPin:hashPin(tempPin),addedBy:currentUser.name,addedAt:new Date().toLocaleString('en-AU'),joinDate:joinDateVal};
   staff.push(newMember);
   saveStaff(staff); document.getElementById('newName').value='';
   spSaveStaffMember(newMember);
@@ -3064,6 +3225,1304 @@ function exportCSV() {
   a.click();
   showToast('CSV downloaded (' + from + ' to ' + to + ').', 'ok');
 }
+
+
+// ══════════════════════════════════════════════════════════════════════════
+// ── TEAM LEAD FEATURES ────────────────────────────────────════════════════
+// ══════════════════════════════════════════════════════════════════════════
+
+// ── Teams storage helpers ─────────────────────────────────────────────────
+// Teams stored as: { [tlName]: [staffName, staffName, ...] }
+function getTeams() { return LS.get('ci_teams') || {}; }
+function saveTeams(t) { LS.set('ci_teams', t); }
+
+function getMyTeam() {
+  if (!currentUser) return [];
+  const teams = getTeams();
+  return teams[currentUser.name] || [];
+}
+
+function getTeamForTL(tlName) {
+  const teams = getTeams();
+  return teams[tlName] || [];
+}
+
+// ── Manage Team modal (opened from Admin tab by SA/Manager) ───────────────
+let _managingTL = null;
+
+function openManageTeam(tlName) {
+  _managingTL = tlName;
+  document.getElementById('manageTeamTitle').textContent = 'Manage Team — ' + tlName.split(' ')[0];
+  document.getElementById('manageTeamTLName').textContent = tlName + ' · Team Lead';
+  renderManageTeamModal();
+  const modal = document.getElementById('manageTeamModal');
+  modal.style.display = 'flex';
+}
+
+function closeManageTeamModal() {
+  document.getElementById('manageTeamModal').style.display = 'none';
+  _managingTL = null;
+}
+
+function renderManageTeamModal() {
+  if (!_managingTL) return;
+  const teams = getTeams();
+  const currentTeam = teams[_managingTL] || [];
+  const allStaff = getStaff().filter(s => s.role === 'staff' || s.role === 'teamlead');
+
+  // Current members list
+  const listEl = document.getElementById('manageTeamCurrentList');
+  if (currentTeam.length === 0) {
+    listEl.innerHTML = '<div style="font-size:13px;color:var(--text-3);padding:8px 0">No team members yet.</div>';
+  } else {
+    listEl.innerHTML = currentTeam.map(name => {
+      const member = allStaff.find(s => s.name === name);
+      return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:var(--surface-2);border-radius:var(--radius-sm);margin-bottom:6px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="width:30px;height:30px;border-radius:50%;background:var(--brand-light);color:var(--brand);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center">${esc(initials(name))}</div>
+          <span style="font-size:14px;color:var(--text)">${esc(name)}</span>
+        </div>
+        <button onclick="removeFromTeam('${name.replace(/'/g,"\'")}")" style="background:var(--danger-light);color:var(--danger);border:none;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;font-weight:600">Remove</button>
+      </div>`;
+    }).join('');
+  }
+
+  // Add dropdown — show staff not already in THIS team
+  // (staff can only be in one team, so also exclude those in other teams)
+  const allAssigned = new Set(Object.values(teams).flat());
+  const available = allStaff.filter(s =>
+    s.role === 'staff' &&
+    !currentTeam.includes(s.name) &&
+    (!allAssigned.has(s.name) || currentTeam.includes(s.name))
+  );
+  const sel = document.getElementById('manageTeamAddSelect');
+  sel.innerHTML = '<option value="">— select staff member —</option>' +
+    available.map(s => `<option value="${esc(s.name)}">${esc(s.name)}</option>`).join('');
+}
+
+function addToTeam() {
+  if (!_managingTL) return;
+  const sel = document.getElementById('manageTeamAddSelect');
+  const name = sel.value;
+  if (!name) { showToast('Please select a staff member.', 'err'); return; }
+  const teams = getTeams();
+  if (!teams[_managingTL]) teams[_managingTL] = [];
+  if (teams[_managingTL].includes(name)) { showToast('Already in this team.', 'err'); return; }
+  // Remove from any other team first (one team rule)
+  Object.keys(teams).forEach(tl => {
+    if (tl !== _managingTL) teams[tl] = teams[tl].filter(n => n !== name);
+  });
+  teams[_managingTL].push(name);
+  saveTeams(teams);
+  showToast(name.split(' ')[0] + ' added to team.', 'ok');
+  renderManageTeamModal();
+}
+
+function removeFromTeam(name) {
+  if (!_managingTL) return;
+  const teams = getTeams();
+  if (!teams[_managingTL]) return;
+  teams[_managingTL] = teams[_managingTL].filter(n => n !== name);
+  saveTeams(teams);
+  showToast(name.split(' ')[0] + ' removed from team.', 'ok');
+  renderManageTeamModal();
+}
+
+// ── My Team screen (shown to Team Lead after check-in) ───────────────────
+function renderMyTeam() {
+  const el = document.getElementById('myteamContent');
+  const date = today;
+  const tlName = currentUser.name;
+  const teamNames = getTeamForTL(tlName);
+
+  document.getElementById('myteamSubtitle').textContent =
+    new Date().toLocaleDateString('en-AU', {weekday:'long', day:'numeric', month:'long'});
+
+  if (teamNames.length === 0) {
+    el.innerHTML = `<div class="card" style="text-align:center;padding:2rem">
+      <div style="font-size:2rem;margin-bottom:12px">👥</div>
+      <div style="font-size:16px;font-weight:600;color:var(--text);margin-bottom:6px">No team assigned yet</div>
+      <div style="font-size:13px;color:var(--text-3)">Ask your manager to assign team members to you in the Admin panel.</div>
+    </div>`;
+    return;
+  }
+
+  const allStaff = getStaff();
+  const dayRecs = getRecords().filter(r => r.date === date);
+  const ongoingBreaks = LS.get('ci_ongoingBreaks') || {};
+
+  // Summary counts
+  const statuses = { notsubmitted:0, office:0, wfh:0, halfday:0, leave:0, onbreak:0, available:0 };
+  const memberData = teamNames.map(name => {
+    const rec = dayRecs.find(r => r.name === name);
+    const member = allStaff.find(s => s.name === name);
+    const onBreak = !!(ongoingBreaks[name]);
+    let status, statusLabel, statusColor, statusBg, statusIcon;
+
+    if (!rec) {
+      status = 'notsubmitted'; statusLabel = 'Not submitted'; statusColor = '#B91C1C'; statusBg = '#FEF2F2'; statusIcon = '⏳';
+      statuses.notsubmitted++;
+    } else if (rec.status === 'leave') {
+      status = 'leave'; statusLabel = 'On leave'; statusColor = '#8C5000'; statusBg = '#FEF4E4'; statusIcon = '🏖';
+      statuses.leave++;
+    } else if (rec.status === 'halfday') {
+      status = 'halfday'; statusLabel = 'Half day'; statusColor = '#6D28D9'; statusBg = '#F3EEFF'; statusIcon = '🌗';
+      statuses.halfday++;
+    } else if (onBreak && (rec.status === 'office' || rec.status === 'wfh')) {
+      status = 'onbreak'; statusLabel = 'On break'; statusColor = '#8C5000'; statusBg = '#FEF4E4'; statusIcon = '☕';
+      statuses.onbreak++;
+    } else if (rec.status === 'office') {
+      status = 'office'; statusLabel = 'In office'; statusColor = '#1A56C4'; statusBg = '#EEF4FF'; statusIcon = '🏢';
+      statuses.available++; statuses.office++;
+    } else if (rec.status === 'wfh') {
+      status = 'wfh'; statusLabel = 'WFH'; statusColor = '#1A7A3A'; statusBg = '#E8F7EE'; statusIcon = '🏠';
+      statuses.available++; statuses.wfh++;
+    } else {
+      status = 'notsubmitted'; statusLabel = 'Not submitted'; statusColor = '#B91C1C'; statusBg = '#FEF2F2'; statusIcon = '⏳';
+      statuses.notsubmitted++;
+    }
+
+    const schedule = (member && member.startTime && member.endTime)
+      ? fmt12(member.startTime) + ' – ' + fmt12(member.endTime) : '';
+    const clockInStr = rec && rec.clockIn ? new Date(rec.clockIn).toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit',hour12:true}) : '';
+
+    return { name, status, statusLabel, statusColor, statusBg, statusIcon, schedule, clockInStr, rec, member };
+  });
+
+  // Sort: not submitted first, then by name
+  memberData.sort((a, b) => {
+    if (a.status === 'notsubmitted' && b.status !== 'notsubmitted') return -1;
+    if (b.status === 'notsubmitted' && a.status !== 'notsubmitted') return 1;
+    return a.name.localeCompare(b.name);
+  });
+
+  // Summary bar
+  const summaryHTML = `
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:1rem">
+      <div style="background:#FEF2F2;border-radius:var(--radius-sm);padding:10px 8px;text-align:center">
+        <div style="font-size:22px;font-weight:700;color:#B91C1C">${statuses.notsubmitted}</div>
+        <div style="font-size:11px;color:#B91C1C;font-weight:600">Not submitted</div>
+      </div>
+      <div style="background:#EEF4FF;border-radius:var(--radius-sm);padding:10px 8px;text-align:center">
+        <div style="font-size:22px;font-weight:700;color:var(--brand)">${statuses.office}</div>
+        <div style="font-size:11px;color:var(--brand);font-weight:600">In office</div>
+      </div>
+      <div style="background:#E8F7EE;border-radius:var(--radius-sm);padding:10px 8px;text-align:center">
+        <div style="font-size:22px;font-weight:700;color:var(--success)">${statuses.wfh}</div>
+        <div style="font-size:11px;color:var(--success);font-weight:600">WFH</div>
+      </div>
+      <div style="background:#FEF4E4;border-radius:var(--radius-sm);padding:10px 8px;text-align:center">
+        <div style="font-size:22px;font-weight:700;color:#8C5000">${statuses.leave}</div>
+        <div style="font-size:11px;color:#8C5000;font-weight:600">On leave</div>
+      </div>
+      <div style="background:#FEF3C7;border-radius:var(--radius-sm);padding:10px 8px;text-align:center">
+        <div style="font-size:22px;font-weight:700;color:#92400E">${statuses.halfday}</div>
+        <div style="font-size:11px;color:#92400E;font-weight:600">Half day</div>
+      </div>
+      <div style="background:#F3EEFF;border-radius:var(--radius-sm);padding:10px 8px;text-align:center">
+        <div style="font-size:22px;font-weight:700;color:#8C5000">${statuses.onbreak}</div>
+        <div style="font-size:11px;color:#8C5000;font-weight:600">On break</div>
+      </div>
+    </div>
+    <div style="background:#E8F7EE;border:1.5px solid #BBF7D0;border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:1rem;display:flex;align-items:center;justify-content:space-between">
+      <span style="font-size:13px;font-weight:600;color:var(--success)">✅ Available right now</span>
+      <span style="font-size:20px;font-weight:700;color:var(--success)">${statuses.available} / ${teamNames.length}</span>
+    </div>`;
+
+  // Member cards
+  const cardsHTML = memberData.map(m => `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:var(--surface);border:1.5px solid ${m.status==='notsubmitted'?'#FECACA':'var(--border)'};border-radius:var(--radius-sm);margin-bottom:8px;gap:10px">
+      <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0">
+        <div style="width:38px;height:38px;border-radius:50%;background:${m.statusBg};color:${m.statusColor};font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">${esc(initials(m.name))}</div>
+        <div style="min-width:0">
+          <div style="font-size:14px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(m.name)}</div>
+          <div style="font-size:11px;color:var(--text-3)">${m.schedule}${m.clockInStr?' · in '+m.clockInStr:''}</div>
+        </div>
+      </div>
+      <div style="background:${m.statusBg};color:${m.statusColor};border-radius:50px;padding:4px 10px;font-size:12px;font-weight:600;white-space:nowrap;flex-shrink:0">${m.statusIcon} ${m.statusLabel}</div>
+    </div>`).join('');
+
+  el.innerHTML = `
+    <div class="card" style="margin-bottom:1rem">${summaryHTML}</div>
+    <div class="card">
+      <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Team members (${teamNames.length})</div>
+      ${cardsHTML}
+    </div>
+    <div style="text-align:center;margin-top:8px">
+      <button onclick="renderMyTeam()" style="background:transparent;border:1.5px solid var(--border);border-radius:50px;padding:8px 20px;font-size:13px;color:var(--text-2);cursor:pointer">↻ Refresh</button>
+    </div>`;
+}
+
+// ── Auto-refresh My Team every 60s when on that screen ───────────────────
+setInterval(() => {
+  if (document.getElementById('screen-myteam')?.classList.contains('active')) {
+    renderMyTeam();
+  }
+}, 60000);
+
+
+// ══════════════════════════════════════════════════════════════════════════
+// ── FEATURE PACK 2: 7 NEW FEATURES ────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════
+
+// ─── AUSTRALIAN NATIONAL PUBLIC HOLIDAYS 2025-2026 ────────────────────────
+const AU_PUBLIC_HOLIDAYS = {
+  '2025-01-01':'New Year\'s Day',
+  '2025-01-27':'Australia Day (observed)',
+  '2025-04-18':'Good Friday',
+  '2025-04-19':'Easter Saturday',
+  '2025-04-20':'Easter Sunday',
+  '2025-04-21':'Easter Monday',
+  '2025-04-25':'ANZAC Day',
+  '2025-06-09':'King\'s Birthday',
+  '2025-12-25':'Christmas Day',
+  '2025-12-26':'Boxing Day',
+  '2026-01-01':'New Year\'s Day',
+  '2026-01-26':'Australia Day',
+  '2026-04-03':'Good Friday',
+  '2026-04-04':'Easter Saturday',
+  '2026-04-05':'Easter Sunday',
+  '2026-04-06':'Easter Monday',
+  '2026-04-25':'ANZAC Day',
+  '2026-06-08':'King\'s Birthday',
+  '2026-12-25':'Christmas Day',
+  '2026-12-28':'Boxing Day (observed)',
+};
+
+function getPublicHoliday(date) {
+  return AU_PUBLIC_HOLIDAYS[date] || null;
+}
+
+function isPublicHoliday(date) {
+  return !!AU_PUBLIC_HOLIDAYS[date];
+}
+
+// ─── TENURE / DAYS AT COMPANY ────────────────────────────────────────────
+function calcTenure(joinDate) {
+  if (!joinDate) return null;
+  const join = new Date(joinDate);
+  const now = new Date();
+  const diffMs = now - join;
+  const diffDays = Math.floor(diffMs / 86400000);
+  const diffMonths = Math.floor(diffDays / 30.44);
+  const diffYears = Math.floor(diffDays / 365.25);
+  return { days: diffDays, months: diffMonths, years: diffYears };
+}
+
+function calcTenureLabel(joinDate) {
+  const t = calcTenure(joinDate);
+  if (!t || t.days < 0) return 'Not started yet';
+  if (t.days < 30) return t.days + ' day' + (t.days===1?'':'s') + ' at company';
+  if (t.months < 12) return t.months + ' month' + (t.months===1?'':'s') + ' at company';
+  const remMonths = t.months % 12;
+  return t.years + ' yr' + (t.years===1?'':'s') + (remMonths>0?' '+remMonths+'m':'') + ' at company';
+}
+
+function getTenureAlerts() {
+  const staff = getStaff().filter(s => s.joinDate && s.role === 'staff');
+  const alerts = [];
+  const today_ = new Date();
+  staff.forEach(s => {
+    const t = calcTenure(s.joinDate);
+    if (!t) return;
+    // 1-month probation window: days 28-35
+    if (t.days >= 28 && t.days <= 35) {
+      alerts.push({ name: s.name, type: 'probation1', label: '1-month probation review due', days: t.days });
+    }
+    // 2-month probation window: days 56-63
+    if (t.days >= 56 && t.days <= 63) {
+      alerts.push({ name: s.name, type: 'probation2', label: '2-month probation review due', days: t.days });
+    }
+  });
+  return alerts;
+}
+
+// ─── PUBLIC HOLIDAY: override missing count ───────────────────────────────
+// Patch renderMetrics to skip "absent" flag on public holidays
+// (handled inline in renderMetrics via phName check — see dashboard)
+
+// ─── RECURRING ABSENCE PATTERN DETECTION ─────────────────────────────────
+function detectAbsencePatterns() {
+  const records = getRecords();
+  const staff = getStaff().filter(s => !['superadmin'].includes(s.role));
+  const patterns = [];
+  const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+
+  staff.forEach(s => {
+    // Group their leave/absent records by weekday
+    const leaveRecs = records.filter(r => r.name === s.name && r.status === 'leave');
+    const weekdayCounts = {};
+    const weekdayDates = {};
+    leaveRecs.forEach(r => {
+      const d = new Date(r.date);
+      const wd = d.getDay();
+      weekdayCounts[wd] = (weekdayCounts[wd] || 0) + 1;
+      if (!weekdayDates[wd]) weekdayDates[wd] = [];
+      weekdayDates[wd].push(r.date);
+    });
+
+    // Check consecutive weeks for same weekday
+    Object.keys(weekdayCounts).forEach(wd => {
+      const dates = weekdayDates[wd].sort();
+      if (dates.length < 3) return;
+      // Check if any 3 dates are in consecutive weeks
+      let consecCount = 1;
+      let maxConsec = 1;
+      for (let i = 1; i < dates.length; i++) {
+        const prev = new Date(dates[i-1]);
+        const curr = new Date(dates[i]);
+        const diffDays = Math.round((curr - prev) / 86400000);
+        if (diffDays >= 6 && diffDays <= 8) { // ~1 week apart
+          consecCount++;
+          maxConsec = Math.max(maxConsec, consecCount);
+        } else {
+          consecCount = 1;
+        }
+      }
+      if (maxConsec >= 3) {
+        patterns.push({
+          name: s.name,
+          weekday: DAYS[wd],
+          count: maxConsec,
+          label: s.name.split(' ')[0] + ' absent every ' + DAYS[wd] + ' for ' + maxConsec + ' weeks'
+        });
+      }
+    });
+  });
+  return patterns;
+}
+
+function renderAbsencePatternCard() {
+  const patterns = detectAbsencePatterns();
+  if (patterns.length === 0) {
+    return `<div class="met" style="grid-column:1/-1">
+      <div class="met-lbl">📊 Absence patterns</div>
+      <div class="met-val" style="color:var(--success)">0</div>
+      <div class="met-sub">no recurring patterns ✓</div>
+    </div>`;
+  }
+  return `<div class="met" style="grid-column:1/-1;border-color:#F59E0B;background:#FFFBEB">
+    <div class="met-lbl">⚠️ Absence patterns flagged</div>
+    <div class="met-val" style="color:#B45309">${patterns.length}</div>
+    <div class="met-sub" style="white-space:normal">${patterns.map(p=>esc(p.label)).join(' &nbsp;·&nbsp; ')}</div>
+  </div>`;
+}
+
+// ─── COVERAGE / REPLACEMENT ASSIGNMENT ───────────────────────────────────
+// Coverage data: { date_name: coverName }
+function getCoverage() { return LS.get('ci_coverage') || {}; }
+function saveCoverage(c) { LS.set('ci_coverage', c); }
+
+function assignCover(absenteeName, date) {
+  const staff = getStaff().filter(s => s.role === 'staff' && s.name !== absenteeName);
+  const coverage = getCoverage();
+  const key = date + '_' + absenteeName;
+  const current = coverage[key] || '';
+
+  const options = staff.map(s =>
+    `<option value="${esc(s.name)}" ${current===s.name?'selected':''}>${esc(s.name)}</option>`
+  ).join('');
+
+  const div = document.createElement('div');
+  div.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.6);z-index:300;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)';
+  div.innerHTML = `<div style="background:var(--surface);border-radius:20px;padding:1.5rem;width:calc(100%-2rem);max-width:360px;box-shadow:0 20px 60px rgba(0,0,0,.25)">
+    <div style="font-size:17px;font-weight:700;color:var(--text);margin-bottom:6px">Assign cover for ${esc(absenteeName.split(' ')[0])}</div>
+    <div style="font-size:13px;color:var(--text-3);margin-bottom:1rem">${esc(date)}</div>
+    <select id="_coverSelect" style="width:100%;font-size:15px;padding:10px;border-radius:var(--radius-sm);border:1.5px solid var(--border);margin-bottom:1rem">
+      <option value="">— select cover person —</option>
+      ${options}
+    </select>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <button onclick="this.closest('div[style*=fixed]').remove()" style="padding:12px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:transparent;color:var(--text-2);font-size:15px;cursor:pointer">Cancel</button>
+      <button onclick="saveCoverAssign('${absenteeName.replace(/'/g,"\\'")}','${date}',document.getElementById('_coverSelect').value,this)" style="padding:12px;border-radius:var(--radius-sm);border:none;background:var(--brand);color:#fff;font-size:15px;font-weight:700;cursor:pointer">Save</button>
+    </div>
+  </div>`;
+  document.body.appendChild(div);
+}
+
+function saveCoverAssign(absenteeName, date, coverName, btn) {
+  if (!coverName) { showToast('Select a person first.','err'); return; }
+  const coverage = getCoverage();
+  const key = date + '_' + absenteeName;
+  coverage[key] = coverName;
+  saveCoverage(coverage);
+  showToast(coverName.split(' ')[0] + ' assigned as cover for ' + absenteeName.split(' ')[0] + '.', 'ok');
+  btn.closest('div[style*="fixed"]').remove();
+  renderMetrics();
+}
+
+function renderCoverageCard(date) {
+  const dayRecs = getRecords().filter(r => r.date === date);
+  const onLeave = dayRecs.filter(r => r.status === 'leave');
+  if (onLeave.length === 0) return `<div class="met" style="grid-column:1/-1"><div class="met-lbl">🔄 Coverage</div><div class="met-val" style="color:var(--success)">—</div><div class="met-sub">no leave today ✓</div></div>`;
+  const coverage = getCoverage();
+  const unassigned = onLeave.filter(r => !coverage[date+'_'+r.name]);
+  return `<div class="met" style="grid-column:1/-1;${unassigned.length>0?'border-color:#FECACA':''}">
+    <div class="met-lbl">🔄 Coverage</div>
+    <div class="met-val" style="color:${unassigned.length>0?'var(--danger)':'var(--success)'}">${unassigned.length} unassigned</div>
+    <div class="met-sub" style="white-space:normal">
+      ${onLeave.map(r => {
+        const cov = coverage[date+'_'+r.name];
+        return `<span style="display:inline-flex;align-items:center;gap:4px;margin:2px 4px 2px 0">
+          ${esc(r.name.split(' ')[0])}: ${cov?'<b>'+esc(cov.split(' ')[0])+'</b>':'<span style="color:var(--danger)">unassigned</span>'}
+          <button onclick="assignCover('${r.name.replace(/'/g,"\\'")}','${date}')" style="font-size:10px;padding:1px 6px;border-radius:4px;border:1px solid var(--border);background:var(--surface-2);cursor:pointer">${cov?'change':'assign'}</button>
+        </span>`;
+      }).join('')}
+    </div>
+  </div>`;
+}
+
+// ─── FLOOR CONFIRMATION ───────────────────────────────────────────────────
+function confirmFloor() {
+  const recs = getRecords();
+  const idx = recs.findIndex(r => r.date === today && r.name === currentUser.name);
+  if (idx < 0) { showToast('Submit attendance first.', 'err'); return; }
+  recs[idx].floorConfirmed = true;
+  recs[idx].floorConfirmedAt = Date.now();
+  saveRecords(recs);
+  spSaveRecord(recs[idx]);
+  document.getElementById('floorBtn').style.display = 'none';
+  document.getElementById('floorConfirmed').style.display = 'block';
+  showToast('✓ Presence confirmed!', 'ok');
+}
+
+function updateFloorUI() {
+  const card = document.getElementById('floorCard');
+  if (!card) return;
+  const rec = getRecords().find(r => r.date === today && r.name === currentUser.name);
+  if (!rec || rec.status !== 'office') { card.style.display = 'none'; return; }
+  card.style.display = 'block';
+  if (rec.floorConfirmed) {
+    document.getElementById('floorBtn').style.display = 'none';
+    document.getElementById('floorConfirmed').style.display = 'block';
+  } else {
+    document.getElementById('floorBtn').style.display = 'block';
+    document.getElementById('floorConfirmed').style.display = 'none';
+  }
+}
+
+// ─── FILE LOG ─────────────────────────────────────────────────────────────
+function getFileLogs() { return LS.get('ci_filelogs') || []; }
+function saveFileLogs(l) { LS.set('ci_filelogs', l); }
+
+function addFileLog() {
+  const input = document.getElementById('fileLogInput');
+  const text = input.value.trim();
+  if (!text) { showToast('Enter a file reference.', 'err'); return; }
+  const logs = getFileLogs();
+  const entry = { name: currentUser.name, date: today, file: text, ts: Date.now() };
+  logs.push(entry);
+  saveFileLogs(logs);
+  input.value = '';
+  renderFileLogList();
+  showToast('File logged ✓', 'ok');
+}
+
+function removeFileLog(ts) {
+  const logs = getFileLogs().filter(l => l.ts !== ts);
+  saveFileLogs(logs);
+  renderFileLogList();
+}
+
+function renderFileLogList() {
+  const el = document.getElementById('fileLogList');
+  if (!el) return;
+  const myLogs = getFileLogs().filter(l => l.name === currentUser.name && l.date === today);
+  if (myLogs.length === 0) {
+    el.innerHTML = '<div style="font-size:12px;color:var(--text-3)">No files logged yet today.</div>';
+    return;
+  }
+  el.innerHTML = myLogs.map(l => `
+    <div style="display:flex;align-items:center;justify-content:space-between;background:var(--surface-2);border-radius:var(--radius-sm);padding:8px 10px;gap:8px">
+      <span style="font-size:13px;color:var(--text);flex:1">📁 ${esc(l.file)}</span>
+      <button onclick="removeFileLog(${l.ts})" style="background:var(--danger-light);color:var(--danger);border:none;border-radius:4px;padding:2px 8px;font-size:12px;cursor:pointer">✕</button>
+    </div>`).join('');
+}
+
+function updateFileLogUI() {
+  const card = document.getElementById('fileLogCard');
+  if (!card) return;
+  const rec = getRecords().find(r => r.date === today && r.name === currentUser.name);
+  if (!rec || rec.status === 'leave') { card.style.display = 'none'; return; }
+  card.style.display = 'block';
+  renderFileLogList();
+}
+
+// ─── OBSERVATION NOTES (Manager / TL) ────────────────────────────────────
+function getObsNotes() { return LS.get('ci_obsnotes') || []; }
+function saveObsNotes(n) { LS.set('ci_obsnotes', n); }
+
+function saveObservationNote() {
+  const target = document.getElementById('workloadNoteTarget').value;
+  const text = document.getElementById('workloadNoteText').value.trim();
+  if (!target) { showToast('Select a staff member.', 'err'); return; }
+  if (!text) { showToast('Enter a note.', 'err'); return; }
+  const notes = getObsNotes();
+  notes.push({ by: currentUser.name, target, date: today, note: text, ts: Date.now() });
+  saveObsNotes(notes);
+  document.getElementById('workloadNoteText').value = '';
+  showToast('Note saved ✓', 'ok');
+}
+
+function populateObsNoteDropdown() {
+  const sel = document.getElementById('workloadNoteTarget');
+  if (!sel) return;
+  const staff = getStaff().filter(s => s.role === 'staff' && s.name !== currentUser.name);
+  sel.innerHTML = '<option value="">— select a staff member —</option>' +
+    staff.map(s => `<option value="${esc(s.name)}">${esc(s.name)}</option>`).join('');
+}
+
+function updateObsNoteUI() {
+  const card = document.getElementById('workloadNoteCard');
+  if (!card) return;
+  const canNote = isManager() || isTeamLead();
+  card.style.display = canNote ? 'block' : 'none';
+  if (canNote) populateObsNoteDropdown();
+}
+
+// Observation notes view in admin/dashboard (managers see all notes for today)
+function renderObsNotesForStaff(staffName) {
+  const notes = getObsNotes().filter(n => n.target === staffName);
+  if (notes.length === 0) return '<div style="font-size:12px;color:var(--text-3)">No notes yet.</div>';
+  return notes.sort((a,b)=>b.ts-a.ts).slice(0,5).map(n =>
+    `<div style="background:var(--surface-2);border-radius:var(--radius-sm);padding:8px 10px;margin-bottom:6px;font-size:12px">
+      <div style="color:var(--text);margin-bottom:2px">${esc(n.note)}</div>
+      <div style="color:var(--text-3)">${esc(n.date)} · by ${esc(n.by)}</div>
+    </div>`
+  ).join('');
+}
+
+// ─── TENURE ALERTS IN ADMIN ───────────────────────────────────────────────
+function renderTenureAlerts() {
+  const alerts = getTenureAlerts();
+  if (alerts.length === 0) return '';
+  return `<div class="card" style="border:1.5px solid #FDE68A;background:#FFFBEB;margin-bottom:1rem">
+    <div style="font-size:11px;font-weight:700;color:#92400E;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">📅 Tenure alerts</div>
+    ${alerts.map(a => `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #FDE68A">
+        <div>
+          <div style="font-size:14px;font-weight:600;color:var(--text)">${esc(a.name)}</div>
+          <div style="font-size:12px;color:#92400E">${esc(a.label)}</div>
+        </div>
+        <span style="font-size:20px">${a.type==='probation1'?'⏰':a.type==='probation2'?'⏰':'🎉'}</span>
+      </div>`).join('')}
+  </div>`;
+}
+
+// ─── HOOK ALL NEW UI UPDATES INTO CHECKIN POST-SUBMIT ────────────────────
+// Patch: after lockCheckin runs, call our new UI updaters
+const _origLockCheckin = typeof lockCheckin === 'function' ? lockCheckin : null;
+// We'll call updateFloorUI, updateFileLogUI, updateObsNoteUI from initCheckin too
+
+// ─── MY TEAM: add file logs & obs notes section ───────────────────────────
+// Patch renderMyTeam to also show coverage assignment button
+// (already rendered in renderMyTeam — we patch it below)
+
+// ─── INIT PATCHES ─────────────────────────────────────────────────────────
+// Override initCheckin to call our new UI updaters
+const _origInitCheckin = window.initCheckin;
+
+// Use DOMContentLoaded-safe override
+document.addEventListener('DOMContentLoaded', () => {});
+
+// Patch lockCheckin to trigger floor/file/obs card display
+const _origLock = window.lockCheckin;
+window.lockCheckin = function() {
+  if (_origLock) _origLock.apply(this, arguments);
+  setTimeout(() => {
+    updateFloorUI();
+    updateFileLogUI();
+    updateObsNoteUI();
+  }, 200);
+};
+
+// Also update on initCheckin (for returning users who already submitted today)
+const _origInit = window.initCheckin;
+window.initCheckin = function() {
+  if (_origInit) _origInit.apply(this, arguments);
+  setTimeout(() => {
+    updateFloorUI();
+    updateFileLogUI();
+    updateObsNoteUI();
+  }, 300);
+};
+
+// Patch renderAdmin to prepend tenure alerts
+const _origRenderAdmin = window.renderAdmin;
+window.renderAdmin = function() {
+  if (_origRenderAdmin) _origRenderAdmin.apply(this, arguments);
+  // Insert tenure alerts at top of admin screen
+  const adminScreen = document.getElementById('screen-admin');
+  if (!adminScreen) return;
+  let tenureDiv = document.getElementById('tenureAlertsBlock');
+  if (!tenureDiv) {
+    tenureDiv = document.createElement('div');
+    tenureDiv.id = 'tenureAlertsBlock';
+    const firstCard = adminScreen.querySelector('.card');
+    if (firstCard) adminScreen.insertBefore(tenureDiv, firstCard);
+  }
+  tenureDiv.innerHTML = renderTenureAlerts();
+};
+
+
+// ══════════════════════════════════════════════════════════════════════════
+// ── FILE TRACKER ──────────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════
+
+const FILE_STATUSES = ['Data Collection','Pre-Qualification','Application Start',
+  'Pending Info','Submitted to Lender','MIR','Conditionally Approved',
+  'Unconditionally Approved','Loan Documents','Settlement'];
+
+const FILE_STATUS_COLORS = {
+  'Data Collection':        {bg:'#F3F4F6',color:'#374151'},
+  'Pre-Qualification':      {bg:'#EDE9FE',color:'#5B21B6'},
+  'Application Start':      {bg:'#DBEAFE',color:'#1E40AF'},
+  'Pending Info':           {bg:'#FEF3C7',color:'#92400E'},
+  'Submitted to Lender':    {bg:'#D1FAE5',color:'#065F46'},
+  'MIR':                    {bg:'#FFE4E6',color:'#9F1239'},
+  'Conditionally Approved': {bg:'#CFFAFE',color:'#164E63'},
+  'Unconditionally Approved':{bg:'#A7F3D0',color:'#064E3B'},
+  'Loan Documents':         {bg:'#FEF9C3',color:'#713F12'},
+  'Settlement':             {bg:'#BBF7D0',color:'#14532D'},
+};
+
+// ── Storage ───────────────────────────────────────────────────────────────
+function getFileEntries() { return LS.get('ci_files') || []; }
+function saveFileEntries(f) { LS.set('ci_files', f); }
+
+function genFileId() {
+  return 'f_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+}
+
+// ── File Modal ────────────────────────────────────────────────────────────
+let _editingFileId = null;
+let _activeFilesTab = 'today';
+
+function openFileModal(fileId) {
+  _editingFileId = fileId || null;
+  const modal = document.getElementById('fileModal');
+  const isTL = isTeamLead();
+
+  // Populate owner dropdown for TL
+  const ownerField = document.getElementById('fm_ownerField');
+  const ownerSel = document.getElementById('fm_owner');
+  if (isTL) {
+    ownerField.style.display = 'block';
+    const myTeam = getTeamForTL(currentUser.name);
+    const staff = getStaff().filter(s => myTeam.includes(s.name) || s.name === currentUser.name);
+    ownerSel.innerHTML = staff.map(s =>
+      `<option value="${esc(s.name)}">${esc(s.name)}</option>`
+    ).join('');
+  } else {
+    ownerField.style.display = 'none';
+  }
+
+  if (fileId) {
+    // Edit mode
+    const entry = getFileEntries().find(f => f.id === fileId);
+    if (!entry) return;
+    document.getElementById('fileModalTitle').textContent = 'Edit file';
+    document.getElementById('fm_client').value = entry.client || '';
+    document.getElementById('fm_broker').value = entry.broker || '';
+    document.getElementById('fm_type').value = entry.appType || 'Home Loan';
+    document.getElementById('fm_status').value = entry.status || 'Data Collection';
+    document.getElementById('fm_done').value = entry.done || '';
+    document.getElementById('fm_pending').value = entry.pending || '';
+    document.getElementById('fm_fileId').value = fileId;
+    if (isTL && entry.owner) ownerSel.value = entry.owner;
+    // Loan amount
+    const laEl = document.getElementById('fm_loanAmount');
+    if (laEl) laEl.value = entry.loanAmount || '';
+    toggleLoanAmountField();
+    // Stage history
+    renderStageHistoryInModal(entry);
+    // Show existing attachments
+    renderExistingAttachments(entry);
+    document.getElementById('fm_attachmentStatus').textContent = '';
+  } else {
+    // Add mode
+    document.getElementById('fileModalTitle').textContent = 'Add client file';
+    document.getElementById('fm_client').value = '';
+    document.getElementById('fm_broker').value = '';
+    document.getElementById('fm_type').value = 'Home Loan';
+    document.getElementById('fm_status').value = 'Data Collection';
+    document.getElementById('fm_done').value = '';
+    document.getElementById('fm_pending').value = '';
+    document.getElementById('fm_fileId').value = '';
+    document.getElementById('fm_attachment').value = '';
+    document.getElementById('fm_attachmentStatus').textContent = '';
+    document.getElementById('fm_existingAttachments').innerHTML = '';
+    const laEl2 = document.getElementById('fm_loanAmount');
+    if (laEl2) laEl2.value = '';
+    const shEl = document.getElementById('fm_stageHistory');
+    if (shEl) { shEl.style.display='none'; shEl.innerHTML=''; }
+    toggleLoanAmountField();
+    if (isTL) ownerSel.value = currentUser.name;
+  }
+
+  modal.style.display = 'flex';
+}
+
+function closeFileModal() {
+  document.getElementById('fileModal').style.display = 'none';
+  _editingFileId = null;
+}
+
+function renderExistingAttachments(entry) {
+  const el = document.getElementById('fm_existingAttachments');
+  if (!entry.attachments || entry.attachments.length === 0) { el.innerHTML = ''; return; }
+  // Only show non-expired
+  const now = Date.now();
+  const valid = entry.attachments.filter(a => a.expiresAt > now);
+  if (valid.length === 0) { el.innerHTML = '<div style="font-size:11px;color:var(--text-3)">Previous attachments have expired.</div>'; return; }
+  el.innerHTML = valid.map(a => `
+    <div style="display:flex;align-items:center;justify-content:space-between;background:var(--surface-2);border-radius:var(--radius-sm);padding:6px 10px;margin-bottom:4px;font-size:12px">
+      <span>📎 ${esc(a.name)}</span>
+      <span style="color:var(--text-3)">expires ${new Date(a.expiresAt).toLocaleDateString('en-AU')}</span>
+    </div>`).join('');
+}
+
+async function saveFileEntry() {
+  const client = document.getElementById('fm_client').value.trim();
+  const broker = document.getElementById('fm_broker').value.trim();
+  if (!client) { showToast('Client name is required.','err'); return; }
+  if (!broker) { showToast('Broker name is required.','err'); return; }
+
+  const isTL = isTeamLead();
+  const owner = isTL
+    ? (document.getElementById('fm_owner').value || currentUser.name)
+    : currentUser.name;
+
+  const fileAttachmentInput = document.getElementById('fm_attachment');
+  const files = getFileEntries();
+  const fileId = document.getElementById('fm_fileId').value || genFileId();
+  const existingIdx = files.findIndex(f => f.id === fileId);
+  const existing = existingIdx >= 0 ? files[existingIdx] : null;
+
+  const newStatus = document.getElementById('fm_status').value;
+  const loanAmtRaw = document.getElementById('fm_loanAmount') ? document.getElementById('fm_loanAmount').value : '';
+  const loanAmount = loanAmtRaw ? parseFloat(loanAmtRaw) : (existing ? existing.loanAmount : null);
+
+  // Build stage history — append if status changed
+  let stageHistory = existing ? (existing.stageHistory || []) : [];
+  const prevStatus = existing ? existing.status : null;
+  if (!prevStatus) {
+    // First save — record creation
+    stageHistory.push({ stage: newStatus, enteredAt: today, enteredTs: Date.now(), by: currentUser.name });
+  } else if (prevStatus !== newStatus) {
+    // Mark previous stage exit time
+    if (stageHistory.length > 0) {
+      const last = stageHistory[stageHistory.length - 1];
+      if (!last.exitTs) { last.exitTs = Date.now(); last.exitAt = today; }
+    }
+    stageHistory.push({ stage: newStatus, enteredAt: today, enteredTs: Date.now(), by: currentUser.name });
+  }
+
+  const entry = {
+    id: fileId,
+    owner,
+    client,
+    broker,
+    appType: document.getElementById('fm_type').value,
+    status: newStatus,
+    done: document.getElementById('fm_done').value.trim(),
+    pending: document.getElementById('fm_pending').value.trim(),
+    updatedBy: currentUser.name,
+    updatedAt: today,
+    updatedTs: Date.now(),
+    createdAt: existing ? existing.createdAt : today,
+    attachments: existing ? (existing.attachments || []) : [],
+    stageHistory,
+    loanAmount: loanAmount || null,
+    settledAt: newStatus === 'Settlement' ? (existing&&existing.settledAt ? existing.settledAt : today) : (existing ? existing.settledAt : null),
+    unconditionalAt: newStatus === 'Unconditionally Approved' ? (existing&&existing.unconditionalAt ? existing.unconditionalAt : today) : (existing ? existing.unconditionalAt : null),
+    active: true,
+  };
+
+  // Handle attachment upload
+  if (fileAttachmentInput.files && fileAttachmentInput.files[0]) {
+    const file = fileAttachmentInput.files[0];
+    document.getElementById('fm_attachmentStatus').textContent = 'Uploading…';
+    try {
+      const spFilename = await uploadFileAttachment(file, fileId);
+      const expiresAt = Date.now() + 14 * 24 * 60 * 60 * 1000; // 14 days
+      entry.attachments.push({ name: file.name, spName: spFilename, expiresAt, uploadedAt: Date.now() });
+      document.getElementById('fm_attachmentStatus').textContent = '✓ Uploaded';
+    } catch(e) {
+      document.getElementById('fm_attachmentStatus').textContent = 'Upload failed — saved without attachment';
+    }
+  }
+
+  // Purge expired attachments
+  entry.attachments = (entry.attachments || []).filter(a => a.expiresAt > Date.now());
+
+  if (existingIdx >= 0) {
+    files[existingIdx] = entry;
+  } else {
+    files.push(entry);
+  }
+  saveFileEntries(files);
+  closeFileModal();
+  showToast('File saved ✓', 'ok');
+  updateFileLogUI();
+  // Refresh files screen if open
+  if (document.getElementById('screen-files')?.classList.contains('active')) {
+    renderFilesScreen();
+  }
+}
+
+async function uploadFileAttachment(file, fileId) {
+  const token = await getToken();
+  const safeName = fileId + '_' + file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+  const uploadUrl = `https://loanprocessorau.sharepoint.com/sites/lpattendance/_api/web/lists/getbytitle('AttendancePhotos')/RootFolder/Files/Add(url='${encodeURIComponent(safeName)}',overwrite=true)`;
+  const buf = await file.arrayBuffer();
+  const resp = await fetch(uploadUrl, {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json;odata=nometadata' },
+    body: buf
+  });
+  if (!resp.ok) throw new Error('Upload failed: ' + resp.status);
+  return safeName;
+}
+
+function markFileInactive(fileId) {
+  const files = getFileEntries();
+  const idx = files.findIndex(f => f.id === fileId);
+  if (idx < 0) return;
+  if (!confirm('Mark this file as settled/closed?')) return;
+  files[idx].active = false;
+  files[idx].closedAt = today;
+  saveFileEntries(files);
+  updateFileLogUI();
+  if (document.getElementById('screen-files')?.classList.contains('active')) renderFilesScreen();
+  showToast('File closed.', 'ok');
+}
+
+// ── File log card on check-in screen (staff own files for today) ──────────
+function updateFileLogUI() {
+  const card = document.getElementById('fileLogCard');
+  if (!card) return;
+  const rec = getRecords().find(r => r.date === today && r.name === currentUser.name);
+  if (!rec || rec.status === 'leave') { card.style.display = 'none'; return; }
+  card.style.display = 'block';
+  renderFileLogList();
+}
+
+function renderFileLogList() {
+  const el = document.getElementById('fileLogList');
+  if (!el) return;
+  const myFiles = getFileEntries().filter(f => f.owner === currentUser.name && f.active !== false && f.updatedAt === today);
+  if (myFiles.length === 0) {
+    el.innerHTML = '<div style="font-size:12px;color:var(--text-3)">No files logged today — tap below to add one.</div>';
+    return;
+  }
+  el.innerHTML = myFiles.map(f => {
+    const sc = FILE_STATUS_COLORS[f.status] || {bg:'#F3F4F6',color:'#374151'};
+    return `<div style="background:var(--surface-2);border-radius:var(--radius-sm);padding:10px 12px;border:1px solid var(--border)">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <span style="font-size:14px;font-weight:600;color:var(--text)">${esc(f.client)}</span>
+        <span style="background:${sc.bg};color:${sc.color};border-radius:50px;padding:2px 8px;font-size:11px;font-weight:600">${esc(f.status)}</span>
+      </div>
+      <div style="font-size:12px;color:var(--text-3);margin-bottom:4px">🏦 ${esc(f.appType)}</div>
+      ${f.done?`<div style="font-size:12px;color:var(--text-2);margin-bottom:2px">✅ ${esc(f.done)}</div>`:''}
+      ${f.pending?`<div style="font-size:12px;color:var(--warn)">⏳ ${esc(f.pending)}</div>`:''}
+      <button onclick="openFileModal('${f.id}')" style="margin-top:8px;font-size:12px;padding:4px 12px;border-radius:var(--radius-sm);border:1px solid var(--border);background:transparent;cursor:pointer">Edit</button>
+    </div>`;
+  }).join('');
+}
+
+// ── Files screen (Team Lead) ──────────────────────────────────────────────
+function switchFilesTab(tab, btn) {
+  _activeFilesTab = tab;
+  document.querySelectorAll('#screen-files .tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderFilesScreen();
+}
+
+function renderFilesScreen() {
+  const el = document.getElementById('filesContent');
+  if (!el) return;
+
+  let allFiles, teamAndSelf;
+  if (isSuperAdmin()) {
+    // Superadmin sees all files across all staff
+    allFiles = getFileEntries();
+    teamAndSelf = getStaff().map(s => s.name);
+  } else if (isTeamLead()) {
+    const myTeam = getTeamForTL(currentUser.name);
+    teamAndSelf = [...myTeam, currentUser.name];
+    allFiles = getFileEntries().filter(f => teamAndSelf.includes(f.owner));
+  } else {
+    // Staff sees own files only
+    teamAndSelf = [currentUser.name];
+    allFiles = getFileEntries().filter(f => f.owner === currentUser.name);
+  }
+
+  if (_activeFilesTab === 'today') {
+    renderFilesToday(el, allFiles, teamAndSelf);
+  } else if (_activeFilesTab === 'active') {
+    renderFilesActive(el, allFiles);
+  } else if (_activeFilesTab === 'analytics') {
+    renderFilesAnalytics(el, allFiles, teamAndSelf);
+  }
+}
+
+function renderFilesToday(el, allFiles, teamNames) {
+  const todayFiles = allFiles.filter(f => f.updatedAt === today);
+  const staff = getStaff();
+
+  // Group by owner
+  const byOwner = {};
+  teamNames.forEach(n => { byOwner[n] = []; });
+  todayFiles.forEach(f => {
+    if (byOwner[f.owner]) byOwner[f.owner].push(f);
+    else byOwner[f.owner] = [f];
+  });
+
+  if (todayFiles.length === 0) {
+    el.innerHTML = `<div class="card" style="text-align:center;padding:2rem">
+      <div style="font-size:2rem;margin-bottom:10px">📁</div>
+      <div style="font-size:15px;font-weight:600;color:var(--text)">No files logged today</div>
+      <div style="font-size:13px;color:var(--text-3);margin-top:4px">Staff haven't added any files yet.</div>
+    </div>`;
+    return;
+  }
+
+  el.innerHTML = Object.entries(byOwner).map(([name, files]) => {
+    if (files.length === 0) return `<div class="card" style="margin-bottom:10px">
+      <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px">${esc(name)}</div>
+      <div style="font-size:12px;color:var(--text-3)">No files logged today</div>
+    </div>`;
+    return `<div class="card" style="margin-bottom:10px">
+      <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">${esc(name)}</div>
+      ${files.map(f => fileCard(f, true)).join('')}
+    </div>`;
+  }).join('');
+}
+
+function renderFilesActive(el, allFiles) {
+  const active = allFiles.filter(f => f.active !== false).sort((a,b) => b.updatedTs - a.updatedTs);
+
+  if (active.length === 0) {
+    el.innerHTML = `<div class="card" style="text-align:center;padding:2rem">
+      <div style="font-size:2rem;margin-bottom:10px">✅</div>
+      <div style="font-size:15px;font-weight:600;color:var(--text)">No active files</div>
+    </div>`;
+    return;
+  }
+
+  // Group by stage
+  const byStage = {};
+  FILE_STATUSES.forEach(s => { byStage[s] = []; });
+  active.forEach(f => {
+    if (byStage[f.status]) byStage[f.status].push(f);
+    else byStage[f.status] = [f];
+  });
+
+  el.innerHTML = FILE_STATUSES.filter(s => byStage[s].length > 0).map(stage => {
+    const sc = FILE_STATUS_COLORS[stage] || {bg:'#F3F4F6',color:'#374151'};
+    return `<div style="margin-bottom:12px">
+      <div style="display:inline-block;background:${sc.bg};color:${sc.color};border-radius:50px;padding:4px 12px;font-size:12px;font-weight:700;margin-bottom:8px">${esc(stage)} (${byStage[stage].length})</div>
+      <div class="card" style="padding:0;overflow:hidden">
+        ${byStage[stage].map(f => fileCard(f, true)).join('<div style="height:1px;background:var(--border)"></div>')}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function fileCard(f, showControls) {
+  const sc = FILE_STATUS_COLORS[f.status] || {bg:'#F3F4F6',color:'#374151'};
+  const daysAgo = Math.floor((Date.now() - f.updatedTs) / 86400000);
+  const ageLabel = daysAgo === 0 ? 'today' : daysAgo === 1 ? 'yesterday' : daysAgo + ' days ago';
+  const hasExpiredSoon = f.attachments && f.attachments.some(a => a.expiresAt - Date.now() < 3 * 86400000 && a.expiresAt > Date.now());
+
+  return `<div style="padding:12px 14px">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:6px">
+      <div>
+        <div style="font-size:14px;font-weight:700;color:var(--text)">${esc(f.client)}</div>
+        <div style="font-size:12px;color:var(--text-3)">📋 ${esc(f.appType)} &nbsp;·&nbsp; ${esc(f.owner.split(' ')[0])} &nbsp;·&nbsp; ${ageLabel}</div>
+      </div>
+      <span style="background:${sc.bg};color:${sc.color};border-radius:50px;padding:3px 9px;font-size:11px;font-weight:600;white-space:nowrap;flex-shrink:0">${esc(f.status)}</span>
+    </div>
+    ${f.done?`<div style="font-size:12px;color:var(--text-2);margin-bottom:3px">✅ <b>Done:</b> ${esc(f.done)}</div>`:''}
+    ${f.pending?`<div style="font-size:12px;color:var(--warn);margin-bottom:3px">⏳ <b>Pending:</b> ${esc(f.pending)}</div>`:''}
+    ${f.attachments&&f.attachments.length>0?`<div style="font-size:11px;color:var(--text-3);margin-top:4px">📎 ${f.attachments.length} attachment${f.attachments.length>1?'s':''}${hasExpiredSoon?' · ⚠️ expiring soon':''}</div>`:''}
+    ${showControls&&(isTeamLead()||isSuperAdmin())?`<div style="display:flex;gap:6px;margin-top:8px">
+      <button onclick="openFileModal('${f.id}')" style="font-size:12px;padding:4px 12px;border-radius:var(--radius-sm);border:1px solid var(--border);background:transparent;cursor:pointer">Edit</button>
+      <button onclick="markFileInactive('${f.id}')" style="font-size:12px;padding:4px 12px;border-radius:var(--radius-sm);border:1px solid var(--border);background:transparent;color:var(--text-3);cursor:pointer">Close file</button>
+    </div>`:''}
+  </div>`;
+}
+
+// ── updateFileLogUI override: show "Add file" button any time after check-in
+// Already handled above — this ensures card shows on re-init
+
+
+// ══════════════════════════════════════════════════════════════════════════
+// ── FILE ANALYTICS & STAGE TRACKING ───────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════
+
+// ── Toggle loan amount field based on stage ───────────────────────────────
+function toggleLoanAmountField() {
+  const sel = document.getElementById('fm_status');
+  const field = document.getElementById('fm_loanAmountField');
+  if (!sel || !field) return;
+  const showStages = ['Unconditionally Approved','Loan Documents','Settlement'];
+  field.style.display = showStages.includes(sel.value) ? 'block' : 'none';
+}
+
+// ── Stage history display in modal ────────────────────────────────────────
+function renderStageHistoryInModal(entry) {
+  const el = document.getElementById('fm_stageHistory');
+  if (!el) return;
+  const history = entry.stageHistory || [];
+  if (history.length <= 1) { el.style.display = 'none'; return; }
+  el.style.display = 'block';
+  el.innerHTML = `
+    <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Stage history</div>
+    <div style="display:flex;flex-direction:column;gap:4px">
+      ${history.map((h,i) => {
+        const durationDays = h.exitTs ? Math.round((h.exitTs - h.enteredTs)/86400000) : null;
+        return `<div style="display:flex;align-items:center;justify-content:space-between;font-size:12px;padding:5px 8px;background:var(--surface-2);border-radius:6px">
+          <span style="color:var(--text)">${esc(h.stage)}</span>
+          <span style="color:var(--text-3)">${esc(h.enteredAt)}${durationDays!==null?' · '+durationDays+'d':i===history.length-1?' · current':''}</span>
+        </div>`;
+      }).join('')}
+    </div>`;
+}
+
+// ── Core analytics calculations ───────────────────────────────────────────
+function calcFileAnalytics(files) {
+  const closed = files.filter(f => f.active === false || f.status === 'Settlement');
+  const withHistory = files.filter(f => f.stageHistory && f.stageHistory.length > 0);
+
+  // Average time per stage (days) — across all files that passed through each stage
+  const stageTimings = {};
+  FILE_STATUSES.forEach(s => { stageTimings[s] = []; });
+
+  withHistory.forEach(f => {
+    (f.stageHistory || []).forEach(h => {
+      if (h.exitTs && stageTimings[h.stage]) {
+        const days = (h.exitTs - h.enteredTs) / 86400000;
+        stageTimings[h.stage].push(days);
+      }
+    });
+  });
+
+  const avgPerStage = {};
+  FILE_STATUSES.forEach(s => {
+    const times = stageTimings[s];
+    avgPerStage[s] = times.length > 0
+      ? (times.reduce((a,b)=>a+b,0) / times.length).toFixed(1)
+      : null;
+  });
+
+  // Time from creation to Unconditionally Approved
+  const approvalTimes = files
+    .filter(f => f.unconditionalAt && f.createdAt)
+    .map(f => {
+      const created = new Date(f.createdAt).getTime();
+      const approved = new Date(f.unconditionalAt).getTime();
+      return (approved - created) / 86400000;
+    })
+    .filter(d => d >= 0);
+  const avgApprovalDays = approvalTimes.length > 0
+    ? (approvalTimes.reduce((a,b)=>a+b,0) / approvalTimes.length).toFixed(1)
+    : null;
+
+  // One-touch approvals: Submitted to Lender → Unconditionally Approved with no other stages in between
+  const oneTouchApprovals = files.filter(f => {
+    const history = f.stageHistory || [];
+    const submittedIdx = history.findLastIndex(h => h.stage === 'Submitted to Lender');
+    const unconditionalIdx = history.findLastIndex(h => h.stage === 'Unconditionally Approved');
+    if (submittedIdx < 0 || unconditionalIdx < 0) return false;
+    if (unconditionalIdx <= submittedIdx) return false;
+    // Check no other stages between them
+    const between = history.slice(submittedIdx + 1, unconditionalIdx);
+    return between.length === 0;
+  });
+
+  // Loan volume — settled files with a loan amount
+  const settledWithAmount = files.filter(f => f.loanAmount && (f.status === 'Settlement' || f.active === false));
+  const totalVolume = settledWithAmount.reduce((sum, f) => sum + (f.loanAmount || 0), 0);
+  const settledCount = files.filter(f => f.status === 'Settlement').length;
+
+  return {
+    avgPerStage,
+    avgApprovalDays,
+    approvalCount: approvalTimes.length,
+    oneTouchCount: oneTouchApprovals.length,
+    oneTouchFiles: oneTouchApprovals,
+    totalVolume,
+    settledCount,
+    settledWithAmount: settledWithAmount.length,
+    totalFiles: files.length,
+    activeFiles: files.filter(f => f.active !== false).length,
+  };
+}
+
+// ── Analytics screen renderer ─────────────────────────────────────────────
+function renderFilesAnalytics(el, allFiles, teamNames) {
+  const isSA = isSuperAdmin();
+  const isTL = isTeamLead();
+
+  // Date range filter
+  const fromDate = document.getElementById('analyticsFrom') ? document.getElementById('analyticsFrom').value : '';
+  const toDate   = document.getElementById('analyticsTo')   ? document.getElementById('analyticsTo').value   : '';
+
+  // Filter files by date range if set
+  let filteredFiles = allFiles;
+  if (fromDate) filteredFiles = filteredFiles.filter(f => f.createdAt >= fromDate);
+  if (toDate)   filteredFiles = filteredFiles.filter(f => f.createdAt <= toDate);
+
+  const analytics = calcFileAnalytics(filteredFiles);
+
+  const fmt$ = v => '$' + Math.round(v).toLocaleString('en-AU');
+
+  // Summary cards
+  const summaryCards = `
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:1rem">
+      <div style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:12px;text-align:center">
+        <div style="font-size:24px;font-weight:700;color:var(--brand)">${analytics.activeFiles}</div>
+        <div style="font-size:11px;color:var(--text-3);font-weight:600">Active files</div>
+      </div>
+      <div style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:12px;text-align:center">
+        <div style="font-size:24px;font-weight:700;color:var(--success)">${analytics.settledCount}</div>
+        <div style="font-size:11px;color:var(--text-3);font-weight:600">Settled</div>
+      </div>
+      <div style="background:#FFFBEB;border:1.5px solid #FDE68A;border-radius:var(--radius-sm);padding:12px;text-align:center">
+        <div style="font-size:24px;font-weight:700;color:#92400E">${analytics.oneTouchCount}</div>
+        <div style="font-size:11px;color:#92400E;font-weight:600">One-touch approvals</div>
+      </div>
+      <div style="background:#F0FDF4;border:1.5px solid #BBF7D0;border-radius:var(--radius-sm);padding:12px;text-align:center">
+        <div style="font-size:24px;font-weight:700;color:#14532D">${analytics.avgApprovalDays ? analytics.avgApprovalDays + 'd' : '—'}</div>
+        <div style="font-size:11px;color:#14532D;font-weight:600">Avg start→approval</div>
+      </div>
+    </div>
+    <div style="background:var(--brand-light);border:1.5px solid var(--brand);border-radius:var(--radius-sm);padding:14px;text-align:center;margin-bottom:1rem">
+      <div style="font-size:11px;font-weight:700;color:var(--brand);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Total loan volume settled</div>
+      <div style="font-size:28px;font-weight:700;color:var(--brand)">${analytics.totalVolume > 0 ? fmt$(analytics.totalVolume) : '—'}</div>
+      <div style="font-size:12px;color:var(--text-3)">${analytics.settledWithAmount} file${analytics.settledWithAmount!==1?'s':''} with amount recorded</div>
+    </div>`;
+
+  // Avg time per stage table
+  const stagesWithData = FILE_STATUSES.filter(s => analytics.avgPerStage[s] !== null);
+  const avgStageTable = stagesWithData.length === 0 ? '' : `
+    <div class="card" style="margin-bottom:1rem">
+      <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">⏱ Average time per stage</div>
+      ${FILE_STATUSES.map(s => {
+        const avg = analytics.avgPerStage[s];
+        if (avg === null) return '';
+        const sc = FILE_STATUS_COLORS[s] || {bg:'#F3F4F6',color:'#374151'};
+        const pct = Math.min(100, Math.round((parseFloat(avg)/30)*100));
+        return `<div style="margin-bottom:8px">
+          <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+            <span style="font-size:12px;color:var(--text)">${esc(s)}</span>
+            <span style="font-size:12px;font-weight:700;color:${sc.color}">${avg}d</span>
+          </div>
+          <div style="background:var(--surface-2);border-radius:4px;height:6px;overflow:hidden">
+            <div style="width:${pct}%;height:100%;background:${sc.color};border-radius:4px;transition:width .4s"></div>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>`;
+
+  // Per-person breakdown (TL + SA)
+  let perPersonHTML = '';
+  if (isTL || isSA) {
+    const staffNames = [...new Set(filteredFiles.map(f => f.owner))].filter(Boolean);
+    perPersonHTML = `<div class="card" style="margin-bottom:1rem">
+      <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">👤 By staff member</div>
+      ${staffNames.length === 0 ? '<div style="font-size:13px;color:var(--text-3)">No data yet.</div>' :
+        staffNames.map(name => {
+          const personFiles = filteredFiles.filter(f => f.owner === name);
+          const pa = calcFileAnalytics(personFiles);
+          return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+            <div>
+              <div style="font-size:13px;font-weight:600;color:var(--text)">${esc(name)}</div>
+              <div style="font-size:11px;color:var(--text-3)">${pa.activeFiles} active · ${pa.settledCount} settled · ${pa.oneTouchCount} one-touch</div>
+            </div>
+            <div style="text-align:right">
+              <div style="font-size:13px;font-weight:700;color:var(--brand)">${pa.totalVolume>0?fmt$(pa.totalVolume):'—'}</div>
+              <div style="font-size:11px;color:var(--text-3)">${pa.avgApprovalDays?pa.avgApprovalDays+'d avg':''}</div>
+            </div>
+          </div>`;
+        }).join('')}
+    </div>`;
+  }
+
+  // One-touch approvals detail
+  const oneTouchDetail = analytics.oneTouchFiles.length === 0 ? '' : `
+    <div class="card" style="margin-bottom:1rem">
+      <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">⚡ One-touch approvals</div>
+      ${analytics.oneTouchFiles.map(f => `
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)">
+          <div>
+            <div style="font-size:13px;font-weight:600;color:var(--text)">${esc(f.client)}</div>
+            <div style="font-size:11px;color:var(--text-3)">${esc(f.appType)} · ${esc(f.owner.split(' ')[0])}</div>
+          </div>
+          ${f.loanAmount?`<div style="font-size:13px;font-weight:700;color:var(--success)">${fmt$(f.loanAmount)}</div>`:''}
+        </div>`).join('')}
+    </div>`;
+
+  el.innerHTML = `
+    <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center;flex-wrap:wrap">
+      <input type="date" id="analyticsFrom" value="${fromDate}" onchange="renderFilesScreen()" style="font-size:13px;padding:6px 10px;border-radius:var(--radius-sm);border:1.5px solid var(--border)"/>
+      <span style="font-size:12px;color:var(--text-3)">to</span>
+      <input type="date" id="analyticsTo" value="${toDate}" onchange="renderFilesScreen()" style="font-size:13px;padding:6px 10px;border-radius:var(--radius-sm);border:1.5px solid var(--border)"/>
+      <button onclick="document.getElementById('analyticsFrom').value='';document.getElementById('analyticsTo').value='';renderFilesScreen()" style="font-size:12px;padding:6px 12px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:transparent;cursor:pointer">All time</button>
+    </div>
+    ${summaryCards}
+    ${avgStageTable}
+    ${perPersonHTML}
+    ${oneTouchDetail}`;
+}
+
+// ── Staff self-analytics (their own files) on checkin screen ─────────────
+function renderMyFileAnalytics() {
+  const myFiles = getFileEntries().filter(f => f.owner === currentUser.name);
+  if (myFiles.length === 0) return '';
+  const a = calcFileAnalytics(myFiles);
+  const fmt$ = v => '$' + Math.round(v).toLocaleString('en-AU');
+  return `<div class="card" style="margin-top:12px">
+    <div class="card-label">📊 My file stats</div>
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px">
+      <div style="background:var(--surface-2);border-radius:var(--radius-sm);padding:10px;text-align:center">
+        <div style="font-size:20px;font-weight:700;color:var(--brand)">${a.activeFiles}</div>
+        <div style="font-size:11px;color:var(--text-3)">Active files</div>
+      </div>
+      <div style="background:var(--surface-2);border-radius:var(--radius-sm);padding:10px;text-align:center">
+        <div style="font-size:20px;font-weight:700;color:var(--success)">${a.settledCount}</div>
+        <div style="font-size:11px;color:var(--text-3)">Settled</div>
+      </div>
+      <div style="background:var(--surface-2);border-radius:var(--radius-sm);padding:10px;text-align:center">
+        <div style="font-size:20px;font-weight:700;color:#92400E">${a.oneTouchCount}</div>
+        <div style="font-size:11px;color:var(--text-3)">One-touch</div>
+      </div>
+      <div style="background:var(--surface-2);border-radius:var(--radius-sm);padding:10px;text-align:center">
+        <div style="font-size:20px;font-weight:700;color:#14532D">${a.totalVolume > 0 ? fmt$(a.totalVolume) : '—'}</div>
+        <div style="font-size:11px;color:var(--text-3)">Volume settled</div>
+      </div>
+    </div>
+  </div>`;
+}
+
+// Patch updateFileLogUI to also show staff their own analytics
+const _origUpdateFileLogUI = window.updateFileLogUI;
+window.updateFileLogUI = function() {
+  if (_origUpdateFileLogUI) _origUpdateFileLogUI.apply(this, arguments);
+  // Append analytics to file log card if staff
+  const card = document.getElementById('fileLogCard');
+  if (!card || card.style.display === 'none') return;
+  let statsDiv = document.getElementById('myFileStatsDiv');
+  if (!statsDiv) {
+    statsDiv = document.createElement('div');
+    statsDiv.id = 'myFileStatsDiv';
+    card.appendChild(statsDiv);
+  }
+  statsDiv.innerHTML = renderMyFileAnalytics();
+};
+
 </script>
 </body>
 </html>
