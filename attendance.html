@@ -2454,7 +2454,7 @@ async function getToken() {
 }
 
 async function onMsLogin(account) {
-  showScreen('screen-geoblocked');
+  showScreen('geoblocked');
   // Load data from SharePoint
   await loadFromSharePoint();
   // Then request geo
@@ -2660,7 +2660,7 @@ async function initMsal() {
     if (accounts.length > 0) {
       await onMsLogin(accounts[0]);
     } else {
-      showScreen('screen-mslogin');
+      showScreen('mslogin');
     }
   } catch(e) {
     console.error('MSAL init error:', e);
