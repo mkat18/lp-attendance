@@ -767,6 +767,21 @@ tr.flagged-row:hover td { background: #FFEAEA; }
     <input type="text" id="myFilesSearch" placeholder="🔍 Search client or lender…" oninput="renderMyFilesScreen()" style="width:100%;font-size:14px;padding:8px 12px;border-radius:var(--radius-sm);border:1.5px solid var(--border);margin-bottom:12px"/>
     <div id="myFilesContent"></div>
   </div>
+
+  <!-- ── FEEDBACK SCREEN (Team Lead) ──────────────────────────────────────── -->
+  <div id="screen-feedback" class="screen">
+    <div class="page-header">
+      <h1>📣 Broker Feedback</h1>
+      <p>Feedback received from brokers about your team</p>
+    </div>
+    <button onclick="openBrokerFeedbackModal(null)" class="btn-primary" style="margin-bottom:1rem">+ Log broker feedback</button>
+    <div style="display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap">
+      <button class="tab active" id="bftab-all" onclick="switchFeedbackTab('all',this)">All</button>
+      <button class="tab" id="bftab-analyst" onclick="switchFeedbackTab('analyst',this)">By analyst</button>
+      <button class="tab" id="bftab-tags" onclick="switchFeedbackTab('tags',this)">By type</button>
+    </div>
+    <div id="feedbackContent"></div>
+  </div>
 </main>
 
 
@@ -963,6 +978,53 @@ tr.flagged-row:hover td { background: #FFEAEA; }
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px">
       <button onclick="closeFileModal()" style="padding:12px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:transparent;color:var(--text-2);font-size:15px;cursor:pointer">Cancel</button>
       <button onclick="saveFileEntry()" style="padding:12px;border-radius:var(--radius-sm);border:none;background:var(--brand);color:#fff;font-size:15px;font-weight:700;cursor:pointer">Save</button>
+    </div>
+  </div>
+</div>
+
+
+<div id="brokerFeedbackModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.65);z-index:260;align-items:flex-start;justify-content:center;backdrop-filter:blur(4px);overflow-y:auto;padding:1rem">
+  <div style="background:var(--surface);border-radius:20px;padding:1.5rem;width:calc(100%-2rem);max-width:460px;margin:auto;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+    <div style="font-size:17px;font-weight:700;color:var(--text);margin-bottom:4px">📣 Broker feedback</div>
+    <div style="font-size:13px;color:var(--text-3);margin-bottom:1.25rem" id="bfModalSub">Log feedback received from broker</div>
+
+    <div class="field">
+      <label>Analyst <span style="color:var(--danger)">*</span></label>
+      <select id="bf_analyst" style="font-size:14px">
+        <option value="">— select analyst —</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label>Broker name <span style="color:var(--danger)">*</span></label>
+      <input type="text" id="bf_broker" placeholder="e.g. Sarah Mitchell"/>
+    </div>
+
+    <div class="field">
+      <label>Feedback type <span style="font-size:11px;color:var(--text-3)">(select all that apply)</span></label>
+      <div id="bf_tags" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">
+        <!-- rendered by JS -->
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Overall sentiment</label>
+      <div style="display:flex;gap:8px;margin-top:4px">
+        <button type="button" id="bfSent_positive" onclick="setBFSentiment('positive')" style="flex:1;padding:8px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:var(--surface-2);cursor:pointer;font-size:13px">👍 Positive</button>
+        <button type="button" id="bfSent_neutral" onclick="setBFSentiment('neutral')" style="flex:1;padding:8px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:var(--surface-2);cursor:pointer;font-size:13px">😐 Neutral</button>
+        <button type="button" id="bfSent_negative" onclick="setBFSentiment('negative')" style="flex:1;padding:8px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:var(--surface-2);cursor:pointer;font-size:13px">👎 Negative</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Note <span style="font-size:11px;color:var(--text-3)">(optional)</span></label>
+      <textarea id="bf_note" placeholder="Any additional context from the broker…" style="width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:14px;color:var(--text);background:var(--surface-2);outline:none;resize:none;min-height:68px;line-height:1.5"></textarea>
+    </div>
+
+    <input type="hidden" id="bf_feedbackId"/>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px">
+      <button onclick="closeBrokerFeedbackModal()" style="padding:12px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:transparent;color:var(--text-2);font-size:15px;cursor:pointer">Cancel</button>
+      <button onclick="saveBrokerFeedback()" style="padding:12px;border-radius:var(--radius-sm);border:none;background:var(--brand);color:#fff;font-size:15px;font-weight:700;cursor:pointer">Save feedback</button>
     </div>
   </div>
 </div>
@@ -1394,7 +1456,7 @@ function buildNav() {
   } else if (r === 'hr') {
     tabs = [['checkin','Check in'],['dashboard','Dashboard'],['profile','PIN']];
   } else if (r === 'teamlead') {
-    tabs = [['checkin','Check in'],['myteam','My Team'],['files','Team Files'],['myfiles','My Files'],['profile','PIN']];
+    tabs = [['checkin','Check in'],['myteam','My Team'],['files','Team Files'],['myfiles','My Files'],['feedback','📣 Feedback'],['profile','PIN']];
   } else if (r === 'analyst') {
     tabs = [['checkin','Check in'],['myfiles','My Files'],['profile','PIN']];
   } else if (['assistant','sales','customerservice','socialmedia'].includes(r)) {
@@ -1417,6 +1479,7 @@ function goTab(name, btn) {
   if (name==='myteam')    renderMyTeam();
   if (name==='files')     renderFilesScreen();
   if (name==='myfiles')   renderMyFilesScreen();
+  if (name==='feedback')  renderFeedbackScreen();
   if (name==='admin')     renderAdmin();
   if (name==='profile')   initCp();
 }
@@ -3329,7 +3392,9 @@ function renderManageTeamModal() {
   if (!_managingTL) return;
   const teams = getTeams();
   const currentTeam = teams[_managingTL] || [];
-  const allStaff = getStaff().filter(s => s.role === 'staff' || s.role === 'teamlead');
+  // All assignable roles — analyst + any role that can be in a team
+  const TEAM_ROLES = ['analyst','assistant','sales','customerservice','socialmedia','hr'];
+  const allStaff = getStaff().filter(s => TEAM_ROLES.includes(s.role));
 
   // Current members list
   const listEl = document.getElementById('manageTeamCurrentList');
@@ -3338,21 +3403,23 @@ function renderManageTeamModal() {
   } else {
     listEl.innerHTML = currentTeam.map(name => {
       const member = allStaff.find(s => s.name === name);
+      const roleLabel = member ? (ROLE_LABEL[member.role]||member.role) : '';
       return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:var(--surface-2);border-radius:var(--radius-sm);margin-bottom:6px">
         <div style="display:flex;align-items:center;gap:8px">
           <div style="width:30px;height:30px;border-radius:50%;background:var(--brand-light);color:var(--brand);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center">${esc(initials(name))}</div>
-          <span style="font-size:14px;color:var(--text)">${esc(name)}</span>
+          <div>
+            <div style="font-size:14px;color:var(--text)">${esc(name)}</div>
+            <div style="font-size:11px;color:var(--text-3)">${esc(roleLabel)}</div>
+          </div>
         </div>
         <button onclick="removeFromTeam('${name.replace(/'/g,"\'")}")" style="background:var(--danger-light);color:var(--danger);border:none;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;font-weight:600">Remove</button>
       </div>`;
     }).join('');
   }
 
-  // Add dropdown — show staff not already in THIS team
-  // (staff can only be in one team, so also exclude those in other teams)
+  // Add dropdown — unassigned staff or already in this team
   const allAssigned = new Set(Object.values(teams).flat());
   const available = allStaff.filter(s =>
-    s.role === 'staff' &&
     !currentTeam.includes(s.name) &&
     (!allAssigned.has(s.name) || currentTeam.includes(s.name))
   );
@@ -4706,9 +4773,8 @@ function renderMyFilesActive(el, myFiles) {
 
 // ── Auto-refresh myfiles screen every 60s ────────────────────────────────
 setInterval(() => {
-  if (document.getElementById('screen-myfiles')?.classList.contains('active')) {
-    renderMyFilesScreen();
-  }
+  if (document.getElementById('screen-myfiles')?.classList.contains('active')) renderMyFilesScreen();
+  if (document.getElementById('screen-feedback')?.classList.contains('active')) renderFeedbackScreen();
 }, 60000);
 
 // ── Patch openFileModal: allow analyst + TL on myfiles screen ─────────────
@@ -4887,7 +4953,7 @@ function fileCard(f, showControls) {
           <span style="font-size:14px;font-weight:700;color:var(--text)">${esc(f.client)}</span>
         </div>
         <div style="font-size:11px;color:var(--text-3)">
-          📋 ${esc(f.appType)}${f.lender?' · 🏦 '+esc(f.lender):''} · ${esc(f.owner.split(' ')[0])} · ${ageLabel}
+          📋 ${esc(f.appType)}${f.lender?' · 🏦 '+esc(f.lender):''} · 👤 ${esc(f.owner)} · ${ageLabel}
           ${f.settleDate?' · 📅 settle '+esc(f.settleDate):''}
         </div>
       </div>
@@ -5218,6 +5284,275 @@ window.updateFileLogUI = function() {
   const card = document.getElementById('fileLogCard');
   if (card) card.style.display = 'none'; // always hidden — use My Files tab instead
 };
+
+
+// ══════════════════════════════════════════════════════════════════════════
+// ── BROKER FEEDBACK SYSTEM ────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════
+
+const BF_FEEDBACK_TAGS = [
+  'Too slow', 'Cannot understand', 'Repeats mistakes',
+  'Careless', 'Not pro-active', 'Not professional',
+  'Rude', 'Dishonest', 'Good work', 'Very responsive',
+  'Excellent communication', 'Proactive'
+];
+
+const BF_TAG_COLORS = {
+  'Too slow':              {bg:'#FEF2F2',color:'#B91C1C'},
+  'Cannot understand':     {bg:'#FEF2F2',color:'#B91C1C'},
+  'Repeats mistakes':      {bg:'#FEF2F2',color:'#B91C1C'},
+  'Careless':              {bg:'#FEF2F2',color:'#B91C1C'},
+  'Not pro-active':        {bg:'#FEF3C7',color:'#92400E'},
+  'Not professional':      {bg:'#FEF3C7',color:'#92400E'},
+  'Rude':                  {bg:'#FEE2E2',color:'#991B1B'},
+  'Dishonest':             {bg:'#FEE2E2',color:'#991B1B'},
+  'Good work':             {bg:'#D1FAE5',color:'#065F46'},
+  'Very responsive':       {bg:'#D1FAE5',color:'#065F46'},
+  'Excellent communication':{bg:'#D1FAE5',color:'#065F46'},
+  'Proactive':             {bg:'#D1FAE5',color:'#065F46'},
+};
+
+// ── Storage ───────────────────────────────────────────────────────────────
+function getBrokerFeedback() { return LS.get('ci_bfeedback') || []; }
+function saveBrokerFeedback_(f) { LS.set('ci_bfeedback', f); }
+
+let _selectedBFTags = new Set();
+let _bfSentiment = '';
+let _bfTab = 'all';
+
+// ── Open / close modal ────────────────────────────────────────────────────
+function openBrokerFeedbackModal(feedbackId) {
+  _selectedBFTags = new Set();
+  _bfSentiment = '';
+
+  // Populate analyst dropdown — TL sees their team
+  const sel = document.getElementById('bf_analyst');
+  const myTeam = getTeamForTL(currentUser.name);
+  const analysts = getStaff().filter(s => myTeam.includes(s.name) || (isSuperAdmin() && ANALYST_ROLES.includes(s.role)));
+  sel.innerHTML = '<option value="">— select analyst —</option>' +
+    analysts.map(s => `<option value="${esc(s.name)}">${esc(s.name)}</option>`).join('');
+
+  // Render tag chips
+  renderBFTags();
+  setBFSentiment('');
+
+  if (feedbackId) {
+    const entry = getBrokerFeedback().find(f => f.id === feedbackId);
+    if (entry) {
+      sel.value = entry.analyst || '';
+      document.getElementById('bf_broker').value = entry.broker || '';
+      document.getElementById('bf_note').value = entry.note || '';
+      document.getElementById('bf_feedbackId').value = feedbackId;
+      _selectedBFTags = new Set(entry.tags || []);
+      _bfSentiment = entry.sentiment || '';
+      renderBFTags();
+      setBFSentiment(_bfSentiment);
+    }
+  } else {
+    document.getElementById('bf_broker').value = '';
+    document.getElementById('bf_note').value = '';
+    document.getElementById('bf_feedbackId').value = '';
+  }
+
+  document.getElementById('brokerFeedbackModal').style.display = 'flex';
+}
+
+function closeBrokerFeedbackModal() {
+  document.getElementById('brokerFeedbackModal').style.display = 'none';
+}
+
+function renderBFTags() {
+  const el = document.getElementById('bf_tags');
+  if (!el) return;
+  el.innerHTML = BF_FEEDBACK_TAGS.map(tag => {
+    const sel = _selectedBFTags.has(tag);
+    const sc = BF_TAG_COLORS[tag] || {bg:'#F3F4F6',color:'#374151'};
+    return `<button type="button" onclick="toggleBFTag('${tag.replace(/'/g,"\\'")}\")"
+      style="padding:5px 12px;border-radius:50px;border:1.5px solid ${sel?sc.color:'var(--border)'};
+      background:${sel?sc.bg:'var(--surface-2)'};color:${sel?sc.color:'var(--text-2)'};
+      font-size:12px;font-weight:${sel?'700':'400'};cursor:pointer;transition:all .15s">
+      ${sel?'✓ ':''}${esc(tag)}
+    </button>`;
+  }).join('');
+}
+
+function toggleBFTag(tag) {
+  if (_selectedBFTags.has(tag)) _selectedBFTags.delete(tag);
+  else _selectedBFTags.add(tag);
+  renderBFTags();
+}
+
+function setBFSentiment(s) {
+  _bfSentiment = s;
+  ['positive','neutral','negative'].forEach(k => {
+    const btn = document.getElementById('bfSent_'+k);
+    if (!btn) return;
+    const active = k === s;
+    btn.style.fontWeight = active ? '700' : '400';
+    btn.style.borderColor = active ? 'var(--brand)' : 'var(--border)';
+    btn.style.background = active ? 'var(--brand-light)' : 'var(--surface-2)';
+    btn.style.color = active ? 'var(--brand)' : 'var(--text-2)';
+  });
+}
+
+function saveBrokerFeedback() {
+  const analyst = document.getElementById('bf_analyst').value;
+  const broker  = document.getElementById('bf_broker').value.trim();
+  if (!analyst) { showToast('Select an analyst.', 'err'); return; }
+  if (!broker)  { showToast('Enter broker name.', 'err'); return; }
+
+  const feedbackId = document.getElementById('bf_feedbackId').value || genFileId();
+  const all = getBrokerFeedback();
+  const idx = all.findIndex(f => f.id === feedbackId);
+
+  const entry = {
+    id: feedbackId,
+    analyst,
+    broker,
+    tags: Array.from(_selectedBFTags),
+    sentiment: _bfSentiment,
+    note: document.getElementById('bf_note').value.trim(),
+    loggedBy: currentUser.name,
+    date: today,
+    ts: Date.now(),
+  };
+
+  if (idx >= 0) all[idx] = entry;
+  else all.push(entry);
+  saveBrokerFeedback_(all);
+  closeBrokerFeedbackModal();
+  showToast('Feedback saved ✓', 'ok');
+  renderFeedbackScreen();
+}
+
+function deleteBrokerFeedback(feedbackId) {
+  if (!confirm('Delete this feedback entry?')) return;
+  const all = getBrokerFeedback().filter(f => f.id !== feedbackId);
+  saveBrokerFeedback_(all);
+  renderFeedbackScreen();
+  showToast('Deleted.', 'ok');
+}
+
+// ── Feedback screen renderer ──────────────────────────────────────────────
+function switchFeedbackTab(tab, btn) {
+  _bfTab = tab;
+  document.querySelectorAll('#screen-feedback .tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderFeedbackScreen();
+}
+
+function renderFeedbackScreen() {
+  const el = document.getElementById('feedbackContent');
+  if (!el) return;
+
+  // Scope: TL sees their team, SA sees all
+  const myTeam = isTeamLead() ? [...getTeamForTL(currentUser.name), currentUser.name] : null;
+  let all = getBrokerFeedback();
+  if (myTeam) all = all.filter(f => myTeam.includes(f.analyst));
+
+  if (all.length === 0) {
+    el.innerHTML = `<div class="card" style="text-align:center;padding:2rem">
+      <div style="font-size:2rem;margin-bottom:10px">📣</div>
+      <div style="font-size:15px;font-weight:600;color:var(--text)">No feedback logged yet</div>
+      <div style="font-size:13px;color:var(--text-3);margin-top:4px">Tap "+ Log broker feedback" to add the first entry.</div>
+    </div>`;
+    return;
+  }
+
+  if (_bfTab === 'all') {
+    renderFeedbackAll(el, all);
+  } else if (_bfTab === 'analyst') {
+    renderFeedbackByAnalyst(el, all);
+  } else if (_bfTab === 'tags') {
+    renderFeedbackByTags(el, all);
+  }
+}
+
+function feedbackCard(f) {
+  const sentIcon = {positive:'👍',neutral:'😐',negative:'👎'}[f.sentiment]||'';
+  const tagHTML = (f.tags||[]).map(tag => {
+    const sc = BF_TAG_COLORS[tag]||{bg:'#F3F4F6',color:'#374151'};
+    return `<span style="padding:2px 8px;border-radius:50px;background:${sc.bg};color:${sc.color};font-size:11px;font-weight:600">${esc(tag)}</span>`;
+  }).join('');
+
+  return `<div style="padding:12px 14px">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:6px">
+      <div>
+        <div style="font-size:14px;font-weight:700;color:var(--text)">${esc(f.analyst)} ${sentIcon}</div>
+        <div style="font-size:11px;color:var(--text-3)">From ${esc(f.broker)} · ${esc(f.date)} · by ${esc(f.loggedBy.split(' ')[0])}</div>
+      </div>
+      <div style="display:flex;gap:4px">
+        <button onclick="openBrokerFeedbackModal('${f.id}')" style="font-size:11px;padding:3px 8px;border-radius:4px;border:1px solid var(--border);background:transparent;cursor:pointer">Edit</button>
+        <button onclick="deleteBrokerFeedback('${f.id}')" style="font-size:11px;padding:3px 8px;border-radius:4px;border:1px solid var(--border);background:transparent;color:var(--danger);cursor:pointer">✕</button>
+      </div>
+    </div>
+    ${tagHTML ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px">${tagHTML}</div>` : ''}
+    ${f.note ? `<div style="font-size:12px;color:var(--text-2);font-style:italic">"${esc(f.note)}"</div>` : ''}
+  </div>`;
+}
+
+function renderFeedbackAll(el, all) {
+  const sorted = [...all].sort((a,b) => b.ts - a.ts);
+  el.innerHTML = `<div class="card" style="padding:0;overflow:hidden">
+    ${sorted.map(f => feedbackCard(f)).join('<div style="height:1px;background:var(--border)"></div>')}
+  </div>`;
+}
+
+function renderFeedbackByAnalyst(el, all) {
+  const byAnalyst = {};
+  all.forEach(f => {
+    if (!byAnalyst[f.analyst]) byAnalyst[f.analyst] = [];
+    byAnalyst[f.analyst].push(f);
+  });
+
+  el.innerHTML = Object.entries(byAnalyst).map(([analyst, entries]) => {
+    const negCount = entries.filter(e => e.sentiment === 'negative' || (e.tags||[]).some(t => BF_TAG_COLORS[t]?.color==='#B91C1C'||BF_TAG_COLORS[t]?.color==='#991B1B')).length;
+    const posCount = entries.filter(e => e.sentiment === 'positive').length;
+    return `<div style="margin-bottom:12px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <div style="font-size:14px;font-weight:700;color:var(--text)">${esc(analyst)}</div>
+        <div style="font-size:12px;color:var(--text-3)">${entries.length} entries · ${posCount>0?'👍 '+posCount+' positive · ':''} ${negCount>0?'⚠️ '+negCount+' negative':''}</div>
+      </div>
+      <div class="card" style="padding:0;overflow:hidden">
+        ${entries.sort((a,b)=>b.ts-a.ts).map(f => feedbackCard(f)).join('<div style="height:1px;background:var(--border)"></div>')}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderFeedbackByTags(el, all) {
+  const byTag = {};
+  all.forEach(f => {
+    (f.tags||[]).forEach(tag => {
+      if (!byTag[tag]) byTag[tag] = [];
+      byTag[tag].push(f);
+    });
+  });
+
+  if (Object.keys(byTag).length === 0) {
+    el.innerHTML = '<div class="card" style="text-align:center;padding:1.5rem;font-size:13px;color:var(--text-3)">No tags used yet.</div>';
+    return;
+  }
+
+  // Sort by count desc
+  const sorted = Object.entries(byTag).sort((a,b) => b[1].length - a[1].length);
+  el.innerHTML = sorted.map(([tag, entries]) => {
+    const sc = BF_TAG_COLORS[tag]||{bg:'#F3F4F6',color:'#374151'};
+    return `<div style="margin-bottom:10px">
+      <div style="display:inline-flex;align-items:center;gap:8px;margin-bottom:6px">
+        <span style="padding:4px 12px;border-radius:50px;background:${sc.bg};color:${sc.color};font-size:12px;font-weight:700">${esc(tag)}</span>
+        <span style="font-size:12px;color:var(--text-3)">${entries.length}×</span>
+      </div>
+      <div class="card" style="padding:0;overflow:hidden">
+        ${entries.sort((a,b)=>b.ts-a.ts).slice(0,5).map(f => feedbackCard(f)).join('<div style="height:1px;background:var(--border)"></div>')}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── File card: confirm analyst name shows under each card (already in fileCard) ─
+// The fileCard function already shows: "${esc(f.owner.split(' ')[0])}" in the meta line
+// Let's make it show full name for TL view
 
 </script>
 </body>
