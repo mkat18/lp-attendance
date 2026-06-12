@@ -1388,7 +1388,7 @@ function submitCheckin() {
       if (staff&&staff.office&&staff.office!=='WFH'&&CONFIG.offices[staff.office]) {
         const dist=haversineKm(geo.lat,geo.lng,CONFIG.offices[staff.office].lat,CONFIG.offices[staff.office].lng);
         if (dist>CONFIG.geoThresholdKm) {
-          setTimeout(()=>showToast(`⚠ You appear to be ${Math.round(dist*10)/10}km from ${staff.office} office`,'err'),1500);
+          // Location flag recorded silently — managers see it on dashboard
         }
       }
     }
@@ -1544,22 +1544,22 @@ function renderMetrics() {
   const nowMins=now.getHours()*60+now.getMinutes();
   const isWorkingHours=nowMins>=240&&nowMins<=1380;
 
-  const lateStaff=!isWeekend ? allStaff.filter(s=>{
+  const lateStaff=allStaff.filter(s=>{
     if (!s.startTime) return false;
     const rec=dayRecs.find(r=>r.name===s.name);
     if (!rec||!rec.clockIn) return false;
     const scheduledMs=new Date(date+'T'+s.startTime+':00').getTime();
     return rec.clockIn > scheduledMs + 15*60*1000;
-  }) : [];
+  });
 
   // Early clock out — clocked out >15 mins BEFORE scheduled end (not after)
-  const earlyStaff=!isWeekend ? allStaff.filter(s=>{
+  const earlyStaff=allStaff.filter(s=>{
     if (!s.endTime) return false;
     const rec=dayRecs.find(r=>r.name===s.name);
     if (!rec||!rec.clockOut) return false;
     const scheduledEndMs=new Date(date+'T'+s.endTime+':00').getTime();
     return rec.clockOut < scheduledEndMs - 15*60*1000;
-  }) : [];
+  });
 
   // Location flagged — submitted "In office" or "Half day" but geo shows >0.75km from their office
   const locationFlagged=dayRecs.filter(r=>{
@@ -1570,10 +1570,10 @@ function renderMetrics() {
   });
 
   document.getElementById('metrics').innerHTML=`
-    <div class="met clickable" style="grid-column:1/-1;${missing.length>0&&!isWeekend?'border-color:#FECACA':''}" onclick="cardTap('missing')">
+    <div class="met clickable" style="grid-column:1/-1;${missing.length>0?'border-color:#FECACA':''}" onclick="cardTap('missing')">
       <div class="met-lbl">Not submitted</div>
-      <div class="met-val" style="color:${missing.length>0&&!isWeekend?'var(--danger)':'var(--success)'}">${isWeekend?'—':missing.length}</div>
-      <div class="met-sub">${isWeekend?'weekend':missing.length>0?missing.slice(0,3).map(n=>n.split(' ')[0]).join(', ')+(missing.length>3?' +more':''):'all clear ✓'}</div>
+      <div class="met-val" style="color:${missing.length>0?'var(--danger)':'var(--success)'}">${missing.length}</div>
+      <div class="met-sub">${missing.length>0?missing.slice(0,3).map(n=>n.split(' ')[0]).join(', ')+(missing.length>3?' +more':''):'all clear ✓'}</div>
     </div>
     <div class="met clickable" onclick="cardTap('office')">
       <div class="met-lbl">In office</div>
@@ -1595,7 +1595,7 @@ function renderMetrics() {
       <div class="met-val" style="color:var(--halfday)">${halfday}</div>
       <div class="met-sub">${halfday>0?'tap to see who':'&nbsp;'}</div>
     </div>
-    ${isToday&&!isWeekend?`
+    ${isToday?`
     <div class="met clickable" style="${onBreakNames.length>0?'border-color:#E8A040':''}" onclick="cardTap('onbreak')">
       <div class="met-lbl">On break now</div>
       <div class="met-val" style="color:${onBreakNames.length>0?'var(--warn)':'var(--text-3)'}">${onBreakNames.length}</div>
@@ -1608,18 +1608,18 @@ function renderMetrics() {
     </div>`:''}
     <div class="met clickable" style="${lateStaff.length>0?'border-color:#FECACA':''}" onclick="cardTap('late')">
       <div class="met-lbl">Late clock in</div>
-      <div class="met-val" style="color:${lateStaff.length>0?'var(--danger)':'var(--success)'}">${isWeekend?'—':lateStaff.length}</div>
-      <div class="met-sub">${isWeekend?'weekend':lateStaff.length>0?lateStaff.slice(0,2).map(n=>n.name.split(' ')[0]).join(', ')+(lateStaff.length>2?' +more':''):'all on time ✓'}</div>
+      <div class="met-val" style="color:${lateStaff.length>0?'var(--danger)':'var(--success)'}">${lateStaff.length}</div>
+      <div class="met-sub">${lateStaff.length>0?lateStaff.slice(0,2).map(n=>n.name.split(' ')[0]).join(', ')+(lateStaff.length>2?' +more':''):'all on time ✓'}</div>
     </div>
     <div class="met clickable" style="${earlyStaff.length>0?'border-color:#FECACA':''}" onclick="cardTap('early')">
       <div class="met-lbl">Early clock out</div>
-      <div class="met-val" style="color:${earlyStaff.length>0?'var(--danger)':'var(--success)'}">${isWeekend?'—':earlyStaff.length}</div>
-      <div class="met-sub">${isWeekend?'weekend':earlyStaff.length>0?earlyStaff.slice(0,2).map(n=>n.name.split(' ')[0]).join(', ')+(earlyStaff.length>2?' +more':''):'all good ✓'}</div>
+      <div class="met-val" style="color:${earlyStaff.length>0?'var(--danger)':'var(--success)'}">${earlyStaff.length}</div>
+      <div class="met-sub">${earlyStaff.length>0?earlyStaff.slice(0,2).map(n=>n.name.split(' ')[0]).join(', ')+(earlyStaff.length>2?' +more':''):'all good ✓'}</div>
     </div>
     <div class="met clickable" style="grid-column:1/-1;${locationFlagged.length>0?'border-color:#FECACA':''}" onclick="cardTap('location')">
       <div class="met-lbl">📍 Location issues</div>
-      <div class="met-val" style="color:${locationFlagged.length>0?'var(--danger)':'var(--success)'}">${isWeekend?'—':locationFlagged.length}</div>
-      <div class="met-sub">${isWeekend?'weekend':locationFlagged.length>0?locationFlagged.slice(0,3).map(r=>r.name.split(' ')[0]).join(', ')+(locationFlagged.length>3?' +more':''):'all locations verified ✓'}</div>
+      <div class="met-val" style="color:${locationFlagged.length>0?'var(--danger)':'var(--success)'}">${locationFlagged.length}</div>
+      <div class="met-sub">${locationFlagged.length>0?locationFlagged.slice(0,3).map(r=>r.name.split(' ')[0]).join(', ')+(locationFlagged.length>3?' +more':''):'all locations verified ✓'}</div>
     </div>`;
 }
 
