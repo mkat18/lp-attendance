@@ -445,7 +445,7 @@ tr.flagged-row:hover td { background: #FFEAEA; }
   <!-- ── LOGIN ─────────────────────────────────────────────────────────── -->
   <!-- ── MS LOGIN ─────────────────────────────────────────────────────────── -->
   <div id="screen-mslogin" class="screen active" style="text-align:center;padding:4rem 1.5rem">
-    <img src="https://loanprocessor.com.au/wp-content/uploads/2021/10/Cropped-and-Trans.png" style="height:60px;margin-bottom:2rem"/>
+    <img src="https://loanprocessor.com.au/wp-content/uploads/2021/10/Cropped-and-Trans.png" style="height:60px;margin-bottom:2rem" onerror="this.style.display='none'"/>
     <h1 style="font-size:22px;font-weight:700;margin-bottom:8px;color:var(--text)">Staff Attendance</h1>
     <p style="color:var(--text-2);margin-bottom:2rem">Sign in with your Loan Processor Microsoft account to continue.</p>
     <button class="btn-primary" onclick="msSignIn()" style="max-width:280px;margin:0 auto;display:flex;align-items:center;justify-content:center;gap:10px">
@@ -2314,9 +2314,15 @@ const SP_SCOPES = ['https://loanprocessorau.sharepoint.com/Sites.ReadWrite.All',
 async function msSignIn() {
   if (!msalInstance) { showToast('Auth not ready, please refresh.','err'); return; }
   try {
-    const result = await msalInstance.loginPopup({ scopes: SP_SCOPES });
-    msalToken = result.accessToken;
-    await onMsLogin(result.account);
+    // Use redirect for mobile, popup for desktop
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    if (isMobile) {
+      await msalInstance.loginRedirect({ scopes: SP_SCOPES });
+    } else {
+      const result = await msalInstance.loginPopup({ scopes: SP_SCOPES });
+      msalToken = result.accessToken;
+      await onMsLogin(result.account);
+    }
   } catch(e) {
     document.getElementById('msLoginErr').textContent = 'Sign in failed. Please try again.';
     console.error('MSAL error:', e);
