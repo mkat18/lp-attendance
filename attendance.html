@@ -963,6 +963,7 @@ function spToRecord(item) {
     clockOut: hhmmToTs(item.ClockOut, dateStr),
     geo: (item.GeoLat && item.GeoLng) ? {lat:parseFloat(item.GeoLat),lng:parseFloat(item.GeoLng),accuracy:parseFloat(item.GeoAccuracy||0)} : null,
     submittedBy: item.SubmittedBy||null,
+    msAccount: item.MsAccount||null,
     ts: hhmmToTs(item.ClockIn, dateStr)||Date.now(),
   };
 }
