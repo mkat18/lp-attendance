@@ -2422,12 +2422,13 @@ const msalConfig = {
   cache: { cacheLocation: 'sessionStorage' }
 };
 
-const msalInstance = new msal.PublicClientApplication(msalConfig);
+let msalInstance = null;
 let msalToken = null;
 
 const SP_SCOPES = ['https://loanprocessorau.sharepoint.com/Sites.ReadWrite.All', 'User.Read'];
 
 async function msSignIn() {
+  if (!msalInstance) { showToast('Auth not ready, please refresh.','err'); return; }
   try {
     const result = await msalInstance.loginPopup({ scopes: SP_SCOPES });
     msalToken = result.accessToken;
@@ -2651,16 +2652,22 @@ if (document.readyState === 'loading') {
 }
 
 async function initMsal() {
-  await msalInstance.initialize();
-  // Handle redirect response
-  await msalInstance.handleRedirectPromise();
-  const accounts = msalInstance.getAllAccounts();
-  if (accounts.length > 0) {
-    // Already signed in
-    await onMsLogin(accounts[0]);
-  } else {
-    // Show MS login screen
-    showScreen('screen-mslogin');
+  try {
+    msalInstance = new msal.PublicClientApplication(msalConfig);
+    await msalInstance.initialize();
+    await msalInstance.handleRedirectPromise();
+    const accounts = msalInstance.getAllAccounts();
+    if (accounts.length > 0) {
+      await onMsLogin(accounts[0]);
+    } else {
+      showScreen('screen-mslogin');
+    }
+  } catch(e) {
+    console.error('MSAL init error:', e);
+    // Fallback to normal login if MSAL fails
+    showScreen('login');
+    populateNameDropdown();
+    requestGeo();
   }
 }
 
