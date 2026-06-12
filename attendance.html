@@ -1089,6 +1089,16 @@ function getGreeting() {
     });
   }
   saveRecords(recs); saveBreaks(brks); LS.set('ci_seeded12', true);
+  // Push staff to SharePoint if logged in
+  setTimeout(async function() {
+    if (typeof getToken === 'function') {
+      try {
+        const staff = getStaff();
+        for (const s of staff) { await spSaveStaffMember(s); }
+        console.log('Seed staff pushed to SharePoint');
+      } catch(e) { console.log('SharePoint push skipped:', e.message); }
+    }
+  }, 3000);
 })();
 
 // ── State ─────────────────────────────────────────────────────────────────
@@ -2506,15 +2516,16 @@ async function loadFromSharePoint() {
       spGet(SP_API + "('AttendanceRecords')/items?$top=5000"),
       spGet(SP_API + "('AttendanceBreaks')/items?$top=5000"),
     ]);
-    if (staffRes && staffRes.value) {
+    // Only overwrite local data if SharePoint has data
+    if (staffRes && staffRes.value && staffRes.value.length > 0) {
       _staff = staffRes.value.map(spToStaff);
       LS.set('ci_staff', _staff);
     }
-    if (recRes && recRes.value) {
+    if (recRes && recRes.value && recRes.value.length > 0) {
       _records = recRes.value.map(spToRecord);
       LS.set('ci_records', _records);
     }
-    if (brkRes && brkRes.value) {
+    if (brkRes && brkRes.value && brkRes.value.length > 0) {
       _breaks = brkRes.value.map(spToBreak);
       LS.set('ci_breaks', _breaks);
     }
