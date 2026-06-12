@@ -2314,15 +2314,7 @@ const SP_SCOPES = ['https://loanprocessorau.sharepoint.com/Sites.ReadWrite.All',
 async function msSignIn() {
   if (!msalInstance) { showToast('Auth not ready, please refresh.','err'); return; }
   try {
-    // Use redirect for mobile, popup for desktop
-    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-    if (isMobile) {
-      await msalInstance.loginRedirect({ scopes: SP_SCOPES });
-    } else {
-      const result = await msalInstance.loginPopup({ scopes: SP_SCOPES });
-      msalToken = result.accessToken;
-      await onMsLogin(result.account);
-    }
+    await msalInstance.loginRedirect({ scopes: SP_SCOPES });
   } catch(e) {
     document.getElementById('msLoginErr').textContent = 'Sign in failed. Please try again.';
     console.error('MSAL error:', e);
@@ -2337,9 +2329,8 @@ async function getToken() {
     msalToken = result.accessToken;
     return msalToken;
   } catch(e) {
-    const result = await msalInstance.acquireTokenPopup({ scopes: SP_SCOPES });
-    msalToken = result.accessToken;
-    return msalToken;
+    await msalInstance.acquireTokenRedirect({ scopes: SP_SCOPES });
+    return null;
   }
 }
 
@@ -2575,7 +2566,13 @@ async function initMsal() {
   try {
     msalInstance = new msal.PublicClientApplication(msalConfig);
     await msalInstance.initialize();
-    await msalInstance.handleRedirectPromise();
+    // Handle redirect response first
+    const redirectResult = await msalInstance.handleRedirectPromise();
+    if (redirectResult) {
+      msalToken = redirectResult.accessToken;
+      await onMsLogin(redirectResult.account);
+      return;
+    }
     const accounts = msalInstance.getAllAccounts();
     if (accounts.length > 0) {
       await onMsLogin(accounts[0]);
@@ -2584,7 +2581,6 @@ async function initMsal() {
     }
   } catch(e) {
     console.error('MSAL init error:', e);
-    // Fallback to normal login if MSAL fails
     showScreen('login');
     populateNameDropdown();
     requestGeo();
