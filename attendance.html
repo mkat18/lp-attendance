@@ -443,6 +443,18 @@ tr.flagged-row:hover td { background: #FFEAEA; }
 <main>
 
   <!-- ── LOGIN ─────────────────────────────────────────────────────────── -->
+  <!-- ── MS LOGIN ─────────────────────────────────────────────────────────── -->
+  <div id="screen-mslogin" class="screen active" style="text-align:center;padding:4rem 1.5rem">
+    <img src="https://loanprocessor.com.au/wp-content/uploads/2021/10/Cropped-and-Trans.png" style="height:60px;margin-bottom:2rem"/>
+    <h1 style="font-size:22px;font-weight:700;margin-bottom:8px;color:var(--text)">Staff Attendance</h1>
+    <p style="color:var(--text-2);margin-bottom:2rem">Sign in with your Loan Processor Microsoft account to continue.</p>
+    <button class="btn-primary" onclick="msSignIn()" style="max-width:280px;margin:0 auto;display:flex;align-items:center;justify-content:center;gap:10px">
+      <svg width="20" height="20" viewBox="0 0 21 21" fill="none"><rect x="1" y="1" width="9" height="9" fill="#f25022"/><rect x="11" y="1" width="9" height="9" fill="#7fba00"/><rect x="1" y="11" width="9" height="9" fill="#00a4ef"/><rect x="11" y="11" width="9" height="9" fill="#ffb900"/></svg>
+      Sign in with Microsoft
+    </button>
+    <p id="msLoginErr" style="font-size:12px;color:var(--danger);margin-top:1rem"></p>
+  </div>
+
   <!-- ── GEO BLOCKED ──────────────────────────────────────────────────────── -->
   <div id="screen-geoblocked" class="screen" style="text-align:center;padding:3rem 1.5rem">
     <div style="font-size:56px;margin-bottom:1rem">📍</div>
@@ -453,7 +465,7 @@ tr.flagged-row:hover td { background: #FFEAEA; }
   </div>
 
   <!-- ── LOGIN ────────────────────────────────────────────────────────────── -->
-  <div id="screen-login" class="screen active">
+  <div id="screen-login" class="screen">
     <div class="page-header" style="text-align:center;margin-top:.5rem">
       <h1 id="loginGreeting">Good morning 👋</h1>
       <p>Search your name and enter your PIN</p>
@@ -715,6 +727,7 @@ tr.flagged-row:hover td { background: #FFEAEA; }
 </div>
 <div id="toast" role="status" aria-live="polite"></div>
 
+<script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script>
 // ════════════════════════════════════════════════════════════════════════════
@@ -943,13 +956,13 @@ function getGreeting() {
 
 // ── Seed demo data ────────────────────────────────────────────────────────
 (function(){
-  if (LS.get('ci_seeded11')) return;
+  if (LS.get('ci_seeded12')) return;
   localStorage.removeItem('ci_staff');
   localStorage.removeItem('ci_records');
   localStorage.removeItem('ci_breaks');
   saveStaff([
-    { name:'Mayur', role:'superadmin', pin:null, tempPin:null, startTime:null, endTime:null, office:null },
-    { name:'Divit', role:'superadmin', pin:null, tempPin:null, startTime:null, endTime:null, office:null },
+    { name:'Mayur', role:'superadmin', pin:hashPin('284716'), tempPin:null, startTime:null, endTime:null, office:null },
+    { name:'Divit', role:'superadmin', pin:hashPin('539182'), tempPin:null, startTime:null, endTime:null, office:null },
     { name:'Nikki Jain', role:'staff', pin:hashPin('473829'), tempPin:null, startTime:'06:00', endTime:'14:30', office:'Borivali' },
     { name:'Nehal Poojari', role:'staff', pin:hashPin('916274'), tempPin:null, startTime:'06:00', endTime:'14:30', office:'Borivali' },
     { name:'Vianney Romeo', role:'manager', pin:hashPin('739284'), tempPin:null, startTime:'06:00', endTime:'14:30', office:'Goregaon' },
@@ -1045,8 +1058,8 @@ function getGreeting() {
     { name:'Rahul Sharma', role:'staff', pin:null, tempPin:null, startTime:'10:00', endTime:'18:30', office:'Goregaon' },
     { name:'Aniket Chand', role:'staff', pin:null, tempPin:null, startTime:'10:00', endTime:'18:30', office:'WFH' },
     { name:'Kunal Choksi', role:'staff', pin:null, tempPin:null, startTime:'13:00', endTime:'16:00', office:'Goregaon' },
-    { name:'Krutika Natki', role:'manager', pin:null, tempPin:null, startTime:'13:00', endTime:'16:00', office:'Goregaon' },
-    { name:'Yug Kanojia', role:'manager', pin:null, tempPin:null, startTime:'06:00', endTime:'14:30', office:'Borivali' },
+    { name:'Krutika Natki', role:'manager', pin:hashPin('492851'), tempPin:null, startTime:'13:00', endTime:'16:00', office:'Goregaon' },
+    { name:'Yug Kanojia', role:'manager', pin:hashPin('617394'), tempPin:null, startTime:'06:00', endTime:'14:30', office:'Borivali' },
     { name:'Craige', role:'staff', pin:null, tempPin:null, startTime:'06:00', endTime:'14:30', office:'Borivali' },
     { name:'Divya Mahale', role:'staff', pin:null, tempPin:null, startTime:'06:00', endTime:'14:30', office:'Goregaon' },
     { name:'Bhavesh', role:'staff', pin:null, tempPin:null, startTime:'05:00', endTime:'13:30', office:'Goregaon' },
@@ -1055,7 +1068,7 @@ function getGreeting() {
     { name:'Tea Person', role:'staff', pin:null, tempPin:null, startTime:'05:00', endTime:'13:30', office:'Virar' },
     { name:'Auto Driver', role:'staff', pin:null, tempPin:null, startTime:'10:00', endTime:'18:30', office:'Virar' },
     { name:'Chirag Seo', role:'staff', pin:null, tempPin:null, startTime:'10:00', endTime:'18:30', office:'Virar' },
-    { name:'Ankita Lokhande', role:'assistant', pin:null, tempPin:null, startTime:'13:00', endTime:'16:00', office:'WFH' },
+    { name:'Ankita Lokhande', role:'assistant', pin:hashPin('736429'), tempPin:null, startTime:'13:00', endTime:'16:00', office:'WFH' },
     { name:'Samyak Dani', role:'staff', pin:null, tempPin:null, startTime:'13:00', endTime:'16:00', office:'Goregaon' },
     { name:'Kirti Prajapati', role:'staff', pin:null, tempPin:null, startTime:'13:00', endTime:'16:00', office:'Goregaon' },
     { name:'Cherisha Jain', role:'staff', pin:null, tempPin:null, startTime:'13:00', endTime:'16:00', office:'WFH' },
@@ -1075,7 +1088,7 @@ function getGreeting() {
       }
     });
   }
-  saveRecords(recs); saveBreaks(brks); LS.set('ci_seeded11', true);
+  saveRecords(recs); saveBreaks(brks); LS.set('ci_seeded12', true);
 })();
 
 // ── State ─────────────────────────────────────────────────────────────────
@@ -2399,6 +2412,161 @@ function resetPin(i) {
 
 
 
+// ── Microsoft Authentication (MSAL) ──────────────────────────────────────
+const msalConfig = {
+  auth: {
+    clientId: 'a16413fb-880c-4ae0-948d-a6e8e7b833ba',
+    authority: 'https://login.microsoftonline.com/c8838da3-903c-4e2d-ae8a-de9fc6f28d35',
+    redirectUri: 'https://mkat18.github.io/lp-attendance/attendance.html',
+  },
+  cache: { cacheLocation: 'sessionStorage' }
+};
+
+const msalInstance = new msal.PublicClientApplication(msalConfig);
+let msalToken = null;
+
+const SP_SCOPES = ['https://loanprocessorau.sharepoint.com/Sites.ReadWrite.All', 'User.Read'];
+
+async function msSignIn() {
+  try {
+    const result = await msalInstance.loginPopup({ scopes: SP_SCOPES });
+    msalToken = result.accessToken;
+    await onMsLogin(result.account);
+  } catch(e) {
+    document.getElementById('msLoginErr').textContent = 'Sign in failed. Please try again.';
+    console.error('MSAL error:', e);
+  }
+}
+
+async function getToken() {
+  const accounts = msalInstance.getAllAccounts();
+  if (!accounts.length) return null;
+  try {
+    const result = await msalInstance.acquireTokenSilent({ scopes: SP_SCOPES, account: accounts[0] });
+    msalToken = result.accessToken;
+    return msalToken;
+  } catch(e) {
+    const result = await msalInstance.acquireTokenPopup({ scopes: SP_SCOPES });
+    msalToken = result.accessToken;
+    return msalToken;
+  }
+}
+
+async function onMsLogin(account) {
+  showScreen('screen-geoblocked');
+  // Load data from SharePoint
+  await loadFromSharePoint();
+  // Then request geo
+  requestGeo();
+}
+
+async function spGet(url) {
+  const token = await getToken();
+  const r = await fetch(url, { headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json;odata=nometadata' } });
+  return await r.json();
+}
+
+async function spPostDirect(url, body) {
+  const token = await getToken();
+  const r = await fetch(url, {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json;odata=nometadata', 'Content-Type': 'application/json;odata=nometadata' },
+    body: JSON.stringify(body)
+  });
+  return r.ok ? await r.json() : null;
+}
+
+async function spPatch(url, body) {
+  const token = await getToken();
+  const r = await fetch(url, {
+    method: 'PATCH',
+    headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json;odata=nometadata', 'Content-Type': 'application/json;odata=nometadata', 'IF-MATCH': '*' },
+    body: JSON.stringify(body)
+  });
+  return r.ok;
+}
+
+async function spDelete(url) {
+  const token = await getToken();
+  const r = await fetch(url, {
+    method: 'DELETE',
+    headers: { 'Authorization': 'Bearer ' + token, 'IF-MATCH': '*' }
+  });
+  return r.ok;
+}
+
+const SP_API = 'https://loanprocessorau.sharepoint.com/sites/lpattendance/_api/lists/getbytitle';
+
+async function loadFromSharePoint() {
+  showToast('Loading data…', 'ok');
+  try {
+    const [staffRes, recRes, brkRes] = await Promise.all([
+      spGet(SP_API + "('AttendanceStaff')/items?$top=500"),
+      spGet(SP_API + "('AttendanceRecords')/items?$top=5000"),
+      spGet(SP_API + "('AttendanceBreaks')/items?$top=5000"),
+    ]);
+    if (staffRes && staffRes.value) {
+      _staff = staffRes.value.map(spToStaff);
+      LS.set('ci_staff', _staff);
+    }
+    if (recRes && recRes.value) {
+      _records = recRes.value.map(spToRecord);
+      LS.set('ci_records', _records);
+    }
+    if (brkRes && brkRes.value) {
+      _breaks = brkRes.value.map(spToBreak);
+      LS.set('ci_breaks', _breaks);
+    }
+    showToast('Data loaded ✓', 'ok');
+  } catch(e) {
+    console.error('SharePoint load error:', e);
+    showToast('Using cached data', 'ok');
+  }
+}
+
+async function spSaveRecord(rec) {
+  const payload = {
+    StaffName: rec.name, RecordDate: rec.date,
+    Status: rec.status||'', Reason: rec.reason||'',
+    ClockIn: rec.clockIn||0, ClockOut: rec.clockOut||0,
+    GeoLat: rec.geo?String(rec.geo.lat):'',
+    GeoLng: rec.geo?String(rec.geo.lng):'',
+    GeoAccuracy: rec.geo?String(rec.geo.accuracy):'',
+    SubmittedBy: rec.submittedBy||''
+  };
+  if (rec.id) {
+    await spPatch(SP_API + "('AttendanceRecords')/items(" + rec.id + ")", payload);
+  } else {
+    const res = await spPostDirect(SP_API + "('AttendanceRecords')/items", payload);
+    if (res && res.ID) rec.id = res.ID;
+  }
+}
+
+async function spSaveBreak(brk) {
+  await spPostDirect(SP_API + "('AttendanceBreaks')/items", {
+    StaffName: brk.name, BreakDate: brk.date,
+    StartTime: brk.startTime||0, EndTime: brk.endTime||0, DurationMs: brk.durationMs||0
+  });
+}
+
+async function spSaveStaffMember(s) {
+  const payload = {
+    Title: s.name, Role: s.role||'staff',
+    Pin: s.pin||'', TempPin: s.tempPin||'',
+    StartTime: s.startTime||'', EndTime: s.endTime||'', Office: s.office||''
+  };
+  if (s.id) {
+    await spPatch(SP_API + "('AttendanceStaff')/items(" + s.id + ")", payload);
+  } else {
+    const res = await spPostDirect(SP_API + "('AttendanceStaff')/items", payload);
+    if (res && res.ID) s.id = res.ID;
+  }
+}
+
+async function spDeleteStaff(id) {
+  await spDelete(SP_API + "('AttendanceStaff')/items(" + id + ")");
+}
+
 // ── Geolocation ───────────────────────────────────────────────────────────
 let currentGeo = null; // { lat, lng, accuracy, timestamp }
 
@@ -2450,6 +2618,7 @@ function requestGeo() {
       if (document.getElementById('screen-geoblocked').classList.contains('active')) {
         showScreen('login'); populateNameDropdown();
       }
+      // Also update login screen to show after geo granted
     },
     err => {
       currentGeo = null;
@@ -2475,11 +2644,24 @@ function captureGeoAndSubmit(callback) {
 
 // ── Init — guaranteed to run after seed and all JS ───────────────────────
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', function() { populateNameDropdown(); requestGeo(); loadFromSharePoint(); });
+  document.addEventListener('DOMContentLoaded', function() { populateNameDropdown(); initMsal(); });
 } else {
   populateNameDropdown();
-  requestGeo();
-  loadFromSharePoint();
+  initMsal();
+}
+
+async function initMsal() {
+  await msalInstance.initialize();
+  // Handle redirect response
+  await msalInstance.handleRedirectPromise();
+  const accounts = msalInstance.getAllAccounts();
+  if (accounts.length > 0) {
+    // Already signed in
+    await onMsLogin(accounts[0]);
+  } else {
+    // Show MS login screen
+    showScreen('screen-mslogin');
+  }
 }
 
 // ── Export CSV ────────────────────────────────────────────────────────────
