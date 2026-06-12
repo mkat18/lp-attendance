@@ -2405,8 +2405,8 @@ async function spSaveRecord(rec) {
     RecordDate: rec.date + 'T00:00:00Z',
     Status: rec.status||'',
     Reason: rec.reason||'',
-    ClockIn: rec.clockIn||0,
-    ClockOut: rec.clockOut||0,
+    ClockIn: rec.clockIn||null,
+    ClockOut: rec.clockOut||null,
     GeoLat: rec.geo?String(rec.geo.lat):'',
     GeoLng: rec.geo?String(rec.geo.lng):'',
     GeoAccuracy: rec.geo?String(rec.geo.accuracy):'',
@@ -2424,9 +2424,9 @@ async function spSaveBreak(brk) {
   await spPostDirect(SP_API + "('AttendanceBreaks')/items", {
     StaffName: brk.name,
     BreakDate: brk.date + 'T00:00:00Z',
-    StartTime: brk.startTime||0,
-    EndTime: brk.endTime||0,
-    DurationMs: brk.durationMs||0
+    StartTime: brk.startTime||null,
+    EndTime: brk.endTime||null,
+    DurationMs: brk.durationMs||null
   });
 }
 
