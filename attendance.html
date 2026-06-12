@@ -2581,9 +2581,7 @@ async function initMsal() {
     }
   } catch(e) {
     console.error('MSAL init error:', e);
-    showScreen('login');
-    populateNameDropdown();
-    requestGeo();
+    showScreen('mslogin');
   }
 }
 
