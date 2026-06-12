@@ -546,12 +546,6 @@ tr.flagged-row:hover td { background: #FFEAEA; }
     </div>
 
 
-    <div class="card" id="fileLogCard" style="display:none">
-      <div class="card-label">📁 My files today</div>
-      <div id="fileLogList" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px"></div>
-      <button onclick="openFileModal(null)" class="btn-primary" style="font-size:13px;padding:10px">+ Add / update a file</button>
-    </div>
-
     <div class="card" id="workloadNoteCard" style="display:none">
       <div class="card-label">📝 Observation note</div>
       <div style="font-size:13px;color:var(--text-2);margin-bottom:10px">Private note visible to managers only.</div>
@@ -740,6 +734,7 @@ tr.flagged-row:hover td { background: #FFEAEA; }
     </div>
     <div style="display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap">
       <button class="tab active" id="ftab-today" onclick="switchFilesTab('today',this)">Today</button>
+      <button class="tab" id="ftab-daterange" onclick="switchFilesTab('daterange',this)">By date</button>
       <button class="tab" id="ftab-active" onclick="switchFilesTab('active',this)">Active</button>
       <button class="tab" id="ftab-settling" onclick="switchFilesTab('settling',this)">Settling soon</button>
       <button class="tab" id="ftab-analytics" onclick="switchFilesTab('analytics',this)">📊 Analytics</button>
@@ -757,6 +752,7 @@ tr.flagged-row:hover td { background: #FFEAEA; }
     </div>
     <div style="display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap">
       <button class="tab active" id="mftab-today" onclick="switchMyFilesTab('today',this)">Today</button>
+      <button class="tab" id="mftab-daterange" onclick="switchMyFilesTab('daterange',this)">By date</button>
       <button class="tab" id="mftab-active" onclick="switchMyFilesTab('active',this)">Active</button>
       <button class="tab" id="mftab-settling" onclick="switchMyFilesTab('settling',this)">Settling soon</button>
       <button class="tab" id="mftab-analytics" onclick="switchMyFilesTab('analytics',this)">📊 My stats</button>
@@ -765,7 +761,10 @@ tr.flagged-row:hover td { background: #FFEAEA; }
     <div style="margin-bottom:12px">
       <button onclick="openFileModal(null)" class="btn-primary" style="font-size:13px;padding:10px 18px">+ Add / update a file</button>
     </div>
-    <input type="text" id="myFilesSearch" placeholder="🔍 Search client name…" oninput="renderMyFilesScreen()" style="width:100%;font-size:14px;padding:8px 12px;border-radius:var(--radius-sm);border:1.5px solid var(--border);margin-bottom:12px"/>
+    <div id="mfLookupBar" style="display:none;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+      <select id="mfLookupOwner" onchange="renderMyFilesScreen()" style="flex:1;font-size:13px;padding:7px 10px;border-radius:var(--radius-sm);border:1.5px solid var(--border)"><option value="">All staff</option></select>
+    </div>
+    <input type="text" id="myFilesSearch" placeholder="🔍 Search client or lender…" oninput="renderMyFilesScreen()" style="width:100%;font-size:14px;padding:8px 12px;border-radius:var(--radius-sm);border:1.5px solid var(--border);margin-bottom:12px"/>
     <div id="myFilesContent"></div>
   </div>
 </main>
@@ -951,10 +950,13 @@ tr.flagged-row:hover td { background: #FFEAEA; }
       <select id="fm_owner" style="font-size:14px"></select>
     </div>
     <div class="field">
-      <label>Attachment <span style="font-size:11px;color:var(--text-3)">(auto-deleted after 14 days)</span></label>
-      <input type="file" id="fm_attachment" style="font-size:13px"/>
-      <div id="fm_attachmentStatus" style="font-size:12px;color:var(--text-3);margin-top:4px"></div>
-      <div id="fm_existingAttachments" style="margin-top:6px"></div>
+      <label>Attachments <span style="font-size:11px;color:var(--text-3)">(auto-deleted after 14 days)</span></label>
+      <div id="fm_existingAttachments" style="margin-bottom:8px"></div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input type="file" id="fm_attachment" multiple style="font-size:13px;flex:1"/>
+        <button type="button" onclick="uploadSelectedAttachments()" style="padding:7px 14px;background:var(--brand);color:#fff;border:none;border-radius:var(--radius-sm);font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap">Upload</button>
+      </div>
+      <div id="fm_attachmentStatus" style="font-size:12px;color:var(--text-3);margin-top:6px"></div>
     </div>
     <div id="fm_stageHistory" style="margin-bottom:12px;display:none"></div>
     <input type="hidden" id="fm_fileId"/>
@@ -4250,6 +4252,8 @@ function renderFilesScreen() {
 
   if (_activeFilesTab === 'today') {
     renderFilesToday(el, filtered, teamAndSelf);
+  } else if (_activeFilesTab === 'daterange') {
+    renderMyFilesDateRange(el, filtered);
   } else if (_activeFilesTab === 'active') {
     renderFilesActive(el, filtered);
   } else if (_activeFilesTab === 'analytics') {
@@ -4627,17 +4631,34 @@ let _myFilesTab = 'today';
 function renderMyFilesScreen() {
   const el = document.getElementById('myFilesContent');
   if (!el) return;
-  const myFiles = getFileEntries().filter(f => f.owner === currentUser.name);
 
+  // Determine whose files to show based on role + lookup selector
+  let ownerPool;
+  if (isSuperAdmin()) {
+    const sel = document.getElementById('mfLookupOwner');
+    const picked = sel ? sel.value : '';
+    ownerPool = picked ? [picked] : getStaff().map(s=>s.name);
+  } else if (isTeamLead()) {
+    const myTeam = getTeamForTL(currentUser.name);
+    const sel = document.getElementById('mfLookupOwner');
+    const picked = sel ? sel.value : currentUser.name;
+    ownerPool = picked ? [picked] : [...myTeam, currentUser.name];
+  } else {
+    ownerPool = [currentUser.name]; // analyst sees own files only
+  }
+
+  const allFiles = getFileEntries().filter(f => ownerPool.includes(f.owner));
   const mySearchQ = (document.getElementById('myFilesSearch')?.value||'').toLowerCase().trim();
-  const myFiltered = mySearchQ ? myFiles.filter(f=>(f.client||'').toLowerCase().includes(mySearchQ)||(f.lender||'').toLowerCase().includes(mySearchQ)) : myFiles;
+  const myFiltered = mySearchQ ? allFiles.filter(f=>(f.client||'').toLowerCase().includes(mySearchQ)||(f.lender||'').toLowerCase().includes(mySearchQ)) : allFiles;
 
   if (_myFilesTab === 'today') {
     renderMyFilesToday(el, myFiltered);
+  } else if (_myFilesTab === 'daterange') {
+    renderMyFilesDateRange(el, myFiltered);
   } else if (_myFilesTab === 'active') {
     renderMyFilesActive(el, myFiltered);
   } else if (_myFilesTab === 'analytics') {
-    renderFilesAnalytics(el, myFiltered, [currentUser.name]);
+    renderFilesAnalytics(el, myFiltered, ownerPool);
   } else if (_myFilesTab === 'settling') {
     renderFilesSettling(el, myFiltered);
   } else if (_myFilesTab === 'archive') {
@@ -4927,6 +4948,275 @@ window.renderMyFilesActive = function(el, myFiles) {
       </div>
     </div>`;
   }).join('');
+};
+
+
+// ══════════════════════════════════════════════════════════════════════════
+// ── FIX PACK: Multiple attachments, date range, clock cards, file log ──────
+// ══════════════════════════════════════════════════════════════════════════
+
+// ── MULTIPLE ATTACHMENTS ──────────────────────────────────────────────────
+// Upload all selected files from the multi-file input
+async function uploadSelectedAttachments() {
+  const input = document.getElementById('fm_attachment');
+  const statusEl = document.getElementById('fm_attachmentStatus');
+  if (!input.files || input.files.length === 0) {
+    showToast('Select at least one file first.', 'err');
+    return;
+  }
+
+  // Need fileId — if new file, generate and stash it
+  let fileId = document.getElementById('fm_fileId').value;
+  if (!fileId) {
+    fileId = genFileId();
+    document.getElementById('fm_fileId').value = fileId;
+  }
+
+  const files = getFileEntries();
+  const idx = files.findIndex(f => f.id === fileId);
+  let attachments = idx >= 0 ? (files[idx].attachments || []) : [];
+
+  const total = input.files.length;
+  let uploaded = 0;
+  let failed = 0;
+
+  statusEl.textContent = `Uploading 0 of ${total}…`;
+
+  for (const file of Array.from(input.files)) {
+    try {
+      const spName = await uploadFileAttachment(file, fileId);
+      const expiresAt = Date.now() + 14 * 24 * 60 * 60 * 1000;
+      attachments.push({ name: file.name, spName, expiresAt, uploadedAt: Date.now() });
+      uploaded++;
+      statusEl.textContent = `Uploading ${uploaded} of ${total}…`;
+    } catch(e) {
+      failed++;
+      console.warn('Upload failed:', file.name, e);
+    }
+  }
+
+  // Save attachments back even if file entry doesn't exist yet
+  // (will be fully saved when user clicks Save)
+  if (idx >= 0) {
+    files[idx].attachments = attachments;
+    saveFileEntries(files);
+  }
+
+  // Store pending attachments in a temp var for saveFileEntry to pick up
+  window._pendingAttachments = attachments;
+
+  statusEl.textContent = `✓ ${uploaded} uploaded${failed > 0 ? `, ${failed} failed` : ''}`;
+  input.value = ''; // clear input
+
+  // Refresh existing attachments display
+  const entryForDisplay = { attachments };
+  renderExistingAttachments(entryForDisplay);
+}
+
+// Patch renderExistingAttachments to show remove buttons
+function renderExistingAttachments(entry) {
+  const el = document.getElementById('fm_existingAttachments');
+  if (!el) return;
+  const attachments = (window._pendingAttachments || entry.attachments || []);
+  if (attachments.length === 0) { el.innerHTML = ''; return; }
+  const now = Date.now();
+  const valid = attachments.filter(a => a.expiresAt > now);
+  if (valid.length === 0) {
+    el.innerHTML = '<div style="font-size:11px;color:var(--text-3)">Previous attachments have expired.</div>';
+    return;
+  }
+  el.innerHTML = valid.map((a, i) => `
+    <div style="display:flex;align-items:center;justify-content:space-between;background:var(--surface-2);border-radius:var(--radius-sm);padding:6px 10px;margin-bottom:4px;font-size:12px">
+      <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">📎 ${esc(a.name)}</span>
+      <span style="color:var(--text-3);margin:0 8px;white-space:nowrap">exp ${new Date(a.expiresAt).toLocaleDateString('en-AU',{day:'numeric',month:'short'})}</span>
+      <button onclick="removeAttachmentByIndex(${i})" style="background:var(--danger-light);color:var(--danger);border:none;border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer;flex-shrink:0">✕</button>
+    </div>`).join('');
+}
+
+function removeAttachmentByIndex(idx) {
+  const attachments = window._pendingAttachments || [];
+  attachments.splice(idx, 1);
+  window._pendingAttachments = attachments;
+  renderExistingAttachments({ attachments });
+}
+
+// Patch openFileModal to initialise _pendingAttachments
+const _origOpenFileModalV7 = window.openFileModal;
+window.openFileModal = function(fileId) {
+  if (fileId) {
+    const entry = getFileEntries().find(f => f.id === fileId);
+    window._pendingAttachments = entry ? JSON.parse(JSON.stringify(entry.attachments || [])) : [];
+  } else {
+    window._pendingAttachments = [];
+  }
+  if (_origOpenFileModalV7) _origOpenFileModalV7.call(this, fileId);
+  // Re-render attachments using _pendingAttachments
+  const el = document.getElementById('fm_existingAttachments');
+  if (el) renderExistingAttachments({ attachments: window._pendingAttachments });
+};
+
+// Patch saveFileEntry to use _pendingAttachments instead of re-uploading
+const _origSaveFileEntry = window.saveFileEntry;
+window.saveFileEntry = async function() {
+  // Inject pending attachments into the entry before saving
+  // We hook into the entry construction by overriding the attachment merge
+  window._usePendingAttachments = true;
+  await _origSaveFileEntry.apply(this, arguments);
+  window._usePendingAttachments = false;
+  window._pendingAttachments = [];
+};
+
+// Patch the attachment merge inside saveFileEntry
+// We replace the old attachment logic: instead of uploading the file input,
+// we use _pendingAttachments which already has any newly uploaded files
+const _origUploadStep = window.uploadFileAttachment;
+// Override the entry.attachments assignment in saveFileEntry by patching
+// the getFileEntries-based merge after save:
+const _origSaveFileEntries = window.saveFileEntries;
+window.saveFileEntries = function(files) {
+  // If we have pending attachments during a save, inject them into the last entry
+  if (window._usePendingAttachments && window._pendingAttachments) {
+    const fileId = document.getElementById('fm_fileId')?.value;
+    if (fileId) {
+      const idx = files.findIndex(f => f.id === fileId);
+      if (idx >= 0) {
+        files[idx].attachments = window._pendingAttachments.filter(a => a.expiresAt > Date.now());
+      }
+    }
+  }
+  if (_origSaveFileEntries) _origSaveFileEntries.call(this, files);
+};
+
+// ── DATE RANGE VIEW ────────────────────────────────────────────────────────
+function renderMyFilesDateRange(el, allFiles) {
+  // Date pickers + optional staff filter injected inline
+  const fromVal = document.getElementById('mfDRFrom')?.value || '';
+  const toVal   = document.getElementById('mfDRTo')?.value   || '';
+
+  const pickers = `
+    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
+      <input type="date" id="mfDRFrom" value="${esc(fromVal)}" onchange="renderMyFilesScreen()"
+        style="font-size:13px;padding:6px 10px;border-radius:var(--radius-sm);border:1.5px solid var(--border)"/>
+      <span style="font-size:12px;color:var(--text-3)">to</span>
+      <input type="date" id="mfDRTo" value="${esc(toVal)}" onchange="renderMyFilesScreen()"
+        style="font-size:13px;padding:6px 10px;border-radius:var(--radius-sm);border:1.5px solid var(--border)"/>
+      <button onclick="document.getElementById('mfDRFrom').value='${today}';document.getElementById('mfDRTo').value='${today}';renderMyFilesScreen()"
+        style="font-size:12px;padding:6px 12px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:transparent;cursor:pointer">Today</button>
+    </div>`;
+
+  if (!fromVal && !toVal) {
+    el.innerHTML = pickers + `<div class="card" style="text-align:center;padding:2rem">
+      <div style="font-size:2rem;margin-bottom:10px">📅</div>
+      <div style="font-size:14px;color:var(--text-2)">Pick a date range above to see files updated in that period.</div>
+    </div>`;
+    return;
+  }
+
+  let filtered = allFiles;
+  if (fromVal) filtered = filtered.filter(f => (f.updatedAt||f.createdAt) >= fromVal);
+  if (toVal)   filtered = filtered.filter(f => (f.updatedAt||f.createdAt) <= toVal);
+
+  // Group by owner then by date updated
+  const byOwner = {};
+  filtered.forEach(f => {
+    if (!byOwner[f.owner]) byOwner[f.owner] = {};
+    const d = f.updatedAt || f.createdAt || '—';
+    if (!byOwner[f.owner][d]) byOwner[f.owner][d] = [];
+    byOwner[f.owner][d].push(f);
+  });
+
+  if (filtered.length === 0) {
+    el.innerHTML = pickers + `<div class="card" style="text-align:center;padding:2rem">
+      <div style="font-size:13px;color:var(--text-3)">No files updated in this range.</div>
+    </div>`;
+    return;
+  }
+
+  const ownerBlocks = Object.entries(byOwner).map(([owner, byDate]) => {
+    const dateBlocks = Object.entries(byDate)
+      .sort(([a],[b]) => b.localeCompare(a))
+      .map(([date, files]) => `
+        <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin:10px 0 6px">${esc(date)}</div>
+        ${files.map(f => fileCard(f, f.owner === currentUser.name || isTeamLead() || isSuperAdmin())).join('<div style="height:1px;background:var(--border)"></div>')}
+      `).join('');
+    const showOwner = Object.keys(byOwner).length > 1;
+    return showOwner
+      ? `<div style="font-size:12px;font-weight:700;color:var(--brand);margin-bottom:4px;padding-top:4px">👤 ${esc(owner)}</div><div class="card" style="padding:0 0 4px;overflow:hidden;margin-bottom:12px">${dateBlocks}</div>`
+      : `<div class="card" style="padding:0 0 4px;overflow:hidden;margin-bottom:12px">${dateBlocks}</div>`;
+  }).join('');
+
+  el.innerHTML = pickers + ownerBlocks;
+}
+
+// ── LOOKUP BAR: show for SA and TL on My Files screen ─────────────────────
+function initMyFilesLookupBar() {
+  const bar = document.getElementById('mfLookupBar');
+  const sel = document.getElementById('mfLookupOwner');
+  if (!bar || !sel) return;
+
+  if (isSuperAdmin()) {
+    bar.style.display = 'flex';
+    const staff = getStaff().filter(s => ANALYST_ROLES.includes(s.role));
+    sel.innerHTML = '<option value="">All staff</option>' +
+      staff.map(s => `<option value="${esc(s.name)}">${esc(s.name)} (${esc(ROLE_LABEL[s.role]||s.role)})</option>`).join('');
+  } else if (isTeamLead()) {
+    bar.style.display = 'flex';
+    const myTeam = getTeamForTL(currentUser.name);
+    const members = getStaff().filter(s => myTeam.includes(s.name) || s.name === currentUser.name);
+    sel.innerHTML = '<option value="">All my team</option>' +
+      members.map(s => `<option value="${esc(s.name)}">${esc(s.name)}</option>`).join('');
+  } else {
+    bar.style.display = 'none';
+  }
+}
+
+// ── CLOCK CARDS FIX: Ensure break + clockout show for all check-in roles ──
+// Override lockCheckin to always show break/clockout cards for any role
+const _origLockCheckinV7 = window.lockCheckin;
+window.lockCheckin = function() {
+  if (_origLockCheckinV7) _origLockCheckinV7.apply(this, arguments);
+  // Ensure break and clock-out cards are NOT hidden for team leads or any non-SA
+  if (currentUser && currentUser.role !== 'superadmin') {
+    const rec = getRecords().find(r => r.date === today && r.name === currentUser.name);
+    if (rec && (rec.status === 'office' || rec.status === 'wfh' || rec.status === 'halfday')) {
+      const bc = document.getElementById('breakCard');
+      const cc = document.getElementById('clockOutCard');
+      if (bc) bc.style.display = 'block';
+      if (cc) cc.style.display = 'block';
+    }
+  }
+};
+
+// Also patch initCheckin to show break/clockout for teamlead when already submitted
+const _origInitCheckinV7 = window.initCheckin;
+window.initCheckin = function() {
+  if (_origInitCheckinV7) _origInitCheckinV7.apply(this, arguments);
+  // Extra guarantee for teamlead
+  if (currentUser && currentUser.role !== 'superadmin') {
+    const rec = getRecords().find(r => r.date === today && r.name === currentUser.name);
+    if (rec && (rec.status === 'office' || rec.status === 'wfh' || rec.status === 'halfday')) {
+      const bc = document.getElementById('breakCard');
+      const cc = document.getElementById('clockOutCard');
+      if (bc) bc.style.display = 'block';
+      if (cc) { cc.style.display = 'block'; }
+    }
+  }
+  // Initialise lookup bar on My Files screen if navigating there
+  setTimeout(initMyFilesLookupBar, 100);
+};
+
+// Call initMyFilesLookupBar whenever my files screen is rendered
+const _origRenderMyFilesScreen = window.renderMyFilesScreen;
+window.renderMyFilesScreen = function() {
+  initMyFilesLookupBar();
+  if (_origRenderMyFilesScreen) _origRenderMyFilesScreen.apply(this, arguments);
+};
+
+// ── Ensure fileLogCard never shows on checkin screen ─────────────────────
+// updateFileLogUI always hides it (we removed the HTML, but JS may still run)
+window.updateFileLogUI = function() {
+  const card = document.getElementById('fileLogCard');
+  if (card) card.style.display = 'none'; // always hidden — use My Files tab instead
 };
 
 </script>
