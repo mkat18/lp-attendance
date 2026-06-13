@@ -798,6 +798,15 @@ tr.flagged-row:hover td { background: #FFEAEA; }
     </div>
     <div id="eodScreenContent"></div>
   </div>
+
+  <!-- ── OTHER TASKS SCREEN ────────────────────────────────────────────── -->
+  <div id="screen-othertasks" class="screen">
+    <div class="page-header">
+      <h1>📌 Other Tasks</h1>
+      <p>Tasks not linked to a client file</p>
+    </div>
+    <div id="otherTasksContent"></div>
+  </div>
 </main>
 
 
@@ -963,6 +972,17 @@ tr.flagged-row:hover td { background: #FFEAEA; }
     <div class="field" id="fm_settleDateField" style="display:none">
       <label>Expected settlement date</label>
       <input type="date" id="fm_settleDate"/>
+    </div>
+    <div class="field">
+      <label>Blocker on this file <span style="font-size:11px;color:var(--text-3)">(optional)</span></label>
+      <select id="fm_blocker" style="font-size:14px">
+        <option value="">No blocker</option>
+        <option value="Waiting on broker">Waiting on broker</option>
+        <option value="Waiting on client">Waiting on client</option>
+        <option value="Waiting on bank / lender">Waiting on bank / lender</option>
+        <option value="Waiting on valuation">Waiting on valuation</option>
+        <option value="Internal issue">Internal issue</option>
+      </select>
     </div>
     <div class="field">
       <label>What's been done</label>
@@ -1493,9 +1513,9 @@ function buildNav() {
   } else if (r === 'hr') {
     tabs = [['checkin','Check in'],['dashboard','Dashboard'],['profile','PIN']];
   } else if (r === 'teamlead') {
-    tabs = [['checkin','Check in'],['myteam','My Team'],['files','Team Files'],['myfiles','My Files'],['feedback','📣 Feedback'],['eod','EOD'],['profile','PIN']];
+    tabs = [['checkin','Check in'],['myteam','My Team'],['files','Team Files'],['myfiles','My Files'],['othertasks','Other Tasks'],['feedback','📣 Feedback'],['eod','EOD'],['profile','PIN']];
   } else if (r === 'analyst') {
-    tabs = [['checkin','Check in'],['myfiles','My Files'],['eod','EOD'],['profile','PIN']];
+    tabs = [['checkin','Check in'],['myfiles','My Files'],['othertasks','Other Tasks'],['eod','EOD'],['profile','PIN']];
   } else if (['assistant','sales','customerservice','socialmedia','trainee'].includes(r)) {
     tabs = [['checkin','Check in'],['profile','PIN']];
   } else {
@@ -1518,6 +1538,7 @@ function goTab(name, btn) {
   if (name==='myfiles')   renderMyFilesScreen();
   if (name==='feedback')  renderFeedbackScreen();
   if (name==='eod')       renderEODScreen();
+  if (name==='othertasks') renderOtherTasksScreen();
   if (name==='admin')     renderAdmin();
   if (name==='profile')   initCp();
 }
@@ -3447,11 +3468,16 @@ function renderManageTeamModal() {
   if (!_managingTL) return;
   const teams = getTeams();
   const currentTeam = teams[_managingTL] || [];
-  // All assignable roles — analyst + any role that can be in a team
   const TEAM_ROLES = ['analyst','trainee','assistant','sales','customerservice','socialmedia','hr'];
   const allStaff = getStaff().filter(s => TEAM_ROLES.includes(s.role));
 
-  // Current members list
+  // Find which team each staff member belongs to
+  const memberToTL = {};
+  Object.entries(teams).forEach(([tl, members]) => {
+    members.forEach(m => { memberToTL[m] = tl; });
+  });
+
+  // Current members list — use data-name to avoid escaping bugs
   const listEl = document.getElementById('manageTeamCurrentList');
   if (currentTeam.length === 0) {
     listEl.innerHTML = '<div style="font-size:13px;color:var(--text-3);padding:8px 0">No team members yet.</div>';
@@ -3467,20 +3493,36 @@ function renderManageTeamModal() {
             <div style="font-size:11px;color:var(--text-3)">${esc(roleLabel)}</div>
           </div>
         </div>
-        <button onclick="removeFromTeam('${name.replace(/'/g,"\'")}")" style="background:var(--danger-light);color:var(--danger);border:none;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;font-weight:600">Remove</button>
+        <button data-removename="${esc(name)}" onclick="removeFromTeamBtn(this)" style="background:var(--danger-light);color:var(--danger);border:none;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;font-weight:600">Remove</button>
       </div>`;
     }).join('');
   }
 
-  // Add dropdown — unassigned staff or already in this team
-  const allAssigned = new Set(Object.values(teams).flat());
-  const available = allStaff.filter(s =>
-    !currentTeam.includes(s.name) &&
-    (!allAssigned.has(s.name) || currentTeam.includes(s.name))
-  );
+  // Add dropdown — show ALL assignable staff, grouped by current team
   const sel = document.getElementById('manageTeamAddSelect');
-  sel.innerHTML = '<option value="">— select staff member —</option>' +
-    available.map(s => `<option value="${esc(s.name)}">${esc(s.name)}</option>`).join('');
+  const inThisTeam = new Set(currentTeam);
+
+  // Separate: unassigned, in other teams, in this team
+  const unassigned = allStaff.filter(s => !memberToTL[s.name] && !inThisTeam.has(s.name));
+  const inOther = allStaff.filter(s => memberToTL[s.name] && memberToTL[s.name] !== _managingTL && !inThisTeam.has(s.name));
+
+  let opts = '<option value="">— select staff member —</option>';
+  if (unassigned.length > 0) {
+    opts += '<optgroup label="Unassigned">' +
+      unassigned.map(s => `<option value="${esc(s.name)}">${esc(s.name)} (${esc(ROLE_LABEL[s.role]||s.role)})</option>`).join('') +
+      '</optgroup>';
+  }
+  if (inOther.length > 0) {
+    opts += '<optgroup label="In another team (will be moved)">' +
+      inOther.map(s => `<option value="${esc(s.name)}">${esc(s.name)} — currently in ${esc(memberToTL[s.name])}'s team</option>`).join('') +
+      '</optgroup>';
+  }
+  sel.innerHTML = opts;
+}
+
+function removeFromTeamBtn(btn) {
+  const name = btn.getAttribute('data-removename');
+  removeFromTeam(name);
 }
 
 function addToTeam() {
@@ -4125,6 +4167,7 @@ function openFileModal(fileId) {
     if (isTL && entry.owner) ownerSel.value = entry.owner;
     // Priority, lender, settle date
     const prEl = document.getElementById('fm_priority'); if (prEl) prEl.value = entry.priority || 'normal';
+    const blEl = document.getElementById('fm_blocker'); if (blEl) blEl.value = entry.fileBlocker || '';
     const lnEl = document.getElementById('fm_lender'); if (lnEl) lnEl.value = entry.lender || '';
     const sdEl = document.getElementById('fm_settleDate'); if (sdEl) sdEl.value = entry.settleDate || '';
     // Loan amount
@@ -4152,6 +4195,7 @@ function openFileModal(fileId) {
     const laEl2 = document.getElementById('fm_loanAmount');
     if (laEl2) laEl2.value = '';
     const prEl2 = document.getElementById('fm_priority'); if (prEl2) prEl2.value = 'normal';
+    const blEl2 = document.getElementById('fm_blocker'); if (blEl2) blEl2.value = '';
     const lnEl2 = document.getElementById('fm_lender'); if (lnEl2) lnEl2.value = '';
     const sdEl2 = document.getElementById('fm_settleDate'); if (sdEl2) sdEl2.value = '';
     const shEl = document.getElementById('fm_stageHistory');
@@ -4228,6 +4272,7 @@ async function saveFileEntry() {
     done: document.getElementById('fm_done').value.trim(),
     pending: document.getElementById('fm_pending').value.trim(),
     priority: document.getElementById('fm_priority') ? document.getElementById('fm_priority').value : 'normal',
+    fileBlocker: document.getElementById('fm_blocker') ? document.getElementById('fm_blocker').value : '',
     lender: document.getElementById('fm_lender') ? document.getElementById('fm_lender').value.trim() : '',
     settleDate: document.getElementById('fm_settleDate') ? document.getElementById('fm_settleDate').value : (existing ? existing.settleDate : ''),
     updatedBy: currentUser.name,
@@ -4464,6 +4509,7 @@ function fileCard(f, showControls) {
       </div>
       <span style="background:${sc.bg};color:${sc.color};border-radius:50px;padding:3px 9px;font-size:11px;font-weight:600;white-space:nowrap;flex-shrink:0">${esc(f.status)}</span>
     </div>
+    ${f.fileBlocker?`<div style="font-size:12px;color:var(--danger);margin-bottom:3px">🔴 <b>Blocked:</b> ${esc(f.fileBlocker)}</div>`:''}
     ${f.done?`<div style="font-size:12px;color:var(--text-2);margin-bottom:3px">✅ <b>Done:</b> ${esc(f.done)}</div>`:''}
     ${f.pending?`<div style="font-size:12px;color:var(--warn);margin-bottom:3px">⏳ <b>Pending:</b> ${esc(f.pending)}</div>`:''}
     ${f.attachments&&f.attachments.length>0?`<div style="font-size:11px;color:var(--text-3);margin-top:4px">📎 ${f.attachments.length} attachment${f.attachments.length>1?'s':''}${hasExpiredSoon?' · ⚠️ expiring soon':''}</div>`:''}
@@ -5014,6 +5060,7 @@ function fileCard(f, showControls) {
       </div>
       <span style="background:${sc.bg};color:${sc.color};border-radius:50px;padding:3px 9px;font-size:11px;font-weight:600;white-space:nowrap;flex-shrink:0">${esc(f.status)}</span>
     </div>
+    ${f.fileBlocker?`<div style="font-size:12px;color:var(--danger);margin-bottom:3px">🔴 <b>Blocked:</b> ${esc(f.fileBlocker)}</div>`:''}
     ${f.done?`<div style="font-size:12px;color:var(--text-2);margin-bottom:3px">✅ <b>Done:</b> ${esc(f.done)}</div>`:''}
     ${f.pending?`<div style="font-size:12px;color:var(--warn);margin-bottom:3px">⏳ <b>Pending:</b> ${esc(f.pending)}</div>`:''}
     ${f.attachments&&f.attachments.length>0?`<div style="font-size:11px;color:var(--text-3);margin-top:4px">📎 ${f.attachments.length} attachment${f.attachments.length>1?'s':''}${hasExpiredSoon?' · ⚠️ expiring soon':''}</div>`:''}
@@ -5907,7 +5954,7 @@ function renderEODScreen() {
         </div>
 
         <div class="field">
-          <label>Support needed from management?</label>
+          <label>Training or other support needed from Team Lead?</label>
           <div style="display:flex;gap:8px;margin-top:6px;margin-bottom:8px">
             <button type="button" onclick="setEODYN('supportNeeded','yes',this)" id="eodSN_yes"
               style="flex:1;padding:9px;border-radius:var(--radius-sm);border:1.5px solid ${pf('supportNeeded')==='yes'?'var(--brand)':'var(--border)'};
@@ -5921,7 +5968,7 @@ function renderEODScreen() {
           <input type="hidden" id="eod_supportNeeded" value="${pf('supportNeeded')}"/>
           <div id="eodSNDetail_wrap" style="display:${pf('supportNeeded')==='yes'?'block':'none'}">
             <textarea id="eod_supportDetail" placeholder="What do you need help with?"
-              style="width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:14px;color:var(--text);background:var(--surface-2);outline:none;resize:none;min-height:60px;line-height:1.5">${esc(pf('supportDetail'))}</textarea>
+              style="width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:14px;color:var(--text);background:var(--surface-2);outline:none;resize:none;min-height:60px;line-height:1.5" placeholder="e.g. Need help with Infynity, training on compliance reports…">${esc(pf('supportDetail'))}</textarea>
           </div>
         </div>
 
@@ -6201,6 +6248,495 @@ const _origInitCheckinEOD = window.initCheckin;
 window.initCheckin = function() {
   if (_origInitCheckinEOD) _origInitCheckinEOD.apply(this, arguments);
   if (EOD_ROLES.includes(currentUser?.role)) setTimeout(updateEODPromptCard, 300);
+};
+
+
+// ══════════════════════════════════════════════════════════════════════════
+// ── PATCH PACK: ALL V11 FIXES ──────────────────────────────────════════════
+// ══════════════════════════════════════════════════════════════════════════
+
+// ── OTHER TASKS SYSTEM ────────────────────────────────────────────────────
+const OTHER_TASK_TYPES = [
+  'Training session','Team meeting','Internal admin',
+  'Compliance / audit','System / tool issue','Process improvement',
+  'Onboarding support','Other'
+];
+
+function getOtherTasks() { return LS.get('ci_othertasks') || []; }
+function saveOtherTasks(t) { LS.set('ci_othertasks', t); }
+
+function renderOtherTasksScreen() {
+  const el = document.getElementById('otherTasksContent');
+  if (!el) return;
+  const myTasks = getOtherTasks()
+    .filter(t => t.owner === currentUser.name)
+    .sort((a,b) => b.ts - a.ts);
+
+  const todayTasks = myTasks.filter(t => t.date === today);
+
+  el.innerHTML = `
+    <div class="card" style="margin-bottom:1rem">
+      <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">Log a task</div>
+      <div class="field">
+        <label>Task type</label>
+        <select id="ot_type" style="font-size:14px">
+          ${OTHER_TASK_TYPES.map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="field">
+        <label>Description <span style="color:var(--danger)">*</span></label>
+        <textarea id="ot_desc" placeholder="e.g. Conducted onboarding training for new analyst Ravi — covered Infynity and checklist process"
+          style="width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:14px;color:var(--text);background:var(--surface-2);outline:none;resize:none;min-height:68px;line-height:1.5"></textarea>
+      </div>
+      <div style="display:flex;gap:8px">
+        <div class="field" style="flex:1;margin-bottom:0">
+          <label>Time spent</label>
+          <select id="ot_duration" style="font-size:14px">
+            <option value="15">15 min</option>
+            <option value="30">30 min</option>
+            <option value="45">45 min</option>
+            <option value="60" selected>1 hour</option>
+            <option value="90">1.5 hours</option>
+            <option value="120">2 hours</option>
+            <option value="180">3 hours</option>
+            <option value="240">4+ hours</option>
+          </select>
+        </div>
+      </div>
+      <button onclick="saveOtherTask()" class="btn-primary" style="margin-top:12px">Add task</button>
+    </div>
+
+    <div class="card">
+      <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Today's other tasks (${todayTasks.length})</div>
+      ${todayTasks.length === 0
+        ? '<div style="font-size:13px;color:var(--text-3)">None logged yet today.</div>'
+        : todayTasks.map(t => `
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);gap:8px">
+            <div style="flex:1">
+              <div style="font-size:13px;font-weight:600;color:var(--text)">${esc(t.type)}</div>
+              <div style="font-size:12px;color:var(--text-2);margin-top:2px">${esc(t.desc)}</div>
+              <div style="font-size:11px;color:var(--text-3);margin-top:2px">⏱ ${t.duration >= 60 ? Math.floor(t.duration/60)+'h'+(t.duration%60?''+t.duration%60+'m':'') : t.duration+'min'}</div>
+            </div>
+            <button onclick="deleteOtherTask('${t.id}')" style="background:var(--danger-light);color:var(--danger);border:none;border-radius:4px;padding:3px 8px;font-size:11px;cursor:pointer;flex-shrink:0">✕</button>
+          </div>`).join('')}
+    </div>`;
+}
+
+function saveOtherTask() {
+  const desc = document.getElementById('ot_desc')?.value.trim();
+  if (!desc) { showToast('Enter a description.','err'); return; }
+  const task = {
+    id: genFileId(),
+    owner: currentUser.name,
+    date: today,
+    type: document.getElementById('ot_type').value,
+    desc,
+    duration: parseInt(document.getElementById('ot_duration').value)||60,
+    ts: Date.now(),
+  };
+  const tasks = getOtherTasks();
+  tasks.push(task);
+  saveOtherTasks(tasks);
+  showToast('Task logged ✓','ok');
+  renderOtherTasksScreen();
+}
+
+function deleteOtherTask(id) {
+  const tasks = getOtherTasks().filter(t => t.id !== id);
+  saveOtherTasks(tasks);
+  renderOtherTasksScreen();
+}
+
+// ── EOD: replace broker concern Yes/No with chip multi-select ─────────────
+// Override renderEODScreen to inject improved version
+const _origRenderEODScreen = window.renderEODScreen;
+window.renderEODScreen = function() {
+  const el = document.getElementById('eodScreenContent');
+  if (!el) return;
+
+  const existing = getTodayEOD(currentUser.name);
+  const rec = getRecords().find(r => r.date === today && r.name === currentUser.name);
+  const hasCheckedIn = rec && rec.status !== 'leave';
+
+  if (!hasCheckedIn) {
+    el.innerHTML = `<div class="card" style="text-align:center;padding:2rem">
+      <div style="font-size:2rem;margin-bottom:10px">⏳</div>
+      <div style="font-size:15px;font-weight:600;color:var(--text)">Check in first</div>
+      <div style="font-size:13px;color:var(--text-3);margin-top:4px">Complete your attendance check-in before filling in the EOD report.</div>
+    </div>`;
+    return;
+  }
+
+  const sub = document.getElementById('eodScreenSub');
+  if (sub) sub.textContent = existing ? 'Submitted — you can update anytime' : 'Complete before clocking out';
+
+  const myTodayFiles = getFileEntries().filter(f => f.owner === currentUser.name && f.updatedAt === today && f.active !== false);
+  const myTodayTasks = getOtherTasks().filter(t => t.owner === currentUser.name && t.date === today);
+  const pf = (field, fallback='') => existing ? (existing[field] ?? fallback) : fallback;
+
+  // Broker concern chips
+  const BROKER_POS = ['Clear instructions','Responsive','Supportive','Good feedback','Easy to work with'];
+  const BROKER_NEG = ['Raised complaint','Unclear brief','Unreasonable expectation','Slow to respond','Changed requirements','Rude or dismissive'];
+  const existingBCTags = pf('brokerConcernTags', []);
+
+  const moodVal = pf('mood','');
+  const moods = [{v:'tough',e:'😔',l:'Tough day'},{v:'ok',e:'😐',l:'OK'},{v:'good',e:'😊',l:'Good day'}];
+
+  el.innerHTML = `<form onsubmit="submitEODv2(event)">
+
+    ${myTodayFiles.length > 0 || myTodayTasks.length > 0 ? `
+    <div class="card" style="margin-bottom:1rem">
+      ${myTodayFiles.length > 0 ? `
+        <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">📁 Files worked on today</div>
+        ${myTodayFiles.map(f => {
+          const sc = FILE_STATUS_COLORS[f.status]||{bg:'#F3F4F6',color:'#374151'};
+          return `<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border)">
+            <span style="font-size:13px;color:var(--text)">${esc(f.client)}</span>
+            <div style="display:flex;gap:6px;align-items:center">
+              ${f.fileBlocker?`<span style="font-size:11px;color:var(--danger)">🔴 ${esc(f.fileBlocker)}</span>`:''}
+              <span style="background:${sc.bg};color:${sc.color};border-radius:50px;padding:2px 8px;font-size:11px;font-weight:600">${esc(f.status)}</span>
+            </div>
+          </div>`;
+        }).join('')}` : ''}
+      ${myTodayTasks.length > 0 ? `
+        <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin:${myTodayFiles.length>0?'10px':0} 0 8px">📌 Other tasks today</div>
+        ${myTodayTasks.map(t=>`<div style="font-size:12px;color:var(--text-2);padding:3px 0">• ${esc(t.type)}: ${esc(t.desc)} (${t.duration<60?t.duration+'min':Math.floor(t.duration/60)+'h'})</div>`).join('')}` : ''}
+    </div>` : ''}
+
+    <div class="card" style="margin-bottom:1rem">
+      <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">How was your day?</div>
+      <div style="display:flex;gap:8px;margin-bottom:14px">
+        ${moods.map(m=>`<button type="button" onclick="selectEODMood('${m.v}')" id="eodMood_${m.v}"
+          style="flex:1;padding:10px 4px;border-radius:var(--radius-sm);border:1.5px solid ${moodVal===m.v?'var(--brand)':'var(--border)'};
+          background:${moodVal===m.v?'var(--brand-light)':'var(--surface-2)'};color:${moodVal===m.v?'var(--brand)':'var(--text-2)'};
+          font-size:13px;font-weight:${moodVal===m.v?'700':'400'};cursor:pointer;text-align:center">
+          <div style="font-size:22px">${m.e}</div><div style="font-size:11px;margin-top:2px">${m.l}</div>
+        </button>`).join('')}
+      </div>
+      <input type="hidden" id="eod_mood" value="${esc(moodVal)}"/>
+
+      <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">How confident are you today's work is 100% accurate?</div>
+      <div style="display:flex;gap:6px;margin-bottom:4px">
+        ${[1,2,3,4,5].map(n => {
+          const sel = existing && existing.confidence === n;
+          const colors = {1:'#B91C1C',2:'#D97706',3:'#B45309',4:'#16A34A',5:'#15803D'};
+          const labels = {1:'Very low',2:'Low',3:'OK',4:'High',5:'Very high'};
+          return `<button type="button" onclick="selectEODConfidence(${n})" id="eodConf_${n}"
+            style="flex:1;padding:8px 4px;border-radius:var(--radius-sm);border:1.5px solid ${sel?colors[n]:'var(--border)'};
+            background:${sel?'#F0FDF4':'var(--surface-2)'};color:${sel?colors[n]:'var(--text-3)'};
+            font-size:13px;font-weight:${sel?'700':'400'};cursor:pointer;text-align:center">
+            <div style="font-size:17px;font-weight:700">${n}</div>
+            <div style="font-size:9px;margin-top:2px">${labels[n]}</div>
+          </button>`;
+        }).join('')}
+      </div>
+      <input type="hidden" id="eod_confidence" value="${pf('confidence','')}"/>
+
+      <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin:12px 0 6px">Daily checklist completed?</div>
+      <div style="display:flex;gap:8px;margin-bottom:4px">
+        ${['Yes','Partially','No'].map(v=>{
+          const sel = pf('checklist','') === v;
+          const col = v==='Yes'?'var(--success)':v==='Partially'?'var(--warn)':'var(--danger)';
+          const bg  = v==='Yes'?'var(--success-light)':v==='Partially'?'var(--warn-light)':'var(--danger-light)';
+          return `<button type="button" onclick="selectEODChecklist('${v}')" id="eodCL_${v}"
+            style="flex:1;padding:9px;border-radius:var(--radius-sm);border:1.5px solid ${sel?col:'var(--border)'};
+            background:${sel?bg:'var(--surface-2)'};color:${sel?col:'var(--text-2)'};
+            font-size:13px;font-weight:${sel?'700':'400'};cursor:pointer">${v}</button>`;
+        }).join('')}
+      </div>
+      <input type="hidden" id="eod_checklist" value="${pf('checklist','')}"/>
+    </div>
+
+    <div class="card" style="margin-bottom:1rem">
+      <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Blockers & broker</div>
+
+      <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:6px">Waiting on: <span style="font-size:11px;color:var(--text-3);font-weight:400">select all that apply</span></div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px" id="eodBlockerChips">
+        ${['Broker','Client','Bank / Lender','Nobody — no blockers'].map(b => {
+          const sel = existing && (existing.blockers||[]).includes(b);
+          return `<button type="button" onclick="toggleEODChip(this,'blocker')" data-val="${esc(b)}"
+            style="padding:5px 12px;border-radius:50px;border:1.5px solid ${sel?'var(--brand)':'var(--border)'};
+            background:${sel?'var(--brand-light)':'var(--surface-2)'};color:${sel?'var(--brand)':'var(--text-2)'};
+            font-size:12px;font-weight:${sel?'700':'400'};cursor:pointer">${sel?'✓ ':''}${esc(b)}</button>`;
+        }).join('')}
+      </div>
+      <textarea id="eod_blockerDetail" placeholder="What's missing? How many follow-ups done?"
+        style="width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:14px;color:var(--text);background:var(--surface-2);outline:none;resize:none;min-height:52px;line-height:1.5;margin-bottom:12px">${esc(pf('blockerDetail'))}</textarea>
+
+      <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:6px">Broker interaction today: <span style="font-size:11px;color:var(--text-3);font-weight:400">select all that apply</span></div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px" id="eodBCChips">
+        ${[...BROKER_POS.map(t=>({t,pos:true})),...BROKER_NEG.map(t=>({t,pos:false}))].map(({t,pos})=>{
+          const sel = existingBCTags.includes(t);
+          const col = pos?'var(--success)':'var(--danger)';
+          const bg  = pos?'var(--success-light)':'var(--danger-light)';
+          return `<button type="button" onclick="toggleEODChip(this,'bc')" data-val="${esc(t)}"
+            style="padding:5px 12px;border-radius:50px;border:1.5px solid ${sel?col:'var(--border)'};
+            background:${sel?bg:'var(--surface-2)'};color:${sel?col:'var(--text-2)'};
+            font-size:12px;font-weight:${sel?'700':'400'};cursor:pointer">${sel?'✓ ':''}${esc(t)}</button>`;
+        }).join('')}
+        <button type="button" onclick="toggleEODChip(this,'bc')" data-val="No broker interaction today"
+          style="padding:5px 12px;border-radius:50px;border:1.5px solid ${existingBCTags.includes('No broker interaction today')?'var(--text-3)':'var(--border)'};
+          background:${existingBCTags.includes('No broker interaction today')?'var(--surface-2)':'var(--surface-2)'};color:var(--text-2);
+          font-size:12px;cursor:pointer">No broker interaction today</button>
+      </div>
+      <textarea id="eod_brokerConcernDetail" placeholder="Add any detail about broker interaction…"
+        style="width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:14px;color:var(--text);background:var(--surface-2);outline:none;resize:none;min-height:52px;line-height:1.5">${esc(pf('brokerConcernDetail'))}</textarea>
+    </div>
+
+    <div class="card" style="margin-bottom:1rem">
+      <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Wrap-up</div>
+
+      <div class="field">
+        <label>Challenges faced today?</label>
+        <div style="display:flex;gap:8px;margin-top:6px;margin-bottom:6px">
+          ${['yes','no'].map(v=>{
+            const sel = pf('challenges','') === v;
+            const col = v==='yes'?'var(--warn)':'var(--success)';
+            const bg  = v==='yes'?'var(--warn-light)':'var(--success-light)';
+            return `<button type="button" onclick="selectEODBool('challenges','${v}',this)" id="eodCH_${v}"
+              style="flex:1;padding:9px;border-radius:var(--radius-sm);border:1.5px solid ${sel?col:'var(--border)'};
+              background:${sel?bg:'var(--surface-2)'};color:${sel?col:'var(--text-2)'};
+              font-size:14px;font-weight:${sel?'700':'400'};cursor:pointer">${v==='yes'?'Yes':'No'}</button>`;
+          }).join('')}
+        </div>
+        <input type="hidden" id="eod_challenges" value="${pf('challenges','')}"/>
+        <div id="eodCHDetail_wrap" style="display:${pf('challenges','')==='yes'?'block':'none'}">
+          <textarea id="eod_challengeDetail" placeholder="Briefly describe the challenge…"
+            style="width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:14px;color:var(--text);background:var(--surface-2);outline:none;resize:none;min-height:52px;line-height:1.5">${esc(pf('challengeDetail'))}</textarea>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Training or other support needed from Team Lead?</label>
+        <div style="display:flex;gap:8px;margin-top:6px;margin-bottom:6px">
+          ${['yes','no'].map(v=>{
+            const sel = pf('supportNeeded','') === v;
+            const col = v==='yes'?'var(--brand)':'var(--success)';
+            const bg  = v==='yes'?'var(--brand-light)':'var(--success-light)';
+            return `<button type="button" onclick="selectEODBool('supportNeeded','${v}',this)" id="eodSN_${v}"
+              style="flex:1;padding:9px;border-radius:var(--radius-sm);border:1.5px solid ${sel?col:'var(--border)'};
+              background:${sel?bg:'var(--surface-2)'};color:${sel?col:'var(--text-2)'};
+              font-size:14px;font-weight:${sel?'700':'400'};cursor:pointer">${v==='yes'?'Yes':'No'}</button>`;
+          }).join('')}
+        </div>
+        <input type="hidden" id="eod_supportNeeded" value="${pf('supportNeeded','')}"/>
+        <div id="eodSNDetail_wrap" style="display:${pf('supportNeeded','')==='yes'?'block':'none'}">
+          <textarea id="eod_supportDetail" placeholder="e.g. Need help with Infynity, training on compliance…"
+            style="width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:14px;color:var(--text);background:var(--surface-2);outline:none;resize:none;min-height:52px;line-height:1.5">${esc(pf('supportDetail'))}</textarea>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>First priority for tomorrow</label>
+        <input type="text" id="eod_tomorrow" value="${esc(pf('tomorrow',''))}" placeholder="e.g. Follow up ANZ vals for Johnson file, call Shaji re: docs"/>
+      </div>
+
+      <div class="field" style="margin-bottom:0">
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
+          <input type="checkbox" id="eod_handover" ${pf('handover',false)?'checked':''} style="width:18px;height:18px;cursor:pointer"/>
+          <span>I'm off tomorrow — TL please review my files</span>
+        </label>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Anything else? <span style="color:var(--text-3);font-weight:400">(optional)</span></label>
+      <textarea id="eod_notes" placeholder="Learnings, observations, handover notes…"
+        style="width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:14px;color:var(--text);background:var(--surface-2);outline:none;resize:none;min-height:52px;line-height:1.5">${esc(pf('notes'))}</textarea>
+    </div>
+
+    <div id="eodSubmitErr" style="color:var(--danger);font-size:13px;margin-bottom:8px;display:none"></div>
+    <button type="submit" class="btn-primary" style="width:100%;padding:14px;font-size:16px;margin-bottom:4px">
+      ${existing ? 'Update EOD report' : 'Submit EOD report'}
+    </button>
+    ${existing ? `<div style="text-align:center;font-size:12px;color:var(--text-3);margin-top:4px">Last submitted: ${esc(existing.submittedAt||existing.date)}</div>` : ''}
+  </form>`;
+};
+
+// ── New EOD interaction helpers ────────────────────────────────────────────
+function selectEODMood(v) {
+  document.getElementById('eod_mood').value = v;
+  ['tough','ok','good'].forEach(m => {
+    const btn = document.getElementById('eodMood_'+m);
+    if (!btn) return;
+    const sel = m === v;
+    btn.style.border = sel?'1.5px solid var(--brand)':'1.5px solid var(--border)';
+    btn.style.background = sel?'var(--brand-light)':'var(--surface-2)';
+    btn.style.color = sel?'var(--brand)':'var(--text-2)';
+    btn.style.fontWeight = sel?'700':'400';
+  });
+}
+
+function selectEODChecklist(v) {
+  document.getElementById('eod_checklist').value = v;
+  const cols = {Yes:'var(--success)',Partially:'var(--warn)',No:'var(--danger)'};
+  const bgs  = {Yes:'var(--success-light)',Partially:'var(--warn-light)',No:'var(--danger-light)'};
+  ['Yes','Partially','No'].forEach(k => {
+    const btn = document.getElementById('eodCL_'+k);
+    if (!btn) return;
+    const sel = k === v;
+    btn.style.border = sel?'1.5px solid '+cols[k]:'1.5px solid var(--border)';
+    btn.style.background = sel?bgs[k]:'var(--surface-2)';
+    btn.style.color = sel?cols[k]:'var(--text-2)';
+    btn.style.fontWeight = sel?'700':'400';
+  });
+}
+
+function selectEODBool(field, val, btn) {
+  document.getElementById('eod_'+field).value = val;
+  const parent = btn.parentElement;
+  const yesCol = {challenges:'var(--warn)',supportNeeded:'var(--brand)'}[field]||'var(--brand)';
+  const yesBg  = {challenges:'var(--warn-light)',supportNeeded:'var(--brand-light)'}[field]||'var(--brand-light)';
+  parent.querySelectorAll('button').forEach(b => {
+    const isThis = b===btn;
+    const isYes = b.textContent.trim()==='Yes';
+    if (isThis) {
+      b.style.border = `1.5px solid ${isYes?yesCol:'var(--success)'}`;
+      b.style.background = isYes?yesBg:'var(--success-light)';
+      b.style.color = isYes?yesCol:'var(--success)';
+      b.style.fontWeight = '700';
+    } else {
+      b.style.border = '1.5px solid var(--border)';
+      b.style.background = 'var(--surface-2)';
+      b.style.color = 'var(--text-2)';
+      b.style.fontWeight = '400';
+    }
+  });
+  const wrapMap = {challenges:'eodCHDetail_wrap',supportNeeded:'eodSNDetail_wrap'};
+  const wrap = document.getElementById(wrapMap[field]);
+  if (wrap) wrap.style.display = val==='yes'?'block':'none';
+}
+
+// ── New submitEOD ──────────────────────────────────────────────────────────
+function submitEODv2(e) {
+  e.preventDefault();
+  const errEl = document.getElementById('eodSubmitErr');
+
+  const blockers = Array.from(document.querySelectorAll('#eodBlockerChips button'))
+    .filter(b => b.style.fontWeight==='700').map(b=>b.dataset.val);
+  const bcTags = Array.from(document.querySelectorAll('#eodBCChips button'))
+    .filter(b => b.style.fontWeight==='700').map(b=>b.dataset.val);
+  const confidence = parseInt(document.getElementById('eod_confidence')?.value||'0');
+  const mood = document.getElementById('eod_mood')?.value||'';
+  const checklist = document.getElementById('eod_checklist')?.value||'';
+  const challenges = document.getElementById('eod_challenges')?.value||'';
+  const supportNeeded = document.getElementById('eod_supportNeeded')?.value||'';
+
+  const errors = [];
+  if (!mood) errors.push('Select how your day was.');
+  if (blockers.length===0) errors.push('Select at least one blocker option.');
+  if (bcTags.length===0) errors.push('Select at least one broker interaction option.');
+  if (!confidence) errors.push('Rate your confidence (1–5).');
+  if (!checklist) errors.push('Answer the checklist question.');
+  if (!challenges) errors.push('Answer the challenges question.');
+  if (challenges==='yes' && !document.getElementById('eod_challengeDetail')?.value.trim())
+    errors.push('Describe the challenge.');
+  if (!supportNeeded) errors.push('Answer the support needed question.');
+
+  if (errors.length>0) {
+    errEl.style.display='block';
+    errEl.innerHTML='⚠️ '+errors.join('<br>⚠️ ');
+    errEl.scrollIntoView({behavior:'smooth',block:'nearest'});
+    return;
+  }
+  errEl.style.display='none';
+
+  const report = {
+    id: genFileId(),
+    name: currentUser.name,
+    role: currentUser.role,
+    date: today,
+    submittedAt: new Date().toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit',hour12:true}),
+    submittedTs: Date.now(),
+    mood,
+    checklist,
+    blockers,
+    blockerDetail: document.getElementById('eod_blockerDetail')?.value.trim()||'',
+    brokerConcernTags: bcTags,
+    brokerConcernDetail: document.getElementById('eod_brokerConcernDetail')?.value.trim()||'',
+    confidence,
+    challenges,
+    challengeDetail: document.getElementById('eod_challengeDetail')?.value.trim()||'',
+    supportNeeded,
+    supportDetail: document.getElementById('eod_supportDetail')?.value.trim()||'',
+    tomorrow: document.getElementById('eod_tomorrow')?.value.trim()||'',
+    handover: document.getElementById('eod_handover')?.checked||false,
+    notes: document.getElementById('eod_notes')?.value.trim()||'',
+    linkedFileIds: getFileEntries().filter(f=>f.owner===currentUser.name&&f.updatedAt===today&&f.active!==false).map(f=>f.id),
+    otherTaskIds: getOtherTasks().filter(t=>t.owner===currentUser.name&&t.date===today).map(t=>t.id),
+  };
+
+  const all = getEODReports().filter(r=>!(r.name===currentUser.name&&r.date===today));
+  all.push(report);
+  saveEODReports(all);
+  showToast('✓ EOD report submitted!','ok');
+  updateEODPromptCard();
+  window.renderEODScreen();
+}
+
+// Patch submitEOD to call new version (old one is bypassed by form onsubmit override)
+window.submitEOD = submitEODv2;
+
+// ── Patch renderEODSummary for new fields ─────────────────────────────────
+const _origRenderEODSummary = window.renderEODSummary;
+window.renderEODSummary = function(el, teamNames, date) {
+  date = date||today;
+  const reports = getEODReports().filter(r=>r.date===date&&teamNames.includes(r.name));
+  const staff = getStaff().filter(s=>EOD_ROLES.includes(s.role)&&teamNames.includes(s.name));
+  const submitted = new Set(reports.map(r=>r.name));
+  const missing = staff.filter(s=>!submitted.has(s.name));
+  const lowConf = reports.filter(r=>r.confidence<=2);
+  const brokerNeg = reports.filter(r=>(r.brokerConcernTags||[]).some(t=>
+    ['Raised complaint','Unclear brief','Unreasonable expectation','Slow to respond','Changed requirements','Rude or dismissive'].includes(t)));
+  const supportFlags = reports.filter(r=>r.supportNeeded==='yes');
+  const handoverFlags = reports.filter(r=>r.handover);
+  const moodEmoji = {tough:'😔',ok:'😐',good:'😊'};
+
+  el.innerHTML = `
+    <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">📋 EOD Reports — ${esc(date)}</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px">
+      <div style="background:${missing.length>0?'var(--danger-light)':'var(--success-light)'};border-radius:var(--radius-sm);padding:8px;text-align:center">
+        <div style="font-size:20px;font-weight:700;color:${missing.length>0?'var(--danger)':'var(--success)'}">${reports.length}/${staff.length}</div>
+        <div style="font-size:10px;color:var(--text-3)">Submitted</div>
+      </div>
+      <div style="background:${lowConf.length>0?'var(--danger-light)':'var(--surface-2)'};border-radius:var(--radius-sm);padding:8px;text-align:center">
+        <div style="font-size:20px;font-weight:700;color:${lowConf.length>0?'var(--danger)':'var(--text-3)'}">${lowConf.length}</div>
+        <div style="font-size:10px;color:var(--text-3)">Low conf.</div>
+      </div>
+      <div style="background:${brokerNeg.length>0?'#FEF3C7':'var(--surface-2)'};border-radius:var(--radius-sm);padding:8px;text-align:center">
+        <div style="font-size:20px;font-weight:700;color:${brokerNeg.length>0?'#92400E':'var(--text-3)'}">${brokerNeg.length}</div>
+        <div style="font-size:10px;color:var(--text-3)">Broker issues</div>
+      </div>
+    </div>
+    ${handoverFlags.length>0?`<div style="background:#EDE9FE;border-radius:var(--radius-sm);padding:8px 12px;font-size:12px;color:#5B21B6;margin-bottom:8px;font-weight:600">🔄 Off tomorrow: ${handoverFlags.map(r=>esc(r.name.split(' ')[0])).join(', ')} — review their files</div>`:''}
+    ${missing.length>0?`<div style="background:var(--danger-light);border-radius:var(--radius-sm);padding:8px 12px;font-size:12px;color:var(--danger);margin-bottom:8px">⏳ Not submitted: ${missing.map(s=>esc(s.name.split(' ')[0])).join(', ')}</div>`:''}
+    ${reports.map(r => {
+      const confColor = r.confidence>=4?'var(--success)':r.confidence>=3?'var(--warn)':'var(--danger)';
+      const negTags = (r.brokerConcernTags||[]).filter(t=>['Raised complaint','Unclear brief','Unreasonable expectation','Slow to respond','Changed requirements','Rude or dismissive'].includes(t));
+      const posTags = (r.brokerConcernTags||[]).filter(t=>['Clear instructions','Responsive','Supportive','Good feedback','Easy to work with'].includes(t));
+      const flags = [];
+      if (r.confidence<=2) flags.push('<span style="background:var(--danger-light);color:var(--danger);border-radius:4px;padding:1px 6px;font-size:11px;font-weight:600">Low confidence</span>');
+      if (negTags.length>0) flags.push('<span style="background:#FEF3C7;color:#92400E;border-radius:4px;padding:1px 6px;font-size:11px;font-weight:600">Broker issue</span>');
+      if (r.supportNeeded==='yes') flags.push('<span style="background:var(--brand-light);color:var(--brand);border-radius:4px;padding:1px 6px;font-size:11px;font-weight:600">Needs support</span>');
+      if (r.handover) flags.push('<span style="background:#EDE9FE;color:#5B21B6;border-radius:4px;padding:1px 6px;font-size:11px;font-weight:600">Off tomorrow</span>');
+      return `<div style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:8px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+          <div style="font-size:13px;font-weight:700;color:var(--text)">${esc(r.name.split(' ')[0])} ${moodEmoji[r.mood]||''} <span style="font-size:11px;color:var(--text-3)">· ${esc(r.submittedAt||'')}</span></div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <span style="font-size:15px;font-weight:700;color:${confColor}">${r.confidence}/5</span>
+            <span style="font-size:12px;color:var(--text-3)">${r.checklist||''}</span>
+          </div>
+        </div>
+        ${flags.length>0?`<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px">${flags.join('')}</div>`:''}
+        ${(r.blockers||[]).length>0&&!r.blockers.includes('Nobody — no blockers')?`<div style="font-size:12px;color:var(--danger)">🔴 Blocked: ${r.blockers.map(b=>esc(b)).join(', ')}${r.blockerDetail?' — '+esc(r.blockerDetail):''}</div>`:''}
+        ${negTags.length>0?`<div style="font-size:12px;color:#92400E">📣 Broker: ${negTags.map(t=>esc(t)).join(', ')}${r.brokerConcernDetail?' — '+esc(r.brokerConcernDetail):''}</div>`:''}
+        ${posTags.length>0?`<div style="font-size:12px;color:var(--success)">👍 ${posTags.map(t=>esc(t)).join(', ')}</div>`:''}
+        ${r.challengeDetail?`<div style="font-size:12px;color:var(--text-2)">⚠️ ${esc(r.challengeDetail)}</div>`:''}
+        ${r.supportDetail?`<div style="font-size:12px;color:var(--brand)">🙋 ${esc(r.supportDetail)}</div>`:''}
+        ${r.tomorrow?`<div style="font-size:12px;color:var(--text-3)">→ Tomorrow: ${esc(r.tomorrow)}</div>`:''}
+        ${r.notes?`<div style="font-size:12px;color:var(--text-3);font-style:italic">"${esc(r.notes)}"</div>`:''}
+      </div>`;
+    }).join('')}`;
 };
 
 </script>
