@@ -807,6 +807,15 @@ tr.flagged-row:hover td { background: #FFEAEA; }
     </div>
     <div id="otherTasksContent"></div>
   </div>
+
+  <!-- ── PERFORMANCE SCREEN (Team Lead only) ──────────────────────────── -->
+  <div id="screen-performance" class="screen">
+    <div class="page-header">
+      <h1>📊 Performance Summary</h1>
+      <p>Your team — visible to Team Lead only</p>
+    </div>
+    <div id="perfContent"></div>
+  </div>
 </main>
 
 
@@ -1513,7 +1522,7 @@ function buildNav() {
   } else if (r === 'hr') {
     tabs = [['checkin','Check in'],['dashboard','Dashboard'],['profile','PIN']];
   } else if (r === 'teamlead') {
-    tabs = [['checkin','Check in'],['myteam','My Team'],['files','Team Files'],['myfiles','My Files'],['othertasks','Other Tasks'],['feedback','📣 Feedback'],['eod','EOD'],['profile','PIN']];
+    tabs = [['checkin','Check in'],['myteam','My Team'],['files','Team Files'],['myfiles','My Files'],['othertasks','Other Tasks'],['feedback','📣 Feedback'],['eod','EOD'],['performance','📊 Performance'],['profile','PIN']];
   } else if (r === 'analyst') {
     tabs = [['checkin','Check in'],['myfiles','My Files'],['othertasks','Other Tasks'],['eod','EOD'],['profile','PIN']];
   } else if (['assistant','sales','customerservice','socialmedia','trainee'].includes(r)) {
@@ -1538,6 +1547,7 @@ function goTab(name, btn) {
   if (name==='myfiles')   renderMyFilesScreen();
   if (name==='feedback')  renderFeedbackScreen();
   if (name==='eod')       renderEODScreen();
+  if (name==='performance') renderPerformanceScreen();
   if (name==='othertasks') renderOtherTasksScreen();
   if (name==='admin')     renderAdmin();
   if (name==='profile')   initCp();
@@ -3477,13 +3487,14 @@ function renderManageTeamModal() {
     members.forEach(m => { memberToTL[m] = tl; });
   });
 
-  // Current members list — use data-name to avoid escaping bugs
+  // Current members list — use index-based removal to avoid all name escaping issues
   const listEl = document.getElementById('manageTeamCurrentList');
   if (currentTeam.length === 0) {
     listEl.innerHTML = '<div style="font-size:13px;color:var(--text-3);padding:8px 0">No team members yet.</div>';
   } else {
-    listEl.innerHTML = currentTeam.map(name => {
-      const member = allStaff.find(s => s.name === name);
+    listEl.innerHTML = currentTeam.map((name, idx) => {
+      const allStaffFull = getStaff();
+      const member = allStaffFull.find(s => s.name === name);
       const roleLabel = member ? (ROLE_LABEL[member.role]||member.role) : '';
       return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:var(--surface-2);border-radius:var(--radius-sm);margin-bottom:6px">
         <div style="display:flex;align-items:center;gap:8px">
@@ -3493,7 +3504,7 @@ function renderManageTeamModal() {
             <div style="font-size:11px;color:var(--text-3)">${esc(roleLabel)}</div>
           </div>
         </div>
-        <button data-removename="${esc(name)}" onclick="removeFromTeamBtn(this)" style="background:var(--danger-light);color:var(--danger);border:none;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;font-weight:600">Remove</button>
+        <button onclick="removeFromTeamByIndex(${idx})" style="background:var(--danger-light);color:var(--danger);border:none;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;font-weight:600">Remove</button>
       </div>`;
     }).join('');
   }
@@ -3523,6 +3534,19 @@ function renderManageTeamModal() {
 function removeFromTeamBtn(btn) {
   const name = btn.getAttribute('data-removename');
   removeFromTeam(name);
+}
+
+function removeFromTeamByIndex(idx) {
+  if (!_managingTL) return;
+  const teams = getTeams();
+  if (!teams[_managingTL]) return;
+  const currentTeam = teams[_managingTL];
+  if (idx < 0 || idx >= currentTeam.length) return;
+  const name = currentTeam[idx];
+  teams[_managingTL] = currentTeam.filter((_, i) => i !== idx);
+  saveTeams(teams);
+  showToast(name.split(' ')[0] + ' removed from team.', 'ok');
+  renderManageTeamModal();
 }
 
 function addToTeam() {
@@ -4876,6 +4900,7 @@ function renderMyFilesActive(el, myFiles) {
 setInterval(() => {
   if (document.getElementById('screen-myfiles')?.classList.contains('active')) renderMyFilesScreen();
   if (document.getElementById('screen-feedback')?.classList.contains('active')) renderFeedbackScreen();
+  if (document.getElementById('screen-performance')?.classList.contains('active')) renderPerformanceScreen();
 }, 60000);
 
 // ── Patch openFileModal: allow analyst + TL on myfiles screen ─────────────
@@ -6737,6 +6762,367 @@ window.renderEODSummary = function(el, teamNames, date) {
         ${r.notes?`<div style="font-size:12px;color:var(--text-3);font-style:italic">"${esc(r.notes)}"</div>`:''}
       </div>`;
     }).join('')}`;
+};
+
+
+// ══════════════════════════════════════════════════════════════════════════
+// ── PERFORMANCE SYSTEM (Team Lead only) ───────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════
+
+// ── Core: get N days ago as YYYY-MM-DD ────────────────────────────────────
+function daysAgoStr(n) {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return d.toISOString().split('T')[0];
+}
+
+function dateRange(days) {
+  const dates = [];
+  for (let i = days - 1; i >= 0; i--) dates.push(daysAgoStr(i));
+  return dates;
+}
+
+// ── Broker complaint tags (negative) ─────────────────────────────────────
+const BROKER_COMPLAINT_TAGS = [
+  'Raised complaint','Unclear brief','Unreasonable expectation',
+  'Slow to respond','Changed requirements','Rude or dismissive'
+];
+
+// ══════════════════════════════════════════════════════════════════════════
+// ── ANALYTICS ENGINE ──────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════
+
+function calcPersonPerformance(name, days) {
+  const from = daysAgoStr(days);
+  const eodAll = getEODReports().filter(r => r.name === name && r.date >= from && r.date <= today);
+  const filesAll = getFileEntries().filter(f => f.owner === name);
+  const otherTasksAll = getOtherTasks().filter(t => t.owner === name && t.date >= from);
+
+  // ── EOD metrics ──────────────────────────────────────────────────────
+  const eodCount = eodAll.length;
+  const workDays = days; // approximate
+  const submissionRate = workDays > 0 ? Math.round((eodCount / workDays) * 100) : 0;
+
+  // Average confidence
+  const confScores = eodAll.filter(r => r.confidence).map(r => r.confidence);
+  const avgConf = confScores.length > 0
+    ? (confScores.reduce((a,b)=>a+b,0) / confScores.length).toFixed(1)
+    : null;
+
+  // Consecutive low confidence (≤2) ending at most recent report
+  const sortedEOD = [...eodAll].sort((a,b) => a.date.localeCompare(b.date));
+  let consecLowConf = 0;
+  for (let i = sortedEOD.length - 1; i >= 0; i--) {
+    if ((sortedEOD[i].confidence||0) <= 2) consecLowConf++;
+    else break;
+  }
+
+  // Checklist completion
+  const clYes = eodAll.filter(r => r.checklist === 'Yes').length;
+  const clPartial = eodAll.filter(r => r.checklist === 'Partially').length;
+  const clNo = eodAll.filter(r => r.checklist === 'No').length;
+  const clRate = eodCount > 0 ? Math.round((clYes / eodCount) * 100) : null;
+
+  // Broker complaints
+  const brokerComplaints = eodAll.filter(r =>
+    (r.brokerConcernTags||[]).some(t => BROKER_COMPLAINT_TAGS.includes(t))
+  );
+  const brokerComplaintCount = brokerComplaints.length;
+
+  // Mood distribution
+  const moodCounts = {tough:0, ok:0, good:0};
+  eodAll.forEach(r => { if (r.mood && moodCounts[r.mood] !== undefined) moodCounts[r.mood]++; });
+
+  // Support requests
+  const supportCount = eodAll.filter(r => r.supportNeeded === 'yes').length;
+
+  // Same blocker repeating (3+ times)
+  const blockerFreq = {};
+  eodAll.forEach(r => (r.blockers||[]).forEach(b => {
+    if (b !== 'Nobody — no blockers') blockerFreq[b] = (blockerFreq[b]||0) + 1;
+  }));
+  const repeatedBlockers = Object.entries(blockerFreq).filter(([,c]) => c >= 3).map(([b,c]) => ({b,c}));
+
+  // ── File metrics ──────────────────────────────────────────────────────
+  const activeFiles = filesAll.filter(f => f.active !== false && f.status !== 'Settlement');
+  const staleFiles = activeFiles.filter(f => {
+    const daysSince = (Date.now() - (f.updatedTs||0)) / 86400000;
+    return daysSince >= 3;
+  });
+  const settledFiles = filesAll.filter(f => f.status === 'Settlement' || f.active === false);
+  const settledInPeriod = settledFiles.filter(f => f.settledAt >= from);
+
+  // Loan volume in period
+  const volumeInPeriod = settledInPeriod
+    .filter(f => f.loanAmount)
+    .reduce((sum,f) => sum + (f.loanAmount||0), 0);
+
+  // Stage regressions — count files that went backward
+  const stageOrder = ['Data Collection','Pre-Qualification','Application Start','Pending Info',
+    'Submitted to Lender','MIR','Conditionally Approved','Unconditionally Approved','Loan Documents','Settlement'];
+  let regressionCount = 0;
+  filesAll.forEach(f => {
+    const hist = f.stageHistory || [];
+    for (let i = 1; i < hist.length; i++) {
+      const prevIdx = stageOrder.indexOf(hist[i-1].stage);
+      const currIdx = stageOrder.indexOf(hist[i].stage);
+      if (prevIdx > 0 && currIdx >= 0 && currIdx < prevIdx) regressionCount++;
+    }
+  });
+
+  // One-touch approvals
+  const oneTouchCount = filesAll.filter(f => {
+    const hist = f.stageHistory || [];
+    const subIdx = hist.findLastIndex(h => h.stage === 'Submitted to Lender');
+    const unconIdx = hist.findLastIndex(h => h.stage === 'Unconditionally Approved');
+    if (subIdx < 0 || unconIdx <= subIdx) return false;
+    return hist.slice(subIdx+1, unconIdx).length === 0;
+  }).length;
+
+  // Avg time from creation to Unconditionally Approved
+  const approvalTimes = filesAll
+    .filter(f => f.unconditionalAt && f.createdAt)
+    .map(f => {
+      const d = (new Date(f.unconditionalAt) - new Date(f.createdAt)) / 86400000;
+      return d >= 0 ? d : null;
+    }).filter(d => d !== null);
+  const avgApprovalDays = approvalTimes.length > 0
+    ? (approvalTimes.reduce((a,b)=>a+b,0)/approvalTimes.length).toFixed(1)
+    : null;
+
+  // ── Alert flags ────────────────────────────────────────────────────────
+  const alerts = [];
+  if (consecLowConf >= 3)
+    alerts.push({ level:'red', msg: `Low confidence for ${consecLowConf} consecutive days` });
+  if (brokerComplaintCount >= 1)
+    alerts.push({ level:'amber', msg: `${brokerComplaintCount} broker complaint${brokerComplaintCount>1?'s':''} in this period` });
+  if (clRate !== null && clRate < 50)
+    alerts.push({ level:'amber', msg: `Checklist completed only ${clRate}% of days` });
+  if (staleFiles.length >= 3)
+    alerts.push({ level:'amber', msg: `${staleFiles.length} stale files not updated in 3+ days` });
+  if (repeatedBlockers.length > 0)
+    alerts.push({ level:'amber', msg: `Same blocker repeating: ${repeatedBlockers.map(({b,c})=>b+' ('+c+'×)').join(', ')}` });
+  if (avgConf !== null && parseFloat(avgConf) <= 2.5 && confScores.length >= 3)
+    alerts.push({ level:'amber', msg: `Average confidence only ${avgConf}/5` });
+  if (moodCounts.tough >= 4 && eodCount >= 5)
+    alerts.push({ level:'amber', msg: `${moodCounts.tough} tough day reports — may need a check-in` });
+
+  // ── Traffic light ─────────────────────────────────────────────────────
+  const redCount = alerts.filter(a => a.level==='red').length;
+  const amberCount = alerts.filter(a => a.level==='amber').length;
+  const pulse = redCount > 0 ? 'red' : amberCount >= 2 ? 'amber' : amberCount === 1 ? 'amber' : 'green';
+
+  return {
+    name, eodCount, submissionRate, avgConf, consecLowConf,
+    clRate, clYes, clPartial, clNo,
+    brokerComplaintCount, brokerComplaints,
+    moodCounts, supportCount, repeatedBlockers,
+    activeFiles: activeFiles.length, staleFiles: staleFiles.length,
+    settledInPeriod: settledInPeriod.length, volumeInPeriod,
+    regressionCount, oneTouchCount, avgApprovalDays,
+    alerts, pulse, days,
+  };
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// ── OPTION A: Performance Pulse card on My Team screen ────────────────────
+// ══════════════════════════════════════════════════════════════════════════
+
+function renderPerformancePulse(containerEl, teamNames) {
+  const pulseData = teamNames
+    .map(name => calcPersonPerformance(name, 7))
+    .sort((a,b) => {
+      const order = {red:0, amber:1, green:2};
+      return order[a.pulse] - order[b.pulse];
+    });
+
+  const redCount = pulseData.filter(p => p.pulse==='red').length;
+  const amberCount = pulseData.filter(p => p.pulse==='amber').length;
+
+  const div = document.createElement('div');
+  div.className = 'card';
+  div.style.marginTop = '1rem';
+  div.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px">📊 Performance Pulse — last 7 days</div>
+      <button onclick="document.querySelectorAll('.nav-tab').forEach(b=>b.classList.remove('active'));Array.from(document.querySelectorAll('.nav-tab')).find(b=>b.textContent.includes('Performance'))?.classList.add('active');renderPerformanceScreen();showScreen('performance')"
+        style="font-size:11px;padding:3px 10px;border-radius:50px;border:1.5px solid var(--border);background:transparent;cursor:pointer;color:var(--text-2)">Full report →</button>
+    </div>
+    ${redCount>0||amberCount>0?`<div style="background:${redCount>0?'var(--danger-light)':'#FFFBEB'};border-radius:var(--radius-sm);padding:8px 12px;font-size:12px;color:${redCount>0?'var(--danger)':'#92400E'};margin-bottom:10px;font-weight:600">
+      ${redCount>0?`🔴 ${redCount} person${redCount>1?'s':''} need${redCount>1?'':'s'} attention`:''}
+      ${amberCount>0?`${redCount>0?' · ':''}⚠️ ${amberCount} person${amberCount>1?'s':''} to watch`:''}
+    </div>`:''}
+    <div style="display:flex;flex-direction:column;gap:6px">
+      ${pulseData.map(p => {
+        const pulseColor = p.pulse==='red'?'var(--danger)':p.pulse==='amber'?'#D97706':'var(--success)';
+        const pulseBg = p.pulse==='red'?'var(--danger-light)':p.pulse==='amber'?'#FEF3C7':'var(--success-light)';
+        const pulseIcon = p.pulse==='red'?'🔴':p.pulse==='amber'?'⚠️':'🟢';
+        return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:${pulseBg};border-radius:var(--radius-sm)">
+          <div style="flex:1">
+            <div style="font-size:13px;font-weight:600;color:var(--text)">${pulseIcon} ${esc(p.name)}</div>
+            ${p.alerts.length>0?`<div style="font-size:11px;color:${pulseColor};margin-top:2px">${p.alerts[0].msg}${p.alerts.length>1?' +more':''}</div>`:'<div style="font-size:11px;color:var(--success)">On track</div>'}
+          </div>
+          <div style="text-align:right;flex-shrink:0">
+            ${p.avgConf!==null?`<div style="font-size:13px;font-weight:700;color:${parseFloat(p.avgConf)>=4?'var(--success)':parseFloat(p.avgConf)>=3?'#D97706':'var(--danger)'}">${p.avgConf}/5</div>`:''}
+            <div style="font-size:10px;color:var(--text-3)">${p.eodCount} EODs</div>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>`;
+  containerEl.appendChild(div);
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// ── OPTION B+C: Full Performance Screen ───────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════
+
+let _perfDays = 7;
+
+function renderPerformanceScreen() {
+  if (!isTeamLead()) return;
+  const el = document.getElementById('perfContent');
+  if (!el) return;
+
+  const myTeam = getTeamForTL(currentUser.name);
+  if (myTeam.length === 0) {
+    el.innerHTML = `<div class="card" style="text-align:center;padding:2rem">
+      <div style="font-size:2rem;margin-bottom:10px">👥</div>
+      <div style="font-size:15px;font-weight:600;color:var(--text)">No team assigned yet</div>
+    </div>`;
+    return;
+  }
+
+  const perfData = myTeam
+    .map(name => calcPersonPerformance(name, _perfDays))
+    .sort((a,b) => {
+      const order = {red:0, amber:1, green:2};
+      return order[a.pulse] - order[b.pulse];
+    });
+
+  const alertsAll = perfData.flatMap(p => p.alerts.map(a => ({...a, name:p.name})));
+  const fmt$ = v => '$' + Math.round(v).toLocaleString('en-AU');
+
+  el.innerHTML = `
+    <!-- Period selector -->
+    <div style="display:flex;gap:8px;margin-bottom:1rem">
+      ${[7,14,30].map(d => `<button onclick="setPerfDays(${d},this)"
+        style="padding:7px 16px;border-radius:50px;border:1.5px solid ${_perfDays===d?'var(--brand)':'var(--border)'};
+        background:${_perfDays===d?'var(--brand-light)':'var(--surface-2)'};
+        color:${_perfDays===d?'var(--brand)':'var(--text-2)'};font-size:13px;font-weight:${_perfDays===d?'700':'400'};cursor:pointer">
+        Last ${d} days
+      </button>`).join('')}
+    </div>
+
+    <!-- OPTION C: Automatic alerts -->
+    ${alertsAll.length > 0 ? `
+    <div class="card" style="margin-bottom:1rem;border-color:#F59E0B;background:#FFFBEB">
+      <div style="font-size:11px;font-weight:700;color:#92400E;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">⚡ Automatic alerts</div>
+      ${alertsAll.map(a => `
+        <div style="display:flex;align-items:flex-start;gap:8px;padding:7px 0;border-bottom:1px solid #FDE68A">
+          <span style="font-size:13px">${a.level==='red'?'🔴':'⚠️'}</span>
+          <div>
+            <span style="font-size:13px;font-weight:600;color:var(--text)">${esc(a.name.split(' ')[0])}</span>
+            <span style="font-size:13px;color:var(--text-2)"> — ${esc(a.msg)}</span>
+          </div>
+        </div>`).join('')}
+    </div>` : `
+    <div class="card" style="margin-bottom:1rem;border-color:#BBF7D0;background:#F0FDF4">
+      <div style="font-size:13px;font-weight:600;color:var(--success);text-align:center;padding:4px 0">✅ No performance alerts — team is on track</div>
+    </div>`}
+
+    <!-- OPTION B: Performance Summary per person -->
+    <div class="card" style="margin-bottom:1rem">
+      <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">📋 Performance Summary — last ${_perfDays} days</div>
+
+      <!-- Summary table header -->
+      <div style="display:grid;grid-template-columns:1fr repeat(5,auto);gap:4px 8px;align-items:center;padding:6px 8px;background:var(--surface-2);border-radius:var(--radius-sm);margin-bottom:6px;font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.3px">
+        <span>Analyst</span>
+        <span style="text-align:center">Pulse</span>
+        <span style="text-align:center">Conf.</span>
+        <span style="text-align:center">Checklist</span>
+        <span style="text-align:center">Stale</span>
+        <span style="text-align:center">EODs</span>
+      </div>
+
+      ${perfData.map(p => {
+        const pulseIcon = p.pulse==='red'?'🔴':p.pulse==='amber'?'⚠️':'🟢';
+        const confColor = p.avgConf ? (parseFloat(p.avgConf)>=4?'var(--success)':parseFloat(p.avgConf)>=3?'#D97706':'var(--danger)') : 'var(--text-3)';
+        return `
+        <div style="border:1.5px solid var(--border);border-radius:var(--radius-sm);margin-bottom:8px;overflow:hidden">
+          <!-- Row summary -->
+          <div style="display:grid;grid-template-columns:1fr repeat(5,auto);gap:4px 8px;align-items:center;padding:8px 10px;cursor:pointer"
+            onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">
+            <span style="font-size:13px;font-weight:600;color:var(--text)">${esc(p.name)}</span>
+            <span style="text-align:center;font-size:14px">${pulseIcon}</span>
+            <span style="text-align:center;font-size:13px;font-weight:700;color:${confColor}">${p.avgConf!==null?p.avgConf+'/5':'—'}</span>
+            <span style="text-align:center;font-size:12px;color:${p.clRate!==null?(p.clRate>=80?'var(--success)':p.clRate>=50?'#D97706':'var(--danger)'):'var(--text-3)'}">${p.clRate!==null?p.clRate+'%':'—'}</span>
+            <span style="text-align:center;font-size:12px;color:${p.staleFiles>2?'var(--danger)':p.staleFiles>0?'#D97706':'var(--success)'}">${p.staleFiles}</span>
+            <span style="text-align:center;font-size:12px;color:var(--text-3)">${p.eodCount}</span>
+          </div>
+
+          <!-- Expanded detail -->
+          <div style="display:none;padding:10px 12px;border-top:1px solid var(--border);background:var(--surface-2)">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+
+              <div>
+                <div style="font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">EOD Quality</div>
+                <div style="font-size:12px;color:var(--text-2)">Submitted: ${p.eodCount} day${p.eodCount!==1?'s':''} of ${_perfDays}</div>
+                <div style="font-size:12px;color:var(--text-2)">Avg confidence: ${p.avgConf!==null?p.avgConf+'/5':'No data'}</div>
+                <div style="font-size:12px;color:var(--text-2)">Checklist: ✅${p.clYes} 🟡${p.clPartial} ❌${p.clNo}</div>
+                <div style="font-size:12px;color:var(--text-2)">Mood: 😊${p.moodCounts.good} 😐${p.moodCounts.ok} 😔${p.moodCounts.tough}</div>
+                ${p.brokerComplaintCount>0?`<div style="font-size:12px;color:var(--danger);margin-top:4px">📣 ${p.brokerComplaintCount} broker complaint${p.brokerComplaintCount>1?'s':''}</div>`:''}
+                ${p.supportCount>0?`<div style="font-size:12px;color:var(--brand)">🙋 Requested support ${p.supportCount}×</div>`:''}
+              </div>
+
+              <div>
+                <div style="font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">File Performance</div>
+                <div style="font-size:12px;color:var(--text-2)">Active files: ${p.activeFiles}</div>
+                <div style="font-size:12px;color:${p.staleFiles>0?'var(--danger)':'var(--text-2)'}">Stale files: ${p.staleFiles}</div>
+                <div style="font-size:12px;color:var(--text-2)">Settled (period): ${p.settledInPeriod}</div>
+                ${p.volumeInPeriod>0?`<div style="font-size:12px;color:var(--success)">Volume: ${fmt$(p.volumeInPeriod)}</div>`:''}
+                ${p.oneTouchCount>0?`<div style="font-size:12px;color:var(--brand)">⚡ ${p.oneTouchCount} one-touch approval${p.oneTouchCount>1?'s':''}</div>`:''}
+                ${p.avgApprovalDays!==null?`<div style="font-size:12px;color:var(--text-2)">Avg to approval: ${p.avgApprovalDays}d</div>`:''}
+                ${p.regressionCount>0?`<div style="font-size:12px;color:var(--warn)">⚠️ ${p.regressionCount} stage regression${p.regressionCount>1?'s':''}</div>`:''}
+              </div>
+            </div>
+
+            ${p.alerts.length>0?`
+            <div style="background:${p.pulse==='red'?'var(--danger-light)':'#FEF3C7'};border-radius:var(--radius-sm);padding:8px 10px">
+              <div style="font-size:10px;font-weight:700;color:${p.pulse==='red'?'var(--danger)':'#92400E'};text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Flags</div>
+              ${p.alerts.map(a=>`<div style="font-size:12px;color:${a.level==='red'?'var(--danger)':'#92400E'}">${a.level==='red'?'🔴':'⚠️'} ${esc(a.msg)}</div>`).join('')}
+            </div>`:''}
+
+            ${p.repeatedBlockers.length>0?`
+            <div style="margin-top:8px;font-size:12px;color:var(--warn)">
+              🔁 Recurring blockers: ${p.repeatedBlockers.map(({b,c})=>esc(b)+' ('+c+'×)').join(', ')}
+            </div>`:''}
+
+            ${p.brokerComplaints.length>0?`
+            <div style="margin-top:8px">
+              <div style="font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Broker complaint detail</div>
+              ${p.brokerComplaints.map(r=>`<div style="font-size:12px;color:var(--danger)">${esc(r.date)}: ${(r.brokerConcernTags||[]).filter(t=>BROKER_COMPLAINT_TAGS.includes(t)).map(t=>esc(t)).join(', ')}${r.brokerConcernDetail?' — '+esc(r.brokerConcernDetail):''}</div>`).join('')}
+            </div>`:''}
+          </div>
+        </div>`;
+      }).join('')}
+    </div>`;
+}
+
+function setPerfDays(days, btn) {
+  _perfDays = days;
+  renderPerformanceScreen();
+}
+
+// ── Patch renderMyTeam to append Performance Pulse ────────────────────────
+const _origRenderMyTeamPerf = window.renderMyTeam;
+window.renderMyTeam = function() {
+  if (_origRenderMyTeamPerf) _origRenderMyTeamPerf.apply(this, arguments);
+  if (!isTeamLead()) return;
+  const myteamEl = document.getElementById('myteamContent');
+  if (!myteamEl) return;
+  const myTeamNames = getTeamForTL(currentUser.name);
+  if (myTeamNames.length === 0) return;
+  renderPerformancePulse(myteamEl, myTeamNames);
 };
 
 </script>
