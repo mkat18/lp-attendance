@@ -546,6 +546,12 @@ tr.flagged-row:hover td { background: #FFEAEA; }
     </div>
 
 
+    <div class="card" id="eodPromptCard" style="display:none;border-color:#6366F1;background:#EEF2FF">
+      <div class="card-label" style="color:#4338CA">📋 End of Day Report</div>
+      <div style="font-size:13px;color:#4338CA;margin-bottom:10px" id="eodPromptStatus">Required before clock-out</div>
+      <button onclick="goToEOD()" class="btn-primary" style="background:#4F46E5;font-size:13px;padding:9px">Fill in EOD report</button>
+    </div>
+
     <div class="card" id="workloadNoteCard" style="display:none">
       <div class="card-label">📝 Observation note</div>
       <div style="font-size:13px;color:var(--text-2);margin-bottom:10px">Private note visible to managers only.</div>
@@ -688,6 +694,7 @@ tr.flagged-row:hover td { background: #FFEAEA; }
         <label for="newManagerRole">Role</label>
         <select id="newManagerRole" style="font-size:14px">
           <option value="analyst">Analyst</option>
+          <option value="trainee">Trainee</option>
           <option value="teamlead">Team Lead</option>
           <option value="hr">HR</option>
           <option value="assistant">Assistant</option>
@@ -781,6 +788,15 @@ tr.flagged-row:hover td { background: #FFEAEA; }
       <button class="tab" id="bftab-tags" onclick="switchFeedbackTab('tags',this)">By type</button>
     </div>
     <div id="feedbackContent"></div>
+  </div>
+
+  <!-- ── EOD REPORT SCREEN ────────────────────────────────────────────── -->
+  <div id="screen-eod" class="screen">
+    <div class="page-header">
+      <h1>📋 End of Day Report</h1>
+      <p id="eodScreenSub">Complete before clocking out</p>
+    </div>
+    <div id="eodScreenContent"></div>
   </div>
 </main>
 
@@ -1025,6 +1041,26 @@ tr.flagged-row:hover td { background: #FFEAEA; }
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px">
       <button onclick="closeBrokerFeedbackModal()" style="padding:12px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:transparent;color:var(--text-2);font-size:15px;cursor:pointer">Cancel</button>
       <button onclick="saveBrokerFeedback()" style="padding:12px;border-radius:var(--radius-sm);border:none;background:var(--brand);color:#fff;font-size:15px;font-weight:700;cursor:pointer">Save feedback</button>
+    </div>
+  </div>
+</div>
+
+
+<div id="assignBrokerModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.6);z-index:270;align-items:center;justify-content:center;backdrop-filter:blur(4px)">
+  <div style="background:var(--surface);border-radius:20px;padding:1.5rem;width:calc(100%-2rem);max-width:380px;box-shadow:0 20px 60px rgba(0,0,0,.25)">
+    <div style="font-size:17px;font-weight:700;color:var(--text);margin-bottom:4px">🎯 Assign broker</div>
+    <div style="font-size:13px;color:var(--text-3);margin-bottom:1.25rem" id="assignBrokerSubtitle">Assigning broker will upgrade this trainee to Analyst</div>
+    <div class="field">
+      <label>Broker name <span style="color:var(--danger)">*</span></label>
+      <input type="text" id="assignBrokerName" placeholder="e.g. Sarah Mitchell — Ace Finance"/>
+    </div>
+    <p style="font-size:12px;color:var(--success);background:var(--success-light);border-radius:var(--radius-sm);padding:8px 12px;margin-bottom:1rem">
+      ✅ Once saved, this person's role will automatically change from <b>Trainee → Analyst</b> and their Files tab will unlock.
+    </p>
+    <input type="hidden" id="assignBrokerTarget"/>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <button onclick="closeAssignBrokerModal()" style="padding:12px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:transparent;color:var(--text-2);font-size:15px;cursor:pointer">Cancel</button>
+      <button onclick="saveAssignBroker()" style="padding:12px;border-radius:var(--radius-sm);border:none;background:var(--brand);color:#fff;font-size:15px;font-weight:700;cursor:pointer">Assign & upgrade</button>
     </div>
   </div>
 </div>
@@ -1422,9 +1458,9 @@ function showScreen(name) {
 }
 
 // ── Role helpers ──────────────────────────────────────────────────────────
-const ROLE_LABEL = { superadmin:'Super Admin', manager:'Manager (Senior HR)', hr:'HR', teamlead:'Team Lead', analyst:'Analyst', assistant:'Assistant', sales:'Sales', customerservice:'Customer Service', socialmedia:'Social Media' };
+const ROLE_LABEL = { superadmin:'Super Admin', manager:'Manager (Senior HR)', hr:'HR', teamlead:'Team Lead', analyst:'Analyst', trainee:'Trainee', assistant:'Assistant', sales:'Sales', customerservice:'Customer Service', socialmedia:'Social Media' };
 const ANALYST_ROLES = ['analyst','teamlead']; // roles that get Files tab
-const CHECKIN_ROLES = ['manager','hr','teamlead','analyst','assistant','sales','customerservice','socialmedia']; // all check in except superadmin
+const CHECKIN_ROLES = ['manager','hr','teamlead','analyst','trainee','assistant','sales','customerservice','socialmedia']; // all check in except superadmin
 const DASHBOARD_ROLES = ['manager','hr','teamlead','assistant']; // see dashboard
 const ADMIN_ROLES = ['manager','superadmin']; // see admin panel
 
@@ -1434,6 +1470,7 @@ function isHR()            { return currentUser&&currentUser.role==='hr'; }
 function isAssistant()     { return currentUser&&currentUser.role==='assistant'; }
 function isTeamLead()      { return currentUser&&currentUser.role==='teamlead'; }
 function isAnalyst()       { return currentUser&&currentUser.role==='analyst'; }
+function isTrainee()       { return currentUser&&currentUser.role==='trainee'; }
 function canSeeFiles()     { return currentUser&&(ANALYST_ROLES.includes(currentUser.role)||isSuperAdmin()); }
 function canSeeDashboard() { return currentUser&&(DASHBOARD_ROLES.includes(currentUser.role)||isSuperAdmin()); }
 function canSeeAdmin()     { return currentUser&&ADMIN_ROLES.includes(currentUser.role); }
@@ -1456,10 +1493,10 @@ function buildNav() {
   } else if (r === 'hr') {
     tabs = [['checkin','Check in'],['dashboard','Dashboard'],['profile','PIN']];
   } else if (r === 'teamlead') {
-    tabs = [['checkin','Check in'],['myteam','My Team'],['files','Team Files'],['myfiles','My Files'],['feedback','📣 Feedback'],['profile','PIN']];
+    tabs = [['checkin','Check in'],['myteam','My Team'],['files','Team Files'],['myfiles','My Files'],['feedback','📣 Feedback'],['eod','EOD'],['profile','PIN']];
   } else if (r === 'analyst') {
-    tabs = [['checkin','Check in'],['myfiles','My Files'],['profile','PIN']];
-  } else if (['assistant','sales','customerservice','socialmedia'].includes(r)) {
+    tabs = [['checkin','Check in'],['myfiles','My Files'],['eod','EOD'],['profile','PIN']];
+  } else if (['assistant','sales','customerservice','socialmedia','trainee'].includes(r)) {
     tabs = [['checkin','Check in'],['profile','PIN']];
   } else {
     tabs = [['checkin','Check in'],['profile','PIN']];
@@ -1480,6 +1517,7 @@ function goTab(name, btn) {
   if (name==='files')     renderFilesScreen();
   if (name==='myfiles')   renderMyFilesScreen();
   if (name==='feedback')  renderFeedbackScreen();
+  if (name==='eod')       renderEODScreen();
   if (name==='admin')     renderAdmin();
   if (name==='profile')   initCp();
 }
@@ -1934,9 +1972,21 @@ function clockOut() {
   const idx=recs.findIndex(r=>r.date===today&&r.name===currentUser.name);
   if (idx<0) return;
   if (recs[idx].clockOut) { showToast('Already clocked out.','err'); return; }
+  // Gate behind EOD for analyst/trainee/teamlead
+  const EOD_ROLES = ['analyst','trainee','teamlead'];
+  if (EOD_ROLES.includes(currentUser.role)) {
+    const eodDone = getTodayEOD(currentUser.name);
+    if (!eodDone) {
+      showToast('Please complete your EOD report before clocking out.','err');
+      // Navigate to EOD tab
+      const eodTab = Array.from(document.querySelectorAll('.nav-tab')).find(b=>b.textContent.trim()==='EOD');
+      if (eodTab) { document.querySelectorAll('.nav-tab').forEach(b=>b.classList.remove('active')); eodTab.classList.add('active'); }
+      renderEODScreen(); showScreen('eod');
+      return;
+    }
+  }
   recs[idx].clockOut=Date.now();
   saveRecords(recs);
-  // Write to SharePoint
   spSaveRecord(recs[idx]);
   showToast('✓ Clocked out!','ok');
   updateClockOutUI();
@@ -2721,6 +2771,7 @@ function renderAdmin() {
           sales:           '<span class="tag" style="background:#FCE7F3;color:#9D174D">Sales</span>',
           customerservice: '<span class="tag" style="background:#E0E7FF;color:#3730A3">Customer Service</span>',
           socialmedia:     '<span class="tag" style="background:#FDF4FF;color:#7E22CE">Social Media</span>',
+          trainee:         '<span class="tag" style="background:#FFF7ED;color:#C2410C">Trainee</span>',
         }[s.role]||'';
 
         // What buttons can current user see for this person
@@ -2729,6 +2780,7 @@ function renderAdmin() {
         const canChangeRoleThis = (sa || mgr) && s.name!==currentUser.name && !(mgr && s.role==='superadmin');
         const canEditScheduleThis = sa || (mgr && s.role!=='superadmin') || (s.name===currentUser.name);
         const canManageTeam = (sa || mgr) && s.role==='teamlead';
+        const canAssignBroker = (sa || mgr || isTeamLead()) && s.role==='trainee';
 
         return `<div class="staff-row" style="flex-wrap:wrap;gap:6px">
           <div class="staff-avatar ${['superadmin','manager'].includes(s.role)?'mgr':''}">${initials(s.name)}</div>
@@ -2737,6 +2789,7 @@ function renderAdmin() {
             <div class="staff-pin-status" style="color:${pinColor}">${pinStatus}</div>
             <div style="font-size:11px;color:var(--text-3);margin-top:2px">🕐 ${schedule}${s.office?` &nbsp;📍 ${s.office}`:''}</div>
             <div style="font-size:11px;color:var(--text-3);margin-top:1px">${s.joinDate?'📅 '+calcTenureLabel(s.joinDate):''}</div>
+            <div style="font-size:11px;color:var(--text-3);margin-top:1px">${s.role==='trainee'?(s.assignedBroker?'🎯 Broker: '+esc(s.assignedBroker):'⚠️ No broker assigned yet'):''}${s.role==='analyst'&&s.assignedBroker?'🎯 Broker: '+esc(s.assignedBroker):''}</div>
           </div>
           <div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center">
             ${canChangeRoleThis?`<select onchange="changeRole(${i},this.value)" style="font-size:12px;padding:3px 6px;border-radius:var(--radius-sm);border:1.5px solid var(--border)">
@@ -2745,12 +2798,14 @@ function renderAdmin() {
               <option value="hr"${s.role==='hr'?' selected':''}>HR</option>
               <option value="teamlead"${s.role==='teamlead'?' selected':''}>Team Lead</option>
               <option value="analyst"${s.role==='analyst'?' selected':''}>Analyst</option>
+              <option value="trainee"${s.role==='trainee'?' selected':''}>Trainee</option>
               <option value="assistant"${s.role==='assistant'?' selected':''}>Assistant</option>
               <option value="sales"${s.role==='sales'?' selected':''}>Sales</option>
               <option value="customerservice"${s.role==='customerservice'?' selected':''}>Customer Service</option>
               <option value="socialmedia"${s.role==='socialmedia'?' selected':''}>Social Media</option>
             </select>`:''}
             ${canManageTeam?`<button class="btn-sm" style="background:#FEF3C7;color:#92400E;border-color:#FDE68A" onclick="openManageTeam('${s.name}')">👥 Manage Team</button>`:''}
+            ${canAssignBroker?`<button class="btn-sm" style="background:#FFF7ED;color:#C2410C;border-color:#FED7AA" onclick="openAssignBrokerModal('${s.name}')">🎯 Assign broker</button>`:''}
             ${canEditScheduleThis?`<button class="btn-sm" onclick="editSchedule(${i})">Schedule & Office</button>`:''}
             ${canResetThis?`<button class="btn-sm" onclick="resetPin(${i})">Reset PIN</button>`:''}
             ${canDeleteThis?`<button class="btn-sm btn-danger" onclick="removePerson(${i})">Remove</button>`:''}
@@ -3393,7 +3448,7 @@ function renderManageTeamModal() {
   const teams = getTeams();
   const currentTeam = teams[_managingTL] || [];
   // All assignable roles — analyst + any role that can be in a team
-  const TEAM_ROLES = ['analyst','assistant','sales','customerservice','socialmedia','hr'];
+  const TEAM_ROLES = ['analyst','trainee','assistant','sales','customerservice','socialmedia','hr'];
   const allStaff = getStaff().filter(s => TEAM_ROLES.includes(s.role));
 
   // Current members list
@@ -5553,6 +5608,600 @@ function renderFeedbackByTags(el, all) {
 // ── File card: confirm analyst name shows under each card (already in fileCard) ─
 // The fileCard function already shows: "${esc(f.owner.split(' ')[0])}" in the meta line
 // Let's make it show full name for TL view
+
+
+// ══════════════════════════════════════════════════════════════════════════
+// ── TRAINEE ROLE ──────────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════
+
+// ── Assign Broker Modal ────────────────────────────────────────────────────
+let _assignBrokerTarget = null;
+
+function openAssignBrokerModal(staffName) {
+  _assignBrokerTarget = staffName;
+  document.getElementById('assignBrokerSubtitle').textContent =
+    'Assigning a broker to ' + staffName.split(' ')[0] + ' will upgrade them from Trainee → Analyst';
+  document.getElementById('assignBrokerTarget').value = staffName;
+
+  // Pre-fill if already has a broker
+  const staff = getStaff();
+  const member = staff.find(s => s.name === staffName);
+  document.getElementById('assignBrokerName').value = member && member.assignedBroker ? member.assignedBroker : '';
+
+  const modal = document.getElementById('assignBrokerModal');
+  modal.style.display = 'flex';
+}
+
+function closeAssignBrokerModal() {
+  document.getElementById('assignBrokerModal').style.display = 'none';
+  _assignBrokerTarget = null;
+}
+
+function saveAssignBroker() {
+  const brokerName = document.getElementById('assignBrokerName').value.trim();
+  const targetName = document.getElementById('assignBrokerTarget').value;
+  if (!brokerName) { showToast('Enter a broker name.', 'err'); return; }
+  if (!targetName) { showToast('No target selected.', 'err'); return; }
+
+  const staff = getStaff();
+  const idx = staff.findIndex(s => s.name === targetName);
+  if (idx < 0) { showToast('Staff member not found.', 'err'); return; }
+
+  const oldRole = staff[idx].role;
+  staff[idx].assignedBroker = brokerName;
+  staff[idx].brokerAssignedAt = today;
+  staff[idx].brokerAssignedBy = currentUser.name;
+
+  // Auto-upgrade trainee → analyst
+  if (staff[idx].role === 'trainee') {
+    staff[idx].role = 'analyst';
+    staff[idx].upgradedAt = today;
+    staff[idx].upgradedBy = currentUser.name;
+  }
+
+  saveStaff(staff);
+  spSaveStaffMember(staff[idx]);
+  writeAuditLog('Broker Assigned', targetName,
+    `Broker "${brokerName}" assigned by ${currentUser.name}. Role upgraded from ${ROLE_LABEL[oldRole]||oldRole} to Analyst.`);
+
+  closeAssignBrokerModal();
+  renderAdmin();
+  showToast(targetName.split(' ')[0] + ' upgraded to Analyst — broker: ' + brokerName, 'ok');
+}
+
+// ── Dashboard: show trainee count for managers ─────────────────────────────
+// Patch renderMetrics to add trainee card
+const _origRenderMetrics = window.renderMetrics;
+window.renderMetrics = function() {
+  if (_origRenderMetrics) _origRenderMetrics.apply(this, arguments);
+  // Add trainee card to metrics if manager/superadmin
+  if (!isManager()) return;
+  const metricsEl = document.getElementById('metrics');
+  if (!metricsEl) return;
+
+  const trainees = getStaff().filter(s => s.role === 'trainee');
+  const unassigned = trainees.filter(s => !s.assignedBroker);
+  if (trainees.length === 0) return;
+
+  const traineeCard = document.createElement('div');
+  traineeCard.className = 'met';
+  traineeCard.style.cssText = `grid-column:1/-1;${unassigned.length>0?'border-color:#FED7AA;background:#FFF7ED':''}`;
+  traineeCard.innerHTML = `
+    <div class="met-lbl">🎓 Trainees</div>
+    <div class="met-val" style="color:#C2410C">${trainees.length}</div>
+    <div class="met-sub">${unassigned.length > 0
+      ? unassigned.length + ' without broker: ' + unassigned.slice(0,3).map(s=>s.name.split(' ')[0]).join(', ') + (unassigned.length>3?' +more':'')
+      : 'all assigned ✓'
+    }</div>`;
+  metricsEl.appendChild(traineeCard);
+};
+
+// ── Trainee login: show message that files are locked ─────────────────────
+// Patch initCheckin to show info banner for trainees
+const _origInitCheckinV9 = window.initCheckin;
+window.initCheckin = function() {
+  if (_origInitCheckinV9) _origInitCheckinV9.apply(this, arguments);
+  // Show trainee info banner
+  let banner = document.getElementById('traineeBanner');
+  if (isTrainee()) {
+    if (!banner) {
+      banner = document.createElement('div');
+      banner.id = 'traineeBanner';
+      banner.style.cssText = 'background:#FFF7ED;border:1.5px solid #FED7AA;border-radius:var(--radius-sm);padding:12px 14px;margin-top:12px;font-size:13px;color:#C2410C;text-align:center';
+      banner.innerHTML = '🎓 <b>Trainee account</b> — Your Files tab will unlock once a broker is assigned to you by your manager.';
+      const checkinScreen = document.getElementById('screen-checkin');
+      if (checkinScreen) checkinScreen.appendChild(banner);
+    }
+    banner.style.display = 'block';
+  } else if (banner) {
+    banner.style.display = 'none';
+  }
+};
+
+// ── Broker feedback: also include trainees in analyst dropdown ─────────────
+// (already handled since we use myTeam filter, not role filter)
+
+// ── Manage team: trainees shown with ⚠️ No broker label ──────────────────
+// (already handled in renderManageTeamModal via roleLabel from ROLE_LABEL)
+
+
+// ══════════════════════════════════════════════════════════════════════════
+// ── EOD REPORT SYSTEM ─────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════
+
+const EOD_ROLES = ['analyst','trainee','teamlead'];
+
+// ── Storage ────────────────────────────────────────────────────────────────
+function getEODReports() { return LS.get('ci_eod') || []; }
+function saveEODReports(r) { LS.set('ci_eod', r); }
+
+function getTodayEOD(name) {
+  return getEODReports().find(r => r.name === name && r.date === today) || null;
+}
+
+// ── Navigate to EOD from checkin screen ───────────────────────────────────
+function goToEOD() {
+  const tab = Array.from(document.querySelectorAll('.nav-tab')).find(b => b.textContent.trim() === 'EOD');
+  if (tab) {
+    document.querySelectorAll('.nav-tab').forEach(b => b.classList.remove('active'));
+    tab.classList.add('active');
+  }
+  renderEODScreen();
+  showScreen('eod');
+}
+
+// ── EOD Prompt card on checkin screen ─────────────────────────────────────
+function updateEODPromptCard() {
+  const card = document.getElementById('eodPromptCard');
+  if (!card) return;
+  if (!EOD_ROLES.includes(currentUser?.role)) { card.style.display = 'none'; return; }
+  const rec = getRecords().find(r => r.date === today && r.name === currentUser.name);
+  if (!rec || rec.status === 'leave') { card.style.display = 'none'; return; }
+  card.style.display = 'block';
+  const existing = getTodayEOD(currentUser.name);
+  const statusEl = document.getElementById('eodPromptStatus');
+  if (existing) {
+    statusEl.textContent = '✓ Completed — tap to update';
+    card.style.borderColor = 'var(--success)';
+    card.style.background = 'var(--success-light)';
+    card.querySelector('.card-label').style.color = 'var(--success)';
+    statusEl.style.color = 'var(--success)';
+    card.querySelector('button').textContent = 'Update EOD report';
+    card.querySelector('button').style.background = 'var(--success)';
+  } else {
+    statusEl.textContent = 'Required before clock-out';
+    card.style.borderColor = '#6366F1';
+    card.style.background = '#EEF2FF';
+    card.querySelector('.card-label').style.color = '#4338CA';
+    statusEl.style.color = '#4338CA';
+    card.querySelector('button').textContent = 'Fill in EOD report';
+    card.querySelector('button').style.background = '#4F46E5';
+  }
+}
+
+// ── EOD Screen ────────────────────────────────────────────────────────────
+function renderEODScreen() {
+  const el = document.getElementById('eodScreenContent');
+  if (!el) return;
+
+  // Check if they've already submitted today
+  const existing = getTodayEOD(currentUser.name);
+  const rec = getRecords().find(r => r.date === today && r.name === currentUser.name);
+  const hasCheckedIn = rec && rec.status !== 'leave';
+
+  if (!hasCheckedIn) {
+    el.innerHTML = `<div class="card" style="text-align:center;padding:2rem">
+      <div style="font-size:2rem;margin-bottom:10px">⏳</div>
+      <div style="font-size:15px;font-weight:600;color:var(--text)">Check in first</div>
+      <div style="font-size:13px;color:var(--text-3);margin-top:4px">Complete your attendance check-in before filling in the EOD report.</div>
+    </div>`;
+    return;
+  }
+
+  const sub = document.getElementById('eodScreenSub');
+  if (sub) sub.textContent = existing ? 'Submitted — you can update anytime' : 'Complete before clocking out';
+
+  // Get today's files for this person
+  const myTodayFiles = getFileEntries().filter(f => f.owner === currentUser.name && f.updatedAt === today && f.active !== false);
+
+  // Pre-fill values from existing report
+  const pf = (field, fallback='') => existing ? (existing[field] ?? fallback) : fallback;
+
+  el.innerHTML = `
+    <form onsubmit="submitEOD(event)">
+
+      ${myTodayFiles.length > 0 ? `
+      <div class="card" style="margin-bottom:1rem">
+        <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">📁 Files worked on today (auto-linked)</div>
+        ${myTodayFiles.map(f => {
+          const sc = FILE_STATUS_COLORS[f.status]||{bg:'#F3F4F6',color:'#374151'};
+          return `<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)">
+            <span style="font-size:13px;color:var(--text)">${esc(f.client)}</span>
+            <span style="background:${sc.bg};color:${sc.color};border-radius:50px;padding:2px 8px;font-size:11px;font-weight:600">${esc(f.status)}</span>
+          </div>`;
+        }).join('')}
+      </div>` : ''}
+
+      <div class="card" style="margin-bottom:1rem">
+        <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">Blockers today</div>
+
+        <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:8px">Waiting on: <span style="font-size:11px;color:var(--text-3);font-weight:400">(select all that apply)</span></div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px" id="eodBlockerChips">
+          ${['Broker','Client','Bank / Lender','Internal team','Nobody — no blockers'].map(b => {
+            const sel = existing && (existing.blockers||[]).includes(b);
+            return `<button type="button" onclick="toggleEODChip(this,'blocker')"
+              data-val="${esc(b)}"
+              style="padding:6px 12px;border-radius:50px;border:1.5px solid ${sel?'var(--brand)':'var(--border)'};
+              background:${sel?'var(--brand-light)':'var(--surface-2)'};color:${sel?'var(--brand)':'var(--text-2)'};
+              font-size:13px;font-weight:${sel?'700':'400'};cursor:pointer">${sel?'✓ ':''}${esc(b)}</button>`;
+          }).join('')}
+        </div>
+
+        <div class="field">
+          <label>If blocked — brief description of what's missing</label>
+          <textarea id="eod_blockerDetail" placeholder="e.g. Waiting on bank statements from 3 clients, chased twice each…"
+            style="width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:14px;color:var(--text);background:var(--surface-2);outline:none;resize:none;min-height:60px;line-height:1.5">${esc(pf('blockerDetail'))}</textarea>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:1rem">
+        <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">Quality & confidence</div>
+
+        <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:8px">How confident are you today's work is 100% accurate?</div>
+        <div style="display:flex;gap:8px;margin-bottom:14px">
+          ${[1,2,3,4,5].map(n => {
+            const sel = existing && existing.confidence === n;
+            const colors = {1:'#B91C1C',2:'#D97706',3:'#B45309',4:'#16A34A',5:'#15803D'};
+            const labels = {1:'Very low',2:'Low',3:'Moderate',4:'High',5:'Very high'};
+            return `<button type="button" onclick="selectEODConfidence(${n})" id="eodConf_${n}"
+              style="flex:1;padding:10px 4px;border-radius:var(--radius-sm);border:1.5px solid ${sel?colors[n]:'var(--border)'};
+              background:${sel?'#F0FDF4':'var(--surface-2)'};color:${sel?colors[n]:'var(--text-3)'};
+              font-size:14px;font-weight:${sel?'700':'400'};cursor:pointer;text-align:center">
+              <div style="font-size:18px;font-weight:700">${n}</div>
+              <div style="font-size:9px;margin-top:2px">${labels[n]}</div>
+            </button>`;
+          }).join('')}
+        </div>
+        <input type="hidden" id="eod_confidence" value="${pf('confidence','')}"/>
+
+        <div class="field" style="margin-bottom:0">
+          <label>Did the broker raise any concerns today?</label>
+          <div style="display:flex;gap:8px;margin-top:6px">
+            <button type="button" onclick="setEODYN('brokerConcern','yes',this)" id="eodBC_yes"
+              style="flex:1;padding:9px;border-radius:var(--radius-sm);border:1.5px solid ${pf('brokerConcern')==='yes'?'var(--danger)':'var(--border)'};
+              background:${pf('brokerConcern')==='yes'?'var(--danger-light)':'var(--surface-2)'};
+              color:${pf('brokerConcern')==='yes'?'var(--danger)':'var(--text-2)'};font-size:14px;font-weight:${pf('brokerConcern')==='yes'?'700':'400'};cursor:pointer">Yes</button>
+            <button type="button" onclick="setEODYN('brokerConcern','no',this)" id="eodBC_no"
+              style="flex:1;padding:9px;border-radius:var(--radius-sm);border:1.5px solid ${pf('brokerConcern')==='no'?'var(--success)':'var(--border)'};
+              background:${pf('brokerConcern')==='no'?'var(--success-light)':'var(--surface-2)'};
+              color:${pf('brokerConcern')==='no'?'var(--success)':'var(--text-2)'};font-size:14px;font-weight:${pf('brokerConcern')==='no'?'700':'400'};cursor:pointer">No</button>
+          </div>
+          <input type="hidden" id="eod_brokerConcern" value="${pf('brokerConcern')}"/>
+          <div id="eodBCDetail_wrap" style="margin-top:8px;display:${pf('brokerConcern')==='yes'?'block':'none'}">
+            <textarea id="eod_brokerConcernDetail" placeholder="Describe what the broker raised…"
+              style="width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:14px;color:var(--text);background:var(--surface-2);outline:none;resize:none;min-height:60px;line-height:1.5">${esc(pf('brokerConcernDetail'))}</textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:1rem">
+        <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">Wrap-up</div>
+
+        <div class="field">
+          <label>Did you face any challenges today?</label>
+          <div style="display:flex;gap:8px;margin-top:6px;margin-bottom:8px">
+            <button type="button" onclick="setEODYN('challenges','yes',this)" id="eodCH_yes"
+              style="flex:1;padding:9px;border-radius:var(--radius-sm);border:1.5px solid ${pf('challenges')==='yes'?'var(--warn)':'var(--border)'};
+              background:${pf('challenges')==='yes'?'var(--warn-light)':'var(--surface-2)'};
+              color:${pf('challenges')==='yes'?'var(--warn)':'var(--text-2)'};font-size:14px;font-weight:${pf('challenges')==='yes'?'700':'400'};cursor:pointer">Yes</button>
+            <button type="button" onclick="setEODYN('challenges','no',this)" id="eodCH_no"
+              style="flex:1;padding:9px;border-radius:var(--radius-sm);border:1.5px solid ${pf('challenges')==='no'?'var(--success)':'var(--border)'};
+              background:${pf('challenges')==='no'?'var(--success-light)':'var(--surface-2)'};
+              color:${pf('challenges')==='no'?'var(--success)':'var(--text-2)'};font-size:14px;font-weight:${pf('challenges')==='no'?'700':'400'};cursor:pointer">No</button>
+          </div>
+          <input type="hidden" id="eod_challenges" value="${pf('challenges')}"/>
+          <div id="eodCHDetail_wrap" style="display:${pf('challenges')==='yes'?'block':'none'}">
+            <textarea id="eod_challengeDetail" placeholder="Briefly describe the challenge…"
+              style="width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:14px;color:var(--text);background:var(--surface-2);outline:none;resize:none;min-height:60px;line-height:1.5">${esc(pf('challengeDetail'))}</textarea>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Support needed from management?</label>
+          <div style="display:flex;gap:8px;margin-top:6px;margin-bottom:8px">
+            <button type="button" onclick="setEODYN('supportNeeded','yes',this)" id="eodSN_yes"
+              style="flex:1;padding:9px;border-radius:var(--radius-sm);border:1.5px solid ${pf('supportNeeded')==='yes'?'var(--brand)':'var(--border)'};
+              background:${pf('supportNeeded')==='yes'?'var(--brand-light)':'var(--surface-2)'};
+              color:${pf('supportNeeded')==='yes'?'var(--brand)':'var(--text-2)'};font-size:14px;font-weight:${pf('supportNeeded')==='yes'?'700':'400'};cursor:pointer">Yes</button>
+            <button type="button" onclick="setEODYN('supportNeeded','no',this)" id="eodSN_no"
+              style="flex:1;padding:9px;border-radius:var(--radius-sm);border:1.5px solid ${pf('supportNeeded')==='no'?'var(--success)':'var(--border)'};
+              background:${pf('supportNeeded')==='no'?'var(--success-light)':'var(--surface-2)'};
+              color:${pf('supportNeeded')==='no'?'var(--success)':'var(--text-2)'};font-size:14px;font-weight:${pf('supportNeeded')==='no'?'700':'400'};cursor:pointer">No</button>
+          </div>
+          <input type="hidden" id="eod_supportNeeded" value="${pf('supportNeeded')}"/>
+          <div id="eodSNDetail_wrap" style="display:${pf('supportNeeded')==='yes'?'block':'none'}">
+            <textarea id="eod_supportDetail" placeholder="What do you need help with?"
+              style="width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:14px;color:var(--text);background:var(--surface-2);outline:none;resize:none;min-height:60px;line-height:1.5">${esc(pf('supportDetail'))}</textarea>
+          </div>
+        </div>
+
+        <div class="field" style="margin-bottom:0">
+          <label>Anything else to note? <span style="color:var(--text-3);font-weight:400">(optional)</span></label>
+          <textarea id="eod_notes" placeholder="Any learning, observation or handover note for tomorrow…"
+            style="width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:14px;color:var(--text);background:var(--surface-2);outline:none;resize:none;min-height:60px;line-height:1.5">${esc(pf('notes'))}</textarea>
+        </div>
+      </div>
+
+      <div id="eodSubmitErr" style="color:var(--danger);font-size:13px;margin-bottom:8px;display:none"></div>
+      <button type="submit" class="btn-primary" style="width:100%;padding:14px;font-size:16px">
+        ${existing ? 'Update EOD report' : 'Submit EOD report'}
+      </button>
+      ${existing ? `<div style="text-align:center;font-size:12px;color:var(--text-3);margin-top:8px">Last submitted: ${esc(existing.submittedAt||existing.date)}</div>` : ''}
+    </form>`;
+}
+
+// ── EOD form interaction helpers ──────────────────────────────────────────
+function toggleEODChip(btn, group) {
+  const val = btn.dataset.val;
+  const isSelected = btn.style.fontWeight === '700';
+  if (isSelected) {
+    btn.style.border = '1.5px solid var(--border)';
+    btn.style.background = 'var(--surface-2)';
+    btn.style.color = 'var(--text-2)';
+    btn.style.fontWeight = '400';
+    btn.textContent = val;
+  } else {
+    btn.style.border = '1.5px solid var(--brand)';
+    btn.style.background = 'var(--brand-light)';
+    btn.style.color = 'var(--brand)';
+    btn.style.fontWeight = '700';
+    btn.textContent = '✓ ' + val;
+  }
+}
+
+function selectEODConfidence(n) {
+  document.getElementById('eod_confidence').value = n;
+  const colors = {1:'#B91C1C',2:'#D97706',3:'#B45309',4:'#16A34A',5:'#15803D'};
+  [1,2,3,4,5].forEach(i => {
+    const btn = document.getElementById('eodConf_'+i);
+    if (!btn) return;
+    if (i === n) {
+      btn.style.border = '1.5px solid ' + colors[i];
+      btn.style.background = '#F0FDF4';
+      btn.style.color = colors[i];
+      btn.style.fontWeight = '700';
+    } else {
+      btn.style.border = '1.5px solid var(--border)';
+      btn.style.background = 'var(--surface-2)';
+      btn.style.color = 'var(--text-3)';
+      btn.style.fontWeight = '400';
+    }
+  });
+}
+
+function setEODYN(field, val, btn) {
+  document.getElementById('eod_'+field).value = val;
+  const yBtn = document.getElementById('eod'+field.charAt(0).toUpperCase()+field.slice(1)+'_yes')||document.getElementById('eod'+field[0].toUpperCase()+field.slice(1)+'_yes');
+  // Find the two buttons in the same parent
+  const parent = btn.parentElement;
+  const btns = parent.querySelectorAll('button');
+  const yesColors = {brokerConcern:'var(--danger)',challenges:'var(--warn)',supportNeeded:'var(--brand)'};
+  const yesBgs   = {brokerConcern:'var(--danger-light)',challenges:'var(--warn-light)',supportNeeded:'var(--brand-light)'};
+  const col = yesColors[field]||'var(--brand)';
+  const bg  = yesBgs[field]||'var(--brand-light)';
+  btns.forEach(b => {
+    const isThis = b === btn;
+    const isYes = b.textContent.trim() === 'Yes';
+    if (isThis) {
+      b.style.border = `1.5px solid ${isYes?col:'var(--success)'}`;
+      b.style.background = isYes?bg:'var(--success-light)';
+      b.style.color = isYes?col:'var(--success)';
+      b.style.fontWeight = '700';
+    } else {
+      b.style.border = '1.5px solid var(--border)';
+      b.style.background = 'var(--surface-2)';
+      b.style.color = 'var(--text-2)';
+      b.style.fontWeight = '400';
+    }
+  });
+  // Show/hide detail field
+  const detailWrap = document.getElementById('eod'+field.charAt(0).toUpperCase()+field.slice(1)+'Detail_wrap')||
+    document.getElementById('eod'+field[0].toUpperCase()+field.slice(1)+'Detail_wrap');
+  const wrap = document.querySelector(`#eod${field[0].toUpperCase()+field.slice(1)}Detail_wrap`)||
+    document.getElementById(`eod${field}Detail_wrap`);
+  // Try generic approach
+  const allWraps = {
+    brokerConcern: document.getElementById('eodBCDetail_wrap'),
+    challenges: document.getElementById('eodCHDetail_wrap'),
+    supportNeeded: document.getElementById('eodSNDetail_wrap'),
+  };
+  if (allWraps[field]) allWraps[field].style.display = val==='yes'?'block':'none';
+}
+
+// ── Submit EOD ─────────────────────────────────────────────────────────────
+function submitEOD(e) {
+  e.preventDefault();
+  const errEl = document.getElementById('eodSubmitErr');
+
+  // Collect blockers
+  const blockerChips = document.querySelectorAll('#eodBlockerChips button');
+  const blockers = Array.from(blockerChips)
+    .filter(b => b.style.fontWeight === '700')
+    .map(b => b.dataset.val);
+
+  const confidence = parseInt(document.getElementById('eod_confidence').value||'0');
+  const brokerConcern = document.getElementById('eod_brokerConcern').value;
+  const challenges = document.getElementById('eod_challenges').value;
+  const supportNeeded = document.getElementById('eod_supportNeeded').value;
+
+  // Validation
+  const errors = [];
+  if (blockers.length === 0) errors.push('Select at least one blocker option (or "Nobody — no blockers").');
+  if (!confidence) errors.push('Rate your confidence (1–5).');
+  if (!brokerConcern) errors.push('Answer the broker concerns question.');
+  if (brokerConcern === 'yes' && !document.getElementById('eod_brokerConcernDetail').value.trim())
+    errors.push('Describe what the broker raised.');
+  if (!challenges) errors.push('Answer the challenges question.');
+  if (challenges === 'yes' && !document.getElementById('eod_challengeDetail').value.trim())
+    errors.push('Describe the challenge briefly.');
+  if (!supportNeeded) errors.push('Answer the support needed question.');
+
+  if (errors.length > 0) {
+    errEl.style.display = 'block';
+    errEl.innerHTML = '⚠️ ' + errors.join('<br>⚠️ ');
+    return;
+  }
+  errEl.style.display = 'none';
+
+  const report = {
+    id: genFileId(),
+    name: currentUser.name,
+    role: currentUser.role,
+    date: today,
+    submittedAt: new Date().toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit',hour12:true}),
+    submittedTs: Date.now(),
+    blockers,
+    blockerDetail: document.getElementById('eod_blockerDetail').value.trim(),
+    confidence,
+    brokerConcern,
+    brokerConcernDetail: document.getElementById('eod_brokerConcernDetail')?.value.trim()||'',
+    challenges,
+    challengeDetail: document.getElementById('eod_challengeDetail')?.value.trim()||'',
+    supportNeeded,
+    supportDetail: document.getElementById('eod_supportDetail')?.value.trim()||'',
+    notes: document.getElementById('eod_notes').value.trim(),
+    linkedFileIds: getFileEntries().filter(f=>f.owner===currentUser.name&&f.updatedAt===today&&f.active!==false).map(f=>f.id),
+  };
+
+  // Save — replace existing if already submitted today
+  const all = getEODReports().filter(r => !(r.name===currentUser.name && r.date===today));
+  all.push(report);
+  saveEODReports(all);
+
+  showToast('✓ EOD report submitted!', 'ok');
+  updateEODPromptCard();
+  renderEODScreen(); // refresh to show update state
+}
+
+// ── EOD Summary for TL / Manager dashboard ────────────────────────────────
+function renderEODSummary(el, teamNames, date) {
+  date = date || today;
+  const reports = getEODReports().filter(r => r.date === date && teamNames.includes(r.name));
+  const staff = getStaff().filter(s => EOD_ROLES.includes(s.role) && teamNames.includes(s.name));
+  const submitted = new Set(reports.map(r => r.name));
+  const missing = staff.filter(s => !submitted.has(s.name));
+
+  // Flags
+  const lowConf = reports.filter(r => r.confidence <= 2);
+  const brokerFlags = reports.filter(r => r.brokerConcern === 'yes');
+  const supportFlags = reports.filter(r => r.supportNeeded === 'yes');
+  const blocked = reports.filter(r => r.blockers.length > 0 && !r.blockers.includes('Nobody — no blockers'));
+
+  el.innerHTML = `
+    <div style="margin-bottom:1rem">
+      <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">EOD Reports — ${esc(date)}</div>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:10px">
+        <div style="background:${missing.length>0?'var(--danger-light)':'var(--success-light)'};border-radius:var(--radius-sm);padding:10px;text-align:center">
+          <div style="font-size:22px;font-weight:700;color:${missing.length>0?'var(--danger)':'var(--success)'}">${reports.length}/${staff.length}</div>
+          <div style="font-size:11px;color:var(--text-3)">Submitted</div>
+        </div>
+        <div style="background:${lowConf.length>0?'var(--danger-light)':'var(--surface-2)'};border-radius:var(--radius-sm);padding:10px;text-align:center">
+          <div style="font-size:22px;font-weight:700;color:${lowConf.length>0?'var(--danger)':'var(--text-3)'}">${lowConf.length}</div>
+          <div style="font-size:11px;color:var(--text-3)">Low confidence</div>
+        </div>
+        <div style="background:${brokerFlags.length>0?'#FEF3C7':'var(--surface-2)'};border-radius:var(--radius-sm);padding:10px;text-align:center">
+          <div style="font-size:22px;font-weight:700;color:${brokerFlags.length>0?'#92400E':'var(--text-3)'}">${brokerFlags.length}</div>
+          <div style="font-size:11px;color:var(--text-3)">Broker concerns</div>
+        </div>
+        <div style="background:${supportFlags.length>0?'var(--brand-light)':'var(--surface-2)'};border-radius:var(--radius-sm);padding:10px;text-align:center">
+          <div style="font-size:22px;font-weight:700;color:${supportFlags.length>0?'var(--brand)':'var(--text-3)'}">${supportFlags.length}</div>
+          <div style="font-size:11px;color:var(--text-3)">Need support</div>
+        </div>
+      </div>
+
+      ${missing.length > 0 ? `<div style="background:var(--danger-light);border-radius:var(--radius-sm);padding:8px 12px;font-size:12px;color:var(--danger);margin-bottom:8px">
+        ⏳ Not submitted: ${missing.map(s=>esc(s.name.split(' ')[0])).join(', ')}
+      </div>` : ''}
+
+      ${reports.map(r => {
+        const confColor = r.confidence>=4?'var(--success)':r.confidence>=3?'var(--warn)':'var(--danger)';
+        const flags = [];
+        if (r.confidence<=2) flags.push('<span style="background:var(--danger-light);color:var(--danger);border-radius:4px;padding:1px 6px;font-size:11px;font-weight:600">Low confidence</span>');
+        if (r.brokerConcern==='yes') flags.push('<span style="background:#FEF3C7;color:#92400E;border-radius:4px;padding:1px 6px;font-size:11px;font-weight:600">Broker concern</span>');
+        if (r.supportNeeded==='yes') flags.push('<span style="background:var(--brand-light);color:var(--brand);border-radius:4px;padding:1px 6px;font-size:11px;font-weight:600">Needs support</span>');
+
+        return `<div style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:8px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+            <div style="font-size:13px;font-weight:700;color:var(--text)">${esc(r.name.split(' ')[0])} <span style="font-size:11px;color:var(--text-3)">· ${esc(r.submittedAt||'')}</span></div>
+            <div style="font-size:16px;font-weight:700;color:${confColor}">${r.confidence}/5</div>
+          </div>
+          ${flags.length>0?`<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px">${flags.join('')}</div>`:''}
+          ${r.blockers.length>0&&!r.blockers.includes('Nobody — no blockers')?`<div style="font-size:12px;color:var(--text-2)">🔴 Blocked: ${r.blockers.map(b=>esc(b)).join(', ')}${r.blockerDetail?' — '+esc(r.blockerDetail):''}</div>`:''}
+          ${r.brokerConcernDetail?`<div style="font-size:12px;color:#92400E">📣 ${esc(r.brokerConcernDetail)}</div>`:''}
+          ${r.challengeDetail?`<div style="font-size:12px;color:var(--text-2)">⚠️ ${esc(r.challengeDetail)}</div>`:''}
+          ${r.supportDetail?`<div style="font-size:12px;color:var(--brand)">🙋 ${esc(r.supportDetail)}</div>`:''}
+          ${r.notes?`<div style="font-size:12px;color:var(--text-3);font-style:italic">"${esc(r.notes)}"</div>`:''}
+        </div>`;
+      }).join('')}
+    </div>`;
+}
+
+// ── Patch renderMyTeam to include EOD tab ─────────────────────────────────
+const _origRenderMyTeam = window.renderMyTeam;
+window.renderMyTeam = function() {
+  if (_origRenderMyTeam) _origRenderMyTeam.apply(this, arguments);
+  // Append EOD summary card to My Team screen
+  const myteamEl = document.getElementById('myteamContent');
+  if (!myteamEl) return;
+  const myTeamNames = getTeamForTL(currentUser.name);
+  if (myTeamNames.length === 0) return;
+  let eodDiv = document.getElementById('myTeamEODSummary');
+  if (!eodDiv) {
+    eodDiv = document.createElement('div');
+    eodDiv.id = 'myTeamEODSummary';
+    eodDiv.className = 'card';
+    eodDiv.style.marginTop = '1rem';
+    myteamEl.appendChild(eodDiv);
+  }
+  renderEODSummary(eodDiv, myTeamNames, today);
+};
+
+// ── Patch manager dashboard to show EOD summary card ─────────────────────
+const _origRenderMetricsEOD = window.renderMetrics;
+window.renderMetrics = function() {
+  if (_origRenderMetricsEOD) _origRenderMetricsEOD.apply(this, arguments);
+  if (!isManager()) return;
+  const metricsEl = document.getElementById('metrics');
+  if (!metricsEl) return;
+  const allAnalysts = getStaff().filter(s => EOD_ROLES.includes(s.role)).map(s => s.name);
+  if (allAnalysts.length === 0) return;
+  const todayReports = getEODReports().filter(r => r.date === today && allAnalysts.includes(r.name));
+  const lowConf = todayReports.filter(r => r.confidence <= 2).length;
+  const brokerFlags = todayReports.filter(r => r.brokerConcern === 'yes').length;
+  const notSubmitted = allAnalysts.length - todayReports.length;
+
+  const eodCard = document.createElement('div');
+  eodCard.className = 'met';
+  eodCard.style.cssText = `grid-column:1/-1;cursor:pointer;${(lowConf>0||brokerFlags>0)?'border-color:#F59E0B;background:#FFFBEB':''}`;
+  eodCard.onclick = () => { /* could expand to full EOD view */ };
+  eodCard.innerHTML = `
+    <div class="met-lbl">📋 EOD Reports</div>
+    <div class="met-val" style="color:${notSubmitted>0?'var(--danger)':'var(--success)'}">${todayReports.length}/${allAnalysts.length}</div>
+    <div class="met-sub">${notSubmitted>0?notSubmitted+' not submitted · ':''}${lowConf>0?'⚠️ '+lowConf+' low confidence · ':''}${brokerFlags>0?'📣 '+brokerFlags+' broker concern':''}${notSubmitted===0&&lowConf===0&&brokerFlags===0?'all clear ✓':''}</div>`;
+  metricsEl.appendChild(eodCard);
+};
+
+// ── Patch lockCheckin / initCheckin to show EOD prompt card ──────────────
+const _origLockCheckinEOD = window.lockCheckin;
+window.lockCheckin = function() {
+  if (_origLockCheckinEOD) _origLockCheckinEOD.apply(this, arguments);
+  if (EOD_ROLES.includes(currentUser?.role)) setTimeout(updateEODPromptCard, 100);
+};
+const _origInitCheckinEOD = window.initCheckin;
+window.initCheckin = function() {
+  if (_origInitCheckinEOD) _origInitCheckinEOD.apply(this, arguments);
+  if (EOD_ROLES.includes(currentUser?.role)) setTimeout(updateEODPromptCard, 300);
+};
 
 </script>
 </body>
