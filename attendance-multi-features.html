@@ -580,14 +580,21 @@ tr.flagged-row:hover td { background: #FFEAEA; }
 
     <div class="dashboard-grid">
 
-    <!-- Cards — single day -->
+    <!-- Cards — single day or range -->
     <div class="dashboard-snapshot" style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:.75rem 1rem;box-shadow:var(--shadow-sm)">
       <div class="snapshot-header" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px">
-        <span style="font-family:var(--font-ui);font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.6px">Daily snapshot</span>
+        <span style="font-family:var(--font-ui);font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.6px">Snapshot</span>
         <div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap">
-          <button class="quick-date-btn active" id="qbtn-today" onclick="setDay('today',this)">Today</button>
-          <button class="quick-date-btn" id="qbtn-yesterday" onclick="setDay('yesterday',this)">Yesterday</button>
-          <input type="date" id="selectedDate" style="width:auto;min-width:0;padding:5px 8px;font-size:12px"/>
+          <button class="quick-date-btn active" id="qbtn-today" onclick="setCardRange('today',this)">Today</button>
+          <button class="quick-date-btn" id="qbtn-yesterday" onclick="setCardRange('yesterday',this)">Yesterday</button>
+          <button class="quick-date-btn" id="qbtn-week" onclick="setCardRange('week',this)">This week</button>
+          <button class="quick-date-btn" id="qbtn-month" onclick="setCardRange('month',this)">This month</button>
+        </div>
+        <div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap">
+          <input type="date" id="selectedDate" style="min-width:110px;padding:5px 8px;font-size:12px"/>
+          <span style="font-size:12px;color:var(--text-3)">to</span>
+          <input type="date" id="selectedDateTo" style="min-width:110px;padding:5px 8px;font-size:12px"/>
+          <button class="icon-btn" onclick="renderMetrics();renderEODCardIfNeeded();" style="padding:5px 10px;font-size:12px">↻</button>
         </div>
       </div>
       <div id="publicHolidayBanner" style="display:none;background:#FEF3C7;border:1.5px solid #FDE68A;border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:10px;font-size:13px;font-weight:600;color:#92400E;text-align:center"></div>
@@ -616,6 +623,9 @@ tr.flagged-row:hover td { background: #FFEAEA; }
         <button class="tab" onclick="switchDashTab('people',this)">By person</button>
         <button class="tab" onclick="switchDashTab('missing',this)">Not submitted</button>
         <button class="tab" onclick="switchDashTab('breaks',this)">Breaks</button>
+        <button class="tab" onclick="switchDashTab('late',this)">⏰ Late</button>
+        <button class="tab" onclick="switchDashTab('early',this)">🏃 Early out</button>
+        <button class="tab" onclick="switchDashTab('suspicious',this)">🔍 Suspicious</button>
         <button class="tab" onclick="switchDashTab('chart',this)">Chart</button>
       </div>
       <div id="dpanel-records" class="panel active">
@@ -629,6 +639,15 @@ tr.flagged-row:hover td { background: #FFEAEA; }
       </div>
       <div id="dpanel-breaks" class="panel">
         <div class="tbl-card"><div class="tbl-wrap"><table id="breaksTable"></table></div></div>
+      </div>
+      <div id="dpanel-late" class="panel">
+        <div class="tbl-card"><div class="tbl-wrap"><table id="lateTable"></table></div></div>
+      </div>
+      <div id="dpanel-early" class="panel">
+        <div class="tbl-card"><div class="tbl-wrap"><table id="earlyTable"></table></div></div>
+      </div>
+      <div id="dpanel-suspicious" class="panel">
+        <div class="tbl-card"><div class="tbl-wrap"><table id="suspiciousTable"></table></div></div>
       </div>
       <div id="dpanel-chart" class="panel">
         <div class="tbl-card" style="padding:1.25rem">
@@ -2166,117 +2185,186 @@ function handleCp() {
   setTimeout(()=>{ const tabs=document.querySelectorAll('.nav-tab'); if(tabs[0]) goTab('checkin',tabs[0]); },600);
 }
 
-// ── Dashboard — cards (single day) ───────────────────────────────────────
+// ── Dashboard — cards (single day or range) ─────────────────────────────
 document.getElementById('selectedDate').value=today;
+document.getElementById('selectedDateTo').value=today;
 document.getElementById('selectedDate').addEventListener('change',()=>{
   document.querySelectorAll('[id^=qbtn]').forEach(b=>b.classList.remove('active'));
-  renderMetrics();
+  // If from > to, snap to-date to match
+  if(document.getElementById('selectedDate').value > document.getElementById('selectedDateTo').value)
+    document.getElementById('selectedDateTo').value = document.getElementById('selectedDate').value;
+  renderMetrics(); renderEODCardIfNeeded();
+});
+document.getElementById('selectedDateTo').addEventListener('change',()=>{
+  document.querySelectorAll('[id^=qbtn]').forEach(b=>b.classList.remove('active'));
+  renderMetrics(); renderEODCardIfNeeded();
 });
 
-function setDay(range, btn) {
+function setCardRange(range, btn) {
   document.querySelectorAll('[id^=qbtn]').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
-  if(range==='today') document.getElementById('selectedDate').value=today;
-  if(range==='yesterday') document.getElementById('selectedDate').value=new Date(Date.now()-86400000).toISOString().split('T')[0];
-  renderMetrics();
+  const d = new Date();
+  const fmt = d2 => d2.toISOString().split('T')[0];
+  if (range==='today') {
+    document.getElementById('selectedDate').value = today;
+    document.getElementById('selectedDateTo').value = today;
+  } else if (range==='yesterday') {
+    const yest = fmt(new Date(Date.now()-86400000));
+    document.getElementById('selectedDate').value = yest;
+    document.getElementById('selectedDateTo').value = yest;
+  } else if (range==='week') {
+    const day = d.getDay()||7;
+    const mon = new Date(d); mon.setDate(d.getDate()-day+1);
+    document.getElementById('selectedDate').value = fmt(mon);
+    document.getElementById('selectedDateTo').value = today;
+  } else if (range==='month') {
+    document.getElementById('selectedDate').value = fmt(new Date(d.getFullYear(),d.getMonth(),1));
+    document.getElementById('selectedDateTo').value = today;
+  }
+  renderMetrics(); renderEODCardIfNeeded();
 }
 
+// Keep setDay as alias for backward compat
+function setDay(range,btn){ setCardRange(range,btn); }
+
 function getSelectedDate(){ return document.getElementById('selectedDate').value||today; }
+function getSelectedDateTo(){ return document.getElementById('selectedDateTo').value||getSelectedDate(); }
+function isMultiDay(){ return getSelectedDate() !== getSelectedDateTo(); }
+
+// Get all dates in selected range as array
+function getDateRange() {
+  const from = new Date(getSelectedDate());
+  const to = new Date(getSelectedDateTo());
+  const dates = [];
+  for (let d = new Date(from); d <= to; d.setDate(d.getDate()+1))
+    dates.push(d.toISOString().split('T')[0]);
+  return dates;
+}
 
 function renderMetrics() {
-  const date=getSelectedDate();
-  const allStaff=getStaff().filter(s=>s.role!=='superadmin');
-  const allPeople=allStaff.map(s=>s.name);
-  const dayRecs=getRecords().filter(r=>r.date===date);
-  const submitted=new Set(dayRecs.map(r=>r.name));
-  const missing=allPeople.filter(n=>!submitted.has(n));
-  const office=dayRecs.filter(r=>r.status==='office').length;
-  const wfh=dayRecs.filter(r=>r.status==='wfh').length;
-  const leave=dayRecs.filter(r=>r.status==='leave').length;
-  const halfday=dayRecs.filter(r=>r.status==='halfday').length;
-  const isWeekend=[0,6].includes(new Date(date).getDay());
-  const isToday=date===today;
-  const phName = getPublicHoliday(date);
+  const fromDate = getSelectedDate();
+  const toDate   = getSelectedDateTo();
+  const multi    = isMultiDay();
+  const dates    = getDateRange();
+  const allStaff = getStaff().filter(s=>s.role!=='superadmin');
+  const allPeople= allStaff.map(s=>s.name);
+  const allRecs  = getRecords().filter(r=>r.date>=fromDate && r.date<=toDate);
+
+  // For single-day use-cases that need per-day semantics
+  const date     = fromDate;
+  const isToday  = fromDate===today && toDate===today;
+
+  // Public holiday banner (single day only)
   const phBanner = document.getElementById('publicHolidayBanner');
-  if (phBanner) { if(phName){phBanner.style.display='block';phBanner.textContent='🎉 Public Holiday: '+phName+' — not counted as absent';}else{phBanner.style.display='none';} }
+  if (phBanner) {
+    if (!multi) {
+      const phName = getPublicHoliday(date);
+      if(phName){phBanner.style.display='block';phBanner.textContent='🎉 Public Holiday: '+phName+' — not counted as absent';}
+      else{phBanner.style.display='none';}
+    } else { phBanner.style.display='none'; }
+  }
 
-  // Break status
-  const ongoingBreaks=LS.get('ci_ongoingBreaks')||{};
-  const onBreakNames=Object.keys(ongoingBreaks).filter(n=>ongoingBreaks[n]);
-  const workingToday=dayRecs.filter(r=>r.status==='office'||r.status==='wfh').map(r=>r.name);
-  const availableNames=workingToday.filter(n=>!onBreakNames.includes(n));
+  // ── Aggregated metrics across range ──────────────────────────────────────
+  const office   = allRecs.filter(r=>r.status==='office').length;
+  const wfh      = allRecs.filter(r=>r.status==='wfh').length;
+  const leave    = allRecs.filter(r=>r.status==='leave').length;
+  const halfday  = allRecs.filter(r=>r.status==='halfday').length;
 
-  // Late to clock in — submitted, clockIn >15 mins after scheduled start
-  const now=new Date();
-  const nowMins=now.getHours()*60+now.getMinutes();
-  const isWorkingHours=nowMins>=240&&nowMins<=1380;
+  // Not submitted — for multi-day: count staff×days missing (working days only)
+  let missing, missingLabel;
+  if (!multi) {
+    const dayRecs  = allRecs.filter(r=>r.date===date);
+    const submitted= new Set(dayRecs.map(r=>r.name));
+    missing = allPeople.filter(n=>!submitted.has(n));
+    missingLabel = missing.length>0 ? missing.slice(0,3).map(n=>n.split(' ')[0]).join(', ')+(missing.length>3?' +more':'') : 'all clear ✓';
+  } else {
+    // Count unique staff who submitted at least once in the range vs total working days
+    const submittedDays = allRecs.length; // total check-ins
+    const workDays = dates.filter(d=>{const dy=new Date(d).getDay(); return dy!==0&&dy!==6;}).length;
+    const expectedTotal = allPeople.length * workDays;
+    const missingCount = Math.max(0, expectedTotal - submittedDays);
+    missing = []; // array not meaningful for multi-day, use count
+    missingLabel = `${submittedDays} check-ins across ${workDays} work day${workDays!==1?'s':''}`;
+    missing.length = missingCount; // trick to reuse missing.length for color
+  }
 
-  const lateStaff=allStaff.filter(s=>{
+  // Break status (today only)
+  const ongoingBreaks  = LS.get('ci_ongoingBreaks')||{};
+  const onBreakNames   = isToday ? Object.keys(ongoingBreaks).filter(n=>ongoingBreaks[n]) : [];
+  const todayRecs      = allRecs.filter(r=>r.date===today);
+  const workingToday   = todayRecs.filter(r=>r.status==='office'||r.status==='wfh').map(r=>r.name);
+  const availableNames = workingToday.filter(n=>!onBreakNames.includes(n));
+
+  // Late clock in — across range
+  const lateStaff = allStaff.filter(s=>{
     if (!s.startTime) return false;
-    const rec=dayRecs.find(r=>r.name===s.name);
-    if (!rec||!rec.clockIn) return false;
-    const scheduledMs=new Date(date+'T'+s.startTime+':00').getTime();
-    return rec.clockIn > scheduledMs + 15*60*1000;
+    return allRecs.some(r=>{
+      if (r.name!==s.name||!r.clockIn) return false;
+      const scheduledMs=new Date(r.date+'T'+s.startTime+':00').getTime();
+      return r.clockIn > scheduledMs + 15*60*1000;
+    });
   });
 
-  // Early clock out — clocked out >15 mins BEFORE scheduled end (not after)
-  const earlyStaff=allStaff.filter(s=>{
+  // Early clock out — across range
+  const earlyStaff = allStaff.filter(s=>{
     if (!s.endTime) return false;
-    const rec=dayRecs.find(r=>r.name===s.name);
-    if (!rec||!rec.clockOut) return false;
-    const scheduledEndMs=new Date(date+'T'+s.endTime+':00').getTime();
-    return rec.clockOut < scheduledEndMs - 15*60*1000;
+    return allRecs.some(r=>{
+      if (r.name!==s.name||!r.clockOut) return false;
+      const scheduledEndMs=new Date(r.date+'T'+s.endTime+':00').getTime();
+      return r.clockOut < scheduledEndMs - 15*60*1000;
+    });
   });
 
-  // Location flagged — submitted "In office" or "Half day" but geo shows >0.75km from their office
-  const locationFlagged=dayRecs.filter(r=>{
-    if (r.status!=='office' && r.status!=='halfday') return false;
+  // Location flagged — across range
+  const locationFlagged = allRecs.filter(r=>{
+    if (r.status!=='office'&&r.status!=='halfday') return false;
     if (!r.geo) return false;
     const flag=geoFlagForRecord(r);
-    return flag && !flag.ok;
+    return flag&&!flag.ok;
   });
 
-  // Suspicious activity — M365 account doesn't match staff name
-  const suspicious = isSuperAdmin() ? dayRecs.filter(r => {
+  // Suspicious activity — across range
+  const suspicious = isSuperAdmin() ? allRecs.filter(r=>{
     if (!r.msAccount) return false;
-    const msName = r.msAccount.split('@')[0].toLowerCase().replace(/[._]/g,' ');
-    const staffName = r.name.toLowerCase();
-    const msFirst = msName.split(' ')[0];
-    const staffFirst = staffName.split(' ')[0];
-    return msFirst !== staffFirst && !staffName.includes(msFirst) && !msName.includes(staffFirst);
+    const msName=r.msAccount.split('@')[0].toLowerCase().replace(/[._]/g,' ');
+    const staffName=r.name.toLowerCase();
+    const msFirst=msName.split(' ')[0], staffFirst=staffName.split(' ')[0];
+    return msFirst!==staffFirst&&!staffName.includes(msFirst)&&!msName.includes(staffFirst);
   }) : [];
 
-  // No photo — submitted without a selfie (only for office/wfh/halfday)
-  const noPhoto = isManager() ? dayRecs.filter(r => {
-    if (r.status === 'leave') return false;
+  // No photo — across range
+  const noPhoto = isManager() ? allRecs.filter(r=>{
+    if (r.status==='leave') return false;
     return !r.hasPhoto;
   }) : [];
 
+  const rangeLabel = multi ? ` <span style="font-size:10px;color:var(--text-3);font-weight:400">${fromDate} – ${toDate}</span>` : '';
+
   document.getElementById('metrics').innerHTML=`
     <div class="met clickable" style="grid-column:1/-1;${missing.length>0?'border-color:#FECACA':''}" onclick="cardTap('missing')">
-      <div class="met-lbl">Not submitted</div>
+      <div class="met-lbl">Not submitted${rangeLabel}</div>
       <div class="met-val" style="color:${missing.length>0?'var(--danger)':'var(--success)'}">${missing.length}</div>
-      <div class="met-sub">${missing.length>0?missing.slice(0,3).map(n=>n.split(' ')[0]).join(', ')+(missing.length>3?' +more':''):'all clear ✓'}</div>
+      <div class="met-sub">${missingLabel}</div>
     </div>
     <div class="met clickable" onclick="cardTap('office')">
       <div class="met-lbl">In office</div>
       <div class="met-val" style="color:var(--brand)">${office}</div>
-      <div class="met-sub">${office>0?'tap to see who':'&nbsp;'}</div>
+      <div class="met-sub">${office>0?'tap to see':'&nbsp;'}</div>
     </div>
     <div class="met clickable" onclick="cardTap('wfh')">
       <div class="met-lbl">WFH</div>
       <div class="met-val" style="color:var(--success)">${wfh}</div>
-      <div class="met-sub">${wfh>0?'tap to see who':'&nbsp;'}</div>
+      <div class="met-sub">${wfh>0?'tap to see':'&nbsp;'}</div>
     </div>
     <div class="met clickable" onclick="cardTap('leave')">
       <div class="met-lbl">On leave</div>
       <div class="met-val" style="color:var(--warn)">${leave}</div>
-      <div class="met-sub">${leave>0?'tap to see who':'&nbsp;'}</div>
+      <div class="met-sub">${leave>0?'tap to see':'&nbsp;'}</div>
     </div>
     <div class="met clickable" onclick="cardTap('halfday')">
       <div class="met-lbl">Half day</div>
       <div class="met-val" style="color:var(--halfday)">${halfday}</div>
-      <div class="met-sub">${halfday>0?'tap to see who':'&nbsp;'}</div>
+      <div class="met-sub">${halfday>0?'tap to see':'&nbsp;'}</div>
     </div>
     ${isToday?`
     <div class="met clickable" style="${onBreakNames.length>0?'border-color:#E8A040':''}" onclick="cardTap('onbreak')">
@@ -2308,7 +2396,7 @@ function renderMetrics() {
     <div class="met" style="grid-column:1/-1;${suspicious.length>0?'border-color:#F59E0B;background:#FFFBEB':''}">
       <div class="met-lbl">🔍 Suspicious activity</div>
       <div class="met-val" style="color:${suspicious.length>0?'#B45309':'var(--success)'}">${suspicious.length}</div>
-      <div class="met-sub" style="white-space:normal">${suspicious.length>0?suspicious.map(r=>`${esc(r.name.split(' ')[0])} via <b>${esc(r.msAccount)}</b>`).join(' &nbsp;·&nbsp; '):'no anomalies detected ✓'}</div>
+      <div class="met-sub" style="white-space:normal">${suspicious.length>0?suspicious.map(r=>esc(r.name.split(' ')[0])+' via <b>'+esc(r.msAccount)+'</b>').join(' · '):'no anomalies detected ✓'}</div>
     </div>`:''}
     ${isManager()?`
     <div class="met" style="grid-column:1/-1;${noPhoto.length>0?'border-color:#FECACA':''}">
@@ -2318,13 +2406,29 @@ function renderMetrics() {
     </div>`:''}
     ${isManager()?renderAbsencePatternCard():''}
     ${isManager()?renderCoverageCard(date):''}
-    `;
+  `;
+}
+
+function renderEODCardIfNeeded() {
+  // Re-trigger the patched renderMetrics EOD card
+  if (isManager()) {
+    // Remove old EOD card and re-render
+    const metricsEl = document.getElementById('metrics');
+    if (metricsEl) {
+      const old = metricsEl.querySelector('.eod-summary-card');
+      if (old) old.remove();
+    }
+    if (window._origRenderMetricsEOD) {
+      // the patch will re-append it on next renderMetrics call — already handled
+    }
+  }
 }
 
 function cardTap(status) {
   const date=getSelectedDate();
+  const dateTo=getSelectedDateTo();
   document.getElementById('fromDate').value=date;
-  document.getElementById('toDate').value=date;
+  document.getElementById('toDate').value=dateTo;
   document.querySelectorAll('[id^=rbtn]').forEach(b=>b.classList.remove('active'));
   loadTabs();
   if(status==='onbreak'||status==='available'){
@@ -2332,11 +2436,25 @@ function cardTap(status) {
     if(btn) switchDashTab('breaks',btn);
     return;
   }
-  if(status==='late'||status==='early'||status==='missing'){
+  if(status==='missing'){
     const btn=Array.from(document.querySelectorAll('.tab')).find(t=>t.textContent.trim()==='Not submitted');
     if(btn) switchDashTab('missing',btn);
     window._missingFilter=status;
     renderMissing();
+    const tabSection=document.querySelector('.tab-bar');
+    if(tabSection) tabSection.scrollIntoView({behavior:'smooth',block:'start'});
+    return;
+  }
+  if(status==='late'){
+    const btn=Array.from(document.querySelectorAll('.tab')).find(t=>t.textContent.trim()==='⏰ Late');
+    if(btn) switchDashTab('late',btn);
+    const tabSection=document.querySelector('.tab-bar');
+    if(tabSection) tabSection.scrollIntoView({behavior:'smooth',block:'start'});
+    return;
+  }
+  if(status==='early'){
+    const btn=Array.from(document.querySelectorAll('.tab')).find(t=>t.textContent.trim()==='🏃 Early out');
+    if(btn) switchDashTab('early',btn);
     const tabSection=document.querySelector('.tab-bar');
     if(tabSection) tabSection.scrollIntoView({behavior:'smooth',block:'start'});
     return;
@@ -2423,6 +2541,9 @@ function renderActiveTab(name){
   if(name==='people') renderPeople();
   if(name==='missing') renderMissing();
   if(name==='breaks') renderBreaks();
+  if(name==='late') renderLateTab();
+  if(name==='early') renderEarlyTab();
+  if(name==='suspicious') renderSuspiciousTab();
   if(name==='chart') renderChart();
 }
 
@@ -2539,6 +2660,139 @@ function renderMissing() {
   }
 
   document.getElementById('missingTable').innerHTML=html+'</tbody>';
+}
+
+
+// ── Late Clock In Tab ──────────────────────────────────────────────────────
+function renderLateTab() {
+  const from = document.getElementById('fromDate').value;
+  const to   = document.getElementById('toDate').value;
+  const fn   = document.getElementById('filterName').value.trim().toLowerCase();
+  const allStaff = getStaff().filter(s=>s.role!=='superadmin'&&s.startTime);
+  const allRecs  = getRecords().filter(r=>r.date>=from&&r.date<=to);
+  const singleDay = from===to;
+
+  const rows = [];
+  for (const s of allStaff) {
+    if (fn && !s.name.toLowerCase().includes(fn)) continue;
+    const recs = allRecs.filter(r=>r.name===s.name&&r.clockIn);
+    for (const r of recs) {
+      const scheduledMs = new Date(r.date+'T'+s.startTime+':00').getTime();
+      const diffMs = r.clockIn - scheduledMs;
+      if (diffMs > 15*60*1000) {
+        const mins = Math.round(diffMs/60000);
+        rows.push({ name:s.name, date:r.date, scheduled:s.startTime, actual:fmtTime(r.clockIn), minsLate:mins });
+      }
+    }
+  }
+  rows.sort((a,b)=>b.date.localeCompare(a.date)||b.minsLate-a.minsLate);
+
+  const el = document.getElementById('lateTable');
+  if (!rows.length) { el.innerHTML='<tr><td><div class="empty-state">No late clock-ins in this range ✓</div></td></tr>'; return; }
+  let html = '<thead><tr>'+(singleDay?'':'<th>Date</th>')+'<th>Name</th><th>Scheduled</th><th>Clocked In</th><th>Mins Late</th></tr></thead><tbody>';
+  let lastDate='';
+  for (const r of rows) {
+    if (!singleDay && r.date!==lastDate) {
+      lastDate=r.date;
+      const label=r.date===today?'Today':new Date(r.date+'T12:00:00').toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short'});
+      html+=`<tr><td colspan="5" style="background:var(--surface-2);font-size:11px;font-weight:700;color:var(--text-3);letter-spacing:0.5px;text-transform:uppercase;padding:6px 14px">${label}</td></tr>`;
+    }
+    const severity = r.minsLate>60?'var(--danger)':r.minsLate>30?'#D97706':'var(--warn)';
+    html+=`<tr>
+      ${singleDay?'':'<td style="font-size:12px;color:var(--text-3)">${r.date}</td>'}
+      <td style="font-weight:600">${esc(r.name)}</td>
+      <td style="font-size:13px;color:var(--text-2)">${fmt12(r.scheduled)}</td>
+      <td style="font-size:13px;color:var(--text-2)">${r.actual}</td>
+      <td style="font-weight:700;color:${severity}">+${r.minsLate}m</td>
+    </tr>`;
+  }
+  html += '</tbody>';
+  el.innerHTML = html;
+}
+
+// ── Early Clock Out Tab ────────────────────────────────────────────────────
+function renderEarlyTab() {
+  const from = document.getElementById('fromDate').value;
+  const to   = document.getElementById('toDate').value;
+  const fn   = document.getElementById('filterName').value.trim().toLowerCase();
+  const allStaff = getStaff().filter(s=>s.role!=='superadmin'&&s.endTime);
+  const allRecs  = getRecords().filter(r=>r.date>=from&&r.date<=to);
+  const singleDay = from===to;
+
+  const rows = [];
+  for (const s of allStaff) {
+    if (fn && !s.name.toLowerCase().includes(fn)) continue;
+    const recs = allRecs.filter(r=>r.name===s.name&&r.clockOut);
+    for (const r of recs) {
+      const scheduledEndMs = new Date(r.date+'T'+s.endTime+':00').getTime();
+      const diffMs = scheduledEndMs - r.clockOut;
+      if (diffMs > 15*60*1000) {
+        const mins = Math.round(diffMs/60000);
+        rows.push({ name:s.name, date:r.date, scheduled:s.endTime, actual:fmtTime(r.clockOut), minsEarly:mins });
+      }
+    }
+  }
+  rows.sort((a,b)=>b.date.localeCompare(a.date)||b.minsEarly-a.minsEarly);
+
+  const el = document.getElementById('earlyTable');
+  if (!rows.length) { el.innerHTML='<tr><td><div class="empty-state">No early clock-outs in this range ✓</div></td></tr>'; return; }
+  let html = '<thead><tr>'+(singleDay?'':'<th>Date</th>')+'<th>Name</th><th>Scheduled end</th><th>Clocked Out</th><th>Mins Early</th></tr></thead><tbody>';
+  let lastDate='';
+  for (const r of rows) {
+    if (!singleDay && r.date!==lastDate) {
+      lastDate=r.date;
+      const label=r.date===today?'Today':new Date(r.date+'T12:00:00').toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short'});
+      html+=`<tr><td colspan="5" style="background:var(--surface-2);font-size:11px;font-weight:700;color:var(--text-3);letter-spacing:0.5px;text-transform:uppercase;padding:6px 14px">${label}</td></tr>`;
+    }
+    const severity = r.minsEarly>60?'var(--danger)':r.minsEarly>30?'#D97706':'var(--warn)';
+    html+=`<tr>
+      ${singleDay?'':'<td style="font-size:12px;color:var(--text-3)">${r.date}</td>'}
+      <td style="font-weight:600">${esc(r.name)}</td>
+      <td style="font-size:13px;color:var(--text-2)">${fmt12(r.scheduled)}</td>
+      <td style="font-size:13px;color:var(--text-2)">${r.actual}</td>
+      <td style="font-weight:700;color:${severity}">-${r.minsEarly}m</td>
+    </tr>`;
+  }
+  html += '</tbody>';
+  el.innerHTML = html;
+}
+
+// ── Suspicious Login Tab ───────────────────────────────────────────────────
+function renderSuspiciousTab() {
+  const from = document.getElementById('fromDate').value;
+  const to   = document.getElementById('toDate').value;
+  const fn   = document.getElementById('filterName').value.trim().toLowerCase();
+  const allRecs = getRecords().filter(r=>r.date>=from&&r.date<=to&&r.msAccount);
+  const singleDay = from===to;
+
+  const rows = allRecs.filter(r=>{
+    if (fn && !r.name.toLowerCase().includes(fn)) return false;
+    const msName = r.msAccount.split('@')[0].toLowerCase().replace(/[._]/g,' ');
+    const staffName = r.name.toLowerCase();
+    const msFirst = msName.split(' ')[0], staffFirst = staffName.split(' ')[0];
+    return msFirst!==staffFirst && !staffName.includes(msFirst) && !msName.includes(staffFirst);
+  }).sort((a,b)=>b.date.localeCompare(a.date));
+
+  const el = document.getElementById('suspiciousTable');
+  if (!rows.length) { el.innerHTML='<tr><td><div class="empty-state">No suspicious logins in this range ✓</div></td></tr>'; return; }
+  let html = '<thead><tr>'+(singleDay?'':'<th>Date</th>')+'<th>Staff name</th><th>MS Account used</th><th>Status</th><th>Clock in</th></tr></thead><tbody>';
+  let lastDate='';
+  for (const r of rows) {
+    if (!singleDay && r.date!==lastDate) {
+      lastDate=r.date;
+      const label=r.date===today?'Today':new Date(r.date+'T12:00:00').toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short'});
+      html+=`<tr><td colspan="5" style="background:var(--surface-2);font-size:11px;font-weight:700;color:var(--text-3);letter-spacing:0.5px;text-transform:uppercase;padding:6px 14px">${label}</td></tr>`;
+    }
+    html+=`<tr>
+      ${singleDay?'':'<td style="font-size:12px;color:var(--text-3)">${r.date}</td>'}
+      <td style="font-weight:600">${esc(r.name)}</td>
+      <td style="color:#B45309;font-size:12px">${esc(r.msAccount)}</td>
+      <td><span class="tag" style="background:#FEF3C7;color:#92400E">${esc(r.status||'')}</span></td>
+      <td style="font-size:13px;color:var(--text-2)">${r.clockIn?fmtTime(r.clockIn):'—'}</td>
+    </tr>`;
+  }
+  html += '</tbody>';
+  el.innerHTML = html;
 }
 
 function switchDashTab(name,btn) {
@@ -6408,12 +6662,13 @@ window.renderMetrics = function() {
   const metricsEl = document.getElementById('metrics');
   if (!metricsEl) return;
   // Use dashboard selected date so EOD card respects the date picker
-  const selDate = getSelectedDate();
-  const selRecs = getRecords().filter(r => r.date === selDate && r.status !== 'leave' && r.status !== 'absent');
-  const selNames = selRecs.map(r => r.name);
+  const selFrom = getSelectedDate();
+  const selTo   = getSelectedDateTo();
+  const selRecs = getRecords().filter(r => r.date >= selFrom && r.date <= selTo && r.status !== 'leave' && r.status !== 'absent');
+  const selNames = [...new Set(selRecs.map(r => r.name))];
   const allAnalysts = getStaff().filter(s => EOD_ROLES.includes(s.role) && selNames.includes(s.name)).map(s => s.name);
   if (allAnalysts.length === 0) return;
-  const todayReports = getEODReports().filter(r => r.date === selDate && allAnalysts.includes(r.name));
+  const todayReports = getEODReports().filter(r => r.date >= selFrom && r.date <= selTo && allAnalysts.includes(r.name));
   const lowConf = todayReports.filter(r => r.confidence <= 2).length;
   const brokerFlags = todayReports.filter(r => r.brokerConcern === 'yes').length;
   const notSubmitted = allAnalysts.length - todayReports.length;
