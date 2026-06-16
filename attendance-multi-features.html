@@ -1867,38 +1867,6 @@ function handlePin() {
   loginAs(member);
 }
 
-// Fetch just this user's record for today — fast targeted SP query
-async function fetchTodayRecord(name) {
-  try {
-    const token = await getToken();
-    if (!token) return; // no token — fall back to cached data
-    const encoded = encodeURIComponent(name);
-    const res = await fetch(
-      SP_API + "('AttendanceRecords')/items?$filter=StaffName eq '" + encoded + "' and RecordDate eq '" + today + "T00:00:00Z'&$top=1",
-      { headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json;odata=nometadata' } }
-    );
-    if (!res.ok) return;
-    const data = await res.json();
-    if (data && data.value) {
-      // Merge this user's fresh record into _records cache
-      const recs = getRecords();
-      const idx = recs.findIndex(r => r.name === name && r.date === today);
-      if (data.value.length > 0) {
-        const fresh = spToRecord(data.value[0]);
-        if (idx >= 0) recs[idx] = fresh;
-        else recs.push(fresh);
-      } else {
-        // No record found — remove stale cached record if any
-        if (idx >= 0) recs.splice(idx, 1);
-      }
-      _records = recs;
-      LS.set('ci_records', recs);
-    }
-  } catch(e) {
-    console.warn('fetchTodayRecord failed — using cache:', e);
-  }
-}
-
 async function loginAs(member) {
   currentUser={name:member.name, role:member.role};
   buildNav();
@@ -1907,9 +1875,12 @@ async function loginAs(member) {
     await loadFromSharePoint().catch(()=>{});
     loadDashboard(); showScreen('dashboard');
   } else {
-    // Fetch just this user's record for today from SP — fast, no full reload needed
-    // This ensures check-in state is always accurate regardless of device/browser
-    await fetchTodayRecord(member.name).catch(()=>{});
+    // Debug: show what records are in cache for this user today
+    const cachedRecs = getRecords();
+    const myRec = cachedRecs.find(r=>r.date===today&&r.name===member.name);
+    console.log('[LOGIN DEBUG] Records in cache:', cachedRecs.length);
+    console.log('[LOGIN DEBUG] Today record for', member.name, ':', myRec);
+    console.log('[LOGIN DEBUG] _records null?', _records===null, '| LS records count:', (LS.get('ci_records')||[]).length);
     initCheckin(); showScreen('checkin');
   }
   setTimeout(()=>{ const t=document.querySelectorAll('.nav-tab'); if(t[0]) t[0].classList.add('active'); }, 50);
