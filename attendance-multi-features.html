@@ -1857,10 +1857,12 @@ async function loginAs(member) {
     await loadFromSharePoint().catch(()=>{});
     loadDashboard(); showScreen('dashboard');
   } else {
-    // All other roles — load fresh SharePoint data first so existing
-    // check-in records are available before initCheckin() runs
-    showToast('Loading your data…', 'ok');
-    await loadFromSharePoint().catch(()=>{});
+    // Records already loaded in initMsal pre-login fetch for PIN users.
+    // Only reload if we have an MS token (MS login flow) — PIN users already have fresh data.
+    if (msalToken) {
+      showToast('Loading your data…', 'ok');
+      await loadFromSharePoint().catch(()=>{});
+    }
     initCheckin(); showScreen('checkin');
   }
   setTimeout(()=>{ const t=document.querySelectorAll('.nav-tab'); if(t[0]) t[0].classList.add('active'); }, 50);
@@ -3899,16 +3901,21 @@ async function initMsal() {
     if (accounts.length > 0) {
       await onMsLogin(accounts[0]);
     } else {
-      // No MS session — going to PIN login. Fetch fresh staff from SharePoint
-      // first so PIN resets and role changes are always reflected on any device.
-      showScreen('mslogin'); // show something while we load
+      // No MS session — PIN login flow.
+      // Fetch staff AND records from SharePoint before showing PIN screen
+      // so PIN resets and existing check-ins are always reflected on any device.
+      showScreen('mslogin');
       try {
         const token = await getToken();
         if (token) {
-          const staffRes = await fetch(
-            `${SP_API}('AttendanceStaff')/items?$select=Title,Role,Pin,TempPin,StartTime,EndTime,Office,Team,JoinDate&$top=500`,
-            { headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json;odata=nometadata' } }
-          );
+          const [staffRes, recRes, brkRes] = await Promise.all([
+            fetch(`${SP_API}('AttendanceStaff')/items?$select=Title,Role,Pin,TempPin,StartTime,EndTime,Office,Team,JoinDate&$top=500`,
+              { headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json;odata=nometadata' } }),
+            fetch(`${SP_API}('AttendanceRecords')/items?$top=5000`,
+              { headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json;odata=nometadata' } }),
+            fetch(`${SP_API}('AttendanceBreaks')/items?$top=5000`,
+              { headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json;odata=nometadata' } }),
+          ]);
           if (staffRes.ok) {
             const staffData = await staffRes.json();
             if (staffData && staffData.value && staffData.value.length > 0) {
@@ -3926,9 +3933,23 @@ async function initMsal() {
               LS.set('ci_staff', _staff);
             }
           }
+          if (recRes.ok) {
+            const recData = await recRes.json();
+            if (recData && recData.value && recData.value.length > 0) {
+              _records = recData.value.map(spToRecord);
+              LS.set('ci_records', _records);
+            }
+          }
+          if (brkRes.ok) {
+            const brkData = await brkRes.json();
+            if (brkData && brkData.value && brkData.value.length > 0) {
+              _breaks = brkData.value.map(spToBreak);
+              LS.set('ci_breaks', _breaks);
+            }
+          }
         }
       } catch(e) {
-        console.warn('Pre-login staff fetch failed — using cache:', e);
+        console.warn('Pre-login SP fetch failed — using cache:', e);
       }
       showScreen('mslogin');
     }
