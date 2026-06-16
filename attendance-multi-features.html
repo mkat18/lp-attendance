@@ -1556,10 +1556,40 @@ function goTab(name, btn) {
 function logout() {
   currentUser=null; pinBuffer=''; pinStage='login'; pinFirst='';
   stopBreakTimer();
-  buildNav(); showScreen('login');
-  populateNameDropdown();
+  buildNav(); showScreen('mslogin');
   clearName();
   document.getElementById('loginGreeting').textContent = getGreeting();
+  // Refresh staff from SharePoint so PIN resets are reflected immediately
+  (async () => {
+    try {
+      const token = await getToken();
+      if (token) {
+        const staffRes = await fetch(
+          `${SP_API}('AttendanceStaff')/items?$select=Title,Role,Pin,TempPin,StartTime,EndTime,Office,Team,JoinDate&$top=500`,
+          { headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json;odata=nometadata' } }
+        );
+        if (staffRes.ok) {
+          const staffData = await staffRes.json();
+          if (staffData && staffData.value && staffData.value.length > 0) {
+            _staff = staffData.value.map(item => ({
+              name: item.Title,
+              role: (item.Role||'staff').toLowerCase(),
+              pin: item.Pin||'',
+              tempPin: item.TempPin||'',
+              startTime: item.StartTime||'',
+              endTime: item.EndTime||'',
+              office: item.Office||'',
+              team: item.Team||'',
+              joinDate: item.JoinDate||'',
+            }));
+            LS.set('ci_staff', _staff);
+          }
+        }
+      }
+    } catch(e) {
+      console.warn('Post-logout staff refresh failed — using cache:', e);
+    }
+  })();
 }
 
 // ── Login ─────────────────────────────────────────────────────────────────
@@ -3377,6 +3407,37 @@ async function initMsal() {
     if (accounts.length > 0) {
       await onMsLogin(accounts[0]);
     } else {
+      // No MS session — going to PIN login. Fetch fresh staff from SharePoint
+      // first so PIN resets and role changes are always reflected on any device.
+      showScreen('mslogin'); // show something while we load
+      try {
+        const token = await getToken();
+        if (token) {
+          const staffRes = await fetch(
+            `${SP_API}('AttendanceStaff')/items?$select=Title,Role,Pin,TempPin,StartTime,EndTime,Office,Team,JoinDate&$top=500`,
+            { headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json;odata=nometadata' } }
+          );
+          if (staffRes.ok) {
+            const staffData = await staffRes.json();
+            if (staffData && staffData.value && staffData.value.length > 0) {
+              _staff = staffData.value.map(item => ({
+                name: item.Title,
+                role: (item.Role||'staff').toLowerCase(),
+                pin: item.Pin||'',
+                tempPin: item.TempPin||'',
+                startTime: item.StartTime||'',
+                endTime: item.EndTime||'',
+                office: item.Office||'',
+                team: item.Team||'',
+                joinDate: item.JoinDate||'',
+              }));
+              LS.set('ci_staff', _staff);
+            }
+          }
+        }
+      } catch(e) {
+        console.warn('Pre-login staff fetch failed — using cache:', e);
+      }
       showScreen('mslogin');
     }
   } catch(e) {
