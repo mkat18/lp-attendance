@@ -3722,6 +3722,8 @@ async function spSaveRecord(rec) {
     MsAccount: String(rec.msAccount||''),
     HasPhoto: rec.hasPhoto ? 'true' : 'false'
   };
+  console.log('[PAYLOAD]', JSON.stringify(payload));
+  console.log('[TYPES]', Object.entries(payload).map(([k,v])=>k+'='+typeof v+'('+JSON.stringify(v)+')').join(' | '));
   if (rec.id) {
     await spPatch(SP_API + "('AttendanceRecords')/items(" + rec.id + ")", payload);
   } else {
