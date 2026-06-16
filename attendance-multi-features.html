@@ -3756,8 +3756,7 @@ async function loadFromSharePoint() {
 
 async function spSaveRecord(rec) {
   const toHHMM = ts => {
-    if (!ts) return null;
-    // Always use Indian Standard Time
+    if (!ts) return ''; // return empty string not null — SP string fields reject null
     const str = new Date(ts).toLocaleTimeString('en-AU', {hour:'2-digit', minute:'2-digit', hour12:false, timeZone:'Asia/Kolkata'});
     return str;
   };
@@ -3772,20 +3771,23 @@ async function spSaveRecord(rec) {
     }
   }
 
+  // Ensure all fields are the correct type for SharePoint
+  const clockInVal = toHHMM(rec.clockIn);
+  const clockOutVal = toHHMM(rec.clockOut);
   const payload = {
-    StaffName: rec.name,
+    StaffName: String(rec.name||''),
     RecordDate: rec.date + 'T00:00:00Z',
-    Status: rec.status||'',
-    Reason: rec.reason||'',
-    ClockIn: toHHMM(rec.clockIn),
-    ClockOut: toHHMM(rec.clockOut),
-    GeoLat: rec.geo?String(rec.geo.lat):'',
-    GeoLng: rec.geo?String(rec.geo.lng):'',
-    GeoAccuracy: rec.geo?String(rec.geo.accuracy)+'m':'',
-    DistanceKm: distKm,
-    SubmittedBy: rec.submittedBy||rec.name||'',
-    MsAccount: rec.msAccount||'',
-    HasPhoto: !!rec.hasPhoto
+    Status: String(rec.status||''),
+    Reason: String(rec.reason||''),
+    ClockIn: clockInVal !== null ? String(clockInVal) : '',
+    ClockOut: clockOutVal !== null ? String(clockOutVal) : '',
+    GeoLat: rec.geo ? String(rec.geo.lat) : '',
+    GeoLng: rec.geo ? String(rec.geo.lng) : '',
+    GeoAccuracy: rec.geo ? String(rec.geo.accuracy)+'m' : '',
+    DistanceKm: String(distKm||''),
+    SubmittedBy: String(rec.submittedBy||rec.name||''),
+    MsAccount: String(rec.msAccount||''),
+    HasPhoto: rec.hasPhoto ? true : false
   };
   if (rec.id) {
     await spPatch(SP_API + "('AttendanceRecords')/items(" + rec.id + ")", payload);
