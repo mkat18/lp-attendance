@@ -1881,6 +1881,8 @@ async function loginAs(member) {
     console.log('[LOGIN DEBUG] Records in cache:', cachedRecs.length);
     console.log('[LOGIN DEBUG] Today record for', member.name, ':', myRec);
     console.log('[LOGIN DEBUG] _records null?', _records===null, '| LS records count:', (LS.get('ci_records')||[]).length);
+    console.log('[LOGIN DEBUG] All cached names+dates:', cachedRecs.map(r=>r.name+'|'+r.date));
+    console.log('[LOGIN DEBUG] member.name chars:', [...member.name].map(c=>c.charCodeAt(0)));
     initCheckin(); showScreen('checkin');
   }
   setTimeout(()=>{ const t=document.querySelectorAll('.nav-tab'); if(t[0]) t[0].classList.add('active'); }, 50);
