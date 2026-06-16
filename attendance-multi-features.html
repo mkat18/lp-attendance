@@ -2823,6 +2823,38 @@ function renderChart() {
 }
 
 // ── Admin ─────────────────────────────────────────────────────────────────
+
+function startEditName(i) {
+  document.getElementById('name-display-'+i).style.display='none';
+  document.getElementById('name-edit-'+i).style.display='block';
+  document.getElementById('name-input-'+i).focus();
+  document.getElementById('name-input-'+i).select();
+}
+
+function cancelEditName(i) {
+  document.getElementById('name-display-'+i).style.display='block';
+  document.getElementById('name-edit-'+i).style.display='none';
+}
+
+async function saveEditName(i) {
+  const newName = document.getElementById('name-input-'+i).value.trim();
+  if (!newName) { showToast('Name cannot be empty.','err'); return; }
+  const staff = getStaff();
+  const oldName = staff[i].name;
+  if (newName === oldName) { cancelEditName(i); return; }
+  // Check for duplicates
+  if (staff.some((s,idx)=>idx!==i&&s.name.toLowerCase()===newName.toLowerCase())) {
+    showToast('A staff member with that name already exists.','err'); return;
+  }
+  staff[i].name = newName;
+  saveStaff(staff);
+  // Save to SharePoint
+  await spSaveStaffMember(staff[i]);
+  showToast('Name updated to '+newName+' ✓','ok');
+  writeAuditLog('Name Changed', currentUser.name, `${oldName} renamed to ${newName}`);
+  renderAdmin();
+}
+
 function renderAdmin() {
   const staff=getStaff();
   const sa=isSuperAdmin();
@@ -2865,7 +2897,15 @@ function renderAdmin() {
         return `<div class="staff-row" style="flex-wrap:wrap;gap:6px">
           <div class="staff-avatar ${['superadmin','manager'].includes(s.role)?'mgr':''}">${initials(s.name)}</div>
           <div class="staff-info" style="min-width:140px;flex:1">
-            <div class="staff-name-txt">${esc(s.name)} ${roleTag}</div>
+            <div class="staff-name-txt" id="name-display-${i}">
+              ${esc(s.name)} ${roleTag}
+              ${sa?`<button onclick="startEditName(${i})" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--text-3);margin-left:4px;padding:1px 4px;border-radius:4px;vertical-align:middle" title="Edit name">✏️</button>`:''}
+            </div>
+            <div id="name-edit-${i}" style="display:none;margin-top:2px">
+              <input id="name-input-${i}" type="text" value="${esc(s.name)}" style="font-size:13px;padding:4px 8px;border-radius:var(--radius-sm);border:1.5px solid var(--brand);width:160px"/>
+              <button onclick="saveEditName(${i})" style="font-size:12px;padding:4px 8px;border-radius:var(--radius-sm);background:var(--brand);color:#fff;border:none;cursor:pointer;margin-left:4px">Save</button>
+              <button onclick="cancelEditName(${i})" style="font-size:12px;padding:4px 8px;border-radius:var(--radius-sm);background:var(--border);color:var(--text-1);border:none;cursor:pointer;margin-left:2px">Cancel</button>
+            </div>
             <div class="staff-pin-status" style="color:${pinColor}">${pinStatus}</div>
             <div style="font-size:11px;color:var(--text-3);margin-top:2px">🕐 ${schedule}${s.office?` &nbsp;📍 ${s.office}`:''}</div>
             <div style="font-size:11px;color:var(--text-3);margin-top:1px">${s.joinDate?'📅 '+calcTenureLabel(s.joinDate):''}</div>
