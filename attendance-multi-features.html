@@ -3808,11 +3808,10 @@ const toHHMM = ts => {
 async function spStartBreak(brk) {
   try {
     const res = await spPostDirect(SP_API + "('AttendanceBreaks')/items", {
-      StaffName: brk.name,
+      StaffName: String(brk.name||''),
       BreakDate: brk.date + 'T00:00:00Z',
-      StartTime: toHHMM(brk.startTime),
+      StartTime: toHHMM(brk.startTime)||'',
       EndTime: '',
-      DurationMs: '',
       IsOpen: true
     });
     return res && (res.ID || res.Id) ? (res.ID || res.Id) : null;
@@ -3828,18 +3827,16 @@ async function spEndBreak(spId, brk) {
     const durMins = brk.durationMs ? Math.round(brk.durationMs/60000) + ' mins' : '';
     if (spId) {
       await spPatch(SP_API + "('AttendanceBreaks')/items(" + spId + ")", {
-        EndTime: toHHMM(brk.endTime),
-        DurationMs: durMins,
+        EndTime: toHHMM(brk.endTime)||'',
         IsOpen: false
       });
     } else {
       // No SP ID (break started offline) — create full record
       await spPostDirect(SP_API + "('AttendanceBreaks')/items", {
-        StaffName: brk.name,
+        StaffName: String(brk.name||''),
         BreakDate: brk.date + 'T00:00:00Z',
-        StartTime: toHHMM(brk.startTime),
-        EndTime: toHHMM(brk.endTime),
-        DurationMs: durMins,
+        StartTime: toHHMM(brk.startTime)||'',
+        EndTime: toHHMM(brk.endTime)||'',
         IsOpen: false
       });
     }
