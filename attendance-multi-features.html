@@ -1391,63 +1391,7 @@ function saveStaff(s)  { _staff=s;   LS.set('ci_staff',s); }
 function saveRecords(r){ _records=r; LS.set('ci_records',r); }
 function saveBreaks(b) { _breaks=b;  LS.set('ci_breaks',b); }
 
-// ── Load all data from SharePoint on startup ──────────────────────────────
-async function loadFromSharePoint() {
-  showToast('Loading data…','ok');
-  try {
-    const [staffRes, recRes, brkRes] = await Promise.all([
-      spPost(FLOW.GET_STAFF),
-      spPost(FLOW.GET_RECORDS),
-      spPost(FLOW.GET_BREAKS),
-    ]);
-
-    if (staffRes && staffRes.value) {
-      _staff = staffRes.value.map(spToStaff);
-      LS.set('ci_staff', _staff);
-    }
-    if (recRes && recRes.value) {
-      _records = recRes.value.map(spToRecord);
-      LS.set('ci_records', _records);
-    }
-    if (brkRes && brkRes.value) {
-      _breaks = brkRes.value.map(spToBreak);
-      LS.set('ci_breaks', _breaks);
-    }
-    showToast('Data loaded ✓','ok');
-  } catch(e) {
-    console.error('SharePoint load error:', e);
-    showToast('Using cached data','ok');
-  }
-}
-
-// ── SharePoint write helpers ──────────────────────────────────────────────
-async function spSaveRecord(rec) {
-  const payload = {
-    StaffName: rec.name,
-    RecordDate: rec.date,
-    Status: rec.status||'',
-    Reason: rec.reason||'',
-    ClockIn: rec.clockIn||0,
-    ClockOut: rec.clockOut||0,
-    GeoLat: rec.geo ? String(rec.geo.lat) : '',
-    GeoLng: rec.geo ? String(rec.geo.lng) : '',
-    GeoAccuracy: rec.geo ? String(rec.geo.accuracy) : '',
-    SubmittedBy: rec.submittedBy||'',
-  };
-  const res = await spPost(rec.id ? FLOW.UPDATE_RECORD : FLOW.SAVE_RECORD, rec.id ? Object.assign({Id:rec.id}, payload) : payload);
-  return res;
-}
-
-async function spSaveBreak(brk) {
-  const res = await spPost(FLOW.SAVE_BREAK, {
-    StaffName: brk.name,
-    BreakDate: brk.date,
-    StartTime: brk.startTime||0,
-    EndTime: brk.endTime||0,
-    DurationMs: brk.durationMs||0,
-  });
-  return res;
-}
+// Legacy Power Automate functions removed — using direct SP REST API
 
 async function spSaveStaffMember(s) {
   const payload = {
@@ -1876,15 +1820,6 @@ async function loginAs(member) {
     loadDashboard(); showScreen('dashboard');
   } else {
     // Debug: show what records are in cache for this user today
-    const cachedRecs = getRecords();
-    const myRec = cachedRecs.find(r=>r.date===today&&r.name===member.name);
-    console.log('[LOGIN DEBUG] Records in cache:', cachedRecs.length);
-    console.log('[LOGIN DEBUG] Today record for', member.name, ':', myRec);
-    console.log('[LOGIN DEBUG] _records null?', _records===null, '| LS records count:', (LS.get('ci_records')||[]).length);
-    console.log('[LOGIN DEBUG] All cached names+dates:', cachedRecs.map(r=>r.name+'|'+r.date));
-    console.log('[LOGIN DEBUG] member.name chars:', [...member.name].map(c=>c.charCodeAt(0)));
-    console.log('[LOGIN DEBUG] today value:', today, '| raw now:', new Date().toString());
-    console.log('[LOGIN DEBUG] name match test:', cachedRecs.filter(r=>r.name===member.name).map(r=>r.date));
     initCheckin(); showScreen('checkin');
   }
   setTimeout(()=>{ const t=document.querySelectorAll('.nav-tab'); if(t[0]) t[0].classList.add('active'); }, 50);
@@ -3790,9 +3725,7 @@ async function spSaveRecord(rec) {
   if (rec.id) {
     await spPatch(SP_API + "('AttendanceRecords')/items(" + rec.id + ")", payload);
   } else {
-    console.log('[RECORD DEBUG] Sending payload:', JSON.stringify(payload));
     const res = await spPostDirect(SP_API + "('AttendanceRecords')/items", payload);
-    console.log('[RECORD DEBUG] SP response:', JSON.stringify(res));
     if (res && res.ID) rec.id = res.ID;
   }
 }
@@ -3805,15 +3738,13 @@ const toHHMM = ts => {
 // Called when break STARTS — creates open break record in SP, returns item ID
 async function spStartBreak(brk) {
   try {
-    const payload = {
+    const res = await spPostDirect(SP_API + "('AttendanceBreaks')/items", {
       StaffName: String(brk.name||''),
       BreakDate: brk.date + 'T00:00:00Z',
       StartTime: toHHMM(brk.startTime)||'',
       EndTime: '',
       IsOpen: true
-    };
-    console.log('[BREAK DEBUG] spStartBreak payload:', JSON.stringify(payload));
-    const res = await spPostDirect(SP_API + "('AttendanceBreaks')/items", payload);
+    });
     return res && (res.ID || res.Id) ? (res.ID || res.Id) : null;
   } catch(e) {
     console.warn('spStartBreak failed:', e);
