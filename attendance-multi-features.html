@@ -1883,6 +1883,8 @@ async function loginAs(member) {
     console.log('[LOGIN DEBUG] _records null?', _records===null, '| LS records count:', (LS.get('ci_records')||[]).length);
     console.log('[LOGIN DEBUG] All cached names+dates:', cachedRecs.map(r=>r.name+'|'+r.date));
     console.log('[LOGIN DEBUG] member.name chars:', [...member.name].map(c=>c.charCodeAt(0)));
+    console.log('[LOGIN DEBUG] today value:', today, '| raw now:', new Date().toString());
+    console.log('[LOGIN DEBUG] name match test:', cachedRecs.filter(r=>r.name===member.name).map(r=>r.date));
     initCheckin(); showScreen('checkin');
   }
   setTimeout(()=>{ const t=document.querySelectorAll('.nav-tab'); if(t[0]) t[0].classList.add('active'); }, 50);
