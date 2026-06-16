@@ -2699,7 +2699,7 @@ function renderLateTab() {
     }
     const severity = r.minsLate>60?'var(--danger)':r.minsLate>30?'#D97706':'var(--warn)';
     html+=`<tr>
-      ${singleDay?'':'<td style="font-size:12px;color:var(--text-3)">${r.date}</td>'}
+      ${singleDay?'':('<td style="font-size:12px;color:var(--text-3)">'+r.date+'</td>')}
       <td style="font-weight:600">${esc(r.name)}</td>
       <td style="font-size:13px;color:var(--text-2)">${fmt12(r.scheduled)}</td>
       <td style="font-size:13px;color:var(--text-2)">${r.actual}</td>
@@ -2746,7 +2746,7 @@ function renderEarlyTab() {
     }
     const severity = r.minsEarly>60?'var(--danger)':r.minsEarly>30?'#D97706':'var(--warn)';
     html+=`<tr>
-      ${singleDay?'':'<td style="font-size:12px;color:var(--text-3)">${r.date}</td>'}
+      ${singleDay?'':('<td style="font-size:12px;color:var(--text-3)">'+r.date+'</td>')}
       <td style="font-weight:600">${esc(r.name)}</td>
       <td style="font-size:13px;color:var(--text-2)">${fmt12(r.scheduled)}</td>
       <td style="font-size:13px;color:var(--text-2)">${r.actual}</td>
@@ -2784,7 +2784,7 @@ function renderSuspiciousTab() {
       html+=`<tr><td colspan="5" style="background:var(--surface-2);font-size:11px;font-weight:700;color:var(--text-3);letter-spacing:0.5px;text-transform:uppercase;padding:6px 14px">${label}</td></tr>`;
     }
     html+=`<tr>
-      ${singleDay?'':'<td style="font-size:12px;color:var(--text-3)">${r.date}</td>'}
+      ${singleDay?'':('<td style="font-size:12px;color:var(--text-3)">'+r.date+'</td>')}
       <td style="font-weight:600">${esc(r.name)}</td>
       <td style="color:#B45309;font-size:12px">${esc(r.msAccount)}</td>
       <td><span class="tag" style="background:#FEF3C7;color:#92400E">${esc(r.status||'')}</span></td>
