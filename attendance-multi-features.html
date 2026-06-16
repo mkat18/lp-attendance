@@ -1364,7 +1364,7 @@ function spToRecord(item) {
     geo: (item.GeoLat && item.GeoLng) ? {lat:parseFloat(item.GeoLat),lng:parseFloat(item.GeoLng),accuracy:parseFloat(item.GeoAccuracy||0)} : null,
     submittedBy: item.SubmittedBy||null,
     msAccount: item.MsAccount||null,
-    hasPhoto: !!item.HasPhoto,
+    hasPhoto: item.HasPhoto === 'true' || item.HasPhoto === true,
     ts: hhmmToTs(item.ClockIn, dateStr)||Date.now(),
   };
 }
@@ -3680,7 +3680,7 @@ async function loadFromSharePoint() {
       _breaks = brkRes.value.map(spToBreak);
       LS.set('ci_breaks', _breaks);
     }
-    showToast('Data loaded ✓', 'ok');
+    showToast('Data loaded ✓ — ' + (_records ? _records.length : 0) + ' records', 'ok');
   } catch(e) {
     console.error('SharePoint load error:', e);
     showToast('Using cached data', 'ok');
@@ -3720,7 +3720,7 @@ async function spSaveRecord(rec) {
     DistanceKm: String(distKm||''),
     SubmittedBy: String(rec.submittedBy||rec.name||''),
     MsAccount: String(rec.msAccount||''),
-    HasPhoto: rec.hasPhoto ? true : false
+    HasPhoto: rec.hasPhoto ? 'true' : 'false'
   };
   if (rec.id) {
     await spPatch(SP_API + "('AttendanceRecords')/items(" + rec.id + ")", payload);
@@ -3738,13 +3738,15 @@ const toHHMM = ts => {
 // Called when break STARTS — creates open break record in SP, returns item ID
 async function spStartBreak(brk) {
   try {
-    const res = await spPostDirect(SP_API + "('AttendanceBreaks')/items", {
+    const p = {
       StaffName: String(brk.name||''),
       BreakDate: brk.date + 'T00:00:00Z',
       StartTime: toHHMM(brk.startTime)||'',
       EndTime: '',
       IsOpen: 'true'
-    });
+    };
+    console.log('[BREAK PAYLOAD]', JSON.stringify(p), 'types:', Object.entries(p).map(([k,v])=>k+':'+typeof v).join(', '));
+    const res = await spPostDirect(SP_API + "('AttendanceBreaks')/items", p);
     return res && (res.ID || res.Id) ? (res.ID || res.Id) : null;
   } catch(e) {
     console.warn('spStartBreak failed:', e);
