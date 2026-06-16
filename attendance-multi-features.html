@@ -1912,6 +1912,8 @@ function initCheckin() {
       document.getElementById('breakCard').style.display='block';
       document.getElementById('clockOutCard').style.display='block';
       updateClockOutUI();
+      // Check for open break in SP — async, updates break UI when done
+      checkOpenBreak(currentUser.name).catch(()=>{});
     } else {
       document.getElementById('breakCard').style.display='none';
       document.getElementById('clockOutCard').style.display='none';
@@ -1927,10 +1929,6 @@ function lockCheckin() {
   document.querySelectorAll('.status-btn').forEach(b=>{ b.onclick=null; b.style.cursor='default'; b.style.opacity=b.classList.contains('active')?'1':'0.35'; });
   document.getElementById('submitBtn').style.display='none';
   document.getElementById('submittedMsg').style.display='block';
-  // Restore break state from SharePoint (works across devices/browsers)
-  if (!breakOngoing) {
-    checkOpenBreak(currentUser.name).catch(()=>{});
-  }
   // Show reason locked if on leave
   const reasonField=document.getElementById('leaveReasonField');
   const ta=document.getElementById('leaveReason');
@@ -3854,7 +3852,7 @@ async function checkOpenBreak(userName) {
     const token = await getToken();
     if (!token) return;
     const res = await fetch(
-      SP_API + "('AttendanceBreaks')/items?$filter=StaffName eq '" + encodeURIComponent(userName) + "' and IsOpen eq 1&$select=Id,StartTime,BreakDate&$top=1",
+      SP_API + "('AttendanceBreaks')/items?$filter=StaffName eq '" + encodeURIComponent(userName) + "' and IsOpen eq true&$select=Id,StartTime,BreakDate&$top=1",
       { headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json;odata=nometadata' } }
     );
     if (!res.ok) return;
@@ -3863,11 +3861,12 @@ async function checkOpenBreak(userName) {
       const item = data.value[0];
       const dateStr = item.BreakDate ? item.BreakDate.split('T')[0] : today;
       if (dateStr !== today) return; // open break from a previous day — ignore
-      // Restore break state
-      const startTs = item.StartTime ? new Date(today + 'T' + item.StartTime + ':00').getTime() : Date.now();
+      // Restore break state — use LS timestamp if available (more precise than HHMM)
+      const lsStart = LS.get('ci_breakStart_' + userName);
+      const startTs = lsStart || (item.StartTime ? new Date(today + 'T' + item.StartTime + ':00+05:30').getTime() : Date.now());
       breakOngoing = true;
       breakStart = startTs;
-      LS.set('ci_breakSpId_' + userName, item.Id); // store SP ID for patching on end
+      LS.set('ci_breakSpId_' + userName, item.Id);
       LS.set('ci_breakStart_' + userName, startTs);
       setOngoingBreak(userName, true);
       clearInterval(breakInterval);
