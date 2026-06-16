@@ -740,6 +740,25 @@ tr.flagged-row:hover td { background: #FFEAEA; }
       <button class="btn-primary" onclick="loadAuditLog()">View audit log</button>
       <div id="auditLogList" style="margin-top:12px"></div>
     </div>
+
+    <div class="card" id="obsNotesStatsCard" style="display:none">
+      <div class="section-label">📝 Observation Notes — Stats</div>
+      <p style="font-size:13px;color:var(--text-2);margin-bottom:12px">Track how often staff have been observed. Select a date range to analyse patterns.</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
+        <input type="date" id="obsFromDate" style="font-size:13px;padding:5px 8px;border-radius:var(--radius-sm);border:1.5px solid var(--border)"/>
+        <span style="font-size:12px;color:var(--text-3)">to</span>
+        <input type="date" id="obsToDate" style="font-size:13px;padding:5px 8px;border-radius:var(--radius-sm);border:1.5px solid var(--border)"/>
+        <button class="btn-sm" onclick="renderObsStats()">Apply</button>
+        <button class="btn-sm" onclick="setObsRange('month')">This month</button>
+        <button class="btn-sm" onclick="setObsRange('3month')">3 months</button>
+        <button class="btn-sm" onclick="setObsRange('6month')">6 months</button>
+        <button class="btn-sm" onclick="setObsRange('all')">All time</button>
+      </div>
+      <div style="margin-bottom:10px">
+        <input type="text" id="obsFilterName" placeholder="Filter by staff name…" oninput="renderObsStats()" style="font-size:13px;width:100%;padding:7px 10px;border-radius:var(--radius-sm);border:1.5px solid var(--border)"/>
+      </div>
+      <div id="obsStatsContent"></div>
+    </div>
   </div>
 
 
@@ -1884,6 +1903,18 @@ function lockCheckin() {
   document.querySelectorAll('.status-btn').forEach(b=>{ b.onclick=null; b.style.cursor='default'; b.style.opacity=b.classList.contains('active')?'1':'0.35'; });
   document.getElementById('submitBtn').style.display='none';
   document.getElementById('submittedMsg').style.display='block';
+  // Restore break state if user was on break when they closed the browser
+  const ob = LS.get('ci_ongoingBreaks') || {};
+  const savedStart = LS.get('ci_breakStart_'+currentUser.name);
+  if (ob[currentUser.name] && savedStart && !breakOngoing) {
+    breakOngoing = true;
+    breakStart = savedStart;
+    breakInterval = setInterval(()=>{
+      const el = document.getElementById('breakTimer');
+      if(el){ el.textContent=fmtMs(Date.now()-breakStart); el.className='break-time running'; }
+    }, 1000);
+    updateBreakUI();
+  }
   // Show reason locked if on leave
   const reasonField=document.getElementById('leaveReasonField');
   const ta=document.getElementById('leaveReason');
@@ -2142,6 +2173,7 @@ function setOngoingBreak(name, active) {
 function toggleBreak() {
   if (!breakOngoing) {
     breakOngoing=true; breakStart=Date.now();
+    LS.set('ci_breakStart_'+currentUser.name, breakStart); // persist so browser close doesn't lose it
     setOngoingBreak(currentUser.name, true);
     breakInterval=setInterval(()=>{
       const el=document.getElementById('breakTimer');
@@ -2151,6 +2183,7 @@ function toggleBreak() {
   } else {
     const durationMs=Date.now()-breakStart;
     stopBreakTimer();
+    LS.set('ci_breakStart_'+currentUser.name, null);
     setOngoingBreak(currentUser.name, false);
     const newBreak={name:currentUser.name, date:today, durationMs, startTime:breakStart, endTime:Date.now(), ts:Date.now()};
     const brks=getBreaks();
@@ -3109,6 +3142,99 @@ async function saveEditName(i) {
   renderAdmin();
 }
 
+
+function setObsRange(range) {
+  const d = new Date();
+  const fmt = d2 => d2.toISOString().split('T')[0];
+  document.getElementById('obsToDate').value = today;
+  if (range==='month')   document.getElementById('obsFromDate').value = fmt(new Date(d.getFullYear(),d.getMonth(),1));
+  if (range==='3month')  document.getElementById('obsFromDate').value = fmt(new Date(d.getFullYear(),d.getMonth()-3,d.getDate()));
+  if (range==='6month')  document.getElementById('obsFromDate').value = fmt(new Date(d.getFullYear(),d.getMonth()-6,d.getDate()));
+  if (range==='all')     document.getElementById('obsFromDate').value = '2020-01-01';
+  renderObsStats();
+}
+
+function renderObsStats() {
+  const from = document.getElementById('obsFromDate').value;
+  const to   = document.getElementById('obsToDate').value;
+  const fn   = (document.getElementById('obsFilterName').value||'').trim().toLowerCase();
+  const el   = document.getElementById('obsStatsContent');
+  if (!el) return;
+
+  const notes = getObsNotes().filter(n => {
+    if (from && n.date < from) return false;
+    if (to && n.date > to) return false;
+    if (fn && !n.target.toLowerCase().includes(fn)) return false;
+    return true;
+  });
+
+  if (!notes.length) {
+    el.innerHTML = '<div style="color:var(--text-3);font-size:13px;text-align:center;padding:20px">No observation notes in this range.</div>';
+    return;
+  }
+
+  // Aggregate by target
+  const byPerson = {};
+  for (const n of notes) {
+    if (!byPerson[n.target]) byPerson[n.target] = [];
+    byPerson[n.target].push(n);
+  }
+
+  // Sort by most notes desc
+  const sorted = Object.entries(byPerson).sort((a,b)=>b[1].length-a[1].length);
+  const maxCount = sorted[0][1].length;
+
+  let html = '';
+
+  // Summary bar
+  html += `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px">
+    <div style="background:var(--surface-2);border-radius:var(--radius-sm);padding:10px;text-align:center">
+      <div style="font-size:22px;font-weight:700;color:var(--brand)">${notes.length}</div>
+      <div style="font-size:11px;color:var(--text-3)">Total notes</div>
+    </div>
+    <div style="background:var(--surface-2);border-radius:var(--radius-sm);padding:10px;text-align:center">
+      <div style="font-size:22px;font-weight:700;color:var(--brand)">${sorted.length}</div>
+      <div style="font-size:11px;color:var(--text-3)">Staff observed</div>
+    </div>
+    <div style="background:var(--surface-2);border-radius:var(--radius-sm);padding:10px;text-align:center">
+      <div style="font-size:22px;font-weight:700;color:${maxCount>=5?'var(--danger)':'var(--warn)'}">${maxCount}</div>
+      <div style="font-size:11px;color:var(--text-3)">Most for one person</div>
+    </div>
+  </div>`;
+
+  // Per-person cards
+  for (const [name, personNotes] of sorted) {
+    const count = personNotes.length;
+    const barPct = Math.round((count/maxCount)*100);
+    const barColor = count>=5?'var(--danger)':count>=3?'var(--warn)':'var(--brand)';
+    const sortedNotes = [...personNotes].sort((a,b)=>b.ts-a.ts);
+    const uniqueBy = [...new Set(personNotes.map(n=>n.by))].join(', ');
+
+    html += `<div style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:10px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <div style="font-size:14px;font-weight:700;color:var(--text)">${esc(name)}</div>
+        <span style="font-size:13px;font-weight:700;color:${barColor};background:${count>=5?'var(--danger-light)':count>=3?'#FEF3C7':'var(--brand-light)'};padding:2px 10px;border-radius:99px">${count} note${count!==1?'s':''}</span>
+      </div>
+      <div style="background:var(--surface-2);border-radius:99px;height:6px;margin-bottom:8px">
+        <div style="background:${barColor};width:${barPct}%;height:6px;border-radius:99px;transition:width .3s"></div>
+      </div>
+      <div style="font-size:11px;color:var(--text-3);margin-bottom:8px">Noted by: ${esc(uniqueBy)} &nbsp;·&nbsp; Last: ${esc(sortedNotes[0].date)}</div>
+      <details>
+        <summary style="font-size:12px;color:var(--brand);cursor:pointer;user-select:none">View all notes</summary>
+        <div style="margin-top:8px">
+          ${sortedNotes.map(n=>`
+            <div style="background:var(--surface-2);border-radius:var(--radius-sm);padding:8px 10px;margin-bottom:6px">
+              <div style="font-size:13px;color:var(--text);margin-bottom:3px">${esc(n.note)}</div>
+              <div style="font-size:11px;color:var(--text-3)">${esc(n.date)} · by ${esc(n.by)}</div>
+            </div>`).join('')}
+        </div>
+      </details>
+    </div>`;
+  }
+
+  el.innerHTML = html;
+}
+
 function renderAdmin() {
   const staff=getStaff();
   const sa=isSuperAdmin();
@@ -3121,6 +3247,17 @@ function renderAdmin() {
   if(addStaffCard) addStaffCard.style.display=canAddStaff()?'block':'none';
   const auditCard=document.getElementById('auditLogCard');
   if(auditCard) auditCard.style.display=sa?'block':'none';
+  const obsCard=document.getElementById('obsNotesStatsCard');
+  if(obsCard) {
+    obsCard.style.display=(sa||mgr)?'block':'none';
+    if(sa||mgr) {
+      const d=new Date();
+      const sixMonthsAgo=new Date(d.getFullYear(),d.getMonth()-6,d.getDate()).toISOString().split('T')[0];
+      if(!document.getElementById('obsFromDate').value) document.getElementById('obsFromDate').value=sixMonthsAgo;
+      if(!document.getElementById('obsToDate').value) document.getElementById('obsToDate').value=today;
+      renderObsStats();
+    }
+  }
 
   document.getElementById('staffList').innerHTML = staff.length
     ? staff.map((s,i)=>{
@@ -3563,6 +3700,8 @@ async function loadFromSharePoint() {
       spGet(SP_API + "('AttendanceRecords')/items?$top=5000"),
       spGet(SP_API + "('AttendanceBreaks')/items?$top=5000"),
     ]);
+    // Load obs notes in background (non-blocking)
+    loadObsNotesFromSP().catch(()=>{});
     // Only overwrite local data if SharePoint has data
     if (staffRes && staffRes.value && staffRes.value.length > 0) {
       _staff = staffRes.value.map(spToStaff);
@@ -4414,19 +4553,68 @@ function updateFileLogUI() {
 }
 
 // ─── OBSERVATION NOTES (Manager / TL) ────────────────────────────────────
-function getObsNotes() { return LS.get('ci_obsnotes') || []; }
-function saveObsNotes(n) { LS.set('ci_obsnotes', n); }
+let _obsNotes = null; // in-memory cache
 
-function saveObservationNote() {
+function getObsNotes() { return _obsNotes || LS.get('ci_obsnotes') || []; }
+function saveObsNotes(n) { _obsNotes = n; LS.set('ci_obsnotes', n); }
+
+async function loadObsNotesFromSP() {
+  try {
+    const token = await getToken();
+    if (!token) return;
+    const res = await fetch(
+      SP_API + "('ObservationNotes')/items?$select=Id,Title,NoteBy,NoteDate,NoteText&$top=5000&$orderby=Created desc",
+      { headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json;odata=nometadata' } }
+    );
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data && data.value) {
+      _obsNotes = data.value.map(item => ({
+        id: item.Id,
+        target: item.Title || '',
+        by: item.NoteBy || '',
+        date: item.NoteDate ? item.NoteDate.split('T')[0] : '',
+        note: item.NoteText || '',
+        ts: item.NoteDate ? new Date(item.NoteDate).getTime() : 0
+      }));
+      LS.set('ci_obsnotes', _obsNotes);
+    }
+  } catch(e) { console.warn('ObsNotes SP load failed:', e); }
+}
+
+async function spSaveObsNote(note) {
+  try {
+    const token = await getToken();
+    if (!token) return;
+    await fetch(SP_API + "('ObservationNotes')/items", {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + token,
+        'Accept': 'application/json;odata=nometadata',
+        'Content-Type': 'application/json;odata=nometadata'
+      },
+      body: JSON.stringify({
+        Title: note.target,
+        NoteBy: note.by,
+        NoteDate: new Date(note.ts).toISOString(),
+        NoteText: note.note
+      })
+    });
+  } catch(e) { console.warn('ObsNote SP save failed:', e); }
+}
+
+async function saveObservationNote() {
   const target = document.getElementById('workloadNoteTarget').value;
   const text = document.getElementById('workloadNoteText').value.trim();
   if (!target) { showToast('Select a staff member.', 'err'); return; }
   if (!text) { showToast('Enter a note.', 'err'); return; }
+  const note = { by: currentUser.name, target, date: today, note: text, ts: Date.now() };
   const notes = getObsNotes();
-  notes.push({ by: currentUser.name, target, date: today, note: text, ts: Date.now() });
+  notes.unshift(note);
   saveObsNotes(notes);
   document.getElementById('workloadNoteText').value = '';
   showToast('Note saved ✓', 'ok');
+  await spSaveObsNote(note);
 }
 
 function populateObsNoteDropdown() {
