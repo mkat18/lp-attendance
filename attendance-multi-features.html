@@ -6319,7 +6319,9 @@ function submitEOD(e) {
 function renderEODSummary(el, teamNames, date) {
   date = date || today;
   const reports = getEODReports().filter(r => r.date === date && teamNames.includes(r.name));
-  const staff = getStaff().filter(s => EOD_ROLES.includes(s.role) && teamNames.includes(s.name));
+  // Only count staff who actually checked in on this date (not on leave/absent)
+  const checkedInNames = new Set(getRecords().filter(r => r.date === date && r.status !== 'leave' && r.status !== 'absent').map(r => r.name));
+  const staff = getStaff().filter(s => EOD_ROLES.includes(s.role) && teamNames.includes(s.name) && checkedInNames.has(s.name));
   const submitted = new Set(reports.map(r => r.name));
   const missing = staff.filter(s => !submitted.has(s.name));
 
@@ -6405,9 +6407,13 @@ window.renderMetrics = function() {
   if (!isManager()) return;
   const metricsEl = document.getElementById('metrics');
   if (!metricsEl) return;
-  const allAnalysts = getStaff().filter(s => EOD_ROLES.includes(s.role)).map(s => s.name);
+  // Use dashboard selected date so EOD card respects the date picker
+  const selDate = getSelectedDate();
+  const selRecs = getRecords().filter(r => r.date === selDate && r.status !== 'leave' && r.status !== 'absent');
+  const selNames = selRecs.map(r => r.name);
+  const allAnalysts = getStaff().filter(s => EOD_ROLES.includes(s.role) && selNames.includes(s.name)).map(s => s.name);
   if (allAnalysts.length === 0) return;
-  const todayReports = getEODReports().filter(r => r.date === today && allAnalysts.includes(r.name));
+  const todayReports = getEODReports().filter(r => r.date === selDate && allAnalysts.includes(r.name));
   const lowConf = todayReports.filter(r => r.confidence <= 2).length;
   const brokerFlags = todayReports.filter(r => r.brokerConcern === 'yes').length;
   const notSubmitted = allAnalysts.length - todayReports.length;
