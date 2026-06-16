@@ -1594,7 +1594,7 @@ function goTab(name, btn) {
 
 function logout() {
   currentUser=null; pinBuffer=''; pinStage='login'; pinFirst='';
-  stopBreakTimer();
+  stopBreakTimer(false); // preserve ongoing break across logout
   buildNav(); showScreen('mslogin');
   clearName();
   document.getElementById('loginGreeting').textContent = getGreeting();
@@ -1603,10 +1603,14 @@ function logout() {
     try {
       const token = await getToken();
       if (token) {
-        const staffRes = await fetch(
-          `${SP_API}('AttendanceStaff')/items?$select=Title,Role,Pin,TempPin,StartTime,EndTime,Office,Team,JoinDate&$top=500`,
-          { headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json;odata=nometadata' } }
-        );
+        const [staffRes, recRes, brkRes] = await Promise.all([
+          fetch(`${SP_API}('AttendanceStaff')/items?$select=Title,Role,Pin,TempPin,StartTime,EndTime,Office,Team,JoinDate&$top=500`,
+            { headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json;odata=nometadata' } }),
+          fetch(`${SP_API}('AttendanceRecords')/items?$top=5000`,
+            { headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json;odata=nometadata' } }),
+          fetch(`${SP_API}('AttendanceBreaks')/items?$top=5000`,
+            { headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json;odata=nometadata' } }),
+        ]);
         if (staffRes.ok) {
           const staffData = await staffRes.json();
           if (staffData && staffData.value && staffData.value.length > 0) {
@@ -1622,6 +1626,20 @@ function logout() {
               joinDate: item.JoinDate||'',
             }));
             LS.set('ci_staff', _staff);
+          }
+        }
+        if (recRes.ok) {
+          const recData = await recRes.json();
+          if (recData && recData.value && recData.value.length > 0) {
+            _records = recData.value.map(spToRecord);
+            LS.set('ci_records', _records);
+          }
+        }
+        if (brkRes.ok) {
+          const brkData = await brkRes.json();
+          if (brkData && brkData.value && brkData.value.length > 0) {
+            _breaks = brkData.value.map(spToBreak);
+            LS.set('ci_breaks', _breaks);
           }
         }
       }
@@ -1849,6 +1867,38 @@ function handlePin() {
   loginAs(member);
 }
 
+// Fetch just this user's record for today — fast targeted SP query
+async function fetchTodayRecord(name) {
+  try {
+    const token = await getToken();
+    if (!token) return; // no token — fall back to cached data
+    const encoded = encodeURIComponent(name);
+    const res = await fetch(
+      SP_API + "('AttendanceRecords')/items?$filter=StaffName eq '" + encoded + "' and RecordDate eq '" + today + "T00:00:00Z'&$top=1",
+      { headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json;odata=nometadata' } }
+    );
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data && data.value) {
+      // Merge this user's fresh record into _records cache
+      const recs = getRecords();
+      const idx = recs.findIndex(r => r.name === name && r.date === today);
+      if (data.value.length > 0) {
+        const fresh = spToRecord(data.value[0]);
+        if (idx >= 0) recs[idx] = fresh;
+        else recs.push(fresh);
+      } else {
+        // No record found — remove stale cached record if any
+        if (idx >= 0) recs.splice(idx, 1);
+      }
+      _records = recs;
+      LS.set('ci_records', recs);
+    }
+  } catch(e) {
+    console.warn('fetchTodayRecord failed — using cache:', e);
+  }
+}
+
 async function loginAs(member) {
   currentUser={name:member.name, role:member.role};
   buildNav();
@@ -1857,12 +1907,9 @@ async function loginAs(member) {
     await loadFromSharePoint().catch(()=>{});
     loadDashboard(); showScreen('dashboard');
   } else {
-    // Records already loaded in initMsal pre-login fetch for PIN users.
-    // Only reload if we have an MS token (MS login flow) — PIN users already have fresh data.
-    if (msalToken) {
-      showToast('Loading your data…', 'ok');
-      await loadFromSharePoint().catch(()=>{});
-    }
+    // Fetch just this user's record for today from SP — fast, no full reload needed
+    // This ensures check-in state is always accurate regardless of device/browser
+    await fetchTodayRecord(member.name).catch(()=>{});
     initCheckin(); showScreen('checkin');
   }
   setTimeout(()=>{ const t=document.querySelectorAll('.nav-tab'); if(t[0]) t[0].classList.add('active'); }, 50);
@@ -1905,17 +1952,9 @@ function lockCheckin() {
   document.querySelectorAll('.status-btn').forEach(b=>{ b.onclick=null; b.style.cursor='default'; b.style.opacity=b.classList.contains('active')?'1':'0.35'; });
   document.getElementById('submitBtn').style.display='none';
   document.getElementById('submittedMsg').style.display='block';
-  // Restore break state if user was on break when they closed the browser
-  const ob = LS.get('ci_ongoingBreaks') || {};
-  const savedStart = LS.get('ci_breakStart_'+currentUser.name);
-  if (ob[currentUser.name] && savedStart && !breakOngoing) {
-    breakOngoing = true;
-    breakStart = savedStart;
-    breakInterval = setInterval(()=>{
-      const el = document.getElementById('breakTimer');
-      if(el){ el.textContent=fmtMs(Date.now()-breakStart); el.className='break-time running'; }
-    }, 1000);
-    updateBreakUI();
+  // Restore break state from SharePoint (works across devices/browsers)
+  if (!breakOngoing) {
+    checkOpenBreak(currentUser.name).catch(()=>{});
   }
   // Show reason locked if on leave
   const reasonField=document.getElementById('leaveReasonField');
@@ -2172,33 +2211,44 @@ function setOngoingBreak(name, active) {
   LS.set('ci_ongoingBreaks', ob);
 }
 
-function toggleBreak() {
+async function toggleBreak() {
   if (!breakOngoing) {
+    // Starting a break
     breakOngoing=true; breakStart=Date.now();
-    LS.set('ci_breakStart_'+currentUser.name, breakStart); // persist so browser close doesn't lose it
+    LS.set('ci_breakStart_'+currentUser.name, breakStart);
+    LS.set('ci_breakSpId_'+currentUser.name, null); // will be set after SP write
     setOngoingBreak(currentUser.name, true);
     breakInterval=setInterval(()=>{
       const el=document.getElementById('breakTimer');
       if(el){ el.textContent=fmtMs(Date.now()-breakStart); el.className='break-time running'; }
     },1000);
     updateBreakUI();
+    // Write open break to SharePoint — store returned ID for patching on end
+    const brk={name:currentUser.name, date:today, startTime:breakStart};
+    const spId = await spStartBreak(brk);
+    if (spId) LS.set('ci_breakSpId_'+currentUser.name, spId);
   } else {
+    // Ending a break
     const durationMs=Date.now()-breakStart;
-    stopBreakTimer();
+    const spId = LS.get('ci_breakSpId_'+currentUser.name);
+    stopBreakTimer(true);
     LS.set('ci_breakStart_'+currentUser.name, null);
+    LS.set('ci_breakSpId_'+currentUser.name, null);
     setOngoingBreak(currentUser.name, false);
     const newBreak={name:currentUser.name, date:today, durationMs, startTime:breakStart, endTime:Date.now(), ts:Date.now()};
     const brks=getBreaks();
     brks.push(newBreak);
     saveBreaks(brks);
-    // Write to SharePoint
-    spSaveBreak(newBreak);
+    // Patch the open SP record with end time
+    await spEndBreak(spId, newBreak);
     updateBreakUI();
     showToast('Break logged.','ok');
   }
 }
-function stopBreakTimer() {
-  if(breakOngoing && currentUser) setOngoingBreak(currentUser.name, false);
+function stopBreakTimer(clearOngoing=true) {
+  // Only clear the ongoing break marker if explicitly requested
+  // (not on logout — break should persist across sessions)
+  if(clearOngoing && breakOngoing && currentUser) setOngoingBreak(currentUser.name, false);
   breakOngoing=false; clearInterval(breakInterval); breakInterval=null;
 }
 
@@ -3765,19 +3815,91 @@ async function spSaveRecord(rec) {
   }
 }
 
-async function spSaveBreak(brk) {
-  const toHHMM = ts => {
-    if (!ts) return '';
-    return new Date(ts).toLocaleTimeString('en-AU', {hour:'2-digit', minute:'2-digit', hour12:false, timeZone:'Asia/Kolkata'});
-  };
-  const durMins = brk.durationMs ? Math.round(brk.durationMs/60000) + ' mins' : '';
-  await spPostDirect(SP_API + "('AttendanceBreaks')/items", {
-    StaffName: brk.name,
-    BreakDate: brk.date + 'T00:00:00Z',
-    StartTime: toHHMM(brk.startTime),
-    EndTime: toHHMM(brk.endTime),
-    DurationMs: durMins
-  });
+const toHHMM = ts => {
+  if (!ts) return '';
+  return new Date(ts).toLocaleTimeString('en-AU', {hour:'2-digit', minute:'2-digit', hour12:false, timeZone:'Asia/Kolkata'});
+};
+
+// Called when break STARTS — creates open break record in SP, returns item ID
+async function spStartBreak(brk) {
+  try {
+    const res = await spPostDirect(SP_API + "('AttendanceBreaks')/items", {
+      StaffName: brk.name,
+      BreakDate: brk.date + 'T00:00:00Z',
+      StartTime: toHHMM(brk.startTime),
+      EndTime: '',
+      DurationMs: '',
+      IsOpen: true
+    });
+    return res && (res.ID || res.Id) ? (res.ID || res.Id) : null;
+  } catch(e) {
+    console.warn('spStartBreak failed:', e);
+    return null;
+  }
+}
+
+// Called when break ENDS — patches existing SP record with end time
+async function spEndBreak(spId, brk) {
+  try {
+    const durMins = brk.durationMs ? Math.round(brk.durationMs/60000) + ' mins' : '';
+    if (spId) {
+      await spPatch(SP_API + "('AttendanceBreaks')/items(" + spId + ")", {
+        EndTime: toHHMM(brk.endTime),
+        DurationMs: durMins,
+        IsOpen: false
+      });
+    } else {
+      // No SP ID (break started offline) — create full record
+      await spPostDirect(SP_API + "('AttendanceBreaks')/items", {
+        StaffName: brk.name,
+        BreakDate: brk.date + 'T00:00:00Z',
+        StartTime: toHHMM(brk.startTime),
+        EndTime: toHHMM(brk.endTime),
+        DurationMs: durMins,
+        IsOpen: false
+      });
+    }
+  } catch(e) {
+    console.warn('spEndBreak failed:', e);
+  }
+}
+
+// Keep spSaveBreak as alias for any legacy calls
+async function spSaveBreak(brk) { await spEndBreak(null, brk); }
+
+// Called on login — checks SP for any open break for this user today
+async function checkOpenBreak(userName) {
+  try {
+    const token = await getToken();
+    if (!token) return;
+    const res = await fetch(
+      SP_API + "('AttendanceBreaks')/items?$filter=StaffName eq '" + encodeURIComponent(userName) + "' and IsOpen eq 1&$select=Id,StartTime,BreakDate&$top=1",
+      { headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json;odata=nometadata' } }
+    );
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data && data.value && data.value.length > 0) {
+      const item = data.value[0];
+      const dateStr = item.BreakDate ? item.BreakDate.split('T')[0] : today;
+      if (dateStr !== today) return; // open break from a previous day — ignore
+      // Restore break state
+      const startTs = item.StartTime ? new Date(today + 'T' + item.StartTime + ':00').getTime() : Date.now();
+      breakOngoing = true;
+      breakStart = startTs;
+      LS.set('ci_breakSpId_' + userName, item.Id); // store SP ID for patching on end
+      LS.set('ci_breakStart_' + userName, startTs);
+      setOngoingBreak(userName, true);
+      clearInterval(breakInterval);
+      breakInterval = setInterval(() => {
+        const el = document.getElementById('breakTimer');
+        if (el) { el.textContent = fmtMs(Date.now() - breakStart); el.className = 'break-time running'; }
+      }, 1000);
+      updateBreakUI();
+      showToast('Break resumed ✓', 'ok');
+    }
+  } catch(e) {
+    console.warn('checkOpenBreak failed:', e);
+  }
 }
 
 async function spSaveStaffMember(s) {
