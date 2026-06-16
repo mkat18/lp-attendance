@@ -3695,7 +3695,12 @@ async function spPostDirect(url, body) {
     headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json;odata=nometadata', 'Content-Type': 'application/json;odata=nometadata' },
     body: JSON.stringify(body)
   });
-  return r.ok ? await r.json() : null;
+  if (!r.ok) {
+    const errText = await r.text();
+    console.error('[SP POST ERROR]', r.status, url, errText);
+    return null;
+  }
+  return await r.json();
 }
 
 async function spPatch(url, body) {
@@ -3785,7 +3790,9 @@ async function spSaveRecord(rec) {
   if (rec.id) {
     await spPatch(SP_API + "('AttendanceRecords')/items(" + rec.id + ")", payload);
   } else {
+    console.log('[RECORD DEBUG] Sending payload:', JSON.stringify(payload));
     const res = await spPostDirect(SP_API + "('AttendanceRecords')/items", payload);
+    console.log('[RECORD DEBUG] SP response:', JSON.stringify(res));
     if (res && res.ID) rec.id = res.ID;
   }
 }
