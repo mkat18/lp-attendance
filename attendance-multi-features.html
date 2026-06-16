@@ -3743,7 +3743,7 @@ async function spStartBreak(brk) {
       BreakDate: brk.date + 'T00:00:00Z',
       StartTime: toHHMM(brk.startTime)||'',
       EndTime: '',
-      IsOpen: true
+      IsOpen: 'true'
     });
     return res && (res.ID || res.Id) ? (res.ID || res.Id) : null;
   } catch(e) {
@@ -3759,7 +3759,7 @@ async function spEndBreak(spId, brk) {
     if (spId) {
       await spPatch(SP_API + "('AttendanceBreaks')/items(" + spId + ")", {
         EndTime: toHHMM(brk.endTime)||'',
-        IsOpen: false
+        IsOpen: 'false'
       });
     } else {
       // No SP ID (break started offline) — create full record
@@ -3768,7 +3768,7 @@ async function spEndBreak(spId, brk) {
         BreakDate: brk.date + 'T00:00:00Z',
         StartTime: toHHMM(brk.startTime)||'',
         EndTime: toHHMM(brk.endTime)||'',
-        IsOpen: false
+        IsOpen: 'false'
       });
     }
   } catch(e) {
@@ -3785,7 +3785,7 @@ async function checkOpenBreak(userName) {
     const token = await getToken();
     if (!token) return;
     const res = await fetch(
-      SP_API + "('AttendanceBreaks')/items?$filter=StaffName eq '" + encodeURIComponent(userName) + "' and IsOpen eq true&$select=Id,StartTime,BreakDate&$top=1",
+      SP_API + "('AttendanceBreaks')/items?$filter=StaffName eq '" + encodeURIComponent(userName) + "' and IsOpen eq 'true'&$select=Id,StartTime,BreakDate&$top=1",
       { headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json;odata=nometadata' } }
     );
     if (!res.ok) return;
