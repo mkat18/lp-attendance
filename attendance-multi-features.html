@@ -3805,13 +3805,15 @@ const toHHMM = ts => {
 // Called when break STARTS — creates open break record in SP, returns item ID
 async function spStartBreak(brk) {
   try {
-    const res = await spPostDirect(SP_API + "('AttendanceBreaks')/items", {
+    const payload = {
       StaffName: String(brk.name||''),
       BreakDate: brk.date + 'T00:00:00Z',
       StartTime: toHHMM(brk.startTime)||'',
       EndTime: '',
       IsOpen: true
-    });
+    };
+    console.log('[BREAK DEBUG] spStartBreak payload:', JSON.stringify(payload));
+    const res = await spPostDirect(SP_API + "('AttendanceBreaks')/items", payload);
     return res && (res.ID || res.Id) ? (res.ID || res.Id) : null;
   } catch(e) {
     console.warn('spStartBreak failed:', e);
