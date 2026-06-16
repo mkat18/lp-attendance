@@ -1326,6 +1326,7 @@ function spToRecord(item) {
     geo: (item.GeoLat && item.GeoLng) ? {lat:parseFloat(item.GeoLat),lng:parseFloat(item.GeoLng),accuracy:parseFloat(item.GeoAccuracy||0)} : null,
     submittedBy: item.SubmittedBy||null,
     msAccount: item.MsAccount||null,
+    hasPhoto: !!item.HasPhoto,
     ts: hhmmToTs(item.ClockIn, dateStr)||Date.now(),
   };
 }
@@ -2018,12 +2019,23 @@ async function uploadPhoto(dataUrl, rec) {
     const blob = await res.blob();
     const filename = `${rec.date}_${rec.name.replace(/\s+/g,'_')}_${Date.now()}.jpg`;
     const uploadUrl = `https://loanprocessorau.sharepoint.com/sites/lpattendance/_api/web/lists/getbytitle('AttendancePhotos')/RootFolder/Files/Add(url='${encodeURIComponent(filename)}',overwrite=true)`;
-    await fetch(uploadUrl, {
+    const uploadRes = await fetch(uploadUrl, {
       method: 'POST',
       headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json;odata=nometadata' },
       body: blob
     });
-    console.log('Photo uploaded:', filename);
+    if (uploadRes.ok) {
+      // Mark hasPhoto on the record in SharePoint now that upload succeeded
+      rec.hasPhoto = true;
+      if (rec.id) spSaveRecord(rec);
+      // Also update local cache
+      const recs = getRecords();
+      const idx = recs.findIndex(r => r.id === rec.id || (r.name === rec.name && r.date === rec.date));
+      if (idx >= 0) { recs[idx].hasPhoto = true; saveRecords(recs); }
+      console.log('Photo uploaded:', filename);
+    } else {
+      console.warn('Photo upload failed with status:', uploadRes.status);
+    }
   } catch(e) {
     console.warn('Photo upload failed:', e);
   }
@@ -3300,7 +3312,8 @@ async function spSaveRecord(rec) {
     GeoAccuracy: rec.geo?String(rec.geo.accuracy)+'m':'',
     DistanceKm: distKm,
     SubmittedBy: rec.submittedBy||rec.name||'',
-    MsAccount: rec.msAccount||''
+    MsAccount: rec.msAccount||'',
+    HasPhoto: !!rec.hasPhoto
   };
   if (rec.id) {
     await spPatch(SP_API + "('AttendanceRecords')/items(" + rec.id + ")", payload);
