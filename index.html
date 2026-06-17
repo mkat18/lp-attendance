@@ -616,7 +616,12 @@ async function getToken() {
 
 async function msLogin() {
   try {
-    await msalInstance.loginRedirect({ scopes: SP_SCOPES });
+    // Clear any cached accounts to force fresh login with correct scopes
+    const accounts = msalInstance.getAllAccounts();
+    await msalInstance.loginRedirect({ 
+      scopes: SP_SCOPES,
+      prompt: 'select_account'
+    });
   } catch(e) {
     document.getElementById('loginErr').textContent = 'Sign in failed. Please try again.';
   }
@@ -703,11 +708,18 @@ async function init() {
     const result = await msalInstance.handleRedirectPromise();
     if (result) {
       _portalToken = result.accessToken;
-      // Decode token to check audience
       try {
         const payload = JSON.parse(atob(result.accessToken.split('.')[1]));
         console.log('[TOKEN] aud:', payload.aud, 'scp:', payload.scp);
-      } catch(e) {}
+        // If we got a Graph token instead of SP token, request SP token separately
+        if (payload.aud && payload.aud.includes('graph') || payload.aud === '00000003-0000-0ff1-ce00-000000000000') {
+          console.log('[TOKEN] Got Graph token, requesting SP token separately');
+          const spToken = await msalInstance.acquireTokenSilent({ scopes: SP_SCOPES, account: result.account });
+          _portalToken = spToken.accessToken;
+          const spPayload = JSON.parse(atob(spToken.accessToken.split('.')[1]));
+          console.log('[TOKEN] SP token aud:', spPayload.aud);
+        }
+      } catch(e) { console.warn('[TOKEN] decode error:', e); }
       console.log('[INIT] Got token from redirect');
     }
 
