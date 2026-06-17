@@ -577,16 +577,16 @@ tr.flagged-row:hover td { background: #FFEAEA; }
 
     <!-- Weekly widgets — visible to all staff after check-in -->
     <div id="staffWeeklyWidgets" style="display:none;margin-top:12px">
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
-        <div class="card" style="margin:0">
+      <div style="display:flex;gap:12px">
+        <div class="card" style="margin:0;flex:1">
           <div class="card-label">🎂 Birthdays today</div>
           <div id="staffWidgetBirthdays"><div style="font-size:12px;color:var(--text-3)">No birthdays today</div></div>
         </div>
-        <div class="card" style="margin:0">
+        <div class="card" style="margin:0;flex:1">
           <div class="card-label">🎉 Work anniversaries</div>
           <div id="staffWidgetAnniversaries"><div style="font-size:12px;color:var(--text-3)">No anniversaries this week</div></div>
         </div>
-        <div class="card" style="margin:0">
+        <div class="card" style="margin:0;flex:1">
           <div class="card-label">🏖 On leave this week</div>
           <div id="staffWidgetLeaves"><div style="font-size:12px;color:var(--text-3)">No leave this week</div></div>
         </div>
@@ -685,16 +685,16 @@ tr.flagged-row:hover td { background: #FFEAEA; }
     </div><!-- end dashboard-grid -->
 
     <!-- Weekly widgets: birthdays, anniversaries, leaves -->
-    <div id="weeklyWidgets" style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:12px">
-      <div style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:1rem">
-        <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:10px">Birthdays this week</div>
+    <div id="weeklyWidgets" style="display:flex;gap:12px;margin-top:12px">
+      <div style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:1rem;flex:1">
+        <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:10px">Birthdays today</div>
         <div id="widgetBirthdays"><div style="font-size:12px;color:var(--text-3)">No birthdays today</div></div>
       </div>
-      <div style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:1rem">
+      <div style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:1rem;flex:1">
         <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:10px">Work anniversaries</div>
         <div id="widgetAnniversaries"><div style="font-size:12px;color:var(--text-3)">No anniversaries this week</div></div>
       </div>
-      <div style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:1rem">
+      <div style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:1rem;flex:1">
         <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:10px">On leave this week</div>
         <div id="widgetLeaves"><div style="font-size:12px;color:var(--text-3)">No leave this week</div></div>
       </div>
@@ -3857,12 +3857,12 @@ function renderStaffWeeklyWidgets() {
   // On leave
   const leaveEl = document.getElementById('staffWidgetLeaves');
   if (leaveEl) {
-    const leaveRecs = getRecords().filter(r=>weekDates.includes(r.date)&&(r.status==='leave'||r.status==='halfday'));
+    const leaveRecs = getRecords().filter(r=>weekDates.includes(r.date)&&r.status==='leave');
     const byDate = {};
     for (const r of leaveRecs) { if(!byDate[r.date]) byDate[r.date]=[]; byDate[r.date].push(r); }
     const leaveDates = Object.keys(byDate).sort();
     leaveEl.innerHTML = leaveDates.length
-      ? leaveDates.map(d=>`<div style="margin-bottom:8px"><div style="font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.5px">${fmtDate(d)}</div>${byDate[d].map(r=>`<div style="font-size:13px;font-weight:500">${esc(r.name)} <span style="font-size:11px;color:var(--text-3)">${r.status==='halfday'?'Half day':'Leave'}</span></div>`).join('')}</div>`).join('')
+      ? leaveDates.map(d=>`<div style="margin-bottom:8px"><div style="font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.5px">${fmtDate(d)}</div>${byDate[d].map(r=>`<div style="font-size:13px;font-weight:500">${esc(r.name)}</div>`).join('')}</div>`).join('')
       : '<div style="font-size:12px;color:var(--text-3)">No leave this week</div>';
   }
 }
@@ -3938,24 +3938,14 @@ function renderWeeklyWidgets() {
 
   const staff = getStaff().filter(s => s.role !== 'superadmin');
 
-  // ── Birthdays ────────────────────────────────────────────────────────
+  // ── Birthdays today only ─────────────────────────────────────────────
   const bdayEl = document.getElementById('widgetBirthdays');
   if (bdayEl) {
-    const birthdays = [];
-    for (const d of weekDates) {
-      const mmdd = d.slice(5); // MM-DD
-      const bday = staff.filter(s => s.dob && s.dob.slice(5) === mmdd);
-      if (bday.length) birthdays.push({ date: d, people: bday });
-    }
-    if (!birthdays.length) {
-      bdayEl.innerHTML = '<div style="font-size:12px;color:var(--text-3)">No birthdays this week</div>';
-    } else {
-      bdayEl.innerHTML = birthdays.map(b =>
-        `<div style="margin-bottom:8px">
-          <div style="font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.5px">${fmtDate(b.date)}</div>
-          ${b.people.map(p=>`<div style="font-size:13px;font-weight:500;color:var(--text)">${esc(p.name)}</div>`).join('')}
-        </div>`).join('');
-    }
+    const todayMMDD = today.slice(5);
+    const todayBdays = staff.filter(s => s.dob && s.dob.slice(5) === todayMMDD);
+    bdayEl.innerHTML = todayBdays.length
+      ? todayBdays.map(p=>`<div style="font-size:13px;font-weight:500;color:var(--text)">${esc(p.name)}</div>`).join('')
+      : '<div style="font-size:12px;color:var(--text-3)">No birthdays today</div>';
   }
 
   // ── Work anniversaries ───────────────────────────────────────────────
@@ -3986,14 +3976,12 @@ function renderWeeklyWidgets() {
     }
   }
 
-  // ── On leave this week ───────────────────────────────────────────────
+  // ── On leave this week (leave only, no half days, no label) ──────────
   const leaveEl = document.getElementById('widgetLeaves');
   if (leaveEl) {
     const leaveRecs = getRecords().filter(r =>
-      weekDates.includes(r.date) &&
-      (r.status === 'leave' || r.status === 'halfday')
+      weekDates.includes(r.date) && r.status === 'leave'
     );
-    // Group by date
     const byDate = {};
     for (const r of leaveRecs) {
       if (!byDate[r.date]) byDate[r.date] = [];
@@ -4006,7 +3994,7 @@ function renderWeeklyWidgets() {
       leaveEl.innerHTML = leaveDates.map(d =>
         `<div style="margin-bottom:8px">
           <div style="font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.5px">${fmtDate(d)}</div>
-          ${byDate[d].map(r=>`<div style="font-size:13px;font-weight:500;color:var(--text)">${esc(r.name)} <span style="font-size:11px;color:var(--text-3)">${r.status==='halfday'?'Half day':'Leave'}</span></div>`).join('')}
+          ${byDate[d].map(r=>`<div style="font-size:13px;font-weight:500;color:var(--text)">${esc(r.name)}</div>`).join('')}
         </div>`).join('');
     }
   }
