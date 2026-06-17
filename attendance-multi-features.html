@@ -1182,6 +1182,7 @@ tr.flagged-row:hover td { background: #FFEAEA; }
         <option value="Pre-Qualification">Pre-Qualification</option>
         <option value="Application Start">Application Start</option>
         <option value="Pending Info">Pending Info</option>
+        <option value="Ready to Submit">Ready to Submit</option>
         <option value="Submitted to Lender">Submitted to Lender</option>
         <option value="MIR">MIR</option>
         <option value="Conditionally Approved">Conditionally Approved</option>
@@ -1835,12 +1836,16 @@ async function loadPermissions() {
 // Get permissions for current user's role
 function getPerms() {
   if (isSuperAdmin()) return null; // superadmin always has everything
-  // During preview, currentUser.role is the preview role
   const role = currentUser?.role;
-  // Use SP permissions if loaded and valid, otherwise use defaults
+  if (!role) return DEFAULT_PERMISSIONS.staff;
+  // During preview — always use defaults so SP data doesn't interfere
+  if (_previewRole) return DEFAULT_PERMISSIONS[role] || DEFAULT_PERMISSIONS.staff;
+  // Normal mode — use SP permissions if fully loaded, otherwise defaults
   const spPerms = _permissions[role];
   const defaults = DEFAULT_PERMISSIONS[role] || DEFAULT_PERMISSIONS.staff;
-  if (spPerms && spPerms.tabs && Object.keys(spPerms.tabs).length > 3) return spPerms;
+  if (spPerms && spPerms.tabs && spPerms.features &&
+      Object.keys(spPerms.tabs).length >= 10 &&
+      Object.keys(spPerms.features).length >= 10) return spPerms;
   return defaults;
 }
 
@@ -6996,9 +7001,41 @@ function getChecklistPendingFiles() {
   return myFiles.filter(f => f.status === 'Ready to Submit' && !f.checklistSubmitted);
 }
 
+
+// ── Submitted deals card ──────────────────────────────────────────────────
+function renderSubmittedCard(files, containerId) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  const submitted = files.filter(f => 
+    f.status === 'Submitted to Lender' || 
+    (f.stageHistory && f.stageHistory.some(s => s.stage === 'Submitted to Lender'))
+  );
+  const activeSubmitted = submitted.filter(f => f.status === 'Submitted to Lender');
+  const everSubmitted = submitted.length;
+  
+  el.innerHTML = '<div class="card" style="margin-bottom:12px">' +
+    '<div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">📤 Submitted to Lender</div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">' +
+    '<div style="background:var(--surface-2);border-radius:var(--radius-sm);padding:12px;text-align:center">' +
+    '<div style="font-size:28px;font-weight:700;color:var(--brand)">' + activeSubmitted.length + '</div>' +
+    '<div style="font-size:11px;color:var(--text-3)">Currently at this stage</div>' +
+    '</div>' +
+    '<div style="background:var(--surface-2);border-radius:var(--radius-sm);padding:12px;text-align:center">' +
+    '<div style="font-size:28px;font-weight:700;color:var(--text-2)">' + everSubmitted + '</div>' +
+    '<div style="font-size:11px;color:var(--text-3)">Ever reached this stage</div>' +
+    '</div>' +
+    '</div>' +
+    (activeSubmitted.length ? '<div style="font-size:12px;font-weight:600;color:var(--text-2);margin-bottom:6px">Currently submitted:</div>' +
+    activeSubmitted.map(f => '<div style="font-size:13px;padding:5px 0;border-bottom:0.5px solid var(--border);display:flex;justify-content:space-between">' +
+      '<span>' + esc(f.client||'Unnamed') + '</span>' +
+      '<span style="color:var(--text-3);font-size:12px">' + esc(f.broker||'') + '</span>' +
+    '</div>').join('') : '') +
+    '</div>';
+}
+
 const FILE_STATUSES = ['Data Collection','Pre-Qualification','Application Start',
-  'Pending Info','Submitted to Lender','MIR','Conditionally Approved',
-  'Unconditionally Approved','Loan Documents','Ready to Submit','Settlement'];
+  'Pending Info','Ready to Submit','Submitted to Lender','MIR','Conditionally Approved',
+  'Unconditionally Approved','Loan Documents','Settlement'];
 
 const FILE_STATUS_COLORS = {
   'Data Collection':        {bg:'#F3F4F6',color:'#374151'},
@@ -7577,15 +7614,21 @@ function renderFilesAnalytics(el, allFiles, teamNames) {
   if (toDate)   filteredFiles = filteredFiles.filter(f => f.createdAt <= toDate);
 
   const analytics = calcFileAnalytics(filteredFiles);
+  const submittedFiles = filteredFiles.filter(f => f.status === 'Submitted to Lender' || f.stageHistory?.some(h => h.stage === 'Submitted to Lender'));
+  const submittedCount = filteredFiles.filter(f => f.status === 'Submitted to Lender').length;
 
   const fmt$ = v => '$' + Math.round(v).toLocaleString('en-AU');
 
   // Summary cards
   const summaryCards = `
-    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:1rem">
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:1rem">
       <div style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:12px;text-align:center">
         <div style="font-size:24px;font-weight:700;color:var(--brand)">${analytics.activeFiles}</div>
         <div style="font-size:11px;color:var(--text-3);font-weight:600">Active files</div>
+      </div>
+      <div style="background:#EFF6FF;border:1.5px solid #BFDBFE;border-radius:var(--radius-sm);padding:12px;text-align:center;cursor:pointer" onclick="toggleSubmittedList()">
+        <div style="font-size:24px;font-weight:700;color:#1D4ED8">${submittedCount}</div>
+        <div style="font-size:11px;color:#1D4ED8;font-weight:600">Submitted to lender</div>
       </div>
       <div style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:12px;text-align:center">
         <div style="font-size:24px;font-weight:700;color:var(--success)">${analytics.settledCount}</div>
@@ -7602,6 +7645,11 @@ function renderFilesAnalytics(el, allFiles, teamNames) {
         <div style="font-size:11px;color:#14532D;font-weight:600">Avg start→approval</div>
       </div>
     </div>
+    ${submittedCount > 0 ? `
+    <div id="submittedFilesList" style="display:none;background:#EFF6FF;border:1.5px solid #BFDBFE;border-radius:var(--radius-sm);padding:12px;margin-bottom:1rem">
+      <div style="font-size:12px;font-weight:700;color:#1D4ED8;margin-bottom:8px">Currently submitted to lender</div>
+      ${filteredFiles.filter(f=>f.status==='Submitted to Lender').map(f=>'<div style="font-size:13px;padding:4px 0;border-bottom:0.5px solid #BFDBFE">'+esc(f.client||'Unnamed')+(f.broker?' — '+esc(f.broker):'')+'</div>').join('')}
+    </div>` : ''}
     <div style="background:var(--brand-light);border:1.5px solid var(--brand);border-radius:var(--radius-sm);padding:14px;text-align:center;margin-bottom:1rem">
       <div style="font-size:11px;font-weight:700;color:var(--brand);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Total loan volume settled</div>
       <div style="font-size:28px;font-weight:700;color:var(--brand)">${analytics.totalVolume > 0 ? fmt$(analytics.totalVolume) : '—'}</div>
