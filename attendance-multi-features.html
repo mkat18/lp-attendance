@@ -7215,13 +7215,24 @@ async function saveFileEntry() {
 
   const newStatus = document.getElementById('fm_status').value;
 
-  // Gate: cannot move to any stage after Ready to Submit without checklist interaction
+  // Gate: cannot set stage past Ready to Submit without checklist interaction
+  // This applies to both new files and edits
   const existingStatus = existing ? existing.status : null;
-  if (STAGES_AFTER_READY.includes(newStatus) && existing && !existing.checklistSubmitted && !existing.checklistDeferred) {
-    showToast('Complete or defer the submission checklist first.', 'err');
-    const gateIdx = files.findIndex(f => f.id === fileId);
-    if (gateIdx >= 0) setTimeout(() => showChecklistModal(gateIdx), 300);
-    return;
+  const isNewFile = !existing;
+  if (STAGES_AFTER_READY.includes(newStatus)) {
+    const checklistDone = existing && (existing.checklistSubmitted || existing.checklistDeferred);
+    if (!checklistDone) {
+      showToast('Complete or defer the submission checklist before moving past Ready to Submit.', 'err');
+      // For existing files, open the checklist modal
+      if (!isNewFile) {
+        const gateIdx = files.findIndex(f => f.id === fileId);
+        if (gateIdx >= 0) setTimeout(() => showChecklistModal(gateIdx), 300);
+      } else {
+        // For new files, force stage back to Ready to Submit
+        document.getElementById('fm_status').value = 'Ready to Submit';
+      }
+      return;
+    }
   }
   const loanAmtRaw = document.getElementById('fm_loanAmount') ? document.getElementById('fm_loanAmount').value : '';
   const loanAmount = loanAmtRaw ? parseFloat(loanAmtRaw) : (existing ? existing.loanAmount : null);
