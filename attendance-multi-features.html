@@ -598,6 +598,10 @@ tr.flagged-row:hover td { background: #FFEAEA; }
         </div>
       </div>
       <div id="publicHolidayBanner" style="display:none;background:#FEF3C7;border:1.5px solid #FDE68A;border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:10px;font-size:13px;font-weight:600;color:#92400E;text-align:center"></div>
+      <div id="needsAttentionBanner" style="display:none;background:#FEF2F2;border:1.5px solid #FECACA;border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:10px">
+        <div style="font-size:12px;font-weight:700;color:var(--danger);margin-bottom:6px">⚠ Needs manager attention</div>
+        <div id="needsAttentionList"></div>
+      </div>
       <div class="metrics" id="metrics" style="margin-bottom:0"></div>
     </div>
 
@@ -657,13 +661,53 @@ tr.flagged-row:hover td { background: #FFEAEA; }
     </div>
 
     </div><!-- end dashboard-grid -->
+
+    <!-- Weekly widgets: birthdays, anniversaries, leaves -->
+    <div id="weeklyWidgets" style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:12px">
+      <div style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:1rem">
+        <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:10px">Birthdays this week</div>
+        <div id="widgetBirthdays"><div style="font-size:12px;color:var(--text-3)">No birthdays this week</div></div>
+      </div>
+      <div style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:1rem">
+        <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:10px">Work anniversaries</div>
+        <div id="widgetAnniversaries"><div style="font-size:12px;color:var(--text-3)">No anniversaries this week</div></div>
+      </div>
+      <div style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:1rem">
+        <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:10px">On leave this week</div>
+        <div id="widgetLeaves"><div style="font-size:12px;color:var(--text-3)">No leave this week</div></div>
+      </div>
+    </div>
     <button class="btn-primary" style="margin-top:.75rem" onclick="exportCSV()">⬇ Download CSV</button>
   </div>
 
   <!-- ── CHANGE PIN ──────────────────────────────────────────────────────── -->
   <div id="screen-profile" class="screen">
-    <div class="page-header"><h1>Change PIN</h1><p>Enter a new 6-digit PIN twice to confirm.</p></div>
+    <div class="page-header"><h1>My profile</h1><p>Update your personal details and PIN.</p></div>
+
+    <div class="card" style="margin-bottom:1rem">
+      <div class="section-label">Personal details</div>
+      <p style="font-size:12px;color:var(--text-3);margin-bottom:12px">Date of joining is set by your manager and cannot be changed here.</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="field"><label>Phone number</label><input type="tel" id="profilePhone" placeholder="e.g. 0412 345 678"/></div>
+        <div class="field"><label>Email address</label><input type="email" id="profileEmail" placeholder="e.g. you@email.com"/></div>
+        <div class="field"><label>Date of birth</label><input type="date" id="profileDOB"/></div>
+        <div class="field" style="grid-column:1/-1"><label>Home address</label><textarea id="profileAddress" rows="2" style="width:100%;font-size:13px;padding:8px;border-radius:var(--radius-sm);border:1.5px solid var(--border);resize:vertical"></textarea></div>
+      </div>
+      <div style="font-size:12px;font-weight:600;color:var(--text-2);margin:12px 0 8px;text-transform:uppercase;letter-spacing:0.5px">Emergency contacts</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px">
+        <div class="field"><label>Contact 1 name <span style="color:var(--danger)">*</span></label><input type="text" id="profileEC1Name"/></div>
+        <div class="field"><label>Relationship <span style="color:var(--danger)">*</span></label><input type="text" id="profileEC1Relation"/></div>
+        <div class="field"><label>Phone <span style="color:var(--danger)">*</span></label><input type="tel" id="profileEC1Phone"/></div>
+        <div class="field"><label>Contact 2 name</label><input type="text" id="profileEC2Name" placeholder="Optional"/></div>
+        <div class="field"><label>Relationship</label><input type="text" id="profileEC2Relation" placeholder="Optional"/></div>
+        <div class="field"><label>Phone</label><input type="tel" id="profileEC2Phone" placeholder="Optional"/></div>
+      </div>
+      <button class="btn-primary" onclick="saveProfileDetails()">Save details</button>
+    </div>
+
     <div class="card">
+      <div class="section-label">Change PIN</div>
+      <p style="font-size:12px;color:var(--text-3);margin-bottom:12px">Enter a new 6-digit PIN twice to confirm.</p>
       <div class="pin-label" id="cpLabel">Enter new PIN</div>
       <div class="pin-wrap">
         <div class="pin-dot" id="cp0"></div><div class="pin-dot" id="cp1"></div>
@@ -698,17 +742,47 @@ tr.flagged-row:hover td { background: #FFEAEA; }
     </div>
 
     <div class="card" id="addStaffCard" style="display:none">
-      <div class="section-label">Add staff member</div>
-      <div class="field"><label for="newName">Full name</label><input type="text" id="newName" placeholder="e.g. Jake Thompson"/></div>
-      <div class="field"><label for="newJoinDate">Join date (optional)</label><input type="date" id="newJoinDate"/></div>
-      <button class="btn-primary" onclick="addPerson('staff')">Add staff member</button>
+      <div class="section-label">Onboard new staff member</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="field"><label>Full name <span style="color:var(--danger)">*</span></label><input type="text" id="newName" placeholder="e.g. Jake Thompson"/></div>
+        <div class="field"><label>Date of joining <span style="color:var(--danger)">*</span></label><input type="date" id="newJoinDate"/></div>
+        <div class="field"><label>Phone number</label><input type="tel" id="newPhone" placeholder="e.g. 0412 345 678"/></div>
+        <div class="field"><label>Email address</label><input type="email" id="newEmail" placeholder="e.g. jake@email.com"/></div>
+        <div class="field"><label>Date of birth</label><input type="date" id="newDOB"/></div>
+        <div class="field" style="grid-column:1/-1"><label>Home address</label><textarea id="newAddress" rows="2" placeholder="Street, Suburb, State, Postcode" style="width:100%;font-size:13px;padding:8px;border-radius:var(--radius-sm);border:1.5px solid var(--border);resize:vertical"></textarea></div>
+      </div>
+      <div style="font-size:12px;font-weight:600;color:var(--text-2);margin:12px 0 8px;text-transform:uppercase;letter-spacing:0.5px">Emergency contacts</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px">
+        <div class="field"><label>Contact 1 name <span style="color:var(--danger)">*</span></label><input type="text" id="newEC1Name" placeholder="e.g. Sarah Thompson"/></div>
+        <div class="field"><label>Relationship <span style="color:var(--danger)">*</span></label><input type="text" id="newEC1Relation" placeholder="e.g. Mother"/></div>
+        <div class="field"><label>Phone <span style="color:var(--danger)">*</span></label><input type="tel" id="newEC1Phone" placeholder="e.g. 0412 345 678"/></div>
+        <div class="field"><label>Contact 2 name</label><input type="text" id="newEC2Name" placeholder="Optional"/></div>
+        <div class="field"><label>Relationship</label><input type="text" id="newEC2Relation" placeholder="Optional"/></div>
+        <div class="field"><label>Phone</label><input type="tel" id="newEC2Phone" placeholder="Optional"/></div>
+      </div>
+      <button class="btn-primary" onclick="addPerson('staff')">Onboard staff member</button>
       <p style="font-size:12px;color:var(--text-3);margin-top:8px">A temp PIN will be generated — share it with them privately.</p>
     </div>
 
     <div class="card" id="addManagerCard">
       <div class="section-label">Add account</div>
-      <div class="field"><label for="newManagerName">Full name</label><input type="text" id="newManagerName" placeholder="e.g. Vianney Romeo"/></div>
-      <div class="field"><label for="newManagerJoinDate">Join date (optional)</label><input type="date" id="newManagerJoinDate"/></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="field"><label>Full name <span style="color:var(--danger)">*</span></label><input type="text" id="newManagerName" placeholder="e.g. Vianney Romeo"/></div>
+        <div class="field"><label>Date of joining</label><input type="date" id="newManagerJoinDate"/></div>
+        <div class="field"><label>Phone number</label><input type="tel" id="newManagerPhone" placeholder="e.g. 0412 345 678"/></div>
+        <div class="field"><label>Email address</label><input type="email" id="newManagerEmail" placeholder="e.g. vianney@email.com"/></div>
+        <div class="field"><label>Date of birth</label><input type="date" id="newManagerDOB"/></div>
+        <div class="field" style="grid-column:1/-1"><label>Home address</label><textarea id="newManagerAddress" rows="2" placeholder="Street, Suburb, State, Postcode" style="width:100%;font-size:13px;padding:8px;border-radius:var(--radius-sm);border:1.5px solid var(--border);resize:vertical"></textarea></div>
+      </div>
+      <div style="font-size:12px;font-weight:600;color:var(--text-2);margin:12px 0 8px;text-transform:uppercase;letter-spacing:0.5px">Emergency contacts</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px">
+        <div class="field"><label>Contact 1 name</label><input type="text" id="newManagerEC1Name" placeholder="e.g. Sarah"/></div>
+        <div class="field"><label>Relationship</label><input type="text" id="newManagerEC1Relation" placeholder="e.g. Spouse"/></div>
+        <div class="field"><label>Phone</label><input type="tel" id="newManagerEC1Phone" placeholder="e.g. 0412 345 678"/></div>
+        <div class="field"><label>Contact 2 name</label><input type="text" id="newManagerEC2Name" placeholder="Optional"/></div>
+        <div class="field"><label>Relationship</label><input type="text" id="newManagerEC2Relation" placeholder="Optional"/></div>
+        <div class="field"><label>Phone</label><input type="tel" id="newManagerEC2Phone" placeholder="Optional"/></div>
+      </div>
       <div class="field">
         <label for="newManagerRole">Role</label>
         <select id="newManagerRole" style="font-size:14px">
@@ -1375,13 +1449,19 @@ function spToRecord(item) {
 // Map SharePoint item to break object
 function spToBreak(item) {
   const dateStr = item.BreakDate ? item.BreakDate.split('T')[0] : '';
+  const startTs = hhmmToTs(item.StartTime, dateStr);
+  const endTs = hhmmToTs(item.EndTime, dateStr);
+  // Calculate duration from start/end times — don't rely on DurationMs field
+  const durMs = (startTs && endTs && endTs > startTs) ? (endTs - startTs) : 0;
+  const isOpen = item.IsOpen === 'true';
   return {
-    id: item.ID||item.id,
+    id: item.ID||item.Id||item.id,
     name: item.StaffName||'',
     date: dateStr,
-    startTime: hhmmToTs(item.StartTime, dateStr),
-    endTime: hhmmToTs(item.EndTime, dateStr),
-    durationMs: item.DurationMs ? parseInt(item.DurationMs)*60000 : 0,
+    startTime: startTs,
+    endTime: isOpen ? null : endTs,
+    durationMs: isOpen ? 0 : durMs,
+    isOpen: isOpen,
   };
 }
 
@@ -1467,6 +1547,53 @@ document.getElementById('loginGreeting').textContent = getGreeting();
 
 
 // ── Nav & routing ─────────────────────────────────────────────────────────
+
+// ── Profile editing (staff can edit their own details) ────────────────────
+function renderProfileScreen() {
+  if (!currentUser) return;
+  const staff = getStaff();
+  const me = staff.find(s => s.name === currentUser.name);
+  if (!me) return;
+  const sv = (id, val) => { const el=document.getElementById(id); if(el) el.value=val||''; };
+  sv('profilePhone', me.phone);
+  sv('profileEmail', me.email);
+  sv('profileDOB', me.dob);
+  sv('profileAddress', me.address);
+  sv('profileEC1Name', me.ec1Name);
+  sv('profileEC1Phone', me.ec1Phone);
+  sv('profileEC1Relation', me.ec1Relation);
+  sv('profileEC2Name', me.ec2Name);
+  sv('profileEC2Phone', me.ec2Phone);
+  sv('profileEC2Relation', me.ec2Relation);
+}
+
+async function saveProfileDetails() {
+  const ec1Name = document.getElementById('profileEC1Name').value.trim();
+  const ec1Phone = document.getElementById('profileEC1Phone').value.trim();
+  const ec1Relation = document.getElementById('profileEC1Relation').value.trim();
+  if (!ec1Name || !ec1Phone || !ec1Relation) {
+    showToast('Emergency contact 1 is required.','err'); return;
+  }
+  const staff = getStaff();
+  const idx = staff.findIndex(s => s.name === currentUser.name);
+  if (idx < 0) return;
+  const gv = id => (document.getElementById(id)&&document.getElementById(id).value)||'';
+  staff[idx].phone = gv('profilePhone');
+  staff[idx].email = gv('profileEmail');
+  staff[idx].dob = gv('profileDOB');
+  staff[idx].address = gv('profileAddress');
+  staff[idx].ec1Name = ec1Name;
+  staff[idx].ec1Phone = ec1Phone;
+  staff[idx].ec1Relation = ec1Relation;
+  staff[idx].ec2Name = gv('profileEC2Name');
+  staff[idx].ec2Phone = gv('profileEC2Phone');
+  staff[idx].ec2Relation = gv('profileEC2Relation');
+  saveStaff(staff);
+  await spSaveStaffMember(staff[idx]);
+  showToast('Profile updated ✓','ok');
+  writeAuditLog('Profile Updated', currentUser.name, 'Staff updated their own profile details');
+}
+
 function showScreen(name) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById('screen-'+name).classList.add('active');
@@ -1536,7 +1663,7 @@ function goTab(name, btn) {
   if (name==='performance') renderPerformanceScreen();
   if (name==='othertasks') renderOtherTasksScreen();
   if (name==='admin')     renderAdmin();
-  if (name==='profile')   initCp();
+  if (name==='profile')   { initCp(); renderProfileScreen(); }
 }
 
 function logout() {
@@ -1551,7 +1678,7 @@ function logout() {
       const token = await getToken();
       if (token) {
         const [staffRes, recRes, brkRes] = await Promise.all([
-          fetch(`${SP_API}('AttendanceStaff')/items?$select=Title,Role,Pin,TempPin,StartTime,EndTime,Office,Team,JoinDate&$top=500`,
+          fetch(`${SP_API}('AttendanceStaff')/items?$select=Title,Role,Pin,TempPin,StartTime,EndTime,Office,Team,JoinDate,DOB,Phone,Email,Address,EmergencyContact1Name,EmergencyContact1Phone,EmergencyContact1Relation,EmergencyContact2Name,EmergencyContact2Phone,EmergencyContact2Relation&$top=500`,
             { headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json;odata=nometadata' } }),
           fetch(`${SP_API}('AttendanceRecords')/items?$top=5000`,
             { headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json;odata=nometadata' } }),
@@ -2000,6 +2127,12 @@ function closeCameraAndSubmit(photoDataUrl) {
     _cameraStream = null;
   }
   document.getElementById('cameraModal').style.display = 'none';
+  // Handle clock-out flow
+  if (_pendingClockOut) {
+    completeClockOut(photoDataUrl);
+    return;
+  }
+
   if (!_pendingSubmit) return;
   _pendingSubmit = false;
 
@@ -2071,18 +2204,38 @@ function clockOut() {
     const eodDone = getTodayEOD(currentUser.name);
     if (!eodDone) {
       showToast('Please complete your EOD report before clocking out.','err');
-      // Navigate to EOD tab
       const eodTab = Array.from(document.querySelectorAll('.nav-tab')).find(b=>b.textContent.trim()==='EOD');
       if (eodTab) { document.querySelectorAll('.nav-tab').forEach(b=>b.classList.remove('active')); eodTab.classList.add('active'); }
       renderEODScreen(); showScreen('eod');
       return;
     }
   }
-  recs[idx].clockOut=Date.now();
-  saveRecords(recs);
-  spSaveRecord(recs[idx]);
-  showToast('✓ Clocked out!','ok');
-  updateClockOutUI();
+  // Gate behind open break
+  const ob = LS.get('ci_ongoingBreaks')||{};
+  if (ob[currentUser.name]) { showToast('End your break before clocking out.','err'); return; }
+  // Require selfie + location for clock-out (same as check-in)
+  _pendingClockOut = true;
+  openCamera();
+}
+
+let _pendingClockOut = false;
+
+function completeClockOut(photoDataUrl) {
+  _pendingClockOut = false;
+  const recs=getRecords();
+  const idx=recs.findIndex(r=>r.date===today&&r.name===currentUser.name);
+  if (idx<0) return;
+  showToast('Getting your location…','ok');
+  captureGeoAndSubmit(function(geo) {
+    recs[idx].clockOut=Date.now();
+    recs[idx].clockOutGeo=geo||null;
+    recs[idx].clockOutPhoto=!!photoDataUrl;
+    saveRecords(recs);
+    spSaveRecord(recs[idx]);
+    if (photoDataUrl) uploadPhoto(photoDataUrl, {...recs[idx], name: recs[idx].name+'_clockout'});
+    showToast('✓ Clocked out!','ok');
+    updateClockOutUI();
+  });
 }
 
 function updateClockOutUI() {
@@ -2810,7 +2963,186 @@ function switchDashTab(name,btn) {
   renderActiveTab(name);
 }
 
-function loadDashboard() { renderMetrics(); loadTabs(); }
+
+// ── Needs Attention — missing clock-outs + unclosed breaks ────────────────
+async function renderNeedsAttention() {
+  if (!isManager()) return;
+  const banner = document.getElementById('needsAttentionBanner');
+  const list = document.getElementById('needsAttentionList');
+  if (!banner || !list) return;
+
+  const issues = [];
+
+  // 1. Missing clock-outs — records with no clockOut for dates before today
+  const recs = getRecords().filter(r => r.date < today && !r.clockOut && r.status !== 'leave' && r.status !== 'absent');
+  for (const r of recs) {
+    issues.push({
+      type: 'no-clockout',
+      name: r.name,
+      date: r.date,
+      detail: 'No clock-out recorded',
+      id: r.id
+    });
+  }
+
+  // 2. Open breaks from SP (IsOpen = 'true' and date < today)
+  const brks = getBreaks().filter(b => b.isOpen && b.date < today);
+  for (const b of brks) {
+    issues.push({
+      type: 'open-break',
+      name: b.name,
+      date: b.date,
+      detail: 'Break started ' + (b.startTime ? fmtTime(b.startTime) : '') + ' — never ended',
+      id: b.id
+    });
+  }
+
+  if (!issues.length) { banner.style.display = 'none'; return; }
+
+  banner.style.display = 'block';
+  list.innerHTML = issues.map((iss, i) => `
+    <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:0.5px solid #FECACA;font-size:12px">
+      <span style="flex:1"><b>${esc(iss.name)}</b> · ${iss.date} · ${iss.detail}</span>
+      ${iss.type==='no-clockout'
+        ? `<input type="time" id="co-time-${i}" style="font-size:12px;padding:3px 6px;border-radius:4px;border:1px solid #FECACA" />
+           <button onclick="managerClockOut('${iss.id}','${iss.name}','${iss.date}','co-time-${i}')" style="font-size:11px;padding:4px 8px;background:var(--danger);color:#fff;border:none;border-radius:4px;cursor:pointer">Set clock-out</button>`
+        : `<button onclick="managerCloseBreak('${iss.id}','${iss.name}','${iss.date}')" style="font-size:11px;padding:4px 8px;background:var(--danger);color:#fff;border:none;border-radius:4px;cursor:pointer">Close break</button>`
+      }
+    </div>`).join('');
+}
+
+async function managerClockOut(recId, name, date, timeInputId) {
+  const timeVal = document.getElementById(timeInputId).value;
+  if (!timeVal) { showToast('Enter a clock-out time first.', 'err'); return; }
+  const recs = getRecords();
+  const idx = recs.findIndex(r => r.id == recId || (r.name === name && r.date === date));
+  if (idx < 0) { showToast('Record not found.', 'err'); return; }
+  const clockOutTs = new Date(date + 'T' + timeVal + ':00+05:30').getTime();
+  recs[idx].clockOut = clockOutTs;
+  recs[idx].managerReviewed = true;
+  saveRecords(recs);
+  await spSaveRecord(recs[idx]);
+  showToast('Clock-out set for ' + name.split(' ')[0] + ' ✓', 'ok');
+  renderNeedsAttention();
+}
+
+async function managerCloseBreak(breakId, name, date) {
+  const staff = getStaff().find(s => s.name === name);
+  const endTime = staff && staff.endTime ? staff.endTime : '18:00';
+  await spPatch(SP_API + "('AttendanceBreaks')/items(" + breakId + ")", {
+    EndTime: endTime,
+    IsOpen: 'false',
+    Title: 'MANAGER-CLOSED'
+  });
+  // Update local cache
+  const brks = getBreaks();
+  const idx = brks.findIndex(b => b.id == breakId);
+  if (idx >= 0) {
+    brks[idx].isOpen = false;
+    brks[idx].endTime = new Date(date + 'T' + endTime + ':00+05:30').getTime();
+    brks[idx].durationMs = brks[idx].endTime - (brks[idx].startTime || brks[idx].endTime);
+    saveBreaks(brks);
+  }
+  showToast('Break closed for ' + name.split(' ')[0] + ' ✓', 'ok');
+  renderNeedsAttention();
+  renderBreaks();
+}
+
+
+// ── Weekly widgets: birthdays, anniversaries, leaves ─────────────────────
+function renderWeeklyWidgets() {
+  // Get this week's date range (Mon-Sun)
+  const now = new Date();
+  const dayOfWeek = now.getDay() || 7; // Mon=1 Sun=7
+  const mon = new Date(now); mon.setDate(now.getDate() - dayOfWeek + 1);
+  const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+
+  const weekDates = [];
+  for (let d = new Date(mon); d <= sun; d.setDate(d.getDate()+1))
+    weekDates.push(new Date(d).toISOString().split('T')[0]);
+
+  const fmtDate = d => {
+    const dt = new Date(d + 'T12:00:00');
+    return dt.toLocaleDateString('en-AU', {weekday:'short', day:'numeric', month:'short'});
+  };
+
+  const staff = getStaff().filter(s => s.role !== 'superadmin');
+
+  // ── Birthdays ────────────────────────────────────────────────────────
+  const bdayEl = document.getElementById('widgetBirthdays');
+  if (bdayEl) {
+    const birthdays = [];
+    for (const d of weekDates) {
+      const mmdd = d.slice(5); // MM-DD
+      const bday = staff.filter(s => s.dob && s.dob.slice(5) === mmdd);
+      if (bday.length) birthdays.push({ date: d, people: bday });
+    }
+    if (!birthdays.length) {
+      bdayEl.innerHTML = '<div style="font-size:12px;color:var(--text-3)">No birthdays this week</div>';
+    } else {
+      bdayEl.innerHTML = birthdays.map(b =>
+        `<div style="margin-bottom:8px">
+          <div style="font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.5px">${fmtDate(b.date)}</div>
+          ${b.people.map(p=>`<div style="font-size:13px;font-weight:500;color:var(--text)">${esc(p.name)}</div>`).join('')}
+        </div>`).join('');
+    }
+  }
+
+  // ── Work anniversaries ───────────────────────────────────────────────
+  const annivEl = document.getElementById('widgetAnniversaries');
+  if (annivEl) {
+    const anniversaries = [];
+    for (const d of weekDates) {
+      const mmdd = d.slice(5);
+      const anniv = staff.filter(s => {
+        if (!s.joinDate) return false;
+        if (s.joinDate.slice(5) !== mmdd) return false;
+        const years = new Date(d).getFullYear() - new Date(s.joinDate).getFullYear();
+        return years > 0;
+      });
+      if (anniv.length) anniversaries.push({ date: d, people: anniv.map(s => ({
+        name: s.name,
+        years: new Date(d).getFullYear() - new Date(s.joinDate).getFullYear()
+      }))});
+    }
+    if (!anniversaries.length) {
+      annivEl.innerHTML = '<div style="font-size:12px;color:var(--text-3)">No anniversaries this week</div>';
+    } else {
+      annivEl.innerHTML = anniversaries.map(a =>
+        `<div style="margin-bottom:8px">
+          <div style="font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.5px">${fmtDate(a.date)}</div>
+          ${a.people.map(p=>`<div style="font-size:13px;font-weight:500;color:var(--text)">${esc(p.name)} <span style="font-size:11px;color:var(--text-3)">${p.years} yr${p.years!==1?'s':''}</span></div>`).join('')}
+        </div>`).join('');
+    }
+  }
+
+  // ── On leave this week ───────────────────────────────────────────────
+  const leaveEl = document.getElementById('widgetLeaves');
+  if (leaveEl) {
+    const leaveRecs = getRecords().filter(r =>
+      weekDates.includes(r.date) &&
+      (r.status === 'leave' || r.status === 'halfday')
+    );
+    // Group by date
+    const byDate = {};
+    for (const r of leaveRecs) {
+      if (!byDate[r.date]) byDate[r.date] = [];
+      byDate[r.date].push(r);
+    }
+    const leaveDates = Object.keys(byDate).sort();
+    if (!leaveDates.length) {
+      leaveEl.innerHTML = '<div style="font-size:12px;color:var(--text-3)">No leave this week</div>';
+    } else {
+      leaveEl.innerHTML = leaveDates.map(d =>
+        `<div style="margin-bottom:8px">
+          <div style="font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.5px">${fmtDate(d)}</div>
+          ${byDate[d].map(r=>`<div style="font-size:13px;font-weight:500;color:var(--text)">${esc(r.name)} <span style="font-size:11px;color:var(--text-3)">${r.status==='halfday'?'Half day':'Leave'}</span></div>`).join('')}
+        </div>`).join('');
+    }
+  }
+}
+
+function loadDashboard() { renderMetrics(); loadTabs(); renderNeedsAttention(); renderWeeklyWidgets(); }
 
 function getWorkdays(from,to){
   const days=[],d=new Date(from),end=new Date(to);
@@ -2932,15 +3264,21 @@ function renderBreaks() {
   const map={};
   for(const b of brks){
     const k=b.date+'|'+b.name;
-    if(!map[k]) map[k]={date:b.date,name:b.name,totalMs:0,segments:[]};
-    map[k].totalMs+=b.durationMs;
-    map[k].segments.push({startTime:b.startTime,endTime:b.endTime,durationMs:b.durationMs});
+    if(!map[k]) map[k]={date:b.date,name:b.name,totalMs:0,segments:[],hasOpenBreak:false};
+    if(b.isOpen){
+      map[k].hasOpenBreak=true;
+      map[k].segments.push({id:b.id,startTime:b.startTime,endTime:null,durationMs:0,isOpen:true});
+    } else {
+      map[k].totalMs+=b.durationMs;
+      map[k].segments.push({id:b.id,startTime:b.startTime,endTime:b.endTime,durationMs:b.durationMs,isOpen:false});
+    }
   }
-  // Include people currently on break with no completed breaks yet
+  // Include people currently on break with no completed breaks yet (from localStorage)
   if(isViewingToday){
     Object.keys(ongoingBreaks).filter(n=>ongoingBreaks[n]&&(!fn||n.toLowerCase().includes(fn))).forEach(n=>{
       const k=today+'|'+n;
-      if(!map[k]) map[k]={date:today,name:n,totalMs:0,segments:[]};
+      if(!map[k]) map[k]={date:today,name:n,totalMs:0,segments:[],hasOpenBreak:true};
+      else map[k].hasOpenBreak=true;
     });
   }
 
@@ -2955,17 +3293,17 @@ function renderBreaks() {
   rows.forEach((r,i)=>{
     const mins=Math.round(r.totalMs/60000);
     const flagged=mins>CONFIG.breakFlagMins;
-    const onBreakNow=isViewingToday&&ongoingBreaks[r.name];
+    const onBreakNow=r.hasOpenBreak||(isViewingToday&&ongoingBreaks[r.name]);
     let statusTag;
-    if(onBreakNow) statusTag='<span class="tag" style="background:var(--warn-light);color:var(--warn)">On break now</span>';
+    if(onBreakNow) statusTag='<span class="tag" style="background:var(--warn-light);color:var(--warn)">⚠ Break not ended</span>';
     else if(flagged) statusTag=`<span class="tag tag-flagged">Over ${CONFIG.breakFlagMins} min</span>`;
     else statusTag='<span class="tag tag-ok">OK</span>';
 
-    html+=`<tr class="${flagged&&!onBreakNow?'flagged-row':''}" style="cursor:pointer" onclick="toggleBreakDetail('bd-${i}')">
+    html+=`<tr class="${flagged&&!onBreakNow?'flagged-row':onBreakNow?'flagged-row':''}" style="cursor:pointer" onclick="toggleBreakDetail('bd-${i}')">
       <td style="color:var(--text-3);${singleDay?'display:none':''}">${r.date}</td>
       <td style="font-weight:600">${esc(r.name)}</td>
-      <td>${r.segments.length}${onBreakNow?' + 1':''}</td>
-      <td style="font-weight:600">${onBreakNow?'in progress':fmtDur(r.totalMs)}</td>
+      <td>${r.segments.length}</td>
+      <td style="font-weight:600;color:${onBreakNow?'var(--warn)':'inherit'}">${onBreakNow?'Not ended ⚠':fmtDur(r.totalMs)}</td>
       <td>${statusTag}</td>
       <td style="color:var(--text-3);font-size:12px">${r.segments.length>0?'▸':''}</td>
     </tr>`;
@@ -2984,12 +3322,18 @@ function renderBreaks() {
         html+=`<tr>
           <td style="padding:7px 14px 7px 28px;font-size:12px;color:var(--text-3)">Break ${si+1}</td>
           <td style="padding:7px 14px;font-size:13px;font-weight:500">${fmtTime(seg.startTime)}</td>
-          <td style="padding:7px 14px;font-size:13px;font-weight:500">${fmtTime(seg.endTime)}</td>
-          <td style="padding:7px 14px;font-size:13px;font-weight:600;color:${Math.round(seg.durationMs/60000)>CONFIG.breakFlagMins?'var(--danger)':'var(--text)'}">${fmtDur(seg.durationMs)}</td>
+          <td style="padding:7px 14px;font-size:13px;font-weight:500;color:${seg.isOpen?'var(--warn)':'inherit'}">${seg.isOpen?'⚠ Not ended':fmtTime(seg.endTime)}</td>
+          <td style="padding:7px 14px;font-size:13px;font-weight:600;color:${seg.isOpen?'var(--warn)':Math.round(seg.durationMs/60000)>CONFIG.breakFlagMins?'var(--danger)':'var(--text)'}">${seg.isOpen?'Still running…':fmtDur(seg.durationMs)}</td>
         </tr>`;
       });
       if(onBreakNow){
-        html+=`<tr><td style="padding:7px 14px 7px 28px;font-size:12px;color:var(--text-3)">Break ${r.segments.length+1}</td><td style="padding:7px 14px;font-size:13px;font-weight:500;color:var(--warn)">In progress…</td><td style="padding:7px 14px;font-size:13px;color:var(--text-3)">—</td><td style="padding:7px 14px;font-size:13px;color:var(--text-3)">—</td></tr>`;
+        const openSeg = r.segments.find(s=>s.isOpen);
+        const openId = openSeg ? openSeg.id : '';
+        html+=`<tr><td style="padding:7px 14px 7px 28px;font-size:12px;color:var(--text-3)">Break ${r.segments.filter(s=>!s.isOpen).length+1}</td>
+          <td style="padding:7px 14px;font-size:13px;font-weight:500;color:var(--warn)">Still running ⚠</td>
+          <td style="padding:7px 14px;font-size:13px;color:var(--text-3)">Not ended</td>
+          <td style="padding:7px 14px;font-size:13px;color:var(--warn)">${isManager()?`<button onclick="managerCloseBreak('${openId}','${r.name}','${r.date}')" style="font-size:11px;padding:3px 8px;background:var(--danger);color:#fff;border:none;border-radius:4px;cursor:pointer">Force close</button>`:'Manager action needed'}</td>
+        </tr>`;
       }
       html+=`</tbody></table></td></tr>`;
     }
@@ -3360,15 +3704,34 @@ function changeRole(i, newRole) {
 
 function addPerson(role) {
   if (!canAddStaff()) { showToast('Permission denied.','err'); return; }
-  const name=document.getElementById('newName').value.trim();
-  if(!name){showToast('Enter a name.','err');return;}
-  const staff=getStaff();
-  if(staff.find(s=>s.name.toLowerCase()===name.toLowerCase())){showToast('Name already exists.','err');return;}
-  const tempPin=genTempPin();
-  const joinDateVal = (document.getElementById('newJoinDate')&&document.getElementById('newJoinDate').value)||new Date().toISOString().split('T')[0];
-  const newMember={name,role:'staff',pin:null,tempPin:hashPin(tempPin),addedBy:currentUser.name,addedAt:new Date().toLocaleString('en-AU'),joinDate:joinDateVal};
+  const name = document.getElementById('newName').value.trim();
+  const ec1Name = document.getElementById('newEC1Name').value.trim();
+  const ec1Phone = document.getElementById('newEC1Phone').value.trim();
+  const ec1Relation = document.getElementById('newEC1Relation').value.trim();
+  if (!name) { showToast('Enter a name.','err'); return; }
+  if (!ec1Name || !ec1Phone || !ec1Relation) { showToast('Emergency contact 1 is required.','err'); return; }
+  const staff = getStaff();
+  if (staff.find(s=>s.name.toLowerCase()===name.toLowerCase())) { showToast('Name already exists.','err'); return; }
+  const tempPin = genTempPin();
+  const gv = id => (document.getElementById(id)&&document.getElementById(id).value)||'';
+  const newMember = {
+    name, role:'staff', pin:null, tempPin:hashPin(tempPin),
+    addedBy:currentUser.name, addedAt:new Date().toLocaleString('en-AU'),
+    joinDate: gv('newJoinDate')||new Date().toISOString().split('T')[0],
+    dob: gv('newDOB'),
+    phone: gv('newPhone'),
+    email: gv('newEmail'),
+    address: gv('newAddress'),
+    ec1Name, ec1Phone, ec1Relation,
+    ec2Name: gv('newEC2Name'),
+    ec2Phone: gv('newEC2Phone'),
+    ec2Relation: gv('newEC2Relation'),
+  };
   staff.push(newMember);
-  saveStaff(staff); document.getElementById('newName').value='';
+  saveStaff(staff);
+  ['newName','newPhone','newEmail','newAddress','newDOB','newJoinDate',
+   'newEC1Name','newEC1Phone','newEC1Relation','newEC2Name','newEC2Phone','newEC2Relation'
+  ].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
   spSaveStaffMember(newMember);
   writeAuditLog('Staff Added', name, `Added as Staff by ${currentUser.name}`);
   renderAdmin(); populateNameDropdown();
@@ -3377,17 +3740,34 @@ function addPerson(role) {
 
 function addPrivilegedPerson() {
   if (!isSuperAdmin() && !isManager()) { showToast('Permission denied.','err'); return; }
+  const name = document.getElementById('newManagerName').value.trim();
+  const role = document.getElementById('newManagerRole').value;
   if (!isSuperAdmin() && role==='superadmin') { showToast('Only Super Admins can add other Super Admins.','err'); return; }
-  const name=document.getElementById('newManagerName').value.trim();
-  const role=document.getElementById('newManagerRole').value;
-  if(!name){showToast('Enter a name.','err');return;}
-  const staff=getStaff();
-  if(staff.find(s=>s.name.toLowerCase()===name.toLowerCase())){showToast('Name already exists.','err');return;}
-  const tempPin=genTempPin();
-  const joinDateMgr = (document.getElementById('newManagerJoinDate')&&document.getElementById('newManagerJoinDate').value)||new Date().toISOString().split('T')[0];
-  const newMember={name,role,pin:null,tempPin:hashPin(tempPin),addedBy:currentUser.name,addedAt:new Date().toLocaleString('en-AU'),joinDate:joinDateMgr};
+  if (!name) { showToast('Enter a name.','err'); return; }
+  const staff = getStaff();
+  if (staff.find(s=>s.name.toLowerCase()===name.toLowerCase())) { showToast('Name already exists.','err'); return; }
+  const tempPin = genTempPin();
+  const gv = id => (document.getElementById(id)&&document.getElementById(id).value)||'';
+  const newMember = {
+    name, role, pin:null, tempPin:hashPin(tempPin),
+    addedBy:currentUser.name, addedAt:new Date().toLocaleString('en-AU'),
+    joinDate: gv('newManagerJoinDate')||new Date().toISOString().split('T')[0],
+    dob: gv('newManagerDOB'),
+    phone: gv('newManagerPhone'),
+    email: gv('newManagerEmail'),
+    address: gv('newManagerAddress'),
+    ec1Name: gv('newManagerEC1Name'),
+    ec1Phone: gv('newManagerEC1Phone'),
+    ec1Relation: gv('newManagerEC1Relation'),
+    ec2Name: gv('newManagerEC2Name'),
+    ec2Phone: gv('newManagerEC2Phone'),
+    ec2Relation: gv('newManagerEC2Relation'),
+  };
   staff.push(newMember);
-  saveStaff(staff); document.getElementById('newManagerName').value='';
+  saveStaff(staff);
+  ['newManagerName','newManagerPhone','newManagerEmail','newManagerAddress','newManagerDOB','newManagerJoinDate',
+   'newManagerEC1Name','newManagerEC1Phone','newManagerEC1Relation','newManagerEC2Name','newManagerEC2Phone','newManagerEC2Relation'
+  ].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
   spSaveStaffMember(newMember);
   writeAuditLog('Account Added', name, `Added as ${ROLE_LABEL[role]} by ${currentUser.name}`);
   renderAdmin(); populateNameDropdown();
@@ -3872,7 +4252,34 @@ async function checkOpenBreak(userName) {
     if (data && data.value && data.value.length > 0) {
       const item = data.value[0];
       const dateStr = item.BreakDate ? item.BreakDate.split('T')[0] : today;
-      if (dateStr !== today) return; // open break from a previous day — ignore
+      if (dateStr !== today) {
+        // Open break from a previous day — auto-close at scheduled end time and flag
+        const staff = getStaff();
+        const member = staff.find(s => s.name === userName);
+        const endTime = member && member.endTime ? member.endTime : '18:00';
+        const autoEndTs = new Date(dateStr + 'T' + endTime + ':00+05:30').getTime();
+        const startTs = item.StartTime ? new Date(dateStr + 'T' + item.StartTime + ':00+05:30').getTime() : autoEndTs - 3600000;
+        const durMs = autoEndTs - startTs;
+        // Patch SP record — close at scheduled end time
+        await spPatch(SP_API + "('AttendanceBreaks')/items(" + item.Id + ")", {
+          EndTime: endTime,
+          IsOpen: 'false',
+          Title: 'AUTO-CLOSED'
+        });
+        // Flag the attendance record for manager review
+        const recs = getRecords();
+        const recIdx = recs.findIndex(r => r.name === userName && r.date === dateStr);
+        if (recIdx >= 0) {
+          recs[recIdx].breakNotEnded = true;
+          recs[recIdx].needsReview = true;
+          saveRecords(recs);
+          spSaveRecord(recs[recIdx]);
+        }
+        // Log to error log
+        logError('Break auto-closed: ' + userName + ' on ' + dateStr, 'AUTO-CLOSE', 'Open break from previous day auto-closed at scheduled end time', 'warning');
+        console.warn('Open break from', dateStr, 'auto-closed for', userName);
+        return;
+      }
       // Restore break state — use LS timestamp if available (more precise than HHMM)
       const lsStart = LS.get('ci_breakStart_' + userName);
       const startTs = lsStart || (item.StartTime ? new Date(today + 'T' + item.StartTime + ':00+05:30').getTime() : Date.now());
@@ -3902,7 +4309,18 @@ async function spSaveStaffMember(s) {
     TempPin: s.tempPin||'',
     StartTime: s.startTime||'',
     EndTime: s.endTime||'',
-    Office: s.office||''
+    Office: s.office||'',
+    JoinDate: s.joinDate||'',
+    DOB: s.dob||'',
+    Phone: s.phone||'',
+    Email: s.email||'',
+    Address: s.address||'',
+    EmergencyContact1Name: s.ec1Name||'',
+    EmergencyContact1Phone: s.ec1Phone||'',
+    EmergencyContact1Relation: s.ec1Relation||'',
+    EmergencyContact2Name: s.ec2Name||'',
+    EmergencyContact2Phone: s.ec2Phone||'',
+    EmergencyContact2Relation: s.ec2Relation||'',
   };
   if (s.id) {
     return await spPatch(SP_API + "('AttendanceStaff')/items(" + s.id + ")", payload);
@@ -4023,7 +4441,7 @@ async function initMsal() {
         const token = await getToken();
         if (token) {
           const [staffRes, recRes, brkRes] = await Promise.all([
-            fetch(`${SP_API}('AttendanceStaff')/items?$select=Title,Role,Pin,TempPin,StartTime,EndTime,Office,Team,JoinDate&$top=500`,
+            fetch(`${SP_API}('AttendanceStaff')/items?$select=Title,Role,Pin,TempPin,StartTime,EndTime,Office,Team,JoinDate,DOB,Phone,Email,Address,EmergencyContact1Name,EmergencyContact1Phone,EmergencyContact1Relation,EmergencyContact2Name,EmergencyContact2Phone,EmergencyContact2Relation&$top=500`,
               { headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json;odata=nometadata' } }),
             fetch(`${SP_API}('AttendanceRecords')/items?$top=5000`,
               { headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json;odata=nometadata' } }),
@@ -4043,6 +4461,16 @@ async function initMsal() {
                 office: item.Office||'',
                 team: item.Team||'',
                 joinDate: item.JoinDate||'',
+              dob: item.DOB||'',
+              phone: item.Phone||'',
+              email: item.Email||'',
+              address: item.Address||'',
+              ec1Name: item.EmergencyContact1Name||'',
+              ec1Phone: item.EmergencyContact1Phone||'',
+              ec1Relation: item.EmergencyContact1Relation||'',
+              ec2Name: item.EmergencyContact2Name||'',
+              ec2Phone: item.EmergencyContact2Phone||'',
+              ec2Relation: item.EmergencyContact2Relation||'',
               }));
               LS.set('ci_staff', _staff);
             }
