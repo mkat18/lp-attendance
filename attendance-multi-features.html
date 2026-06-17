@@ -1961,7 +1961,7 @@ function handlePin() {
   if (pinStage==='confirm-new') {
     if (pinBuffer!==pinFirst) { document.getElementById('loginErr').textContent="PINs don't match — try again."; pinBuffer=''; pinStage='set-new'; pinFirst=''; updateDots(); setPinLabel('Choose your new PIN'); return; }
     member.pin=hashPin(pinBuffer); member.tempPin=null; staff[idx]=member; saveStaff(staff);
-    spSaveStaffMember(member); // save new PIN to SharePoint so it works on all devices
+    spSavePinOnly(member); // save new PIN to SharePoint so it works on all devices
     showToast('PIN set! Welcome, '+member.name.split(' ')[0]+'!','ok');
     loginAs(member); return;
   }
@@ -1972,7 +1972,6 @@ function handlePin() {
   }
 
   // Temp PIN check — if they enter the temp PIN, force them to set a permanent one
-  console.log('[PIN DEBUG] entered:', pinBuffer, 'hashed:', hashPin(pinBuffer), 'member.tempPin:', member.tempPin, 'member.pin:', member.pin, 'match:', hashPin(pinBuffer)===member.tempPin);
   if (member.tempPin && hashPin(pinBuffer)===member.tempPin) {
     pinStage='set-new'; pinBuffer=''; updateDots();
     setPinLabel('Temp PIN accepted — choose a permanent PIN');
@@ -2385,7 +2384,7 @@ function handleCp() {
   }
   if (cpBuffer!==cpFirst) { document.getElementById('cpErr').textContent="PINs don't match — try again."; cpBuffer=''; cpStage='new'; cpFirst=''; updateCpDots(); document.getElementById('cpLabel').textContent='Enter new PIN'; return; }
   const staff=getStaff(); const idx=staff.findIndex(s=>s.name===currentUser.name);
-  if (idx>=0) { staff[idx].pin=hashPin(cpBuffer); saveStaff(staff); spSaveStaffMember(staff[idx]); }
+  if (idx>=0) { staff[idx].pin=hashPin(cpBuffer); saveStaff(staff); spSavePinOnly(staff[idx]); }
   showToast('PIN updated!','ok');
   setTimeout(()=>{ const tabs=document.querySelectorAll('.nav-tab'); if(tabs[0]) goTab('checkin',tabs[0]); },600);
 }
@@ -4069,10 +4068,9 @@ async function resetPin(i) {
   if(!confirm('Reset PIN for '+s.name+'? A new temporary PIN will be generated.'))return;
   const tempPin=genTempPin();
   staff[i].pin=null; staff[i].tempPin=hashPin(tempPin);
-  console.log('[RESET DEBUG] resetting:', staff[i].name, 'new tempPin hash:', staff[i].tempPin, 'plain:', tempPin);
   staff[i].pinResetBy=currentUser.name; staff[i].pinResetAt=new Date().toLocaleString('en-AU');
   saveStaff(staff);
-  await spSaveStaffMember(staff[i]); // await so SP has the new tempPin before anything re-fetches
+  await spSavePinOnly(staff[i]); // lightweight PIN-only save
   writeAuditLog('PIN Reset', s.name, `PIN reset by ${currentUser.name}`);
   renderAdmin();
   showTempPin(s.name, tempPin);
@@ -4577,27 +4575,40 @@ async function checkOpenBreak(userName) {
   }
 }
 
+// Lightweight PIN-only save — used for PIN reset and change PIN
+// Avoids sending all fields which can cause 400 if any column is misconfigured
+async function spSavePinOnly(s) {
+  if (!s.id) { return await spSaveStaffMember(s); } // no ID yet — do full save
+  return await spPatch(SP_API + "('AttendanceStaff')/items(" + s.id + ")", {
+    Pin: String(s.pin||''),
+    TempPin: String(s.tempPin||''),
+  });
+}
+
 async function spSaveStaffMember(s) {
+  // Build payload — only include fields that exist in SP
   const payload = {
-    Title: s.name,
-    Role: s.role||'staff',
-    Pin: s.pin||'',
-    TempPin: s.tempPin||'',
-    StartTime: s.startTime||'',
-    EndTime: s.endTime||'',
-    Office: s.office||'',
-    JoinDate: s.joinDate||'',
-    DOB: s.dob||'',
-    Phone: s.phone||'',
-    Email: s.email||'',
-    Address: s.address||'',
-    EmergencyContact1Name: s.ec1Name||'',
-    EmergencyContact1Phone: s.ec1Phone||'',
-    EmergencyContact1Relation: s.ec1Relation||'',
-    EmergencyContact2Name: s.ec2Name||'',
-    EmergencyContact2Phone: s.ec2Phone||'',
-    EmergencyContact2Relation: s.ec2Relation||'',
+    Title: String(s.name||''),
+    Role: String(s.role||'staff'),
+    Pin: String(s.pin||''),
+    TempPin: String(s.tempPin||''),
+    StartTime: String(s.startTime||''),
+    EndTime: String(s.endTime||''),
+    Office: String(s.office||''),
+    Team: String(s.team||''),
+    JoinDate: String(s.joinDate||''),
+    DOB: String(s.dob||''),
+    Phone: String(s.phone||''),
+    Email: String(s.email||''),
+    EmergencyContact1Name: String(s.ec1Name||''),
+    EmergencyContact1Phone: String(s.ec1Phone||''),
+    EmergencyContact1Relation: String(s.ec1Relation||''),
+    EmergencyContact2Name: String(s.ec2Name||''),
+    EmergencyContact2Phone: String(s.ec2Phone||''),
+    EmergencyContact2Relation: String(s.ec2Relation||''),
   };
+  // Address is Multiple lines of text — add separately only if set
+  if (s.address) payload.Address = String(s.address);
   if (s.id) {
     return await spPatch(SP_API + "('AttendanceStaff')/items(" + s.id + ")", payload);
   } else {
