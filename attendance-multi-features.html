@@ -868,6 +868,9 @@ tr.flagged-row:hover td { background: #FFEAEA; }
   </div>
   <div style="margin-top:1.25rem;display:flex;gap:12px;flex-direction:column;align-items:center;width:100%;max-width:320px">
     <button onclick="capturePhoto()" style="background:var(--brand);color:#fff;border:none;border-radius:50px;padding:14px 32px;font-size:16px;font-weight:700;cursor:pointer;width:100%">📸 Take selfie</button>
+    <div id="cameraErr" style="display:none;color:#f87171;font-size:13px;text-align:center;padding:1rem;border:1.5px solid #f87171;border-radius:12px;margin-bottom:8px">
+      Camera access was denied or is unavailable. You must either enable camera permissions in your browser settings, or click Skip below — management will be notified that no selfie was taken.
+    </div>
     <button id="skipPhotoBtn" onclick="skipPhoto()" style="display:none;background:transparent;color:#888;border:1.5px solid #444;border-radius:50px;padding:12px 24px;font-size:13px;cursor:pointer;width:100%">Skip (management will be notified)</button>
     <div id="skipCountdown" style="font-size:11px;color:#666;text-align:center"></div>
   </div>
@@ -1815,8 +1818,7 @@ async function loginAs(member) {
   currentUser={name:member.name, role:member.role};
   buildNav();
   if (member.role==='superadmin') {
-    // Superadmin — load fresh data then show dashboard
-    await loadFromSharePoint().catch(()=>{});
+    // Data already loaded in onMsLogin — just show dashboard
     loadDashboard(); showScreen('dashboard');
   } else {
     // Debug: show what records are in cache for this user today
@@ -1931,14 +1933,26 @@ function openCamera() {
   skipBtn.style.display = 'none';
   countdown.textContent = '';
   modal.style.display = 'flex';
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    // Camera API not available — show modal with message, require explicit skip
+    modal.style.display = 'flex';
+    video.style.display = 'none';
+    document.getElementById('cameraErr').style.display = 'block';
+    document.getElementById('skipPhotoBtn').style.display = 'block';
+    return;
+  }
   navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false })
     .then(stream => {
       _cameraStream = stream;
       video.srcObject = stream;
+      document.getElementById('cameraErr').style.display = 'none';
     })
     .catch(err => {
       console.warn('Camera unavailable:', err);
-      closeCameraAndSubmit(null);
+      // Don't auto-submit — show modal with error, require explicit skip
+      video.style.display = 'none';
+      document.getElementById('cameraErr').style.display = 'block';
+      document.getElementById('skipPhotoBtn').style.display = 'block';
     });
 }
 
@@ -3615,9 +3629,64 @@ async function onMsLogin(account) {
   populateNameDropdown();
 }
 
+// ── Error logging system ─────────────────────────────────────────────────
+// Logs errors to SharePoint ErrorLog list and console
+// Critical errors (4xx/5xx on writes) are flagged for Teams alerting via PA flow
+
+const _errorQueue = []; // queue errors if SP not ready yet
+let _errorLogging = true;
+
+async function logError(action, errorCode, errorMessage, severity='critical') {
+  const entry = {
+    AppName: 'Attendance',
+    UserName: currentUser ? currentUser.name : 'Unknown',
+    UserRole: currentUser ? currentUser.role : 'Unknown',
+    Action: String(action||''),
+    ErrorCode: String(errorCode||''),
+    ErrorMessage: String(errorMessage||'').substring(0, 500),
+    DeviceInfo: navigator.userAgent.substring(0, 200),
+    Severity: severity
+  };
+  console.error('[ERROR LOG]', entry);
+  if (!_errorLogging) { _errorQueue.push(entry); return; }
+  try {
+    const token = await getToken();
+    if (!token) { _errorQueue.push(entry); return; }
+    await fetch(SP_API + "('ErrorLog')/items", {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + token,
+        'Accept': 'application/json;odata=nometadata',
+        'Content-Type': 'application/json;odata=nometadata'
+      },
+      body: JSON.stringify({ Title: action||'Error', ...entry })
+    });
+    // Flush any queued errors
+    while (_errorQueue.length > 0) {
+      const queued = _errorQueue.shift();
+      await fetch(SP_API + "('ErrorLog')/items", {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer ' + token,
+          'Accept': 'application/json;odata=nometadata',
+          'Content-Type': 'application/json;odata=nometadata'
+        },
+        body: JSON.stringify({ Title: queued.Action||'Error', ...queued })
+      });
+    }
+  } catch(e) {
+    console.warn('Error logger itself failed:', e);
+  }
+}
+
 async function spGet(url) {
   const token = await getToken();
   const r = await fetch(url, { headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json;odata=nometadata' } });
+  if (!r.ok) {
+    const listName = url.match(/getbytitle\('([^']+)'\)/)?.[1] || url;
+    logError('Read: ' + listName, r.status, r.statusText, r.status >= 500 ? 'critical' : 'warning');
+    return null;
+  }
   return await r.json();
 }
 
@@ -3631,6 +3700,10 @@ async function spPostDirect(url, body) {
   if (!r.ok) {
     const errText = await r.text();
     console.error('[SP POST ERROR]', r.status, url, errText);
+    const listName = url.match(/getbytitle\('([^']+)'\)/)?.[1] || url;
+    if (listName !== 'ErrorLog') { // avoid infinite loop
+      logError('Write: ' + listName, r.status, errText.substring(0,300), 'critical');
+    }
     return null;
   }
   return await r.json();
@@ -3643,6 +3716,10 @@ async function spPatch(url, body) {
     headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json;odata=nometadata', 'Content-Type': 'application/json;odata=nometadata', 'IF-MATCH': '*' },
     body: JSON.stringify(body)
   });
+  if (!r.ok) {
+    const listName = url.match(/getbytitle\('([^']+)'\)/)?.[1] || url;
+    logError('Update: ' + listName, r.status, r.statusText, 'critical');
+  }
   return r.ok;
 }
 
@@ -3658,7 +3735,7 @@ async function spDelete(url) {
 const SP_API = 'https://loanprocessorau.sharepoint.com/sites/lpattendance/_api/lists/getbytitle';
 
 async function loadFromSharePoint() {
-  showToast('Loading data…', 'ok');
+  // loading silently
   try {
     const [staffRes, recRes, brkRes] = await Promise.all([
       spGet(SP_API + "('AttendanceStaff')/items?$top=500"),
@@ -3680,10 +3757,10 @@ async function loadFromSharePoint() {
       _breaks = brkRes.value.map(spToBreak);
       LS.set('ci_breaks', _breaks);
     }
-    showToast('Data loaded ✓ — ' + (_records ? _records.length : 0) + ' records', 'ok');
+  // loaded silently
   } catch(e) {
     console.error('SharePoint load error:', e);
-    showToast('Using cached data', 'ok');
+  // using cache silently
   }
 }
 
@@ -3722,8 +3799,6 @@ async function spSaveRecord(rec) {
     MsAccount: String(rec.msAccount||''),
     HasPhoto: rec.hasPhoto ? 'true' : 'false'
   };
-  console.log('[PAYLOAD]', JSON.stringify(payload));
-  console.log('[TYPES]', Object.entries(payload).map(([k,v])=>k+'='+typeof v+'('+JSON.stringify(v)+')').join(' | '));
   if (rec.id) {
     await spPatch(SP_API + "('AttendanceRecords')/items(" + rec.id + ")", payload);
   } else {
