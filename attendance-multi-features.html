@@ -1771,19 +1771,17 @@ function buildNav() {
   } else {
     tabs = [['checkin','Check in'],['leave','🌴 Leave'],['profile','PIN']];
   }
+  const viewAsDropdown = (!_previewRole && (_realRole==='superadmin' || currentUser.role==='superadmin'))
+    ? '<select class="nav-select" onchange="startPreview(this.value)"><option value="" style="background:#1B2B4B">\uD83D\uDC41 View as\u2026</option><option value="staff" style="background:#1B2B4B">Staff</option><option value="analyst" style="background:#1B2B4B">Analyst</option><option value="trainee" style="background:#1B2B4B">Trainee</option><option value="teamlead" style="background:#1B2B4B">Team Lead</option><option value="manager" style="background:#1B2B4B">Manager</option><option value="hr" style="background:#1B2B4B">HR</option></select>'
+    : '';
+  const exitBtn = _previewRole
+    ? '<button onclick="exitPreview()" style="font-size:12px;padding:5px 14px;background:#F59E0B;color:#000;border:none;border-radius:4px;cursor:pointer;font-weight:700;margin-left:4px">\u2715 Exit preview</button>'
+    : '<button class="logout-btn" onclick="logout()">Sign out</button>';
   nav.innerHTML = `
     <div class="nav-tabs">${tabs.map(([k,l])=>`<button class="nav-tab" onclick="goTab('${k}',this)">${l}</button>`).join('')}</div>
-    ${_previewRole ? '' : (_realRole==='superadmin' || currentUser.role==='superadmin' ? `<select class="nav-select" onchange="startPreview(this.value)">
-      <option value="" style="background:#1B2B4B">👁 View as…</option>
-      <option value="staff" style="background:#1B2B4B">Staff</option>
-      <option value="analyst" style="background:#1B2B4B">Analyst</option>
-      <option value="trainee" style="background:#1B2B4B">Trainee</option>
-      <option value="teamlead" style="background:#1B2B4B">Team Lead</option>
-      <option value="manager" style="background:#1B2B4B">Manager</option>
-      <option value="hr" style="background:#1B2B4B">HR</option>
-    </select>` : '')}
-    <span class="nav-user">${esc(currentUser.name.split(' ')[0])} <span style="font-size:10px;opacity:0.7">${_previewRole ? 'Previewing as '+(_previewRole||'') : (ROLE_LABEL[currentUser.role]||'')}</span></span>
-    ${_previewRole ? `<button onclick="exitPreview()" style="font-size:12px;padding:5px 14px;background:#F59E0B;color:#000;border:none;border-radius:4px;cursor:pointer;font-weight:700;margin-left:4px">&#x2715; Exit preview</button>` : `<button class="logout-btn" onclick="logout()">Sign out</button>`}`;
+    ${viewAsDropdown}
+    <span class="nav-user">${esc(currentUser.name.split(' ')[0])} <span style="font-size:10px;opacity:0.7">${_previewRole ? 'Previewing as '+_previewRole : (ROLE_LABEL[currentUser.role]||'')}</span></span>
+    ${exitBtn}`;
 }
 
 function goTab(name, btn) {
