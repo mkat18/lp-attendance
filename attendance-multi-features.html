@@ -1180,7 +1180,7 @@ tr.flagged-row:hover td { background: #FFEAEA; }
     </div>
     <div class="field">
       <label>Stage</label>
-      <select id="fm_status" style="font-size:14px" onchange="toggleLoanAmountField();toggleSettleDateField()">
+      <select id="fm_status" style="font-size:14px" onchange="gateStatusSelect(this);toggleLoanAmountField();toggleSettleDateField()">
         <option value="Data Collection">Data Collection</option>
         <option value="Pre-Qualification">Pre-Qualification</option>
         <option value="Application Start">Application Start</option>
@@ -7570,6 +7570,27 @@ function fileCard(f, showControls) {
 // ══════════════════════════════════════════════════════════════════════════
 
 // ── Toggle loan amount field based on stage ───────────────────────────────
+function gateStatusSelect(sel) {
+  const newVal = sel.value;
+  if (!STAGES_AFTER_READY.includes(newVal)) return; // fine — not past Ready to Submit
+  const fileId = document.getElementById('fm_fileId').value;
+  if (!fileId) {
+    // New file — cannot start past Ready to Submit
+    showToast('New files must go through Ready to Submit before this stage.', 'err');
+    sel.value = 'Ready to Submit';
+    return;
+  }
+  // Existing file — check if checklist done
+  const files = getFileEntries();
+  const f = files.find(f => f.id === fileId);
+  if (f && !f.checklistSubmitted && !f.checklistDeferred) {
+    showToast('Complete or defer the checklist before moving past Ready to Submit.', 'err');
+    sel.value = f.status || 'Ready to Submit';
+    const idx = files.indexOf(f);
+    if (idx >= 0) setTimeout(() => showChecklistModal(idx), 300);
+  }
+}
+
 function toggleLoanAmountField() {
   const sel = document.getElementById('fm_status');
   const field = document.getElementById('fm_loanAmountField');
