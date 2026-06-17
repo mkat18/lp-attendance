@@ -65,6 +65,7 @@ nav {
   cursor: default; user-select: none;
 }
 .nav-right { display: flex; align-items: center; gap: 6px; }
+.nav-select { width:auto!important; padding:4px 8px!important; border:none!important; background:rgba(255,255,255,0.15)!important; color:#fff!important; font-size:12px!important; border-radius:4px!important; cursor:pointer; -webkit-appearance:auto!important; }
 .nav-tabs { display: flex; gap: 2px; }
 .nav-tab {
   padding: 6px 12px; border-radius: 8px;
@@ -1731,7 +1732,7 @@ function buildNav() {
   }
   nav.innerHTML = `
     <div class="nav-tabs">${tabs.map(([k,l])=>`<button class="nav-tab" onclick="goTab('${k}',this)">${l}</button>`).join('')}</div>
-    ${_previewRole ? '' : (currentUser.role==='superadmin' ? `<select onchange="startPreview(this.value)" style="font-size:12px;padding:4px 8px;border-radius:4px;border:none;background:rgba(255,255,255,0.15);color:#fff;cursor:pointer;max-width:110px">
+    ${_previewRole ? '' : (currentUser.role==='superadmin' ? `<select class="nav-select" onchange="startPreview(this.value)">
       <option value="" style="background:#1B2B4B">👁 View as…</option>
       <option value="staff" style="background:#1B2B4B">Staff</option>
       <option value="analyst" style="background:#1B2B4B">Analyst</option>
