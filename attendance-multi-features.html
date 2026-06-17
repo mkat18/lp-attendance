@@ -415,12 +415,22 @@ tr.flagged-row:hover td { background: #FFEAEA; }
   nav { padding: 0 1rem; }
   main { padding: 1rem 0.75rem 5rem; }
   .nav-user { display: none; }
-  .status-btn { padding: 16px 6px 14px; font-size: 12px; }
+  .status-btn { padding: 16px 6px 14px; font-size: 13px; }
   .status-btn .icon { font-size: 28px; }
   .break-time { font-size: 32px; }
-  .card { padding: 1rem; }
+  .card { padding: 1rem; font-size: 15px; }
   .page-header { margin-bottom: 1rem; }
-  .page-header h1 { font-size: 20px; }
+  .page-header h1 { font-size: 22px; }
+  .page-header p { font-size: 14px; }
+  .card-label { font-size: 12px; }
+  .met-val { font-size: 26px; }
+  .met-lbl { font-size: 12px; }
+  .met-sub { font-size: 11px; }
+  .section-label { font-size: 12px; }
+  input, select, textarea { font-size: 16px !important; } /* prevent iOS zoom */
+  label { font-size: 13px; }
+  .btn-primary { font-size: 16px; padding: 13px; }
+  table { font-size: 13px; }
 }
 
 /* ── Hamburger menu for mobile ─────────────────────────────────────────── */
@@ -441,11 +451,11 @@ tr.flagged-row:hover td { background: #FFEAEA; }
   position: fixed;
   top: 56px;
   left: 0; right: 0;
-  background: var(--navy);
+  background: #0F1E35;
   z-index: 200;
-  border-bottom: 1px solid rgba(255,255,255,0.1);
+  border-bottom: 2px solid rgba(255,255,255,0.15);
   padding: 8px 0;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
 }
 
 .mobile-menu.open { display: block; }
@@ -453,21 +463,28 @@ tr.flagged-row:hover td { background: #FFEAEA; }
 .mobile-menu-tab {
   display: block;
   width: 100%;
-  padding: 14px 20px;
+  padding: 16px 24px;
   text-align: left;
   background: none;
   border: none;
-  color: rgba(255,255,255,0.75);
-  font-size: 15px;
+  color: rgba(255,255,255,0.9);
+  font-size: 16px;
   font-weight: 500;
   cursor: pointer;
-  border-bottom: 1px solid rgba(255,255,255,0.06);
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  letter-spacing: 0.2px;
 }
 
 .mobile-menu-tab.active {
   color: #fff;
   font-weight: 700;
-  background: rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.1);
+  border-left: 3px solid #C9A84C;
+  padding-left: 21px;
+}
+
+.mobile-menu-tab:active {
+  background: rgba(255,255,255,0.15);
 }
 
 .mobile-menu-overlay {

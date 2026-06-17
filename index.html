@@ -224,9 +224,29 @@
 
   @media (max-width: 768px) {
     #loginScreen { flex-direction: column; }
-    .login-left { padding: 3rem 2rem 1rem; }
-    .login-right { width: 100%; padding: 1rem 2rem 3rem; }
+    .login-left { padding: 2.5rem 1.5rem 1rem; }
+    .login-right { width: 100%; padding: 1rem 1.5rem 3rem; }
     .login-features { display: none; }
+    .login-headline { font-size: 28px; }
+    .login-sub { font-size: 15px; }
+    .login-card { padding: 2rem 1.5rem; }
+    .login-card h1 { font-size: 20px; }
+    .login-card p { font-size: 14px; }
+    .ms-btn { font-size: 16px; padding: 15px; }
+    .login-eyebrow { font-size: 12px; }
+    /* Portal cards on mobile */
+    .app-grid { grid-template-columns: 1fr 1fr; gap: 12px; }
+    .app-name { font-size: 14px; }
+    .app-desc { font-size: 12px; }
+    .portal-greeting h2 { font-size: 22px; }
+    .portal-body { padding: 1.5rem 1rem; }
+    .portal-nav { padding: 0 1rem; }
+    .portal-user { font-size: 12px; }
+  }
+
+  @media (max-width: 400px) {
+    .app-grid { grid-template-columns: 1fr; }
+    .login-headline { font-size: 24px; }
   }
 
   /* ── Portal screen ─────────────────────────────────────────────── */
