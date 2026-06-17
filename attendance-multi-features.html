@@ -5553,7 +5553,7 @@ async function onMsLogin(account) {
   if (savedSession) {
     try {
       const sess = JSON.parse(savedSession);
-      if (sess && sess.name && sess.role) {
+      if (sess && sess.name) {
         const member = getStaff().find(s => s.name === sess.name);
         if (member) { await loginAs(member); return; }
       }
@@ -5561,16 +5561,24 @@ async function onMsLogin(account) {
   }
 
   // Auto-login from MS email ONLY when coming from portal (login_hint in URL)
-  const loginHint = new URLSearchParams(window.location.search).get('login_hint');
+  const urlParams = new URLSearchParams(window.location.search);
+  const loginHint = urlParams.get('login_hint');
   if (loginHint && account && account.username) {
     const email = account.username.toLowerCase();
     if (email === loginHint.toLowerCase()) {
       const member = getStaff().find(s => s.email && s.email.toLowerCase() === email);
-      if (member) { await loginAs(member); return; }
+      if (member) {
+        // Strip login_hint from URL so refresh doesn't re-trigger auto-login
+        urlParams.delete('login_hint');
+        const newUrl = window.location.pathname + (urlParams.toString() ? '?' + urlParams.toString() : '');
+        window.history.replaceState({}, '', newUrl);
+        await loginAs(member);
+        return;
+      }
     }
   }
 
-  // Default — show PIN screen so staff can identify themselves
+  // Default — show PIN screen
   populateNameDropdown();
 }
 
