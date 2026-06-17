@@ -3102,7 +3102,8 @@ function renderMetrics() {
         role === 'teamlead' ? (getTeamForTL(currentUser.name).includes(f.owner) || f.owner === currentUser.name) :
         f.owner === currentUser.name
       );
-      const pending = myFiles.filter(f => f.status === 'Ready to Submit' && !f.checklistSubmitted);
+      const atOrPastReady3 = ['Ready to Submit', ...STAGES_AFTER_READY];
+      const pending = myFiles.filter(f => !f.checklistSubmitted && atOrPastReady3.includes(f.status));
       if (!pending.length) return '';
       const names = pending.slice(0,3).map(f=>esc(f.client||'Unnamed')).join(', ') + (pending.length>3?' +more':'');
       return '<div class="met clickable" style="grid-column:1/-1;border-color:#FDE68A;background:#FFFBEB">' +
@@ -7035,9 +7036,9 @@ function getChecklistPendingFiles() {
   const myFiles = isSuperAdmin() || isManager()
     ? files
     : files.filter(f => f.owner === currentUser.name);
-  // Include files at Ready to Submit that haven't completed the checklist
-  // (either not yet touched, or deferred)
-  return myFiles.filter(f => f.status === 'Ready to Submit' && !f.checklistSubmitted);
+  // Include files that are deferred (regardless of stage) OR at Ready to Submit without checklist
+  const atOrPastReady = ['Ready to Submit', ...STAGES_AFTER_READY];
+  return myFiles.filter(f => !f.checklistSubmitted && atOrPastReady.includes(f.status));
 }
 
 
@@ -7706,7 +7707,8 @@ function renderFilesAnalytics(el, allFiles, teamNames) {
   const analytics = calcFileAnalytics(filteredFiles);
   const submittedFiles = filteredFiles.filter(f => f.status === 'Submitted to Lender' || f.stageHistory?.some(h => h.stage === 'Submitted to Lender'));
   const submittedCount = filteredFiles.filter(f => f.status === 'Submitted to Lender').length;
-  const checklistPending = filteredFiles.filter(f => f.status === 'Ready to Submit' && !f.checklistSubmitted);
+  const atOrPastReady2 = ['Ready to Submit', ...STAGES_AFTER_READY];
+  const checklistPending = filteredFiles.filter(f => !f.checklistSubmitted && atOrPastReady2.includes(f.status));
   const isAnalystOrTL = ['analyst','teamlead'].includes(currentUser && currentUser.role);
 
   const fmt$ = v => '$' + Math.round(v).toLocaleString('en-AU');
