@@ -1733,17 +1733,7 @@ function logout() {
         if (staffRes.ok) {
           const staffData = await staffRes.json();
           if (staffData && staffData.value && staffData.value.length > 0) {
-            _staff = staffData.value.map(item => ({
-              name: item.Title,
-              role: (item.Role||'staff').toLowerCase(),
-              pin: item.Pin||'',
-              tempPin: item.TempPin||'',
-              startTime: item.StartTime||'',
-              endTime: item.EndTime||'',
-              office: item.Office||'',
-              team: item.Team||'',
-              joinDate: item.JoinDate||'',
-            }));
+            _staff = staffData.value.map(spToStaff);
             LS.set('ci_staff', _staff);
           }
         }
@@ -4738,27 +4728,7 @@ async function initMsal() {
           if (staffRes.ok) {
             const staffData = await staffRes.json();
             if (staffData && staffData.value && staffData.value.length > 0) {
-              _staff = staffData.value.map(item => ({
-                name: item.Title,
-                role: (item.Role||'staff').toLowerCase(),
-                pin: item.Pin||'',
-                tempPin: item.TempPin||'',
-                startTime: item.StartTime||'',
-                endTime: item.EndTime||'',
-                office: item.Office||'',
-                team: item.Team||'',
-                joinDate: item.JoinDate||'',
-              dob: item.DOB||'',
-              phone: item.Phone||'',
-              email: item.Email||'',
-              address: item.Address||'',
-              ec1Name: item.EmergencyContact1Name||'',
-              ec1Phone: item.EmergencyContact1Phone||'',
-              ec1Relation: item.EmergencyContact1Relation||'',
-              ec2Name: item.EmergencyContact2Name||'',
-              ec2Phone: item.EmergencyContact2Phone||'',
-              ec2Relation: item.EmergencyContact2Relation||'',
-              }));
+              _staff = staffData.value.map(spToStaff);
               LS.set('ci_staff', _staff);
             }
           }
