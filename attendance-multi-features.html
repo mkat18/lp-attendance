@@ -7741,19 +7741,21 @@ function renderFilesAnalytics(el, allFiles, teamNames) {
       ${isAnalystOrTL ? `
       <div style="background:#FEF3C7;border:1.5px solid #FDE68A;border-radius:var(--radius-sm);padding:12px;text-align:center;cursor:pointer" onclick="toggleChecklistPendingAnalytics()">
         <div style="font-size:24px;font-weight:700;color:#92400E">${checklistPending.length}</div>
-        <div style="font-size:11px;color:#92400E;font-weight:600">Checklist not submitted</div>
+        <div style="font-size:11px;color:#92400E;font-weight:600">Checklist not submitted ▼</div>
       </div>` : ''}
     </div>
     ${isAnalystOrTL && checklistPending.length > 0 ? `
     <div id="checklistPendingAnalytics" style="display:none;background:#FEF3C7;border:1.5px solid #FDE68A;border-radius:var(--radius-sm);padding:12px;margin-bottom:1rem">
-      <div style="font-size:12px;font-weight:700;color:#92400E;margin-bottom:8px">Files needing checklist</div>
-      ${checklistPending.map((f,i) => {
-        const idx = filteredFiles.indexOf(f);
-        return '<div style="font-size:13px;padding:4px 0;border-bottom:0.5px solid #FDE68A;display:flex;justify-content:space-between;align-items:center">' +
-          '<span>' + esc(f.client||'Unnamed') + (f.broker ? ' — ' + esc(f.broker) : '') + '</span>' +
-          '<button onclick="showChecklistModal(' + getFileEntries().indexOf(f) + ')" style="font-size:11px;padding:3px 8px;background:#92400E;color:#fff;border:none;border-radius:4px;cursor:pointer">Fill</button>' +
-          '</div>';
-      }).join('')}
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div style="font-size:12px;font-weight:700;color:#92400E">Files needing checklist</div>
+        <button onclick="toggleChecklistPendingAnalytics()" style="font-size:11px;background:none;border:none;color:#92400E;cursor:pointer;font-weight:600">✕ Close</button>
+      </div>
+      ${checklistPending.map(f =>
+        '<div style="font-size:13px;padding:6px 0;border-bottom:0.5px solid #FDE68A;display:flex;justify-content:space-between;align-items:center">' +
+        '<span>' + esc(f.client||'Unnamed') + (f.broker ? ' — ' + esc(f.broker) : '') + (f.status !== 'Ready to Submit' ? ' <span style="font-size:10px;color:#92400E;background:#FDE68A;padding:1px 5px;border-radius:3px">' + esc(f.status) + '</span>' : '') + '</span>' +
+        '<button onclick="showChecklistByFileId(\'' + f.id + '\')" style="font-size:11px;padding:3px 10px;background:#92400E;color:#fff;border:none;border-radius:4px;cursor:pointer;flex-shrink:0;margin-left:8px">Fill</button>' +
+        '</div>'
+      ).join('')}
     </div>` : ''}
     ${submittedCount > 0 ? `
     <div id="submittedFilesList" style="display:none;background:#EFF6FF;border:1.5px solid #BFDBFE;border-radius:var(--radius-sm);padding:12px;margin-bottom:1rem">
@@ -7926,7 +7928,7 @@ function renderMyFilesScreen() {
         '<div id="checklistPendingList" style="display:none;margin-top:10px">' +
         checklistPending.map((f,i) => '<div style="font-size:13px;padding:4px 0;border-top:0.5px solid #FDE68A;display:flex;align-items:center;justify-content:space-between">' +
           '<span>' + esc(f.client||'Unnamed') + (f.broker ? ' — ' + esc(f.broker) : '') + '</span>' +
-          '<button onclick="event.stopPropagation();showChecklistModal(' + getFileEntries().indexOf(f) + ')" style="font-size:11px;padding:3px 8px;background:#92400E;color:#fff;border:none;border-radius:4px;cursor:pointer">Fill checklist</button>' +
+          '<button onclick="event.stopPropagation();showChecklistByFileId(\'' + f.id + '\')" style="font-size:11px;padding:3px 8px;background:#92400E;color:#fff;border:none;border-radius:4px;cursor:pointer">Fill checklist</button>' +
           '</div>').join('') +
         '</div>' +
         '</div>';
@@ -7946,6 +7948,13 @@ function renderMyFilesScreen() {
   } else if (_myFilesTab === 'archive') {
     renderFilesArchive(el, myFiltered);
   }
+}
+
+function showChecklistByFileId(fileId) {
+  const files = getFileEntries();
+  const idx = files.findIndex(f => f.id === fileId);
+  if (idx >= 0) showChecklistModal(idx);
+  else showToast('File not found.', 'err');
 }
 
 function toggleChecklistPendingAnalytics() {
