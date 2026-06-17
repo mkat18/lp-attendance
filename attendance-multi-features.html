@@ -2202,6 +2202,7 @@ function goTab(name, btn) {
 }
 
 function logout() {
+  sessionStorage.removeItem('lp_session');
   currentUser=null; pinBuffer=''; pinStage='login'; pinFirst='';
   stopBreakTimer(false); // preserve ongoing break across logout
   buildNav(); showScreen('mslogin');
@@ -2468,6 +2469,7 @@ function handlePin() {
 
 async function loginAs(member) {
   currentUser={name:member.name, role:member.role};
+  sessionStorage.setItem('lp_session', JSON.stringify({name:member.name, role:member.role}));
   buildNav();
   if (member.role==='superadmin') {
     loadDashboard(); showScreen('dashboard');
@@ -5540,12 +5542,23 @@ async function getToken() {
 
 async function onMsLogin(account) {
   msalAccount = account;
-  populateNameDropdown();
   showScreen('geoblocked');
   requestGeo();
   await loadFromSharePoint().catch(()=>{});
-  populateNameDropdown();
   autoSaveMsEmail(account).catch(()=>{});
+  // Restore session on refresh
+  const saved = sessionStorage.getItem('lp_session');
+  if (saved) {
+    try {
+      const sess = JSON.parse(saved);
+      if (sess && sess.name) {
+        const member = getStaff().find(s => s.name === sess.name);
+        if (member) { await loginAs(member); return; }
+      }
+    } catch(e) {}
+  }
+  // No session — show PIN screen
+  populateNameDropdown();
 }
 
 async function autoSaveMsEmail(account) {
