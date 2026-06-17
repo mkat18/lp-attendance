@@ -633,7 +633,7 @@ async function getStaffRole(email) {
     // Try email match first
     console.log('[ROLE] Looking up email:', email);
     const res = await fetch(
-      SP_API + "('AttendanceStaff')/items?$select=Title,Role,Email&$filter=Email eq '" + encodeURIComponent(email) + "'&$top=1",
+      SP_API + "('AttendanceStaff')/items?$select=Title,Role,Email&$filter=Email eq '" + email + "'&$top=1",
       { headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json;odata=nometadata' } }
     );
     console.log('[ROLE] Email filter status:', res.status);
