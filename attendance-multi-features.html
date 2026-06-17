@@ -1721,18 +1721,14 @@ let _previewRole = null;
 let _realRole = null;
 
 function startPreview(role) {
-  if (!role || !isSuperAdmin()) return;
+  console.log('[PREVIEW] startPreview called with role:', role, 'isSuperAdmin:', isSuperAdmin(), 'currentUser.role:', currentUser&&currentUser.role);
+  if (!role || !isSuperAdmin()) { console.log('[PREVIEW] blocked - role:', role, 'isSuperAdmin:', isSuperAdmin()); return; }
   _previewRole = role;
   _realRole = currentUser.role;
   currentUser.role = role;
-  // Show banner
-  const banner = document.getElementById('previewBanner');
-  if (banner) banner.style.display = 'flex';
-  document.getElementById('previewRoleLabel').textContent = ROLE_LABEL[role]||role;
   buildNav();
   // Show what this role sees first
   if (role === 'manager') { loadDashboard(); showScreen('dashboard'); }
-  else if (role === 'teamlead') { initCheckin(); showScreen('checkin'); }
   else { initCheckin(); showScreen('checkin'); }
   const firstTab = document.querySelector('.nav-tab');
   if (firstTab) firstTab.classList.add('active');
@@ -1743,8 +1739,6 @@ function exitPreview() {
   currentUser.role = _realRole;
   _previewRole = null;
   _realRole = null;
-  const banner = document.getElementById('previewBanner');
-  if (banner) banner.style.display = 'none';
   buildNav();
   loadDashboard(); showScreen('dashboard');
   const firstTab = document.querySelector('.nav-tab');
