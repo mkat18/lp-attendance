@@ -1173,6 +1173,8 @@ tr.flagged-row:hover td { background: #FFEAEA; }
         <option value="Commercial">Commercial</option>
         <option value="SMSF">SMSF</option>
         <option value="Personal Loan">Personal Loan</option>
+        <option value="Trust/Company Loan">Trust/Company Loan</option>
+        <option value="Asset &amp; Equipment Finance">Asset &amp; Equipment Finance</option>
       </select>
     </div>
     <div class="field">
@@ -3087,6 +3089,23 @@ function renderMetrics() {
     </div>`:''}
     ${isManager()?renderAbsencePatternCard():''}
     ${isManager()?renderCoverageCard(date):''}
+    ${(()=>{
+      const role = currentUser && currentUser.role;
+      if (!['analyst','teamlead'].includes(role)) return '';
+      const myFiles = getFileEntries().filter(f => 
+        role === 'superadmin' || role === 'hrmanager' ? true :
+        role === 'teamlead' ? (getTeamForTL(currentUser.name).includes(f.owner) || f.owner === currentUser.name) :
+        f.owner === currentUser.name
+      );
+      const pending = myFiles.filter(f => f.status === 'Ready to Submit' && !f.checklistSubmitted);
+      if (!pending.length) return '';
+      const names = pending.slice(0,3).map(f=>esc(f.client||'Unnamed')).join(', ') + (pending.length>3?' +more':'');
+      return '<div class="met clickable" style="grid-column:1/-1;border-color:#FDE68A;background:#FFFBEB">' +
+        '<div class="met-lbl">⚠ Checklist not submitted</div>' +
+        '<div class="met-val" style="color:#92400E">' + pending.length + '</div>' +
+        '<div class="met-sub" style="white-space:normal">' + names + '</div>' +
+        '</div>';
+    })()}
   `;
 }
 
