@@ -1731,7 +1731,15 @@ function buildNav() {
   }
   nav.innerHTML = `
     <div class="nav-tabs">${tabs.map(([k,l])=>`<button class="nav-tab" onclick="goTab('${k}',this)">${l}</button>`).join('')}</div>
-    ${_previewRole ? '' : (currentUser.role==='superadmin' ? `<select onchange="startPreview(this.value)" style="font-size:12px;padding:4px 8px;border-radius:4px;border:1.5px solid rgba(255,255,255,0.3);background:rgba(255,255,255,0.1);color:inherit;cursor:pointer"><option value="">👁 View as…</option><option value="staff">Staff</option><option value="analyst">Analyst</option><option value="trainee">Trainee</option><option value="teamlead">Team Lead</option><option value="manager">Manager</option><option value="hr">HR</option></select>` : '')}
+    ${_previewRole ? '' : (currentUser.role==='superadmin' ? `<select onchange="startPreview(this.value)" style="font-size:12px;padding:4px 8px;border-radius:4px;border:none;background:rgba(255,255,255,0.15);color:#fff;cursor:pointer;max-width:110px">
+      <option value="" style="background:#1B2B4B">👁 View as…</option>
+      <option value="staff" style="background:#1B2B4B">Staff</option>
+      <option value="analyst" style="background:#1B2B4B">Analyst</option>
+      <option value="trainee" style="background:#1B2B4B">Trainee</option>
+      <option value="teamlead" style="background:#1B2B4B">Team Lead</option>
+      <option value="manager" style="background:#1B2B4B">Manager</option>
+      <option value="hr" style="background:#1B2B4B">HR</option>
+    </select>` : '')}
     <span class="nav-user">${esc(currentUser.name.split(' ')[0])} <span style="font-size:10px;opacity:0.7">${_previewRole ? 'Previewing' : (ROLE_LABEL[currentUser.role]||'')}</span></span>
     <button class="logout-btn" onclick="logout()">Sign out</button>`;
 }
