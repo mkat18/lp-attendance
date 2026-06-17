@@ -2202,6 +2202,7 @@ function goTab(name, btn) {
 }
 
 function logout() {
+  sessionStorage.removeItem('lp_session');
   currentUser=null; pinBuffer=''; pinStage='login'; pinFirst='';
   stopBreakTimer(false); // preserve ongoing break across logout
   buildNav(); showScreen('mslogin');
@@ -2468,6 +2469,8 @@ function handlePin() {
 
 async function loginAs(member) {
   currentUser={name:member.name, role:member.role};
+  // Save session so refresh restores correct user
+  sessionStorage.setItem('lp_session', JSON.stringify({name:member.name, role:member.role}));
   buildNav();
   if (member.role==='superadmin') {
     loadDashboard(); showScreen('dashboard');
@@ -5543,9 +5546,25 @@ async function onMsLogin(account) {
   showScreen('geoblocked');
   requestGeo();
   await loadFromSharePoint().catch(()=>{});
-  // Auto-save MS email to staff record
   autoSaveMsEmail(account).catch(()=>{});
-  // Try to auto-login from MS email — skip PIN if email matches a staff record
+
+  // 1. Restore previous session from sessionStorage (refresh case)
+  const savedSession = sessionStorage.getItem('lp_session');
+  if (savedSession) {
+    try {
+      const sess = JSON.parse(savedSession);
+      if (sess && sess.name && sess.role) {
+        const staff = getStaff();
+        const member = staff.find(s => s.name === sess.name);
+        if (member) {
+          await loginAs(member);
+          return;
+        }
+      }
+    } catch(e) {}
+  }
+
+  // 2. Auto-login from MS email only if no existing session
   if (account && account.username) {
     const email = account.username.toLowerCase();
     const staff = getStaff();
@@ -5555,12 +5574,12 @@ async function onMsLogin(account) {
       s.name.toLowerCase().replace(/\s+/g,' ').includes(emailPrefix.replace(/[._]/g,' ').trim())
     );
     if (member) {
-      // Auto-login — no PIN needed
       await loginAs(member);
       return;
     }
   }
-  // Fallback — show PIN screen
+
+  // 3. Fallback — show PIN screen
   populateNameDropdown();
 }
 
