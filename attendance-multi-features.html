@@ -5548,27 +5548,21 @@ async function onMsLogin(account) {
   await loadFromSharePoint().catch(()=>{});
   autoSaveMsEmail(account).catch(()=>{});
 
-  // Restore session from sessionStorage (refresh case — keeps same user)
-  const savedSession = sessionStorage.getItem('lp_session');
-  if (savedSession) {
-    try {
-      const sess = JSON.parse(savedSession);
-      if (sess && sess.name) {
-        const member = getStaff().find(s => s.name === sess.name);
-        if (member) { await loginAs(member); return; }
-      }
-    } catch(e) {}
-  }
-
   // Auto-login from MS email ONLY when coming from portal (login_hint in URL)
   const urlParams = new URLSearchParams(window.location.search);
   const loginHint = urlParams.get('login_hint');
   if (loginHint && account && account.username) {
     const email = account.username.toLowerCase();
     if (email === loginHint.toLowerCase()) {
-      const member = getStaff().find(s => s.email && s.email.toLowerCase() === email);
+      // Find by email or name prefix
+      const staff = getStaff();
+      const emailPrefix = email.split('@')[0].replace(/[._]/g,' ').trim();
+      const member = staff.find(s =>
+        (s.email && s.email.toLowerCase() === email) ||
+        s.name.toLowerCase().replace(/\s+/g,' ').includes(emailPrefix)
+      );
       if (member) {
-        // Strip login_hint from URL so refresh doesn't re-trigger auto-login
+        // Strip login_hint from URL so refresh doesn't re-trigger
         urlParams.delete('login_hint');
         const newUrl = window.location.pathname + (urlParams.toString() ? '?' + urlParams.toString() : '');
         window.history.replaceState({}, '', newUrl);
@@ -5576,6 +5570,18 @@ async function onMsLogin(account) {
         return;
       }
     }
+  }
+
+  // Restore session from sessionStorage (refresh case — only if no login_hint)
+  const savedSession = sessionStorage.getItem('lp_session');
+  if (savedSession && !loginHint) {
+    try {
+      const sess = JSON.parse(savedSession);
+      if (sess && sess.name) {
+        const member = getStaff().find(s => s.name === sess.name);
+        if (member) { await loginAs(member); return; }
+      }
+    } catch(e) {}
   }
 
   // Default — show PIN screen
@@ -5711,16 +5717,19 @@ const SP_API = 'https://loanprocessorau.sharepoint.com/sites/lpattendance/_api/l
 // Pattern: each list has Title (owner/key) + Data (JSON blob)
 // ══════════════════════════════════════════════════════════════════════════
 
-async function spLoadJsonList(listName) {
+async function spLoadJsonList(listName, dataCol) {
+  dataCol = dataCol || 'Data';
   try {
-    const res = await spGet(SP_API + "('" + listName + "')/items?$select=Id,Title,Data&$top=5000");
-    if (res && res.value) return res.value;
+    const res = await spGet(SP_API + "('" + listName + "')/items?$select=Id,Title," + dataCol + "&$top=5000");
+    if (res && res.value) return res.value.map(item => ({ ...item, Data: item[dataCol] }));
     return [];
   } catch(e) { console.warn('spLoadJsonList failed:', listName, e); return []; }
 }
 
-async function spSaveJsonItem(listName, titleKey, dataObj, existingId) {
-  const payload = { Title: String(titleKey||''), Data: JSON.stringify(dataObj) };
+async function spSaveJsonItem(listName, titleKey, dataObj, existingId, dataCol) {
+  dataCol = dataCol || 'Data';
+  const payload = { Title: String(titleKey||'') };
+  payload[dataCol] = JSON.stringify(dataObj);
   try {
     if (existingId) {
       await spPatch(SP_API + "('" + listName + "')/items(" + existingId + ")", payload);
@@ -5746,7 +5755,7 @@ let _teamAssignments = null;  // { key: {data, spId} }
 
 // ── FileEntries ───────────────────────────────────────────────────────────
 async function loadFileEntriesFromSP() {
-  const items = await spLoadJsonList('FileEntries');
+  const items = await spLoadJsonList('FileEntries', 'FileData');
   _fileEntries = {};
   for (const item of items) {
     try {
@@ -5776,7 +5785,7 @@ async function spSyncFileEntry(entry) {
   if (!entry || !entry.id) return;
   _fileEntries = _fileEntries || {};
   const existing = _fileEntries[entry.id];
-  const spId = await spSaveJsonItem('FileEntries', entry.owner || currentUser.name, entry, existing ? existing.spId : null);
+  const spId = await spSaveJsonItem('FileEntries', entry.owner || currentUser.name, entry, existing ? existing.spId : null, 'FileData');
   _fileEntries[entry.id] = { data: entry, spId };
 }
 
