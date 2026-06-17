@@ -135,7 +135,7 @@ main { max-width: 1280px; margin: 0 auto; padding: 1.75rem 2rem 4rem; }
   letter-spacing: 0.5px; margin-bottom: 6px;
   font-family: var(--font-ui);
 }
-input[type=text], input[type=date], input[type=number], select {
+input[type=text], input[type=date], input[type=number], input[type=tel], input[type=email], input[type=time], select {
   width: 100%; padding: 10px 13px;
   border: 1.5px solid var(--border); border-radius: var(--radius-sm);
   font-family: var(--font-body); font-size: 14px;
@@ -780,6 +780,8 @@ tr.flagged-row:hover td { background: #FFEAEA; }
             <option value="">— None —</option>
           </select>
         </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px">
         <div class="field">
           <label>Office</label>
           <select id="newOffice" style="font-size:14px">
@@ -839,8 +841,8 @@ tr.flagged-row:hover td { background: #FFEAEA; }
     <div class="card" id="auditLogCard" style="display:none">
       <div class="section-label">Audit log</div>
       <p style="font-size:13px;color:var(--text-2);margin-bottom:12px">All PIN resets, role changes and account changes.</p>
-      <button class="btn-primary" onclick="loadAuditLog()">View audit log</button>
-      <div id="auditLogList" style="margin-top:12px"></div>
+      <button class="btn-primary" id="auditLogBtn" onclick="toggleAuditLog()">View audit log</button>
+      <div id="auditLogList" style="margin-top:12px;display:none"></div>
     </div>
 
     <div class="card" id="obsNotesStatsCard" style="display:none">
@@ -1456,14 +1458,26 @@ async function spPost(url, body) {
 // Map SharePoint item to staff object
 function spToStaff(item) {
   return {
-    id: item.ID||item.id,
-    name: item.Title||item.title||'',
-    role: item.Role||'staff',
-    pin: item.Pin||null,
-    tempPin: item.TempPin||null,
-    startTime: item.StartTime||null,
-    endTime: item.EndTime||null,
-    office: item.Office||null,
+    id: item.ID||item.Id||item.id,
+    name: item.Title||'',
+    role: (item.Role||'staff').toLowerCase(),
+    pin: item.Pin||'',
+    tempPin: item.TempPin||'',
+    startTime: item.StartTime||'',
+    endTime: item.EndTime||'',
+    office: item.Office||'',
+    team: item.Team||'',
+    joinDate: item.JoinDate||'',
+    dob: item.DOB||'',
+    phone: item.Phone||'',
+    email: item.Email||'',
+    address: item.Address||'',
+    ec1Name: item.EmergencyContact1Name||'',
+    ec1Phone: item.EmergencyContact1Phone||'',
+    ec1Relation: item.EmergencyContact1Relation||'',
+    ec2Name: item.EmergencyContact2Name||'',
+    ec2Phone: item.EmergencyContact2Phone||'',
+    ec2Relation: item.EmergencyContact2Relation||'',
   };
 }
 
@@ -1524,27 +1538,6 @@ function saveRecords(r){ _records=r; LS.set('ci_records',r); }
 function saveBreaks(b) { _breaks=b;  LS.set('ci_breaks',b); }
 
 // Legacy Power Automate functions removed — using direct SP REST API
-
-async function spSaveStaffMember(s) {
-  const payload = {
-    Title: s.name,
-    Role: s.role||'staff',
-    Pin: s.pin||'',
-    TempPin: s.tempPin||'',
-    StartTime: s.startTime||'',
-    EndTime: s.endTime||'',
-    Office: s.office||'',
-  };
-  if (s.id) {
-    return await spPost(FLOW.UPDATE_STAFF, Object.assign({Id:s.id}, payload));
-  } else {
-    return await spPost(FLOW.SAVE_STAFF, payload);
-  }
-}
-
-async function spDeleteStaff(id) {
-  return await spPost(FLOW.DELETE_STAFF, {Id:id});
-}
 
 // ── Tag helpers ───────────────────────────────────────────────────────────
 const TAG = {
@@ -3805,6 +3798,19 @@ function renderAdmin() {
         </div>`;
       }).join('')
     : '<div class="empty-state">No accounts yet.</div>';
+}
+
+async function toggleAuditLog() {
+  const el = document.getElementById('auditLogList');
+  const btn = document.getElementById('auditLogBtn');
+  if (el.style.display !== 'none') {
+    el.style.display = 'none';
+    btn.textContent = 'View audit log';
+    return;
+  }
+  el.style.display = 'block';
+  btn.textContent = 'Hide audit log';
+  await loadAuditLog();
 }
 
 async function loadAuditLog() {
