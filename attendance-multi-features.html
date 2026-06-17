@@ -1837,12 +1837,16 @@ async function loadPermissions() {
 
 // Get permissions for current user's role
 function getPerms() {
-  if (isSuperAdmin()) return null; // superadmin always has everything
+  // During preview — MUST check this first before isSuperAdmin()
+  // because _realRole is 'superadmin' and isSuperAdmin() would return true
+  if (_previewRole) {
+    const role = currentUser?.role; // this IS the preview role
+    return DEFAULT_PERMISSIONS[role] || DEFAULT_PERMISSIONS.staff;
+  }
+  if (isSuperAdmin()) return null; // real superadmin — always has everything
   const role = currentUser?.role;
   if (!role) return DEFAULT_PERMISSIONS.staff;
-  // During preview — always use defaults so SP data doesn't interfere
-  if (_previewRole) return DEFAULT_PERMISSIONS[role] || DEFAULT_PERMISSIONS.staff;
-  // Normal mode — use SP permissions if fully loaded, otherwise defaults
+  // Use SP permissions if fully loaded, otherwise defaults
   const spPerms = _permissions[role];
   const defaults = DEFAULT_PERMISSIONS[role] || DEFAULT_PERMISSIONS.staff;
   if (spPerms && spPerms.tabs && spPerms.features &&
@@ -1852,13 +1856,13 @@ function getPerms() {
 }
 
 function canDo(feature) {
-  if (isSuperAdmin()) return true;
+  if (isSuperAdmin() && !_previewRole) return true; // real superadmin only, not during preview
   const p = getPerms();
   return p ? (p.features[feature] !== false) : true;
 }
 
 function hasTab(tab) {
-  if (isSuperAdmin()) return true;
+  if (isSuperAdmin() && !_previewRole) return true; // real superadmin only, not during preview
   const p = getPerms();
   return p ? (p.tabs[tab] === true) : false;
 }
@@ -7261,6 +7265,14 @@ async function saveFileEntry() {
   closeFileModal();
   showToast('File saved ✓', 'ok');
   updateFileLogUI();
+
+  // Show checklist if new status is Ready to Submit and no checklist yet
+  if (newStatus === 'Ready to Submit' && !entry.checklistSubmitted) {
+    const savedFiles = getFileEntries();
+    const savedIdx = savedFiles.findIndex(f => f.id === entry.id);
+    if (savedIdx >= 0) setTimeout(() => showChecklistModal(savedIdx), 400);
+  }
+
   // Refresh files screen if open
   if (document.getElementById('screen-files')?.classList.contains('active')) {
     renderFilesScreen();
@@ -7635,6 +7647,8 @@ function renderFilesAnalytics(el, allFiles, teamNames) {
   const analytics = calcFileAnalytics(filteredFiles);
   const submittedFiles = filteredFiles.filter(f => f.status === 'Submitted to Lender' || f.stageHistory?.some(h => h.stage === 'Submitted to Lender'));
   const submittedCount = filteredFiles.filter(f => f.status === 'Submitted to Lender').length;
+  const checklistPending = filteredFiles.filter(f => f.status === 'Ready to Submit' && !f.checklistSubmitted);
+  const isAnalystOrTL = ['analyst','teamlead'].includes(currentUser && currentUser.role);
 
   const fmt$ = v => '$' + Math.round(v).toLocaleString('en-AU');
 
@@ -7663,7 +7677,23 @@ function renderFilesAnalytics(el, allFiles, teamNames) {
         <div style="font-size:24px;font-weight:700;color:#14532D">${analytics.avgApprovalDays ? analytics.avgApprovalDays + 'd' : '—'}</div>
         <div style="font-size:11px;color:#14532D;font-weight:600">Avg start→approval</div>
       </div>
+      ${isAnalystOrTL ? `
+      <div style="background:#FEF3C7;border:1.5px solid #FDE68A;border-radius:var(--radius-sm);padding:12px;text-align:center;cursor:pointer" onclick="toggleChecklistPendingAnalytics()">
+        <div style="font-size:24px;font-weight:700;color:#92400E">${checklistPending.length}</div>
+        <div style="font-size:11px;color:#92400E;font-weight:600">Checklist not submitted</div>
+      </div>` : ''}
     </div>
+    ${isAnalystOrTL && checklistPending.length > 0 ? `
+    <div id="checklistPendingAnalytics" style="display:none;background:#FEF3C7;border:1.5px solid #FDE68A;border-radius:var(--radius-sm);padding:12px;margin-bottom:1rem">
+      <div style="font-size:12px;font-weight:700;color:#92400E;margin-bottom:8px">Files needing checklist</div>
+      ${checklistPending.map((f,i) => {
+        const idx = filteredFiles.indexOf(f);
+        return '<div style="font-size:13px;padding:4px 0;border-bottom:0.5px solid #FDE68A;display:flex;justify-content:space-between;align-items:center">' +
+          '<span>' + esc(f.client||'Unnamed') + (f.broker ? ' — ' + esc(f.broker) : '') + '</span>' +
+          '<button onclick="showChecklistModal(' + getFileEntries().indexOf(f) + ')" style="font-size:11px;padding:3px 8px;background:#92400E;color:#fff;border:none;border-radius:4px;cursor:pointer">Fill</button>' +
+          '</div>';
+      }).join('')}
+    </div>` : ''}
     ${submittedCount > 0 ? `
     <div id="submittedFilesList" style="display:none;background:#EFF6FF;border:1.5px solid #BFDBFE;border-radius:var(--radius-sm);padding:12px;margin-bottom:1rem">
       <div style="font-size:12px;font-weight:700;color:#1D4ED8;margin-bottom:8px">Currently submitted to lender</div>
@@ -7855,6 +7885,11 @@ function renderMyFilesScreen() {
   } else if (_myFilesTab === 'archive') {
     renderFilesArchive(el, myFiltered);
   }
+}
+
+function toggleChecklistPendingAnalytics() {
+  const el = document.getElementById('checklistPendingAnalytics');
+  if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
 }
 
 function toggleChecklistPendingList() {
