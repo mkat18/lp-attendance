@@ -1727,8 +1727,7 @@ let _previewRole = null;
 let _realRole = null;
 
 function startPreview(role) {
-  console.log('[PREVIEW] startPreview called with role:', role, 'isSuperAdmin:', isSuperAdmin(), 'currentUser.role:', currentUser&&currentUser.role);
-  if (!role || !isSuperAdmin()) { console.log('[PREVIEW] blocked - role:', role, 'isSuperAdmin:', isSuperAdmin()); return; }
+  if (!role || !isSuperAdmin()) return;
   _previewRole = role;
   _realRole = currentUser.role;
   currentUser.role = role;
@@ -1836,8 +1835,13 @@ async function loadPermissions() {
 // Get permissions for current user's role
 function getPerms() {
   if (isSuperAdmin()) return null; // superadmin always has everything
+  // During preview, currentUser.role is the preview role
   const role = currentUser?.role;
-  return _permissions[role] || DEFAULT_PERMISSIONS[role] || DEFAULT_PERMISSIONS.staff;
+  // Use SP permissions if loaded and valid, otherwise use defaults
+  const spPerms = _permissions[role];
+  const defaults = DEFAULT_PERMISSIONS[role] || DEFAULT_PERMISSIONS.staff;
+  if (spPerms && spPerms.tabs && Object.keys(spPerms.tabs).length > 3) return spPerms;
+  return defaults;
 }
 
 function canDo(feature) {
@@ -6832,9 +6836,169 @@ window.renderAdmin = function() {
 // ── FILE TRACKER ──────────────────────────────────────────────────────────
 // ══════════════════════════════════════════════════════════════════════════
 
+
+// ── Submission Checklist ─────────────────────────────────────────────────
+const SUBMISSION_CHECKLIST = [
+  { section: 'Privacy', items: [
+    'Interview questions completed accurately',
+    'Credit guide and Privacy consent form signed and dated',
+  ]},
+  { section: 'Identification', items: [
+    'Driver Licence',
+    'Passport',
+    'Visa copy (in case of foreign passport)',
+    'Medicare',
+  ]},
+  { section: 'Income', items: [
+    'PAYG: Payslips / employment letter or contract',
+    'Income statement (if applicable)',
+    'Bank statement with salary credits',
+    'Self employed: Individual Tax returns / Notice of Assessment / Business tax returns / Financial statement / BAS (if required)',
+    'TFN redacted from income documents',
+    'Low doc: Accountant\'s declaration / 2 quarters of BAS / Business bank statement',
+    'Rental income: Rental statements / Rental appraisals / Rental agreement / Valuation report',
+    'Other: Centrelink Income Statements / Child support agency agreement / Pension statements etc',
+    'Notes for explanation of income calculations',
+  ]},
+  { section: 'Existing Liabilities', items: [
+    'Evidence of Home Loan / credit cards / BNPL / Car loan / Personal loan statements',
+    'Evidence of rent/board',
+    '6 months refinance statements or CCR and verification of current details (interest rate, repayments, balance, term remaining)',
+  ]},
+  { section: 'Living Expenses', items: [
+    'Verify living expenses are consistent across Servicing, CRM, and AOL',
+    'Have checked statements for the following:',
+    '— Insurance debits',
+    '— Education debits / Private school fees',
+    '— Strata / Council payments',
+    '— No large credits / debits / fines / overdraw fees',
+  ]},
+  { section: 'Other', items: [
+    'Valuation',
+    'Pricing',
+    'Servicing',
+  ]},
+  { section: 'Purchase / Construction', items: [
+    'Contract of Sale',
+    'Building contract',
+  ]},
+  { section: 'Funds', items: [
+    'Evidence of funds to complete (e.g., deposit receipt, savings, gift letter / declaration)',
+  ]},
+  { section: 'NCCP', items: [
+    'Signed and dated credit proposal',
+    'Home loan application form',
+    'File notes, emails or other documents containing information relevant to the application process',
+  ]},
+];
+
+// Show checklist modal when file reaches Ready to Submit
+function showChecklistModal(fileIdx) {
+  const files = getFileEntries();
+  const file = files[fileIdx];
+  if (!file) return;
+
+  // Check if checklist already submitted
+  const existingChecklist = file.checklist || null;
+
+  const existing = document.getElementById('checklistModal');
+  if (existing) existing.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'checklistModal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:1rem;overflow-y:auto';
+
+  let sectionsHtml = '';
+  let itemIndex = 0;
+  for (const section of SUBMISSION_CHECKLIST) {
+    sectionsHtml += '<div style="margin-bottom:14px">';
+    sectionsHtml += '<div style="font-size:12px;font-weight:700;color:var(--text-2);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;padding-bottom:4px;border-bottom:1.5px solid var(--border)">' + section.section + '</div>';
+    for (const item of section.items) {
+      const savedVal = existingChecklist ? (existingChecklist[itemIndex] || '') : '';
+      sectionsHtml += '<div style="display:flex;align-items:flex-start;gap:10px;padding:6px 0;border-bottom:0.5px solid var(--border)">';
+      sectionsHtml += '<div style="flex:1;font-size:13px;padding-top:4px">' + item + '</div>';
+      sectionsHtml += '<div style="display:flex;gap:4px;flex-shrink:0">';
+      ['Yes','No','N/A'].forEach(opt => {
+        const selected = savedVal === opt;
+        sectionsHtml += '<button onclick="selectChecklistItem(this,' + itemIndex + ')" data-val="' + opt + '" style="font-size:12px;padding:4px 10px;border-radius:4px;border:1.5px solid ' + (selected?'var(--brand)':'var(--border)') + ';background:' + (selected?'var(--brand)':'transparent') + ';color:' + (selected?'#fff':'var(--text-2)') + ';cursor:pointer;font-weight:' + (selected?'600':'400') + '">' + opt + '</button>';
+      });
+      sectionsHtml += '</div></div>';
+      itemIndex++;
+    }
+    sectionsHtml += '</div>';
+  }
+
+  modal.innerHTML = '<div style="background:var(--surface);border-radius:var(--radius);padding:1.5rem;max-width:680px;width:100%;margin:auto">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">' +
+    '<div style="font-size:16px;font-weight:700">Submission Checklist — ' + esc(file.client||'File') + '</div>' +
+    '<button onclick="document.getElementById(\'checklistModal\').remove()" style="font-size:18px;background:none;border:none;cursor:pointer;color:var(--text-3)">&#x2715;</button>' +
+    '</div>' +
+    '<div style="background:#FEF3C7;border:1.5px solid #FDE68A;border-radius:var(--radius-sm);padding:10px 14px;font-size:13px;color:#92400E;margin-bottom:1rem">' +
+    '⚠ Requirements – Follow lender and aggregator checklists, in addition to the below' +
+    '</div>' +
+    '<div id="checklistItems">' + sectionsHtml + '</div>' +
+    '<div id="checklistError" style="color:var(--danger);font-size:12px;margin:8px 0;display:none">Please answer all items before submitting.</div>' +
+    '<div style="display:flex;gap:8px;margin-top:1rem">' +
+    '<button class="btn-primary" onclick="submitChecklist(' + fileIdx + ')">Save checklist</button>' +
+    '<button onclick="document.getElementById(\'checklistModal\').remove()" style="padding:10px 16px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:transparent;cursor:pointer;font-size:13px">Cancel</button>' +
+    '</div>' +
+    '</div>';
+
+  document.body.appendChild(modal);
+  // Store answers
+  modal._answers = existingChecklist ? [...existingChecklist] : new Array(itemIndex).fill('');
+}
+
+function selectChecklistItem(btn, idx) {
+  const modal = document.getElementById('checklistModal');
+  if (!modal) return;
+  if (!modal._answers) modal._answers = [];
+  modal._answers[idx] = btn.getAttribute('data-val');
+  // Update button styles in this row
+  const row = btn.parentElement;
+  row.querySelectorAll('button').forEach(b => {
+    const selected = b === btn;
+    b.style.borderColor = selected ? 'var(--brand)' : 'var(--border)';
+    b.style.background = selected ? 'var(--brand)' : 'transparent';
+    b.style.color = selected ? '#fff' : 'var(--text-2)';
+    b.style.fontWeight = selected ? '600' : '400';
+  });
+}
+
+async function submitChecklist(fileIdx) {
+  const modal = document.getElementById('checklistModal');
+  if (!modal) return;
+  const answers = modal._answers || [];
+  // Validate all answered
+  const totalItems = answers.length;
+  if (answers.filter(a => a).length < totalItems) {
+    const errEl = document.getElementById('checklistError');
+    if (errEl) errEl.style.display = 'block';
+    return;
+  }
+  const files = getFileEntries();
+  if (!files[fileIdx]) return;
+  files[fileIdx].checklist = answers;
+  files[fileIdx].checklistSubmitted = true;
+  files[fileIdx].checklistDate = today;
+  saveFileEntries(files);
+  modal.remove();
+  showToast('Checklist saved ✓', 'ok');
+  renderMyFilesScreen();
+  renderFilesScreen();
+}
+
+function getChecklistPendingFiles() {
+  const files = getFileEntries();
+  const myFiles = isSuperAdmin() || isManager()
+    ? files
+    : files.filter(f => f.owner === currentUser.name);
+  return myFiles.filter(f => f.status === 'Ready to Submit' && !f.checklistSubmitted);
+}
+
 const FILE_STATUSES = ['Data Collection','Pre-Qualification','Application Start',
   'Pending Info','Submitted to Lender','MIR','Conditionally Approved',
-  'Unconditionally Approved','Loan Documents','Settlement'];
+  'Unconditionally Approved','Loan Documents','Ready to Submit','Settlement'];
 
 const FILE_STATUS_COLORS = {
   'Data Collection':        {bg:'#F3F4F6',color:'#374151'},
@@ -7427,11 +7591,13 @@ function renderFilesAnalytics(el, allFiles, teamNames) {
         <div style="font-size:24px;font-weight:700;color:var(--success)">${analytics.settledCount}</div>
         <div style="font-size:11px;color:var(--text-3);font-weight:600">Settled</div>
       </div>
-      <div style="background:#FFFBEB;border:1.5px solid #FDE68A;border-radius:var(--radius-sm);padding:12px;text-align:center">
+      <div style="background:#FFFBEB;border:1.5px solid #FDE68A;border-radius:var(--radius-sm);padding:12px;text-align:center;position:relative">
+        <span style="position:absolute;top:6px;right:6px;font-size:9px;font-weight:700;background:#FDE68A;color:#92400E;padding:1px 6px;border-radius:99px">BETA</span>
         <div style="font-size:24px;font-weight:700;color:#92400E">${analytics.oneTouchCount}</div>
         <div style="font-size:11px;color:#92400E;font-weight:600">One-touch approvals</div>
       </div>
-      <div style="background:#F0FDF4;border:1.5px solid #BBF7D0;border-radius:var(--radius-sm);padding:12px;text-align:center">
+      <div style="background:#F0FDF4;border:1.5px solid #BBF7D0;border-radius:var(--radius-sm);padding:12px;text-align:center;position:relative">
+        <span style="position:absolute;top:6px;right:6px;font-size:9px;font-weight:700;background:#BBF7D0;color:#14532D;padding:1px 6px;border-radius:99px">BETA</span>
         <div style="font-size:24px;font-weight:700;color:#14532D">${analytics.avgApprovalDays ? analytics.avgApprovalDays + 'd' : '—'}</div>
         <div style="font-size:11px;color:#14532D;font-weight:600">Avg start→approval</div>
       </div>
@@ -7591,7 +7757,26 @@ function renderMyFilesScreen() {
   const myFiltered = mySearchQ ? allFiles.filter(f=>(f.client||'').toLowerCase().includes(mySearchQ)||(f.lender||'').toLowerCase().includes(mySearchQ)) : allFiles;
 
   if (_myFilesTab === 'today') {
-    renderMyFilesToday(el, myFiltered);
+    // Show checklist pending card at top
+    const checklistPending = getChecklistPendingFiles().filter(f => ownerPool.includes(f.owner));
+    if (checklistPending.length > 0) {
+      const checklistHtml = '<div class="card" style="background:#FEF3C7;border-color:#FDE68A;margin-bottom:12px;cursor:pointer" onclick="toggleChecklistPendingList()">' +
+        '<div style="display:flex;align-items:center;justify-content:space-between">' +
+        '<div style="font-size:13px;font-weight:600;color:#92400E">⚠ Checklist not submitted</div>' +
+        '<div style="font-size:22px;font-weight:700;color:#92400E">' + checklistPending.length + '</div>' +
+        '</div>' +
+        '<div id="checklistPendingList" style="display:none;margin-top:10px">' +
+        checklistPending.map((f,i) => '<div style="font-size:13px;padding:4px 0;border-top:0.5px solid #FDE68A;display:flex;align-items:center;justify-content:space-between">' +
+          '<span>' + esc(f.client||'Unnamed') + (f.broker ? ' — ' + esc(f.broker) : '') + '</span>' +
+          '<button onclick="event.stopPropagation();showChecklistModal(' + getFileEntries().indexOf(f) + ')" style="font-size:11px;padding:3px 8px;background:#92400E;color:#fff;border:none;border-radius:4px;cursor:pointer">Fill checklist</button>' +
+          '</div>').join('') +
+        '</div>' +
+        '</div>';
+      el.innerHTML = checklistHtml;
+    } else {
+      el.innerHTML = '';
+    }
+    renderMyFilesToday(el, myFiltered, true);
   } else if (_myFilesTab === 'daterange') {
     renderMyFilesDateRange(el, myFiltered);
   } else if (_myFilesTab === 'active') {
@@ -7605,17 +7790,31 @@ function renderMyFilesScreen() {
   }
 }
 
-function renderMyFilesToday(el, myFiles) {
+function toggleChecklistPendingList() {
+  const el = document.getElementById('checklistPendingList');
+  if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+function renderMyFilesToday(el, myFiles, append) {
   const todayFiles = myFiles.filter(f => f.updatedAt === today && f.active !== false);
+  const container = append ? document.createElement('div') : el;
   if (todayFiles.length === 0) {
-    el.innerHTML = `<div class="card" style="text-align:center;padding:2rem">
+    container.innerHTML = `<div class="card" style="text-align:center;padding:2rem">
       <div style="font-size:2rem;margin-bottom:10px">📁</div>
       <div style="font-size:15px;font-weight:600;color:var(--text)">No files updated today</div>
       <div style="font-size:13px;color:var(--text-3);margin-top:4px">Tap "+ Add / update a file" above to get started.</div>
     </div>`;
+    if (append) el.appendChild(container);
     return;
   }
-  el.innerHTML = todayFiles.map(f => `<div class="card" style="margin-bottom:10px;padding:0;overflow:hidden">${fileCard(f, true)}</div>`).join('');
+  const filesHtml = todayFiles.map(f => `<div class="card" style="margin-bottom:10px;padding:0;overflow:hidden">${fileCard(f, true)}</div>`).join('');
+  if (append) {
+    const div = document.createElement('div');
+    div.innerHTML = filesHtml;
+    el.appendChild(div);
+  } else {
+    el.innerHTML = filesHtml;
+  }
 }
 
 function renderMyFilesActive(el, myFiles) {
@@ -7738,6 +7937,11 @@ function quickStatusUpdate(fileId, newStatus) {
 
   saveFileEntries(files);
   showToast('Stage updated to ' + newStatus + ' ✓', 'ok');
+
+  // Show checklist when reaching Ready to Submit
+  if (newStatus === 'Ready to Submit') {
+    setTimeout(() => showChecklistModal(idx), 400);
+  }
 
   // Refresh whichever screen is active
   if (document.getElementById('screen-files')?.classList.contains('active')) renderFilesScreen();
