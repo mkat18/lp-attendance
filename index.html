@@ -40,38 +40,122 @@
   #loginScreen {
     min-height: 100vh;
     display: flex;
+    background: var(--navy);
+    overflow: hidden;
+    position: relative;
+  }
+
+  /* Animated background orbs */
+  #loginScreen::before {
+    content: '';
+    position: absolute;
+    width: 600px; height: 600px;
+    background: radial-gradient(circle, rgba(201,168,76,0.12) 0%, transparent 70%);
+    top: -200px; right: -100px;
+    border-radius: 50%;
+    animation: orb1 12s ease-in-out infinite alternate;
+  }
+
+  #loginScreen::after {
+    content: '';
+    position: absolute;
+    width: 400px; height: 400px;
+    background: radial-gradient(circle, rgba(79,70,229,0.1) 0%, transparent 70%);
+    bottom: -100px; left: -100px;
+    border-radius: 50%;
+    animation: orb2 10s ease-in-out infinite alternate;
+  }
+
+  @keyframes orb1 { from { transform: translate(0,0) scale(1); } to { transform: translate(40px,60px) scale(1.1); } }
+  @keyframes orb2 { from { transform: translate(0,0) scale(1); } to { transform: translate(-30px,-40px) scale(1.15); } }
+
+  .login-left {
+    flex: 1;
+    display: flex;
     flex-direction: column;
+    justify-content: center;
+    padding: 4rem;
+    position: relative;
+    z-index: 1;
+  }
+
+  .login-eyebrow {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin-bottom: 1.5rem;
+  }
+
+  .login-headline {
+    font-size: clamp(32px, 5vw, 52px);
+    font-weight: 700;
+    color: #fff;
+    line-height: 1.15;
+    margin-bottom: 1.25rem;
+    letter-spacing: -0.5px;
+  }
+
+  .login-headline span {
+    color: var(--gold);
+  }
+
+  .login-sub {
+    font-size: 16px;
+    color: rgba(255,255,255,0.5);
+    line-height: 1.7;
+    max-width: 420px;
+    margin-bottom: 3rem;
+  }
+
+  .login-features {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .login-feature {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    color: rgba(255,255,255,0.55);
+  }
+
+  .login-feature-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--gold);
+    flex-shrink: 0;
+  }
+
+  .login-right {
+    width: 420px;
+    display: flex;
     align-items: center;
     justify-content: center;
-    background: var(--navy);
     padding: 2rem;
-  }
-
-  .login-logo {
-    margin-bottom: 2.5rem;
-    text-align: center;
-  }
-
-  .login-logo img {
-    height: 52px;
-    margin-bottom: 1rem;
-  }
-
-  .login-logo-text {
-    font-size: 13px;
-    color: rgba(255,255,255,0.45);
-    letter-spacing: 2px;
-    text-transform: uppercase;
+    position: relative;
+    z-index: 1;
   }
 
   .login-card {
-    background: rgba(255,255,255,0.05);
+    background: rgba(255,255,255,0.04);
     border: 1px solid rgba(255,255,255,0.1);
-    border-radius: var(--radius);
+    border-radius: 20px;
     padding: 2.5rem;
     width: 100%;
-    max-width: 380px;
-    text-align: center;
+    backdrop-filter: blur(20px);
+  }
+
+  .login-card-eyebrow {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.3);
+    margin-bottom: 1.25rem;
   }
 
   .login-card h1 {
@@ -82,10 +166,10 @@
   }
 
   .login-card p {
-    font-size: 14px;
-    color: rgba(255,255,255,0.5);
+    font-size: 13px;
+    color: rgba(255,255,255,0.4);
     margin-bottom: 2rem;
-    line-height: 1.5;
+    line-height: 1.6;
   }
 
   .ms-btn {
@@ -94,27 +178,55 @@
     justify-content: center;
     gap: 10px;
     width: 100%;
-    padding: 13px 20px;
+    padding: 14px 20px;
     background: #fff;
     border: none;
-    border-radius: var(--radius-sm);
+    border-radius: 10px;
     font-size: 14px;
     font-weight: 600;
     color: var(--navy);
     cursor: pointer;
-    transition: background .15s, transform .1s;
+    transition: all .2s;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
   }
 
-  .ms-btn:hover { background: #f0f0f0; transform: translateY(-1px); }
+  .ms-btn:hover { background: #f5f5f5; transform: translateY(-2px); box-shadow: 0 8px 30px rgba(0,0,0,0.4); }
   .ms-btn:active { transform: translateY(0); }
-
   .ms-btn svg { width: 20px; height: 20px; }
+
+  .login-divider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 1.5rem 0;
+  }
+
+  .login-divider-line { flex: 1; height: 1px; background: rgba(255,255,255,0.08); }
+  .login-divider-text { font-size: 11px; color: rgba(255,255,255,0.25); }
+
+  .login-security {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    font-size: 11px;
+    color: rgba(255,255,255,0.25);
+    margin-top: 1.5rem;
+  }
 
   .login-err {
     margin-top: 1rem;
     font-size: 12px;
     color: #FC8181;
     min-height: 18px;
+    text-align: center;
+  }
+
+  @media (max-width: 768px) {
+    #loginScreen { flex-direction: column; }
+    .login-left { padding: 3rem 2rem 1rem; }
+    .login-right { width: 100%; padding: 1rem 2rem 3rem; }
+    .login-features { display: none; }
   }
 
   /* ── Portal screen ─────────────────────────────────────────────── */
@@ -352,22 +464,42 @@
 
 <!-- Login -->
 <div id="loginScreen" style="display:none">
-  <div class="login-logo">
-    <div class="login-logo-text">Loan Processor</div>
+  <div class="login-left">
+    <div class="login-eyebrow">Loan Processor · Internal Portal</div>
+    <h1 class="login-headline">One place for<br>every<span> tool</span> you need</h1>
+    <p class="login-sub">Access your attendance, training, broker tools and HR suite — all in one secure workspace built for the LP team.</p>
+    <div class="login-features">
+      <div class="login-feature"><div class="login-feature-dot"></div>Check in, track breaks and submit EOD reports</div>
+      <div class="login-feature"><div class="login-feature-dot"></div>Access training modules and session recordings</div>
+      <div class="login-feature"><div class="login-feature-dot"></div>Manage broker files and client communications</div>
+      <div class="login-feature"><div class="login-feature-dot"></div>Role-based access — see only what you need</div>
+    </div>
   </div>
-  <div class="login-card">
-    <h1>Welcome back</h1>
-    <p>Sign in with your Loan Processor Microsoft account to access your apps.</p>
-    <button class="ms-btn" onclick="msLogin()">
-      <svg viewBox="0 0 21 21" xmlns="http://www.w3.org/2000/svg">
-        <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
-        <rect x="11" y="1" width="9" height="9" fill="#7fba00"/>
-        <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/>
-        <rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
-      </svg>
-      Sign in with Microsoft
-    </button>
-    <div class="login-err" id="loginErr"></div>
+  <div class="login-right">
+    <div class="login-card">
+      <div class="login-card-eyebrow">Secure sign in</div>
+      <h1>Welcome back</h1>
+      <p>Use your Loan Processor Microsoft account to continue. Access is managed by your system administrator.</p>
+      <button class="ms-btn" onclick="msLogin()">
+        <svg viewBox="0 0 21 21" xmlns="http://www.w3.org/2000/svg">
+          <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
+          <rect x="11" y="1" width="9" height="9" fill="#7fba00"/>
+          <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/>
+          <rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
+        </svg>
+        Sign in with Microsoft
+      </button>
+      <div class="login-divider">
+        <div class="login-divider-line"></div>
+        <div class="login-divider-text">secured by Microsoft Entra ID</div>
+        <div class="login-divider-line"></div>
+      </div>
+      <div class="login-security">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        Your data stays within your Microsoft 365 tenant
+      </div>
+      <div class="login-err" id="loginErr"></div>
+    </div>
   </div>
 </div>
 
@@ -429,7 +561,7 @@ const ALL_APPS = [
     accent: '#C9A84C',
     url: BASE_URL + 'lms.html',
     badge: 'Soon',
-    roles: ['superadmin','manager','teamlead','analyst'],
+    roles: ['superadmin','hrmanager','teamlead','analyst'],
   },
   {
     id: 'broker',
@@ -451,7 +583,7 @@ const ALL_APPS = [
     accent: '#E11D48',
     url: BASE_URL + 'hr.html',
     badge: 'Soon',
-    roles: ['superadmin'],
+    roles: ['superadmin','hrmanager'],
   },
   {
     id: 'payroll',

@@ -838,7 +838,7 @@ tr.flagged-row:hover td { background: #FFEAEA; }
         <div class="field">
           <label>Role</label>
           <select id="newManagerOnlyRole" style="font-size:14px">
-            <option value="manager">Manager</option>
+            <option value="hrmanager">HR Manager</option>
             <option value="superadmin">Super Admin</option>
           </select>
         </div>
@@ -892,6 +892,12 @@ tr.flagged-row:hover td { background: #FFEAEA; }
       <p style="font-size:13px;color:var(--text-2);margin-bottom:12px">All PIN resets, role changes and account changes.</p>
       <button class="btn-primary" id="auditLogBtn" onclick="toggleAuditLog()">View audit log</button>
       <div id="auditLogList" style="margin-top:12px;display:none"></div>
+    </div>
+
+    <div class="card" id="permissionsEditorCard" style="display:none">
+      <div class="section-label">🔐 Role permissions</div>
+      <p style="font-size:13px;color:var(--text-2);margin-bottom:12px">Control what each role can see and do. Superadmin permissions are fixed and cannot be changed.</p>
+      <div id="permissionsEditorContent"></div>
     </div>
 
     <div class="card" id="obsNotesStatsCard" style="display:none">
@@ -1349,13 +1355,13 @@ function hashPin(p){ let h=0; for(let i=0;i<p.length;i++) h=(Math.imul(31,h)+p.c
 const BUILTIN_STAFF = [
     { name:'Mayur', role:'superadmin', pin:hashPin('284716'), tempPin:null, startTime:null, endTime:null, office:null },
     { name:'Divit', role:'superadmin', pin:hashPin('539182'), tempPin:null, startTime:null, endTime:null, office:null },
-    { name:'Yug Kanojia', role:'manager', pin:hashPin('617394'), tempPin:null, startTime:'06:00', endTime:'14:30', office:'Goregaon' },
-    { name:'Krutika Nakti', role:'manager', pin:hashPin('492851'), tempPin:null, startTime:'06:00', endTime:'14:30', office:'Goregaon' },
+    { name:'Yug Kanojia', role:'hrmanager', pin:hashPin('617394'), tempPin:null, startTime:'06:00', endTime:'14:30', office:'Goregaon' },
+    { name:'Krutika Nakti', role:'hrmanager', pin:hashPin('492851'), tempPin:null, startTime:'06:00', endTime:'14:30', office:'Goregaon' },
     { name:'Ankita Lokhande', role:'assistant', pin:hashPin('736429'), tempPin:null, startTime:'06:00', endTime:'14:30', office:'Goregaon' },
 
     { name:'Nikki Jain', role:'staff', pin:hashPin('473829'), tempPin:null, startTime:'06:00', endTime:'14:30', office:'Borivali' },
     { name:'Nehal Poojari', role:'staff', pin:hashPin('916274'), tempPin:null, startTime:'06:00', endTime:'14:30', office:'Borivali' },
-    { name:'Vianney Romeo', role:'manager', pin:hashPin('739284'), tempPin:null, startTime:'06:00', endTime:'14:30', office:'Goregaon' },
+    { name:'Vianney Romeo', role:'hrmanager', pin:hashPin('739284'), tempPin:null, startTime:'06:00', endTime:'14:30', office:'Goregaon' },
     { name:'Shruti Rathod', role:'staff', pin:null, tempPin:null, startTime:'05:00', endTime:'13:30', office:'Goregaon' },
     { name:'Athmika Shetty', role:'staff', pin:null, tempPin:null, startTime:'05:00', endTime:'13:30', office:'Goregaon' },
     { name:'Tushar Goud', role:'staff', pin:null, tempPin:null, startTime:'05:00', endTime:'13:30', office:'Borivali' },
@@ -1691,14 +1697,14 @@ function showScreen(name) {
 }
 
 // ── Role helpers ──────────────────────────────────────────────────────────
-const ROLE_LABEL = { superadmin:'Super Admin', manager:'Manager (Senior HR)', hr:'HR', teamlead:'Team Lead', analyst:'Analyst', trainee:'Trainee', assistant:'Assistant', sales:'Sales', customerservice:'Customer Service', socialmedia:'Social Media' };
+const ROLE_LABEL = { superadmin:'Super Admin', hrmanager:'HR Manager', hr:'HR', teamlead:'Team Lead', analyst:'Analyst', trainee:'Trainee', assistant:'Assistant', sales:'Sales', customerservice:'Customer Service', socialmedia:'Social Media' };
 const ANALYST_ROLES = ['analyst','teamlead']; // roles that get Files tab
 const CHECKIN_ROLES = ['manager','hr','teamlead','analyst','trainee','assistant','sales','customerservice','socialmedia']; // all check in except superadmin
 const DASHBOARD_ROLES = ['manager','hr','teamlead','assistant']; // see dashboard
 const ADMIN_ROLES = ['manager','superadmin']; // see admin panel
 
 function isSuperAdmin()    { return currentUser&&(_realRole||currentUser.role)==='superadmin'; }
-function isManager()       { return currentUser&&(['manager','superadmin'].includes(_realRole||currentUser.role)); }
+function isManager()       { return currentUser&&(['hrmanager','superadmin'].includes(_realRole||currentUser.role)); }
 function isHR()            { return currentUser&&currentUser.role==='hr'; }
 function isAssistant()     { return currentUser&&currentUser.role==='assistant'; }
 function isTeamLead()      { return currentUser&&currentUser.role==='teamlead'; }
@@ -1707,9 +1713,9 @@ function isTrainee()       { return currentUser&&currentUser.role==='trainee'; }
 function canSeeFiles()     { return currentUser&&(ANALYST_ROLES.includes(currentUser.role)||isSuperAdmin()); }
 function canSeeDashboard() { return currentUser&&(DASHBOARD_ROLES.includes(currentUser.role)||isSuperAdmin()); }
 function canSeeAdmin()     { return currentUser&&ADMIN_ROLES.includes(currentUser.role); }
-function hasDashboard() { return currentUser&&['superadmin','manager','assistant'].includes(currentUser.role); }
-function canEdit()      { return currentUser&&['superadmin','manager'].includes(currentUser.role); }
-function canAddStaff()  { return currentUser&&['superadmin','manager'].includes(currentUser.role); }
+function hasDashboard() { return currentUser&&['superadmin','hrmanager','assistant'].includes(currentUser.role); }
+function canEdit()      { return currentUser&&['superadmin','hrmanager'].includes(currentUser.role); }
+function canAddStaff()  { return currentUser&&['superadmin','hrmanager'].includes(currentUser.role); }
 function canDeleteStaff(){ return isSuperAdmin(); }
 function canChangeRole(){ return isSuperAdmin(); }
 function canEditRecords(){ return isSuperAdmin(); }
@@ -1728,7 +1734,7 @@ function startPreview(role) {
   currentUser.role = role;
   buildNav();
   // Show what this role sees first
-  if (role === 'manager') { loadDashboard(); showScreen('dashboard'); }
+  if (role === 'hrmanager') { loadDashboard(); showScreen('dashboard'); }
   else { initCheckin(); showScreen('checkin'); }
   const firstTab = document.querySelector('.nav-tab');
   if (firstTab) firstTab.classList.add('active');
@@ -1745,6 +1751,389 @@ function exitPreview() {
   if (firstTab) firstTab.classList.add('active');
 }
 
+
+// ══════════════════════════════════════════════════════════════════════════
+// ── PERMISSIONS SYSTEM ────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════
+
+// Default permissions per role — used if SP has nothing
+const DEFAULT_PERMISSIONS = {
+  hrmanager: {
+    tabs: { checkin:true, leave:true, dashboard:true, admin:true, files:false, myfiles:false, myteam:false, eod:false, performance:false, othertasks:false, feedback:false, profile:true },
+    features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canApproveLeave:true, canSeeTeamLeaveBalances:true, canSeeAllFiles:false, canAddStaff:true, canResetPins:true, canChangeRoles:false, canDeleteStaff:false, canExportData:true, canAddObsNotes:true }
+  },
+  teamlead: {
+    tabs: { checkin:true, leave:true, dashboard:false, admin:false, files:true, myfiles:true, myteam:true, eod:false, performance:true, othertasks:true, feedback:true, profile:true },
+    features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canApproveLeave:true, canSeeTeamLeaveBalances:false, canSeeAllFiles:false, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:true }
+  },
+  analyst: {
+    tabs: { checkin:true, leave:true, dashboard:false, admin:false, files:false, myfiles:true, myteam:false, eod:true, performance:false, othertasks:true, feedback:false, profile:true },
+    features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canApproveLeave:false, canSeeTeamLeaveBalances:false, canSeeAllFiles:false, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:false }
+  },
+  trainee: {
+    tabs: { checkin:true, leave:true, dashboard:false, admin:false, files:false, myfiles:false, myteam:false, eod:false, performance:false, othertasks:false, feedback:false, profile:true },
+    features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canApproveLeave:false, canSeeTeamLeaveBalances:false, canSeeAllFiles:false, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:false }
+  },
+  staff: {
+    tabs: { checkin:true, leave:true, dashboard:false, admin:false, files:false, myfiles:false, myteam:false, eod:false, performance:false, othertasks:false, feedback:false, profile:true },
+    features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canApproveLeave:false, canSeeTeamLeaveBalances:false, canSeeAllFiles:false, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:false }
+  },
+  hr: {
+    tabs: { checkin:true, leave:true, dashboard:true, admin:false, files:false, myfiles:false, myteam:false, eod:false, performance:false, othertasks:false, feedback:false, profile:true },
+    features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canApproveLeave:false, canSeeTeamLeaveBalances:false, canSeeAllFiles:false, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:false }
+  },
+  assistant: {
+    tabs: { checkin:true, leave:true, dashboard:false, admin:false, files:false, myfiles:false, myteam:false, eod:false, performance:false, othertasks:false, feedback:false, profile:true },
+    features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canApproveLeave:false, canSeeTeamLeaveBalances:false, canSeeAllFiles:false, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:false }
+  },
+  sales: {
+    tabs: { checkin:true, leave:true, dashboard:false, admin:false, files:false, myfiles:false, myteam:false, eod:false, performance:false, othertasks:false, feedback:false, profile:true },
+    features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canApproveLeave:false, canSeeTeamLeaveBalances:false, canSeeAllFiles:false, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:false }
+  },
+  customerservice: {
+    tabs: { checkin:true, leave:true, dashboard:false, admin:false, files:false, myfiles:false, myteam:false, eod:false, performance:false, othertasks:false, feedback:false, profile:true },
+    features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canApproveLeave:false, canSeeTeamLeaveBalances:false, canSeeAllFiles:false, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:false }
+  },
+  socialmedia: {
+    tabs: { checkin:true, leave:true, dashboard:false, admin:false, files:false, myfiles:false, myteam:false, eod:false, performance:false, othertasks:false, feedback:false, profile:true },
+    features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canApproveLeave:false, canSeeTeamLeaveBalances:false, canSeeAllFiles:false, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:false }
+  },
+};
+
+// Live permissions cache
+let _permissions = JSON.parse(JSON.stringify(DEFAULT_PERMISSIONS));
+let _lastSavedPermissions = null; // for undo
+let _undoTimer = null;
+
+// Load permissions from SP
+async function loadPermissions() {
+  try {
+    const token = await getToken();
+    if (!token) return;
+    const res = await fetch(SP_API + "('RolePermissions')/items?$select=Title,Permissions&$top=50",
+      { headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json;odata=nometadata' } });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data?.value?.length) {
+      for (const item of data.value) {
+        const role = item.Title?.toLowerCase();
+        if (role && item.Permissions) {
+          try {
+            const parsed = JSON.parse(item.Permissions);
+            _permissions[role] = parsed;
+          } catch(e) { console.warn('Invalid permissions JSON for role:', role); }
+        }
+      }
+      LS.set('ci_permissions', _permissions);
+    }
+  } catch(e) {
+    const cached = LS.get('ci_permissions');
+    if (cached) _permissions = cached;
+    console.warn('loadPermissions failed:', e);
+  }
+}
+
+// Get permissions for current user's role
+function getPerms() {
+  if (isSuperAdmin()) return null; // superadmin always has everything
+  const role = currentUser?.role;
+  return _permissions[role] || DEFAULT_PERMISSIONS[role] || DEFAULT_PERMISSIONS.staff;
+}
+
+function canDo(feature) {
+  if (isSuperAdmin()) return true;
+  const p = getPerms();
+  return p ? (p.features[feature] !== false) : true;
+}
+
+function hasTab(tab) {
+  if (isSuperAdmin()) return true;
+  const p = getPerms();
+  return p ? (p.tabs[tab] === true) : false;
+}
+
+// Save permissions for a role to SP
+async function saveRolePermissions(role, perms) {
+  const token = await getToken();
+  if (!token) return false;
+  const payload = { Title: role, Permissions: JSON.stringify(perms) };
+  // Check if exists
+  const checkRes = await fetch(SP_API + "('RolePermissions')/items?$filter=Title eq '" + role + "'&$select=Id",
+    { headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json;odata=nometadata' } });
+  if (checkRes.ok) {
+    const checkData = await checkRes.json();
+    if (checkData?.value?.length) {
+      await spPatch(SP_API + "('RolePermissions')/items(" + checkData.value[0].Id + ")", payload);
+    } else {
+      await spPostDirect(SP_API + "('RolePermissions')/items", payload);
+    }
+  }
+  _permissions[role] = perms;
+  LS.set('ci_permissions', _permissions);
+  return true;
+}
+
+// ── Permissions editor ────────────────────────────────────────────────────
+const DANGEROUS_FEATURES = {
+  canChangeRoles: { label: 'Can change roles', warning: 'Allows role escalation — a user could grant themselves or others elevated access including HR Manager.' },
+  canDeleteStaff: { label: 'Can delete staff', warning: 'Allows permanent deletion of staff records. This cannot be undone.' },
+  canExportData: { label: 'Can export all data', warning: 'Exposes complete attendance data for all staff as a downloadable CSV.' },
+  canAddStaff: { label: 'Can add staff', warning: 'Allows creating new accounts in the system.' },
+  canResetPins: { label: 'Can reset PINs', warning: 'Allows resetting another person's PIN — could be used for unauthorised access.' },
+};
+
+const TAB_LABELS = {
+  checkin: 'Check In', leave: '🌴 Leave', dashboard: 'Dashboard',
+  admin: 'Staff admin', files: 'All Files', myfiles: 'My Files',
+  myteam: 'My Team', eod: 'EOD Reports', performance: 'Performance',
+  othertasks: 'Other Tasks', feedback: 'Feedback', profile: 'PIN / Profile'
+};
+
+const FEATURE_LABELS = {
+  canBreak: 'Can take breaks',
+  canClockOut: 'Can clock out',
+  requiresSelfie: 'Must take selfie on check-in',
+  requiresLocation: 'Location required on check-in',
+  canApplyLeave: 'Can apply for leave',
+  canApproveLeave: 'Can approve/reject leave',
+  canSeeTeamLeaveBalances: 'Can see team leave balances',
+  canSeeAllFiles: 'Can see all files (not just own)',
+  canAddStaff: 'Can add new staff',
+  canResetPins: 'Can reset PINs',
+  canChangeRoles: 'Can change roles',
+  canDeleteStaff: 'Can delete staff',
+  canExportData: 'Can export all data as CSV',
+  canAddObsNotes: 'Can add observation notes',
+};
+
+const EDITABLE_ROLES = ['hrmanager','teamlead','analyst','trainee','staff','hr','assistant','sales','customerservice','socialmedia'];
+
+let _editingRole = null;
+let _pendingPermissions = null;
+
+function renderPermissionsEditor() {
+  const el = document.getElementById('permissionsEditorContent');
+  if (!el) return;
+
+  const roleOptions = EDITABLE_ROLES.map(r =>
+    `<option value="${r}" ${_editingRole===r?'selected':''}>${ROLE_LABEL[r]||r}</option>`
+  ).join('');
+
+  if (!_editingRole) {
+    el.innerHTML = `
+      <p style="font-size:13px;color:var(--text-2);margin-bottom:12px">Select a role to view and edit its permissions. Superadmin permissions cannot be modified.</p>
+      <select id="permRoleSelect" onchange="selectPermRole(this.value)" style="font-size:14px;width:auto">
+        <option value="">— Select role —</option>
+        ${roleOptions}
+      </select>`;
+    return;
+  }
+
+  const perms = JSON.parse(JSON.stringify(_permissions[_editingRole] || DEFAULT_PERMISSIONS[_editingRole] || DEFAULT_PERMISSIONS.staff));
+  _pendingPermissions = perms;
+
+  const tabsHtml = Object.entries(TAB_LABELS).map(([key, label]) => `
+    <label style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:0.5px solid var(--border);cursor:pointer;font-size:13px">
+      <input type="checkbox" id="perm-tab-${key}" ${perms.tabs[key]?'checked':''} onchange="updatePendingPerm('tab','${key}',this.checked)" style="width:16px;height:16px;cursor:pointer"/>
+      <span>${label}</span>
+    </label>`).join('');
+
+  const featHtml = Object.entries(FEATURE_LABELS).map(([key, label]) => {
+    const isDangerous = key in DANGEROUS_FEATURES;
+    return `
+    <label style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:0.5px solid var(--border);cursor:pointer;font-size:13px">
+      <input type="checkbox" id="perm-feat-${key}" ${perms.features[key]?'checked':''} onchange="updatePendingPerm('feature','${key}',this.checked)" style="width:16px;height:16px;cursor:pointer"/>
+      <span style="flex:1">${label}</span>
+      ${isDangerous?`<span style="font-size:10px;background:#FEF2F2;color:var(--danger);padding:2px 6px;border-radius:4px;font-weight:600">⚠ Sensitive</span>`:''}
+    </label>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+      <select id="permRoleSelect" onchange="selectPermRole(this.value)" style="font-size:14px;width:auto">
+        <option value="">— Select role —</option>
+        ${roleOptions}
+      </select>
+      <span style="font-size:12px;color:var(--text-3)">Editing: <strong>${ROLE_LABEL[_editingRole]||_editingRole}</strong></span>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+      <div>
+        <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">Tabs visible</div>
+        ${tabsHtml}
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">Features</div>
+        ${featHtml}
+      </div>
+    </div>
+    <div id="permWarnings" style="margin-bottom:12px"></div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button class="btn-primary" onclick="initiatePermSave()">Save permissions</button>
+      <button onclick="selectPermRole('')" style="font-size:13px;padding:8px 16px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:transparent;cursor:pointer">Cancel</button>
+    </div>
+    <div id="undoPermBanner" style="display:none;margin-top:10px;background:#FEF3C7;border:1.5px solid #FDE68A;border-radius:var(--radius-sm);padding:10px 14px;font-size:13px;display:flex;align-items:center;justify-content:space-between">
+      <span>Permissions saved. <span id="undoCountdown">60</span>s to undo.</span>
+      <button onclick="undoPermissions()" style="font-size:12px;padding:4px 10px;background:var(--warn);color:#fff;border:none;border-radius:4px;cursor:pointer">Undo</button>
+    </div>`;
+
+  updatePermWarnings();
+}
+
+function selectPermRole(role) {
+  _editingRole = role || null;
+  renderPermissionsEditor();
+}
+
+function updatePendingPerm(type, key, value) {
+  if (!_pendingPermissions) return;
+  if (type === 'tab') _pendingPermissions.tabs[key] = value;
+  else _pendingPermissions.features[key] = value;
+  updatePermWarnings();
+}
+
+function updatePermWarnings() {
+  const el = document.getElementById('permWarnings');
+  if (!el || !_pendingPermissions) return;
+  const warnings = [];
+  for (const [key, info] of Object.entries(DANGEROUS_FEATURES)) {
+    if (_pendingPermissions.features[key]) {
+      warnings.push(`<div style="background:#FEF2F2;border:1.5px solid #FECACA;border-radius:var(--radius-sm);padding:8px 12px;font-size:12px;color:var(--danger);margin-bottom:6px">⚠ <strong>${info.label}:</strong> ${info.warning}</div>`);
+    }
+  }
+  el.innerHTML = warnings.join('');
+}
+
+function initiatePermSave() {
+  if (!_editingRole || !_pendingPermissions) return;
+
+  // Build change summary
+  const current = _permissions[_editingRole] || DEFAULT_PERMISSIONS[_editingRole] || DEFAULT_PERMISSIONS.staff;
+  const changes = [];
+
+  for (const [key, val] of Object.entries(_pendingPermissions.tabs)) {
+    if ((current.tabs[key]||false) !== val) {
+      changes.push(`${val?'✓ Added':'✗ Removed'} tab: ${TAB_LABELS[key]||key}`);
+    }
+  }
+  for (const [key, val] of Object.entries(_pendingPermissions.features)) {
+    if ((current.features[key]||false) !== val) {
+      changes.push(`${val?'✓ Enabled':'✗ Disabled'} feature: ${FEATURE_LABELS[key]||key}`);
+    }
+  }
+
+  if (!changes.length) { showToast('No changes to save.','ok'); return; }
+
+  // Count affected staff
+  const affectedStaff = getStaff().filter(s => s.role === _editingRole);
+
+  // Show confirmation modal
+  showPermConfirmModal(_editingRole, changes, affectedStaff.length);
+}
+
+function showPermConfirmModal(role, changes, affectedCount) {
+  // Remove existing modal
+  const existing = document.getElementById('permConfirmModal');
+  if (existing) existing.remove();
+
+  const dangerousChanges = changes.filter(c => {
+    for (const key of Object.keys(DANGEROUS_FEATURES)) {
+      if (c.includes(FEATURE_LABELS[key])) return true;
+    }
+    return false;
+  });
+
+  const modal = document.createElement('div');
+  modal.id = 'permConfirmModal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem';
+  modal.innerHTML = `
+    <div style="background:var(--surface);border-radius:var(--radius);padding:2rem;max-width:480px;width:100%;max-height:90vh;overflow-y:auto">
+      <div style="font-size:18px;font-weight:700;margin-bottom:6px">Confirm permission changes</div>
+      <div style="font-size:13px;color:var(--text-2);margin-bottom:16px">
+        You are changing permissions for <strong>${ROLE_LABEL[role]||role}</strong>. 
+        This affects <strong>${affectedCount} staff member${affectedCount!==1?'s':''}</strong> and takes effect immediately.
+      </div>
+      <div style="background:var(--surface-2);border-radius:var(--radius-sm);padding:12px;margin-bottom:12px;max-height:160px;overflow-y:auto">
+        ${changes.map(c=>`<div style="font-size:12px;padding:3px 0;color:${c.startsWith('✓')?'var(--success)':'var(--danger)'}">${c}</div>`).join('')}
+      </div>
+      ${dangerousChanges.length ? `
+        <div style="background:#FEF2F2;border:1.5px solid #FECACA;border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:12px;font-size:12px;color:var(--danger)">
+          ⚠ You are enabling sensitive permissions. Review carefully before confirming.
+        </div>` : ''}
+      <div style="margin-bottom:16px">
+        <label style="font-size:12px;color:var(--text-2);display:block;margin-bottom:6px">
+          Type <strong>${role.toUpperCase()}</strong> to confirm:
+        </label>
+        <input type="text" id="permConfirmInput" placeholder="Type role name here…" 
+          style="width:100%;font-size:14px;padding:8px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:monospace"
+          oninput="checkPermConfirmInput('${role}')"/>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button id="permConfirmBtn" onclick="confirmPermSave('${role}')" disabled
+          style="flex:1;padding:10px;background:var(--danger);color:#fff;border:none;border-radius:var(--radius-sm);font-size:14px;font-weight:600;cursor:not-allowed;opacity:0.5">
+          Confirm changes
+        </button>
+        <button onclick="document.getElementById('permConfirmModal').remove()"
+          style="flex:1;padding:10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-size:14px;background:transparent;cursor:pointer">
+          Cancel
+        </button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+}
+
+function checkPermConfirmInput(role) {
+  const input = document.getElementById('permConfirmInput');
+  const btn = document.getElementById('permConfirmBtn');
+  if (!input || !btn) return;
+  const matches = input.value.trim().toUpperCase() === role.toUpperCase();
+  btn.disabled = !matches;
+  btn.style.opacity = matches ? '1' : '0.5';
+  btn.style.cursor = matches ? 'pointer' : 'not-allowed';
+}
+
+async function confirmPermSave(role) {
+  document.getElementById('permConfirmModal')?.remove();
+  showToast('Saving permissions…','ok');
+
+  // Save backup for undo
+  _lastSavedPermissions = { role, perms: JSON.parse(JSON.stringify(_permissions[role] || DEFAULT_PERMISSIONS[role] || DEFAULT_PERMISSIONS.staff)) };
+
+  const success = await saveRolePermissions(role, _pendingPermissions);
+  if (!success) { showToast('Failed to save permissions.','err'); return; }
+
+  writeAuditLog('Permissions Changed', role, `Permissions updated for ${ROLE_LABEL[role]||role} by ${currentUser.name}`);
+  showToast('Permissions saved ✓','ok');
+
+  // Show undo banner
+  renderPermissionsEditor();
+  const undoBanner = document.getElementById('undoPermBanner');
+  if (undoBanner) {
+    undoBanner.style.display = 'flex';
+    let secs = 60;
+    _undoTimer = setInterval(() => {
+      secs--;
+      const countdown = document.getElementById('undoCountdown');
+      if (countdown) countdown.textContent = secs;
+      if (secs <= 0) {
+        clearInterval(_undoTimer);
+        if (undoBanner) undoBanner.style.display = 'none';
+        _lastSavedPermissions = null;
+      }
+    }, 1000);
+  }
+}
+
+async function undoPermissions() {
+  if (!_lastSavedPermissions) return;
+  clearInterval(_undoTimer);
+  const { role, perms } = _lastSavedPermissions;
+  await saveRolePermissions(role, perms);
+  _lastSavedPermissions = null;
+  writeAuditLog('Permissions Reverted', role, `Permissions for ${ROLE_LABEL[role]||role} reverted by ${currentUser.name}`);
+  showToast('Permissions reverted ✓','ok');
+  selectPermRole(role);
+}
+
 function buildNav() {
   const nav = document.getElementById('navRight');
   if (!currentUser) { nav.innerHTML=''; return; }
@@ -1752,21 +2141,21 @@ function buildNav() {
   const r = currentUser.role;
   if (r === 'superadmin') {
     tabs = [['dashboard','Dashboard'],['admin','Staff'],['files','All Files'],['profile','PIN']];
-  } else if (r === 'manager') {
+  } else if (r === 'hrmanager') {
     tabs = [['checkin','Check in'],['leave','🌴 Leave'],['dashboard','Dashboard'],['admin','Staff'],['profile','PIN']];
-  } else if (r === 'hr') {
-    tabs = [['checkin','Check in'],['leave','🌴 Leave'],['dashboard','Dashboard'],['profile','PIN']];
-  } else if (r === 'teamlead') {
-    tabs = [['checkin','Check in'],['leave','🌴 Leave'],['myteam','My Team'],['files','Team Files'],['myfiles','My Files'],['othertasks','Other Tasks'],['feedback','📣 Feedback'],['eod','EOD'],['performance','📊 Performance'],['profile','PIN']];
-  } else if (r === 'analyst') {
-    tabs = [['checkin','Check in'],['leave','🌴 Leave'],['myfiles','My Files'],['othertasks','Other Tasks'],['eod','EOD'],['profile','PIN']];
-  } else if (['assistant','sales','customerservice','socialmedia','trainee'].includes(r)) {
-    tabs = [['checkin','Check in'],['leave','🌴 Leave'],['profile','PIN']];
   } else {
-    tabs = [['checkin','Check in'],['leave','🌴 Leave'],['profile','PIN']];
+    // All other roles — build tabs dynamically from permissions
+    const ALL_TABS_DEF = [
+      ['checkin','Check in'], ['leave','🌴 Leave'], ['dashboard','Dashboard'],
+      ['admin','Staff'], ['files','All Files'], ['myfiles','My Files'],
+      ['myteam','My Team'], ['eod','EOD'], ['performance','📊 Performance'],
+      ['othertasks','Other Tasks'], ['feedback','📣 Feedback'], ['profile','PIN']
+    ];
+    tabs = ALL_TABS_DEF.filter(([key]) => hasTab(key));
+    if (!tabs.length) tabs = [['checkin','Check in'],['profile','PIN']];
   }
   const viewAsDropdown = (!_previewRole && (_realRole==='superadmin' || currentUser.role==='superadmin'))
-    ? '<select class="nav-select" onchange="startPreview(this.value)"><option value="" style="background:#1B2B4B">\uD83D\uDC41 View as\u2026</option><option value="staff" style="background:#1B2B4B">Staff</option><option value="analyst" style="background:#1B2B4B">Analyst</option><option value="trainee" style="background:#1B2B4B">Trainee</option><option value="teamlead" style="background:#1B2B4B">Team Lead</option><option value="manager" style="background:#1B2B4B">Manager</option><option value="hr" style="background:#1B2B4B">HR</option></select>'
+    ? '<select class="nav-select" onchange="startPreview(this.value)"><option value="" style="background:#1B2B4B">\uD83D\uDC41 View as\u2026</option><option value="staff" style="background:#1B2B4B">Staff</option><option value="analyst" style="background:#1B2B4B">Analyst</option><option value="trainee" style="background:#1B2B4B">Trainee</option><option value="teamlead" style="background:#1B2B4B">Team Lead</option><option value="hrmanager" style="background:#1B2B4B">HR Manager</option><option value="hr" style="background:#1B2B4B">HR</option></select>'
     : '';
   const exitBtn = _previewRole
     ? '<button onclick="exitPreview()" style="font-size:12px;padding:5px 14px;background:#F59E0B;color:#000;border:none;border-radius:4px;cursor:pointer;font-weight:700;margin-left:4px">\u2715 Exit preview</button>'
@@ -3541,6 +3930,36 @@ async function autoMarkLeaveAttendance(req, requestId) {
 }
 
 // ── Render leave screen ────────────────────────────────────────────────────
+function filterMyLeaveHistory() {
+  const from = document.getElementById('leaveHistFrom')?.value||'';
+  const to = document.getElementById('leaveHistTo')?.value||today;
+  const el = document.getElementById('myLeaveHistoryTable');
+  if (!el) return;
+  const reqs = _leaveRequests.filter(r =>
+    r.Title === currentUser.name &&
+    (!from || r.StartDate >= from) &&
+    (!to || r.StartDate <= to)
+  );
+  if (!reqs.length) { el.innerHTML = '<div style="font-size:13px;color:var(--text-3)">No leave in this period.</div>'; return; }
+  el.innerHTML = `<table style="width:100%;font-size:13px;border-collapse:collapse">
+    <thead><tr style="border-bottom:1.5px solid var(--border)">
+      <th style="padding:6px 0;text-align:left;font-size:11px;color:var(--text-3);font-weight:600">Type</th>
+      <th style="padding:6px 0;text-align:left;font-size:11px;color:var(--text-3);font-weight:600">Dates</th>
+      <th style="padding:6px 0;text-align:left;font-size:11px;color:var(--text-3);font-weight:600">Days</th>
+      <th style="padding:6px 0;text-align:left;font-size:11px;color:var(--text-3);font-weight:600">Status</th>
+    </tr></thead><tbody>
+    ${reqs.map(r => {
+      const sc = r.Status==='Approved'?'var(--success)':r.Status==='Rejected'?'var(--danger)':r.Status==='Forced'?'var(--warn)':'var(--text-3)';
+      return `<tr style="border-bottom:0.5px solid var(--border)">
+        <td style="padding:8px 0">${esc(r.LeaveType||'')}</td>
+        <td style="padding:8px 0;color:var(--text-2)">${r.StartDate}${r.EndDate&&r.EndDate!==r.StartDate?' → '+r.EndDate:''}</td>
+        <td style="padding:8px 0">${r.DaysRequested||'?'}</td>
+        <td style="padding:8px 0;color:${sc};font-weight:600">${r.Status||'Pending'}</td>
+      </tr>`;
+    }).join('')}
+  </tbody></table>`;
+}
+
 async function renderLeaveScreen() {
   const el = document.getElementById('leaveScreenContent');
   if (!el) return;
@@ -3554,6 +3973,8 @@ async function renderLeaveScreen() {
   let html = '';
 
   // ── Personal leave balance ───────────────────────────────────────────────
+  const isHRView = isSuperAdmin() || isManager(); // HR Manager or Superadmin see full view
+
   if (!isSuperAdmin() || _previewRole) {
     const staff = getStaff().find(s => s.name === currentUser.name);
     if (staff) await ensureLeaveEntitlement(staff);
@@ -3562,18 +3983,18 @@ async function renderLeaveScreen() {
     const probEnd = staff && probationEndDate(staff);
 
     html += `<div class="card">
-      <div class="section-label">My leave balance — ${bal.leaveYear}</div>
+      <div class="section-label">My leave — ${bal.leaveYear}</div>
       ${onProb ? `<div style="background:#FEF3C7;border:1.5px solid #FDE68A;border-radius:var(--radius-sm);padding:10px 14px;font-size:13px;color:#92400E;margin-bottom:12px">⚠ You are on probation until ${probEnd}. No leave entitlement during this period.</div>` : ''}
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px">
         <div style="background:var(--surface-2);border-radius:var(--radius-sm);padding:12px;text-align:center">
-          <div style="font-size:22px;font-weight:700;color:var(--brand)">${bal.annualRemaining}</div>
-          <div style="font-size:11px;color:var(--text-3)">Annual remaining</div>
-          <div style="font-size:11px;color:var(--text-3)">${bal.annualUsed} used of ${bal.annual}</div>
+          <div style="font-size:22px;font-weight:700;color:var(--brand)">${bal.annualUsed}</div>
+          <div style="font-size:11px;color:var(--text-3)">Annual leave used</div>
+          ${isHRView ? `<div style="font-size:11px;color:var(--text-3)">${bal.annualRemaining} remaining of ${bal.annual}</div>` : ''}
         </div>
         <div style="background:var(--surface-2);border-radius:var(--radius-sm);padding:12px;text-align:center">
-          <div style="font-size:22px;font-weight:700;color:var(--success)">${bal.sickRemaining}</div>
-          <div style="font-size:11px;color:var(--text-3)">Sick remaining</div>
-          <div style="font-size:11px;color:var(--text-3)">${bal.sickUsed} used of ${bal.sick}</div>
+          <div style="font-size:22px;font-weight:700;color:var(--success)">${bal.sickUsed}</div>
+          <div style="font-size:11px;color:var(--text-3)">Sick leave used</div>
+          ${isHRView ? `<div style="font-size:11px;color:var(--text-3)">${bal.sickRemaining} remaining of ${bal.sick}</div>` : ''}
         </div>
         <div style="background:var(--surface-2);border-radius:var(--radius-sm);padding:12px;text-align:center">
           <div style="font-size:22px;font-weight:700;color:var(--text-2)">${bal.totalUsed}</div>
@@ -3622,27 +4043,19 @@ async function renderLeaveScreen() {
       <button class="btn-primary" onclick="submitLeaveRequest()">Submit leave request</button>` : ''}
     </div>`;
 
-    // My leave history
-    const myReqs = _leaveRequests.filter(r => r.Title === currentUser.name).slice(0,20);
-    if (myReqs.length) {
+    // My leave history with date filter
+    const allMyReqs = _leaveRequests.filter(r => r.Title === currentUser.name);
+    if (allMyReqs.length) {
+      const sixMonthsAgo = new Date(); sixMonthsAgo.setMonth(sixMonthsAgo.getMonth()-6);
+      const defaultFrom = sixMonthsAgo.toISOString().split('T')[0];
       html += `<div class="card"><div class="section-label">My leave history</div>
-        <table style="width:100%;font-size:13px;border-collapse:collapse">
-          <thead><tr style="border-bottom:1.5px solid var(--border)">
-            <th style="padding:6px 0;text-align:left;font-size:11px;color:var(--text-3);font-weight:600">Type</th>
-            <th style="padding:6px 0;text-align:left;font-size:11px;color:var(--text-3);font-weight:600">Dates</th>
-            <th style="padding:6px 0;text-align:left;font-size:11px;color:var(--text-3);font-weight:600">Days</th>
-            <th style="padding:6px 0;text-align:left;font-size:11px;color:var(--text-3);font-weight:600">Status</th>
-          </tr></thead><tbody>
-          ${myReqs.map(r => {
-            const sc = r.Status==='Approved'?'var(--success)':r.Status==='Rejected'?'var(--danger)':r.Status==='Forced'?'var(--warn)':'var(--text-3)';
-            return `<tr style="border-bottom:0.5px solid var(--border)">
-              <td style="padding:8px 0">${esc(r.LeaveType||'')}</td>
-              <td style="padding:8px 0;color:var(--text-2)">${r.StartDate}${r.EndDate&&r.EndDate!==r.StartDate?' → '+r.EndDate:''}</td>
-              <td style="padding:8px 0">${r.DaysRequested||'?'}</td>
-              <td style="padding:8px 0;color:${sc};font-weight:600">${r.Status||'Pending'}</td>
-            </tr>`;
-          }).join('')}
-        </tbody></table>
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+          <input type="date" id="leaveHistFrom" value="${defaultFrom}" onchange="filterMyLeaveHistory()" style="font-size:13px;padding:5px 8px;border-radius:var(--radius-sm);border:1.5px solid var(--border)"/>
+          <span style="font-size:12px;color:var(--text-3)">to</span>
+          <input type="date" id="leaveHistTo" value="${today}" onchange="filterMyLeaveHistory()" style="font-size:13px;padding:5px 8px;border-radius:var(--radius-sm);border:1.5px solid var(--border)"/>
+          <button onclick="document.getElementById('leaveHistFrom').value='2020-01-01';filterMyLeaveHistory()" style="font-size:12px;padding:4px 10px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:transparent;cursor:pointer">All time</button>
+        </div>
+        <div id="myLeaveHistoryTable"></div>
       </div>`;
     }
   }
@@ -3740,6 +4153,9 @@ async function renderLeaveScreen() {
   }
 
   el.innerHTML = html;
+
+  // Populate leave history table with default filter
+  filterMyLeaveHistory();
 
   // Populate leave requests list
   if (isMgr || isTL) filterLeaveRequests();
@@ -4514,7 +4930,7 @@ function renderObsStats() {
 function renderAdmin() {
   const staff=getStaff();
   const sa=isSuperAdmin();
-  const mgr=currentUser.role==='manager';
+  const mgr=currentUser.role==='hrmanager';
   document.getElementById('staffCount').textContent=staff.length;
 
   // Show/hide add cards based on role
@@ -4525,6 +4941,11 @@ function renderAdmin() {
   if(onboardBtn) onboardBtn.style.display=(sa||mgr)?'block':'none';
   const auditCard=document.getElementById('auditLogCard');
   if(auditCard) auditCard.style.display=sa?'block':'none';
+  const permCard=document.getElementById('permissionsEditorCard');
+  if(permCard) {
+    permCard.style.display=sa?'block':'none';
+    if(sa) renderPermissionsEditor();
+  }
   const phCard=document.getElementById('publicHolidaysCard');
   if(phCard) {
     phCard.style.display=sa?'block':'none';
@@ -4574,7 +4995,7 @@ function renderAdmin() {
         const canAssignBroker = (sa || mgr || isTeamLead()) && s.role==='trainee';
 
         return `<div class="staff-row" style="flex-wrap:wrap;gap:6px">
-          <div class="staff-avatar ${['superadmin','manager'].includes(s.role)?'mgr':''}">${initials(s.name)}</div>
+          <div class="staff-avatar ${['superadmin','hrmanager'].includes(s.role)?'mgr':''}">${initials(s.name)}</div>
           <div class="staff-info" style="min-width:140px;flex:1">
             <div class="staff-name-txt" id="name-display-${i}">
               ${esc(s.name)} ${roleTag}
@@ -4593,7 +5014,7 @@ function renderAdmin() {
           <div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center">
             ${canChangeRoleThis?`<select onchange="changeRole(${i},this.value)" style="font-size:12px;padding:3px 6px;border-radius:var(--radius-sm);border:1.5px solid var(--border)">
               ${sa?'<option value="superadmin"'+(s.role==='superadmin'?' selected':'')+'>Super Admin</option>':''}
-              <option value="manager"${s.role==='manager'?' selected':''}>Manager</option>
+              <option value="hrmanager"${s.role==='hrmanager'?' selected':''}>HR Manager</option>
               <option value="hr"${s.role==='hr'?' selected':''}>HR</option>
               <option value="teamlead"${s.role==='teamlead'?' selected':''}>Team Lead</option>
               <option value="analyst"${s.role==='analyst'?' selected':''}>Analyst</option>
@@ -4718,7 +5139,7 @@ function updateOnboardTLVisibility() {
   // TL field only relevant for non-manager/non-TL roles
   const role = document.getElementById('newRole').value;
   const tlField = document.getElementById('newTLField');
-  if (tlField) tlField.style.display = (role === 'teamlead' || role === 'manager' || role === 'superadmin') ? 'none' : 'block';
+  if (tlField) tlField.style.display = (role === 'teamlead' || role === 'hrmanager' || role === 'superadmin') ? 'none' : 'block';
 }
 
 async function addPersonUnified() {
@@ -4746,7 +5167,7 @@ async function addPersonUnified() {
       if (role === 'staff') role = mgrRole; // override only if default staff selected
     }
   }
-  if (!isSuperAdmin() && (role === 'manager' || role === 'superadmin')) {
+  if (!isSuperAdmin() && (role === 'hrmanager' || role === 'superadmin')) {
     showToast('Only Super Admins can add managers.','err'); return;
   }
 
@@ -4873,7 +5294,7 @@ function removePerson(i) {
 
 async function resetPin(i) {
   const staff=getStaff(); const s=staff[i];
-  if (!isSuperAdmin() && !(currentUser.role==='manager' && s.role==='staff')) {
+  if (!isSuperAdmin() && !(currentUser.role==='hrmanager' && s.role==='staff')) {
     showToast('Permission denied.','err'); return;
   }
   if(!confirm('Reset PIN for '+s.name+'? A new temporary PIN will be generated.'))return;
@@ -5231,6 +5652,7 @@ async function loadFromSharePoint() {
     loadOfficesFromSP().catch(()=>{});
     loadLeaveData().catch(()=>{});
     loadPublicHolidays().catch(()=>{});
+    loadPermissions().catch(()=>{});
     // Only overwrite local data if SharePoint has data
     if (staffRes && staffRes.value && staffRes.value.length > 0) {
       _staff = staffRes.value.map(spToStaff);
@@ -6300,7 +6722,7 @@ function updateObsNoteUI() {
   const card = document.getElementById('workloadNoteCard');
   if (!card) return;
   const displayRole = currentUser.role; // use current role (preview-aware)
-  const canNote = ['manager','superadmin','teamlead'].includes(displayRole);
+  const canNote = ['hrmanager','superadmin','teamlead'].includes(displayRole);
   card.style.display = canNote ? 'block' : 'none';
   if (canNote) populateObsNoteDropdown();
 }
