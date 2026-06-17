@@ -2202,7 +2202,6 @@ function goTab(name, btn) {
 }
 
 function logout() {
-  sessionStorage.removeItem('lp_session');
   currentUser=null; pinBuffer=''; pinStage='login'; pinFirst='';
   stopBreakTimer(false); // preserve ongoing break across logout
   buildNav(); showScreen('mslogin');
@@ -2469,8 +2468,6 @@ function handlePin() {
 
 async function loginAs(member) {
   currentUser={name:member.name, role:member.role};
-  // Save session so refresh restores correct user
-  sessionStorage.setItem('lp_session', JSON.stringify({name:member.name, role:member.role}));
   buildNav();
   if (member.role==='superadmin') {
     loadDashboard(); showScreen('dashboard');
@@ -5543,49 +5540,12 @@ async function getToken() {
 
 async function onMsLogin(account) {
   msalAccount = account;
+  populateNameDropdown();
   showScreen('geoblocked');
   requestGeo();
   await loadFromSharePoint().catch(()=>{});
-  autoSaveMsEmail(account).catch(()=>{});
-
-  // Auto-login from MS email ONLY when coming from portal (login_hint in URL)
-  const urlParams = new URLSearchParams(window.location.search);
-  const loginHint = urlParams.get('login_hint');
-  if (loginHint && account && account.username) {
-    const email = account.username.toLowerCase();
-    if (email === loginHint.toLowerCase()) {
-      // Find by email or name prefix
-      const staff = getStaff();
-      const emailPrefix = email.split('@')[0].replace(/[._]/g,' ').trim();
-      const member = staff.find(s =>
-        (s.email && s.email.toLowerCase() === email) ||
-        s.name.toLowerCase().replace(/\s+/g,' ').includes(emailPrefix)
-      );
-      if (member) {
-        // Strip login_hint from URL so refresh doesn't re-trigger
-        urlParams.delete('login_hint');
-        const newUrl = window.location.pathname + (urlParams.toString() ? '?' + urlParams.toString() : '');
-        window.history.replaceState({}, '', newUrl);
-        await loginAs(member);
-        return;
-      }
-    }
-  }
-
-  // Restore session from sessionStorage (refresh case — only if no login_hint)
-  const savedSession = sessionStorage.getItem('lp_session');
-  if (savedSession && !loginHint) {
-    try {
-      const sess = JSON.parse(savedSession);
-      if (sess && sess.name) {
-        const member = getStaff().find(s => s.name === sess.name);
-        if (member) { await loginAs(member); return; }
-      }
-    } catch(e) {}
-  }
-
-  // Default — show PIN screen
   populateNameDropdown();
+  autoSaveMsEmail(account).catch(()=>{});
 }
 
 async function autoSaveMsEmail(account) {
