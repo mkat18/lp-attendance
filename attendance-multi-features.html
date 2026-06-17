@@ -2081,6 +2081,7 @@ function submitCheckin() {
 
 let _cameraStream = null;
 let _pendingSubmit = false;
+let _pendingClockOut = false;
 let _photoAttempts = 0;
 let _skipTimer = null;
 
@@ -2252,7 +2253,6 @@ function clockOut() {
   openCamera();
 }
 
-let _pendingClockOut = false;
 
 function completeClockOut(photoDataUrl) {
   _pendingClockOut = false;
