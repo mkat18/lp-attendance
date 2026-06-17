@@ -574,6 +574,24 @@ tr.flagged-row:hover td { background: #FFEAEA; }
         <div id="clockOutDone" style="display:none;text-align:center;font-size:13px;font-weight:600;color:var(--success);padding:4px 0">✓ Clocked out</div>
       </div>
     </div>
+
+    <!-- Weekly widgets — visible to all staff after check-in -->
+    <div id="staffWeeklyWidgets" style="display:none;margin-top:12px">
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
+        <div class="card" style="margin:0">
+          <div class="card-label">🎂 Birthdays this week</div>
+          <div id="staffWidgetBirthdays"><div style="font-size:12px;color:var(--text-3)">No birthdays this week</div></div>
+        </div>
+        <div class="card" style="margin:0">
+          <div class="card-label">🎉 Work anniversaries</div>
+          <div id="staffWidgetAnniversaries"><div style="font-size:12px;color:var(--text-3)">No anniversaries this week</div></div>
+        </div>
+        <div class="card" style="margin:0">
+          <div class="card-label">🏖 On leave this week</div>
+          <div id="staffWidgetLeaves"><div style="font-size:12px;color:var(--text-3)">No leave this week</div></div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- ── DASHBOARD ──────────────────────────────────────────────────────── -->
@@ -686,6 +704,12 @@ tr.flagged-row:hover td { background: #FFEAEA; }
       </div>
     </div>
     <button class="btn-primary" style="margin-top:.75rem" onclick="exportCSV()">⬇ Download CSV</button>
+  </div>
+
+  <!-- ── LEAVE ─────────────────────────────────────────────────────────── -->
+  <div id="screen-leave" class="screen">
+    <div class="page-header"><h1>🌴 Leave</h1><p id="leaveScreenSub">Your leave balance and requests</p></div>
+    <div id="leaveScreenContent"></div>
   </div>
 
   <!-- ── CHANGE PIN ──────────────────────────────────────────────────────── -->
@@ -832,6 +856,27 @@ tr.flagged-row:hover td { background: #FFEAEA; }
       <div class="section-label">Export data</div>
       <p style="font-size:13px;color:var(--text-2);margin-bottom:12px">Download all records as a CSV file you can open in Excel.</p>
       <button class="btn-primary" onclick="exportCSV()">⬇ Download CSV</button>
+    </div>
+
+    <div class="card" id="publicHolidaysCard" style="display:none">
+      <div class="section-label">📅 Public Holidays</div>
+      <p style="font-size:13px;color:var(--text-2);margin-bottom:12px">Manage Australian national public holidays + 15 August. These are excluded from leave day counts.</p>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+        <select id="phYear" onchange="renderPublicHolidaysManager()" style="font-size:13px;width:auto">
+          <option value="2024">2024</option>
+          <option value="2025">2025</option>
+          <option value="2026" selected>2026</option>
+          <option value="2027">2027</option>
+        </select>
+        <button class="btn-primary" onclick="fetchAndSaveAUHolidays(parseInt(document.getElementById('phYear').value))">⬇ Import from API</button>
+      </div>
+      <div id="publicHolidaysManagerList" style="margin-bottom:14px"></div>
+      <div style="font-size:12px;font-weight:600;color:var(--text-2);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px">Add manual holiday</div>
+      <div style="display:grid;grid-template-columns:1fr 2fr auto;gap:8px;align-items:end">
+        <div class="field" style="margin:0"><label style="font-size:12px">Date</label><input type="date" id="phNewDate"/></div>
+        <div class="field" style="margin:0"><label style="font-size:12px">Name</label><input type="text" id="phNewName" placeholder="e.g. Indian Independence Day"/></div>
+        <button class="btn-primary" onclick="addPublicHolidayManual()" style="height:36px">+ Add</button>
+      </div>
     </div>
 
     <div class="card" id="officeManagerCard" style="display:none">
@@ -1718,17 +1763,17 @@ function buildNav() {
   if (r === 'superadmin') {
     tabs = [['dashboard','Dashboard'],['admin','Staff'],['files','All Files'],['profile','PIN']];
   } else if (r === 'manager') {
-    tabs = [['checkin','Check in'],['dashboard','Dashboard'],['admin','Staff'],['profile','PIN']];
+    tabs = [['checkin','Check in'],['leave','🌴 Leave'],['dashboard','Dashboard'],['admin','Staff'],['profile','PIN']];
   } else if (r === 'hr') {
-    tabs = [['checkin','Check in'],['dashboard','Dashboard'],['profile','PIN']];
+    tabs = [['checkin','Check in'],['leave','🌴 Leave'],['dashboard','Dashboard'],['profile','PIN']];
   } else if (r === 'teamlead') {
-    tabs = [['checkin','Check in'],['myteam','My Team'],['files','Team Files'],['myfiles','My Files'],['othertasks','Other Tasks'],['feedback','📣 Feedback'],['eod','EOD'],['performance','📊 Performance'],['profile','PIN']];
+    tabs = [['checkin','Check in'],['leave','🌴 Leave'],['myteam','My Team'],['files','Team Files'],['myfiles','My Files'],['othertasks','Other Tasks'],['feedback','📣 Feedback'],['eod','EOD'],['performance','📊 Performance'],['profile','PIN']];
   } else if (r === 'analyst') {
-    tabs = [['checkin','Check in'],['myfiles','My Files'],['othertasks','Other Tasks'],['eod','EOD'],['profile','PIN']];
+    tabs = [['checkin','Check in'],['leave','🌴 Leave'],['myfiles','My Files'],['othertasks','Other Tasks'],['eod','EOD'],['profile','PIN']];
   } else if (['assistant','sales','customerservice','socialmedia','trainee'].includes(r)) {
-    tabs = [['checkin','Check in'],['profile','PIN']];
+    tabs = [['checkin','Check in'],['leave','🌴 Leave'],['profile','PIN']];
   } else {
-    tabs = [['checkin','Check in'],['profile','PIN']];
+    tabs = [['checkin','Check in'],['leave','🌴 Leave'],['profile','PIN']];
   }
   nav.innerHTML = `
     <div class="nav-tabs">${tabs.map(([k,l])=>`<button class="nav-tab" onclick="goTab('${k}',this)">${l}</button>`).join('')}</div>
@@ -1759,6 +1804,7 @@ function goTab(name, btn) {
   if (name==='performance') renderPerformanceScreen();
   if (name==='othertasks') renderOtherTasksScreen();
   if (name==='admin')     renderAdmin();
+  if (name==='leave')      renderLeaveScreen();
   if (name==='profile')   { initCp(); renderProfileScreen(); }
 }
 
@@ -2063,6 +2109,8 @@ function initCheckin() {
       updateClockOutUI();
       // Check for open break in SP — async, updates break UI when done
       checkOpenBreak(currentUser.name).catch(()=>{});
+      // Show weekly widgets for all staff
+      renderStaffWeeklyWidgets();
     } else {
       document.getElementById('breakCard').style.display='none';
       document.getElementById('clockOutCard').style.display='none';
@@ -2070,6 +2118,8 @@ function initCheckin() {
   } else {
     unlockCheckin();
     document.getElementById('breakCard').style.display='none';
+    // Also show widgets on checkin screen even if not submitted yet
+    renderStaffWeeklyWidgets();
   }
   updateBreakUI();
 }
@@ -3135,6 +3185,748 @@ async function managerCloseBreak(breakId, name, date) {
 
 
 // ── Weekly widgets: birthdays, anniversaries, leaves ─────────────────────
+
+// ══════════════════════════════════════════════════════════════════════════
+// ── LEAVE SYSTEM ──────────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════
+
+// ── Constants ─────────────────────────────────────────────────────────────
+const ANNUAL_DAYS = 14;
+const SICK_DAYS = 5;
+const LEAVE_YEAR_START_MONTH = 6; // July = month 6 (0-indexed)
+const LEAVE_YEAR_START_DAY = 1;
+const AU_INDEPENDENCE_DAY = '08-15'; // 15 August (MM-DD)
+
+// ── Public holidays cache ──────────────────────────────────────────────────
+let _publicHolidays = []; // [{date:'YYYY-MM-DD', name:'...'}]
+
+async function loadPublicHolidays() {
+  try {
+    // First try SP list
+    const token = await getToken();
+    if (token) {
+      const res = await fetch(SP_API + "('PublicHolidays')/items?$select=HolidayDate,Title,IsManual&$top=500",
+        { headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json;odata=nometadata' } });
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.value && data.value.length > 0) {
+          _publicHolidays = data.value.map(h => ({ date: h.HolidayDate||'', name: h.Title||'', isManual: h.IsManual==='true' }));
+          LS.set('ci_pubhols', _publicHolidays);
+          return;
+        }
+      }
+    }
+  } catch(e) { console.warn('loadPublicHolidays failed:', e); }
+  // Fall back to cache
+  const cached = LS.get('ci_pubhols');
+  if (cached) _publicHolidays = cached;
+}
+
+async function fetchAndSaveAUHolidays(year) {
+  try {
+    const res = await fetch(`https://date.nager.at/api/v3/PublicHolidays/${year}/AU`);
+    if (!res.ok) { showToast('Failed to fetch holidays','err'); return; }
+    const data = await res.json();
+    // Filter national only (counties === null means applies to all states)
+    const national = data.filter(h => !h.counties || h.counties.length === 0);
+    const token = await getToken();
+    if (!token) return;
+    // Save each to SP (skip if already exists)
+    for (const h of national) {
+      await spPostDirect(SP_API + "('PublicHolidays')/items", {
+        Title: h.localName || h.name,
+        HolidayDate: h.date,
+        HolidayName: h.localName || h.name,
+        Year: String(year),
+        IsManual: 'false'
+      });
+    }
+    // Add 15 August manually
+    await spPostDirect(SP_API + "('PublicHolidays')/items", {
+      Title: 'Indian Independence Day',
+      HolidayDate: year + '-08-15',
+      HolidayName: 'Indian Independence Day',
+      Year: String(year),
+      IsManual: 'true'
+    });
+    await loadPublicHolidays();
+    showToast(national.length + ' AU holidays + 15 Aug imported for ' + year + ' ✓', 'ok');
+    renderPublicHolidaysManager();
+  } catch(e) {
+    showToast('Failed to import holidays: ' + e.message, 'err');
+  }
+}
+
+function isPublicHoliday(dateStr) {
+  return _publicHolidays.some(h => h.date === dateStr);
+}
+
+// ── Leave year helpers ─────────────────────────────────────────────────────
+function getLeaveYear(dateStr) {
+  const d = new Date(dateStr + 'T12:00:00');
+  const yr = d.getFullYear();
+  const month = d.getMonth();
+  return month >= LEAVE_YEAR_START_MONTH ? yr + '-' + (yr+1) : (yr-1) + '-' + yr;
+}
+
+function getCurrentLeaveYear() { return getLeaveYear(today); }
+
+function leaveYearStart(leaveYear) {
+  const yr = parseInt(leaveYear.split('-')[0]);
+  return yr + '-07-01';
+}
+
+function leaveYearEnd(leaveYear) {
+  const yr = parseInt(leaveYear.split('-')[1]);
+  return yr + '-06-30';
+}
+
+// ── Probation check ────────────────────────────────────────────────────────
+function isOnProbation(staff) {
+  if (!staff.joinDate) return false;
+  const join = new Date(staff.joinDate + 'T12:00:00');
+  const probEnd = new Date(join);
+  probEnd.setMonth(probEnd.getMonth() + 3);
+  return new Date() < probEnd;
+}
+
+function probationEndDate(staff) {
+  if (!staff.joinDate) return null;
+  const join = new Date(staff.joinDate + 'T12:00:00');
+  const probEnd = new Date(join);
+  probEnd.setMonth(probEnd.getMonth() + 3);
+  return probEnd.toISOString().split('T')[0];
+}
+
+// ── Pro-rate leave entitlement ─────────────────────────────────────────────
+function calcEntitlement(staff, leaveYear) {
+  if (!staff.joinDate) return { annual: ANNUAL_DAYS, sick: SICK_DAYS };
+  if (isOnProbation(staff)) return { annual: 0, sick: 0 };
+
+  const yearStart = new Date(leaveYearStart(leaveYear) + 'T12:00:00');
+  const yearEnd = new Date(leaveYearEnd(leaveYear) + 'T12:00:00');
+  const joinDate = new Date(staff.joinDate + 'T12:00:00');
+  const probEnd = new Date(joinDate);
+  probEnd.setMonth(probEnd.getMonth() + 3);
+
+  // Effective start = later of year start or probation end
+  const effectiveStart = probEnd > yearStart ? probEnd : yearStart;
+  if (effectiveStart > yearEnd) return { annual: 0, sick: 0 };
+
+  const totalDays = (yearEnd - yearStart) / 86400000;
+  const earnedDays = (yearEnd - effectiveStart) / 86400000;
+  const ratio = Math.min(1, earnedDays / totalDays);
+
+  return {
+    annual: Math.floor(ANNUAL_DAYS * ratio * 10) / 10,
+    sick: Math.floor(SICK_DAYS * ratio * 10) / 10
+  };
+}
+
+// ── Count leave days (excluding weekends and public holidays) ──────────────
+function countLeaveDays(startDate, endDate, halfDay) {
+  if (halfDay) return 0.5;
+  const start = new Date(startDate + 'T12:00:00');
+  const end = new Date(endDate + 'T12:00:00');
+  let count = 0;
+  for (let d = new Date(start); d <= end; d.setDate(d.getDate()+1)) {
+    const dow = d.getDay();
+    const ds = d.toISOString().split('T')[0];
+    if (dow !== 0 && dow !== 6 && !isPublicHoliday(ds)) count++;
+  }
+  return count;
+}
+
+// ── SP helpers for leave ───────────────────────────────────────────────────
+let _leaveEntitlements = [];
+let _leaveRequests = [];
+
+async function loadLeaveData() {
+  try {
+    const token = await getToken();
+    if (!token) return;
+    const [entRes, reqRes] = await Promise.all([
+      fetch(SP_API + "('LeaveEntitlements')/items?$top=500",
+        { headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json;odata=nometadata' } }),
+      fetch(SP_API + "('LeaveRequests')/items?$top=1000&$orderby=Created desc",
+        { headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json;odata=nometadata' } })
+    ]);
+    if (entRes.ok) {
+      const d = await entRes.json();
+      if (d && d.value) { _leaveEntitlements = d.value; LS.set('ci_leaveEnt', d.value); }
+    }
+    if (reqRes.ok) {
+      const d = await reqRes.json();
+      if (d && d.value) { _leaveRequests = d.value; LS.set('ci_leaveReq', d.value); }
+    }
+  } catch(e) {
+    _leaveEntitlements = LS.get('ci_leaveEnt') || [];
+    _leaveRequests = LS.get('ci_leaveReq') || [];
+    console.warn('loadLeaveData failed:', e);
+  }
+}
+
+function getLeaveEntitlement(name, leaveYear) {
+  return _leaveEntitlements.find(e => e.Title === name && e.LeaveYear === leaveYear) || null;
+}
+
+async function ensureLeaveEntitlement(staff) {
+  const ly = getCurrentLeaveYear();
+  let ent = getLeaveEntitlement(staff.name, ly);
+  if (ent) return ent;
+  // Create new entitlement record
+  const calc = calcEntitlement(staff, ly);
+  const payload = {
+    Title: staff.name,
+    LeaveYear: ly,
+    AnnualEntitlement: String(calc.annual),
+    SickEntitlement: String(calc.sick),
+    AnnualUsed: '0',
+    SickUsed: '0',
+    UnpaidUsed: '0',
+    ForcedLeaveCount: '0',
+    BrokerHolidayCount: '0',
+    AnnualEncashed: '0',
+    EncashmentCleared: 'false',
+    JoiningDate: staff.joinDate||'',
+    ProbationEndDate: probationEndDate(staff)||'',
+  };
+  const res = await spPostDirect(SP_API + "('LeaveEntitlements')/items", payload);
+  if (res) {
+    _leaveEntitlements.push({...payload, Id: res.Id||res.ID});
+    LS.set('ci_leaveEnt', _leaveEntitlements);
+  }
+  return payload;
+}
+
+async function updateLeaveEntitlement(name, leaveYear, updates) {
+  const ent = _leaveEntitlements.find(e => e.Title === name && e.LeaveYear === leaveYear);
+  if (!ent || !ent.Id) return;
+  const payload = {};
+  for (const [k,v] of Object.entries(updates)) payload[k] = String(v);
+  await spPatch(SP_API + "('LeaveEntitlements')/items(" + ent.Id + ")", payload);
+  Object.assign(ent, payload);
+  LS.set('ci_leaveEnt', _leaveEntitlements);
+}
+
+// ── Leave balance calculation ──────────────────────────────────────────────
+function getLeaveBalance(name) {
+  const ly = getCurrentLeaveYear();
+  const ent = getLeaveEntitlement(name, ly);
+  const staff = getStaff().find(s => s.name === name);
+  const calc = staff ? calcEntitlement(staff, ly) : { annual: ANNUAL_DAYS, sick: SICK_DAYS };
+  const annual = ent ? parseFloat(ent.AnnualEntitlement||calc.annual) : calc.annual;
+  const sick = ent ? parseFloat(ent.SickEntitlement||calc.sick) : calc.sick;
+  const annualUsed = ent ? parseFloat(ent.AnnualUsed||0) : 0;
+  const sickUsed = ent ? parseFloat(ent.SickUsed||0) : 0;
+  const unpaidUsed = ent ? parseFloat(ent.UnpaidUsed||0) : 0;
+  const forcedCount = ent ? parseFloat(ent.ForcedLeaveCount||0) : 0;
+  const brokerCount = ent ? parseFloat(ent.BrokerHolidayCount||0) : 0;
+  return {
+    annual: annual, annualUsed, annualRemaining: Math.max(0, annual - annualUsed),
+    sick: sick, sickUsed, sickRemaining: Math.max(0, sick - sickUsed),
+    unpaidUsed, forcedCount, brokerCount,
+    totalUsed: annualUsed + sickUsed + unpaidUsed,
+    leaveYear: ly
+  };
+}
+
+// ── Submit leave request ───────────────────────────────────────────────────
+async function submitLeaveRequest() {
+  const leaveType = document.getElementById('leaveTypeSelect').value;
+  const startDate = document.getElementById('leaveStartDate').value;
+  const endDate = document.getElementById('leaveEndDate').value || startDate;
+  const halfDay = document.getElementById('leaveHalfDay').checked;
+  const halfDaySession = document.getElementById('leaveHalfDaySession').value;
+  const reason = document.getElementById('leaveReason2').value.trim();
+  const brokerName = document.getElementById('leaveBrokerName')?.value.trim()||'';
+
+  if (!leaveType) { showToast('Select a leave type.','err'); return; }
+  if (!startDate) { showToast('Select a start date.','err'); return; }
+  if (!reason) { showToast('Enter a reason.','err'); return; }
+  if (leaveType === 'Broker Holiday' && !brokerName) { showToast('Enter the broker name.','err'); return; }
+
+  const days = countLeaveDays(startDate, endDate, halfDay);
+  if (days <= 0) { showToast('No working days in selected range.','err'); return; }
+
+  // Check balance for annual/sick
+  const bal = getLeaveBalance(currentUser.name);
+  if (leaveType === 'Annual Leave' && days > bal.annualRemaining) {
+    if (!confirm(`You only have ${bal.annualRemaining} annual leave days remaining. Excess will be unpaid. Continue?`)) return;
+  }
+  if (leaveType === 'Sick Leave' && days > bal.sickRemaining) {
+    if (!confirm(`You only have ${bal.sickRemaining} sick leave days remaining. Excess will be unpaid. Continue?`)) return;
+  }
+
+  const ly = getLeaveYear(startDate);
+  const payload = {
+    Title: currentUser.name,
+    LeaveType: leaveType,
+    StartDate: startDate,
+    EndDate: endDate,
+    HalfDay: halfDay ? 'true' : 'false',
+    HalfDaySession: halfDay ? halfDaySession : '',
+    Reason: reason,
+    Status: 'Pending',
+    ApprovedBy: '',
+    ApprovalDate: '',
+    ApprovalNotes: '',
+    DaysRequested: String(days),
+    LeaveYear: ly,
+    BrokerName: brokerName,
+  };
+
+  const res = await spPostDirect(SP_API + "('LeaveRequests')/items", payload);
+  if (res) {
+    _leaveRequests.unshift({...payload, Id: res.Id||res.ID});
+    LS.set('ci_leaveReq', _leaveRequests);
+    showToast('Leave request submitted ✓','ok');
+    renderLeaveScreen();
+  }
+}
+
+// ── Approve/Reject leave request ───────────────────────────────────────────
+async function processLeaveRequest(id, action, notes) {
+  const req = _leaveRequests.find(r => r.Id == id);
+  if (!req) return;
+
+  const newStatus = action === 'approve' ? 'Approved' : action === 'reject' ? 'Rejected' : 'Forced';
+  const payload = {
+    Status: newStatus,
+    ApprovedBy: currentUser.name,
+    ApprovalDate: today,
+    ApprovalNotes: notes||'',
+  };
+
+  await spPatch(SP_API + "('LeaveRequests')/items(" + id + ")", payload);
+  Object.assign(req, payload);
+  LS.set('ci_leaveReq', _leaveRequests);
+
+  if (action === 'approve') {
+    // Deduct from balance
+    const ly = req.LeaveYear || getLeaveYear(req.StartDate);
+    const days = parseFloat(req.DaysRequested||0);
+    const ent = getLeaveEntitlement(req.Title, ly);
+    if (req.LeaveType === 'Annual Leave' || req.LeaveType === 'Forced Leave') {
+      const used = parseFloat(ent?.AnnualUsed||0) + days;
+      await updateLeaveEntitlement(req.Title, ly, { AnnualUsed: String(used) });
+    } else if (req.LeaveType === 'Sick Leave') {
+      const used = parseFloat(ent?.SickUsed||0) + days;
+      await updateLeaveEntitlement(req.Title, ly, { SickUsed: String(used) });
+    } else if (req.LeaveType === 'Unpaid Leave') {
+      const used = parseFloat(ent?.UnpaidUsed||0) + days;
+      await updateLeaveEntitlement(req.Title, ly, { UnpaidUsed: String(used) });
+    } else if (req.LeaveType === 'Broker Holiday') {
+      const used = parseFloat(ent?.BrokerHolidayCount||0) + days;
+      await updateLeaveEntitlement(req.Title, ly, { BrokerHolidayCount: String(used) });
+    }
+    // Auto-mark attendance records for each leave day
+    await autoMarkLeaveAttendance(req, id);
+  }
+
+  showToast('Leave ' + newStatus.toLowerCase() + ' ✓', 'ok');
+  renderLeaveScreen();
+}
+
+async function autoMarkLeaveAttendance(req, requestId) {
+  const start = new Date(req.StartDate + 'T12:00:00');
+  const end = new Date(req.EndDate + 'T12:00:00');
+  for (let d = new Date(start); d <= end; d.setDate(d.getDate()+1)) {
+    const dow = d.getDay();
+    const ds = d.toISOString().split('T')[0];
+    if (dow === 0 || dow === 6 || isPublicHoliday(ds)) continue;
+    // Check if record already exists
+    const existing = getRecords().find(r => r.name === req.Title && r.date === ds);
+    if (existing) continue;
+    const newRec = {
+      name: req.Title, date: ds, status: 'leave',
+      reason: req.LeaveType + (req.Reason ? ' — ' + req.Reason : ''),
+      clockIn: null, clockOut: null, geo: null,
+      submittedBy: currentUser.name, leaveRequestId: String(requestId),
+      ts: Date.now()
+    };
+    const recs = getRecords();
+    recs.push(newRec);
+    saveRecords(recs);
+    await spSaveRecord(newRec);
+  }
+}
+
+// ── Render leave screen ────────────────────────────────────────────────────
+async function renderLeaveScreen() {
+  const el = document.getElementById('leaveScreenContent');
+  if (!el) return;
+  el.innerHTML = '<div style="font-size:13px;color:var(--text-3);padding:20px;text-align:center">Loading leave data…</div>';
+  await loadLeaveData();
+  await loadPublicHolidays();
+
+  const isMgr = isManager() || isSuperAdmin();
+  const isTL = isTeamLead();
+
+  let html = '';
+
+  // ── Personal leave balance ───────────────────────────────────────────────
+  if (!isSuperAdmin() || _previewRole) {
+    const staff = getStaff().find(s => s.name === currentUser.name);
+    if (staff) await ensureLeaveEntitlement(staff);
+    const bal = getLeaveBalance(currentUser.name);
+    const onProb = staff && isOnProbation(staff);
+    const probEnd = staff && probationEndDate(staff);
+
+    html += `<div class="card">
+      <div class="section-label">My leave balance — ${bal.leaveYear}</div>
+      ${onProb ? `<div style="background:#FEF3C7;border:1.5px solid #FDE68A;border-radius:var(--radius-sm);padding:10px 14px;font-size:13px;color:#92400E;margin-bottom:12px">⚠ You are on probation until ${probEnd}. No leave entitlement during this period.</div>` : ''}
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px">
+        <div style="background:var(--surface-2);border-radius:var(--radius-sm);padding:12px;text-align:center">
+          <div style="font-size:22px;font-weight:700;color:var(--brand)">${bal.annualRemaining}</div>
+          <div style="font-size:11px;color:var(--text-3)">Annual remaining</div>
+          <div style="font-size:11px;color:var(--text-3)">${bal.annualUsed} used of ${bal.annual}</div>
+        </div>
+        <div style="background:var(--surface-2);border-radius:var(--radius-sm);padding:12px;text-align:center">
+          <div style="font-size:22px;font-weight:700;color:var(--success)">${bal.sickRemaining}</div>
+          <div style="font-size:11px;color:var(--text-3)">Sick remaining</div>
+          <div style="font-size:11px;color:var(--text-3)">${bal.sickUsed} used of ${bal.sick}</div>
+        </div>
+        <div style="background:var(--surface-2);border-radius:var(--radius-sm);padding:12px;text-align:center">
+          <div style="font-size:22px;font-weight:700;color:var(--text-2)">${bal.totalUsed}</div>
+          <div style="font-size:11px;color:var(--text-3)">Total taken</div>
+          <div style="font-size:11px;color:var(--text-3)">Unpaid: ${bal.unpaidUsed} · Broker: ${bal.brokerCount}</div>
+        </div>
+      </div>
+      ${!onProb ? `
+      <div class="section-label" style="margin-bottom:10px">Apply for leave</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+        <div class="field" style="margin:0">
+          <label>Leave type</label>
+          <select id="leaveTypeSelect" onchange="toggleBrokerField()">
+            <option value="">— Select —</option>
+            <option value="Annual Leave">Annual Leave</option>
+            <option value="Sick Leave">Sick Leave</option>
+            <option value="Unpaid Leave">Unpaid Leave</option>
+            <option value="Broker Holiday">Broker Holiday</option>
+          </select>
+        </div>
+        <div class="field" style="margin:0" id="brokerNameField" style="display:none">
+          <label>Broker name</label>
+          <input type="text" id="leaveBrokerName" placeholder="e.g. John Smith Brokers"/>
+        </div>
+        <div class="field" style="margin:0">
+          <label>Start date</label>
+          <input type="date" id="leaveStartDate" min="${today}"/>
+        </div>
+        <div class="field" style="margin:0">
+          <label>End date</label>
+          <input type="date" id="leaveEndDate" min="${today}"/>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+        <input type="checkbox" id="leaveHalfDay" onchange="toggleHalfDaySession()"/>
+        <label for="leaveHalfDay" style="font-size:13px;margin:0">Half day</label>
+        <select id="leaveHalfDaySession" style="display:none;font-size:13px;width:auto">
+          <option value="Morning">Morning</option>
+          <option value="Afternoon">Afternoon</option>
+        </select>
+      </div>
+      <div class="field" style="margin-bottom:10px">
+        <label>Reason</label>
+        <textarea id="leaveReason2" rows="2" placeholder="Brief reason for leave…" style="width:100%;font-size:13px;padding:8px;border-radius:var(--radius-sm);border:1.5px solid var(--border);resize:vertical"></textarea>
+      </div>
+      <button class="btn-primary" onclick="submitLeaveRequest()">Submit leave request</button>` : ''}
+    </div>`;
+
+    // My leave history
+    const myReqs = _leaveRequests.filter(r => r.Title === currentUser.name).slice(0,20);
+    if (myReqs.length) {
+      html += `<div class="card"><div class="section-label">My leave history</div>
+        <table style="width:100%;font-size:13px;border-collapse:collapse">
+          <thead><tr style="border-bottom:1.5px solid var(--border)">
+            <th style="padding:6px 0;text-align:left;font-size:11px;color:var(--text-3);font-weight:600">Type</th>
+            <th style="padding:6px 0;text-align:left;font-size:11px;color:var(--text-3);font-weight:600">Dates</th>
+            <th style="padding:6px 0;text-align:left;font-size:11px;color:var(--text-3);font-weight:600">Days</th>
+            <th style="padding:6px 0;text-align:left;font-size:11px;color:var(--text-3);font-weight:600">Status</th>
+          </tr></thead><tbody>
+          ${myReqs.map(r => {
+            const sc = r.Status==='Approved'?'var(--success)':r.Status==='Rejected'?'var(--danger)':r.Status==='Forced'?'var(--warn)':'var(--text-3)';
+            return `<tr style="border-bottom:0.5px solid var(--border)">
+              <td style="padding:8px 0">${esc(r.LeaveType||'')}</td>
+              <td style="padding:8px 0;color:var(--text-2)">${r.StartDate}${r.EndDate&&r.EndDate!==r.StartDate?' → '+r.EndDate:''}</td>
+              <td style="padding:8px 0">${r.DaysRequested||'?'}</td>
+              <td style="padding:8px 0;color:${sc};font-weight:600">${r.Status||'Pending'}</td>
+            </tr>`;
+          }).join('')}
+        </tbody></table>
+      </div>`;
+    }
+  }
+
+  // ── Approval section for TL / Manager ────────────────────────────────────
+  if (isMgr || isTL) {
+    let pendingReqs = _leaveRequests.filter(r => r.Status === 'Pending');
+    if (isTL && !isMgr) {
+      const myTeam = getTeamForTL(currentUser.name);
+      pendingReqs = pendingReqs.filter(r => myTeam.includes(r.Title));
+    }
+
+    html += `<div class="card"><div class="section-label">⏳ Pending approvals (${pendingReqs.length})</div>`;
+    if (!pendingReqs.length) {
+      html += '<div style="font-size:13px;color:var(--text-3)">No pending leave requests ✓</div>';
+    } else {
+      html += pendingReqs.map(r => `
+        <div style="background:var(--surface-2);border-radius:var(--radius-sm);padding:12px;margin-bottom:8px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <div style="font-weight:600;font-size:14px">${esc(r.Title)}</div>
+            <span class="badge badge-warn">Pending</span>
+          </div>
+          <div style="font-size:13px;color:var(--text-2);margin-bottom:4px">${esc(r.LeaveType||'')} · ${r.StartDate}${r.EndDate&&r.EndDate!==r.StartDate?' → '+r.EndDate:''} · ${r.DaysRequested||'?'} day${parseFloat(r.DaysRequested)!==1?'s':''}</div>
+          ${r.HalfDay==='true'?`<div style="font-size:12px;color:var(--text-3)">Half day — ${r.HalfDaySession||''}</div>`:''}
+          ${r.BrokerName?`<div style="font-size:12px;color:var(--text-3)">Broker: ${esc(r.BrokerName)}</div>`:''}
+          <div style="font-size:13px;color:var(--text-3);margin-bottom:8px">${esc(r.Reason||'')}</div>
+          <textarea id="notes-${r.Id}" placeholder="Approval notes (optional)…" rows="1" style="width:100%;font-size:12px;padding:6px;border-radius:4px;border:1.5px solid var(--border);margin-bottom:6px;resize:none"></textarea>
+          <div style="display:flex;gap:6px">
+            <button onclick="processLeaveRequest(${r.Id},'approve',document.getElementById('notes-${r.Id}').value)" class="btn-primary" style="font-size:12px;padding:6px 14px">✓ Approve</button>
+            <button onclick="processLeaveRequest(${r.Id},'reject',document.getElementById('notes-${r.Id}').value)" style="font-size:12px;padding:6px 14px;background:var(--danger);color:#fff;border:none;border-radius:var(--radius-sm);cursor:pointer">✗ Reject</button>
+            <button onclick="processLeaveRequest(${r.Id},'force',document.getElementById('notes-${r.Id}').value)" style="font-size:12px;padding:6px 14px;background:var(--warn);color:#fff;border:none;border-radius:var(--radius-sm);cursor:pointer">⚡ Forced</button>
+          </div>
+        </div>`).join('');
+    }
+    html += '</div>';
+
+    // All leave requests with filter
+    html += `<div class="card"><div class="section-label">All leave requests</div>
+      <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+        <select id="leaveFilterStatus" onchange="filterLeaveRequests()" style="font-size:13px;width:auto">
+          <option value="">All statuses</option>
+          <option value="Pending">Pending</option>
+          <option value="Approved">Approved</option>
+          <option value="Rejected">Rejected</option>
+          <option value="Forced">Forced</option>
+        </select>
+        <select id="leaveFilterType" onchange="filterLeaveRequests()" style="font-size:13px;width:auto">
+          <option value="">All types</option>
+          <option value="Annual Leave">Annual Leave</option>
+          <option value="Sick Leave">Sick Leave</option>
+          <option value="Unpaid Leave">Unpaid Leave</option>
+          <option value="Broker Holiday">Broker Holiday</option>
+        </select>
+        <input type="text" id="leaveFilterName" placeholder="Staff name…" oninput="filterLeaveRequests()" style="font-size:13px;padding:6px 10px;width:150px"/>
+      </div>
+      <div id="leaveRequestsList"></div>
+    </div>`;
+  }
+
+  // ── Team leave balances for manager/TL ────────────────────────────────────
+  if (isMgr || isTL) {
+    let teamStaff = isTL && !isMgr
+      ? getStaff().filter(s => getTeamForTL(currentUser.name).includes(s.name))
+      : getStaff().filter(s => s.role !== 'superadmin');
+
+    html += `<div class="card"><div class="section-label">Team leave balances — ${getCurrentLeaveYear()}</div>
+      <table style="width:100%;font-size:13px;border-collapse:collapse">
+        <thead><tr style="border-bottom:1.5px solid var(--border)">
+          <th style="padding:6px 0;text-align:left;font-size:11px;color:var(--text-3);font-weight:600">Staff</th>
+          <th style="padding:6px 0;text-align:center;font-size:11px;color:var(--text-3);font-weight:600">Annual rem.</th>
+          <th style="padding:6px 0;text-align:center;font-size:11px;color:var(--text-3);font-weight:600">Sick rem.</th>
+          <th style="padding:6px 0;text-align:center;font-size:11px;color:var(--text-3);font-weight:600">Unpaid</th>
+          <th style="padding:6px 0;text-align:center;font-size:11px;color:var(--text-3);font-weight:600">Broker days</th>
+          <th style="padding:6px 0;text-align:center;font-size:11px;color:var(--text-3);font-weight:600">Total taken</th>
+          ${isMgr?'<th style="padding:6px 0;text-align:center;font-size:11px;color:var(--text-3);font-weight:600">Encash</th>':''}
+        </tr></thead><tbody>
+        ${teamStaff.map(s => {
+          const bal = getLeaveBalance(s.name);
+          const onProb = isOnProbation(s);
+          const ent = getLeaveEntitlement(s.name, bal.leaveYear);
+          const encashed = ent ? parseFloat(ent.AnnualEncashed||0) : 0;
+          const encashCleared = ent ? ent.EncashmentCleared === 'true' : false;
+          return `<tr style="border-bottom:0.5px solid var(--border)">
+            <td style="padding:8px 0;font-weight:500">${esc(s.name)}${onProb?'<span style="font-size:10px;color:var(--warn);margin-left:4px">Probation</span>':''}</td>
+            <td style="padding:8px 0;text-align:center;color:${bal.annualRemaining<=2?'var(--danger)':'inherit'}">${bal.annualRemaining}</td>
+            <td style="padding:8px 0;text-align:center">${bal.sickRemaining}</td>
+            <td style="padding:8px 0;text-align:center">${bal.unpaidUsed}</td>
+            <td style="padding:8px 0;text-align:center">${bal.brokerCount}</td>
+            <td style="padding:8px 0;text-align:center;font-weight:600">${bal.totalUsed}</td>
+            ${isMgr?`<td style="padding:8px 0;text-align:center">${encashed>0&&!encashCleared?`<button onclick="markEncashed('${esc(s.name)}','${bal.leaveYear}')" style="font-size:11px;padding:3px 8px;background:var(--success);color:#fff;border:none;border-radius:4px;cursor:pointer">Mark encashed (${encashed}d)</button>`:'—'}</td>`:''}
+          </tr>`;
+        }).join('')}
+      </tbody></table>
+    </div>`;
+  }
+
+  el.innerHTML = html;
+
+  // Populate leave requests list
+  if (isMgr || isTL) filterLeaveRequests();
+}
+
+function toggleBrokerField() {
+  const t = document.getElementById('leaveTypeSelect').value;
+  const f = document.getElementById('brokerNameField');
+  if (f) f.style.display = t === 'Broker Holiday' ? 'block' : 'none';
+}
+
+function toggleHalfDaySession() {
+  const cb = document.getElementById('leaveHalfDay');
+  const sel = document.getElementById('leaveHalfDaySession');
+  if (sel) sel.style.display = cb && cb.checked ? 'inline-block' : 'none';
+}
+
+function filterLeaveRequests() {
+  const status = document.getElementById('leaveFilterStatus')?.value||'';
+  const type = document.getElementById('leaveFilterType')?.value||'';
+  const name = (document.getElementById('leaveFilterName')?.value||'').toLowerCase();
+  const el = document.getElementById('leaveRequestsList');
+  if (!el) return;
+
+  let reqs = [..._leaveRequests];
+  if (status) reqs = reqs.filter(r => r.Status === status);
+  if (type) reqs = reqs.filter(r => r.LeaveType === type);
+  if (name) reqs = reqs.filter(r => (r.Title||'').toLowerCase().includes(name));
+  reqs = reqs.slice(0, 50);
+
+  if (!reqs.length) { el.innerHTML = '<div style="font-size:13px;color:var(--text-3)">No requests found.</div>'; return; }
+
+  el.innerHTML = `<table style="width:100%;font-size:13px;border-collapse:collapse">
+    <thead><tr style="border-bottom:1.5px solid var(--border)">
+      <th style="padding:6px 0;text-align:left;font-size:11px;color:var(--text-3);font-weight:600">Staff</th>
+      <th style="padding:6px 0;text-align:left;font-size:11px;color:var(--text-3);font-weight:600">Type</th>
+      <th style="padding:6px 0;text-align:left;font-size:11px;color:var(--text-3);font-weight:600">Dates</th>
+      <th style="padding:6px 0;text-align:left;font-size:11px;color:var(--text-3);font-weight:600">Days</th>
+      <th style="padding:6px 0;text-align:left;font-size:11px;color:var(--text-3);font-weight:600">Status</th>
+      <th style="padding:6px 0;text-align:left;font-size:11px;color:var(--text-3);font-weight:600">By</th>
+    </tr></thead><tbody>
+    ${reqs.map(r => {
+      const sc = r.Status==='Approved'?'var(--success)':r.Status==='Rejected'?'var(--danger)':r.Status==='Forced'?'var(--warn)':'var(--text-3)';
+      return `<tr style="border-bottom:0.5px solid var(--border)">
+        <td style="padding:7px 0;font-weight:500">${esc(r.Title||'')}</td>
+        <td style="padding:7px 0;color:var(--text-2)">${esc(r.LeaveType||'')}</td>
+        <td style="padding:7px 0;color:var(--text-2)">${r.StartDate}${r.EndDate&&r.EndDate!==r.StartDate?' → '+r.EndDate:''}</td>
+        <td style="padding:7px 0">${r.DaysRequested||'?'}</td>
+        <td style="padding:7px 0;color:${sc};font-weight:600">${r.Status||'Pending'}</td>
+        <td style="padding:7px 0;font-size:12px;color:var(--text-3)">${esc(r.ApprovedBy||'—')}</td>
+      </tr>`;
+    }).join('')}
+  </tbody></table>`;
+}
+
+async function markEncashed(name, leaveYear) {
+  if (!confirm('Mark unused annual leave as encashed for ' + name + '?')) return;
+  await updateLeaveEntitlement(name, leaveYear, { EncashmentCleared: 'true' });
+  showToast('Marked as encashed ✓', 'ok');
+  renderLeaveScreen();
+}
+
+// ── Render staff weekly widgets (check-in screen) ──────────────────────────
+function renderStaffWeeklyWidgets() {
+  const el = document.getElementById('staffWeeklyWidgets');
+  if (!el) return;
+  el.style.display = 'block';
+
+  const now = new Date();
+  const dayOfWeek = now.getDay() || 7;
+  const mon = new Date(now); mon.setDate(now.getDate() - dayOfWeek + 1);
+  const weekDates = [];
+  for (let d = new Date(mon); weekDates.length < 7; d.setDate(d.getDate()+1))
+    weekDates.push(new Date(d).toISOString().split('T')[0]);
+
+  const fmtDate = d => new Date(d+'T12:00:00').toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short'});
+  const staff = getStaff().filter(s=>s.role!=='superadmin');
+
+  // Birthdays
+  const bdayEl = document.getElementById('staffWidgetBirthdays');
+  if (bdayEl) {
+    const birthdays = [];
+    for (const d of weekDates) {
+      const mmdd = d.slice(5);
+      const bday = staff.filter(s=>s.dob&&s.dob.slice(5)===mmdd);
+      if (bday.length) birthdays.push({date:d,people:bday});
+    }
+    bdayEl.innerHTML = birthdays.length
+      ? birthdays.map(b=>`<div style="margin-bottom:8px"><div style="font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.5px">${fmtDate(b.date)}</div>${b.people.map(p=>`<div style="font-size:13px;font-weight:500">${esc(p.name)}</div>`).join('')}</div>`).join('')
+      : '<div style="font-size:12px;color:var(--text-3)">No birthdays this week</div>';
+  }
+
+  // Anniversaries
+  const annivEl = document.getElementById('staffWidgetAnniversaries');
+  if (annivEl) {
+    const anniversaries = [];
+    for (const d of weekDates) {
+      const mmdd = d.slice(5);
+      const anniv = staff.filter(s=>{
+        if (!s.joinDate||s.joinDate.slice(5)!==mmdd) return false;
+        return new Date(d).getFullYear()-new Date(s.joinDate).getFullYear()>0;
+      });
+      if (anniv.length) anniversaries.push({date:d,people:anniv.map(s=>({name:s.name,years:new Date(d).getFullYear()-new Date(s.joinDate).getFullYear()}))});
+    }
+    annivEl.innerHTML = anniversaries.length
+      ? anniversaries.map(a=>`<div style="margin-bottom:8px"><div style="font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.5px">${fmtDate(a.date)}</div>${a.people.map(p=>`<div style="font-size:13px;font-weight:500">${esc(p.name)} <span style="font-size:11px;color:var(--text-3)">${p.years}yr${p.years!==1?'s':''}</span></div>`).join('')}</div>`).join('')
+      : '<div style="font-size:12px;color:var(--text-3)">No anniversaries this week</div>';
+  }
+
+  // On leave
+  const leaveEl = document.getElementById('staffWidgetLeaves');
+  if (leaveEl) {
+    const leaveRecs = getRecords().filter(r=>weekDates.includes(r.date)&&(r.status==='leave'||r.status==='halfday'));
+    const byDate = {};
+    for (const r of leaveRecs) { if(!byDate[r.date]) byDate[r.date]=[]; byDate[r.date].push(r); }
+    const leaveDates = Object.keys(byDate).sort();
+    leaveEl.innerHTML = leaveDates.length
+      ? leaveDates.map(d=>`<div style="margin-bottom:8px"><div style="font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.5px">${fmtDate(d)}</div>${byDate[d].map(r=>`<div style="font-size:13px;font-weight:500">${esc(r.name)} <span style="font-size:11px;color:var(--text-3)">${r.status==='halfday'?'Half day':'Leave'}</span></div>`).join('')}</div>`).join('')
+      : '<div style="font-size:12px;color:var(--text-3)">No leave this week</div>';
+  }
+}
+
+// ── Public holidays CRUD (superadmin) ─────────────────────────────────────
+function renderPublicHolidaysManager() {
+  const el = document.getElementById('publicHolidaysManagerList');
+  if (!el) return;
+  const year = parseInt(document.getElementById('phYear')?.value || new Date().getFullYear());
+  const hols = _publicHolidays.filter(h => h.date.startsWith(year));
+  if (!hols.length) { el.innerHTML = '<div style="font-size:13px;color:var(--text-3)">No holidays for ' + year + '. Click "Import from API" to fetch.</div>'; return; }
+  el.innerHTML = hols.sort((a,b)=>a.date.localeCompare(b.date)).map(h => `
+    <div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:0.5px solid var(--border);font-size:13px">
+      <span style="color:var(--text-3);min-width:90px">${h.date}</span>
+      <span style="flex:1;font-weight:500">${esc(h.name)}</span>
+      ${h.isManual?'<span style="font-size:10px;background:var(--surface-2);padding:2px 6px;border-radius:4px;color:var(--text-3)">Manual</span>':''}
+      <button onclick="deletePublicHoliday('${h.date}')" style="font-size:11px;padding:3px 8px;background:var(--danger);color:#fff;border:none;border-radius:4px;cursor:pointer">Remove</button>
+    </div>`).join('');
+}
+
+async function deletePublicHoliday(date) {
+  if (!confirm('Remove holiday on ' + date + '?')) return;
+  const token = await getToken();
+  if (!token) return;
+  // Find item ID
+  const res = await fetch(SP_API + "('PublicHolidays')/items?$filter=HolidayDate eq '" + date + "'&$select=Id",
+    { headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json;odata=nometadata' } });
+  if (res.ok) {
+    const data = await res.json();
+    if (data?.value?.[0]?.Id) {
+      await spDelete(SP_API + "('PublicHolidays')/items(" + data.value[0].Id + ")");
+      _publicHolidays = _publicHolidays.filter(h => h.date !== date);
+      LS.set('ci_pubhols', _publicHolidays);
+      renderPublicHolidaysManager();
+      showToast('Holiday removed ✓','ok');
+    }
+  }
+}
+
+async function addPublicHolidayManual() {
+  const date = document.getElementById('phNewDate').value;
+  const name = document.getElementById('phNewName').value.trim();
+  if (!date || !name) { showToast('Enter date and name.','err'); return; }
+  const res = await spPostDirect(SP_API + "('PublicHolidays')/items", {
+    Title: name, HolidayDate: date, HolidayName: name,
+    Year: date.split('-')[0], IsManual: 'true'
+  });
+  if (res) {
+    _publicHolidays.push({ date, name, isManual: true });
+    LS.set('ci_pubhols', _publicHolidays);
+    document.getElementById('phNewDate').value = '';
+    document.getElementById('phNewName').value = '';
+    showToast('Holiday added ✓','ok');
+    renderPublicHolidaysManager();
+  }
+}
+
 function renderWeeklyWidgets() {
   // Get this week's date range (Mon-Sun)
   const now = new Date();
@@ -3760,6 +4552,11 @@ function renderAdmin() {
   if(onboardBtn) onboardBtn.style.display=(sa||mgr)?'block':'none';
   const auditCard=document.getElementById('auditLogCard');
   if(auditCard) auditCard.style.display=sa?'block':'none';
+  const phCard=document.getElementById('publicHolidaysCard');
+  if(phCard) {
+    phCard.style.display=sa?'block':'none';
+    if(sa) { loadPublicHolidays().then(renderPublicHolidaysManager); }
+  }
   const officeCard=document.getElementById('officeManagerCard');
   if(officeCard) {
     officeCard.style.display=sa?'block':'none';
@@ -4436,9 +5233,11 @@ async function loadFromSharePoint() {
       spGet(SP_API + "('AttendanceRecords')/items?$top=5000"),
       spGet(SP_API + "('AttendanceBreaks')/items?$top=5000"),
     ]);
-    // Load obs notes and offices in background (non-blocking)
+    // Load obs notes, offices and leave data in background (non-blocking)
     loadObsNotesFromSP().catch(()=>{});
     loadOfficesFromSP().catch(()=>{});
+    loadLeaveData().catch(()=>{});
+    loadPublicHolidays().catch(()=>{});
     // Only overwrite local data if SharePoint has data
     if (staffRes && staffRes.value && staffRes.value.length > 0) {
       _staff = staffRes.value.map(spToStaff);
