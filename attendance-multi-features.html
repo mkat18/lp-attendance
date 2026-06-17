@@ -600,7 +600,11 @@ tr.flagged-row:hover td { background: #FFEAEA; }
           <button class="icon-btn" onclick="renderMetrics();renderEODCardIfNeeded();" style="padding:5px 10px;font-size:12px">↻</button>
         </div>
       </div>
-      <div id="publicHolidayBanner" style="display:none;background:#FEF3C7;border:1.5px solid #FDE68A;border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:10px;font-size:13px;font-weight:600;color:#92400E;text-align:center"></div>
+      <div id="previewBanner" style="display:none;background:#1B2B4B;color:#fff;padding:8px 16px;font-size:12px;display:none;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:999">
+  <span>👁 Previewing as: <strong id="previewRoleLabel"></strong> — this is how they see the app</span>
+  <button onclick="exitPreview()" style="font-size:12px;padding:4px 12px;background:#fff;color:#1B2B4B;border:none;border-radius:4px;cursor:pointer;font-weight:600">Exit preview</button>
+</div>
+<div id="publicHolidayBanner" style="display:none;background:#FEF3C7;border:1.5px solid #FDE68A;border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:10px;font-size:13px;font-weight:600;color:#92400E;text-align:center"></div>
       <div id="needsAttentionBanner" style="display:none;background:#FEF2F2;border:1.5px solid #FECACA;border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:10px">
         <div style="font-size:12px;font-weight:700;color:var(--danger);margin-bottom:6px">⚠ Needs manager attention</div>
         <div id="needsAttentionList"></div>
@@ -1651,8 +1655,8 @@ const CHECKIN_ROLES = ['manager','hr','teamlead','analyst','trainee','assistant'
 const DASHBOARD_ROLES = ['manager','hr','teamlead','assistant']; // see dashboard
 const ADMIN_ROLES = ['manager','superadmin']; // see admin panel
 
-function isSuperAdmin()    { return currentUser&&currentUser.role==='superadmin'; }
-function isManager()       { return currentUser&&(currentUser.role==='manager'||currentUser.role==='superadmin'); }
+function isSuperAdmin()    { return currentUser&&(_realRole||currentUser.role)==='superadmin'; }
+function isManager()       { return currentUser&&(['manager','superadmin'].includes(_realRole||currentUser.role)); }
 function isHR()            { return currentUser&&currentUser.role==='hr'; }
 function isAssistant()     { return currentUser&&currentUser.role==='assistant'; }
 function isTeamLead()      { return currentUser&&currentUser.role==='teamlead'; }
@@ -1667,6 +1671,43 @@ function canAddStaff()  { return currentUser&&['superadmin','manager'].includes(
 function canDeleteStaff(){ return isSuperAdmin(); }
 function canChangeRole(){ return isSuperAdmin(); }
 function canEditRecords(){ return isSuperAdmin(); }
+
+
+// ── Role preview for superadmin ───────────────────────────────────────────
+// Stores real role, temporarily overrides for rendering
+let _previewRole = null;
+let _realRole = null;
+
+function startPreview(role) {
+  if (!role || !isSuperAdmin()) return;
+  _previewRole = role;
+  _realRole = currentUser.role;
+  currentUser.role = role;
+  // Show banner
+  const banner = document.getElementById('previewBanner');
+  if (banner) { banner.style.display = 'flex'; }
+  document.getElementById('previewRoleLabel').textContent = ROLE_LABEL[role]||role;
+  buildNav();
+  // Show what this role sees first
+  if (role === 'manager') { loadDashboard(); showScreen('dashboard'); }
+  else if (role === 'teamlead') { initCheckin(); showScreen('checkin'); }
+  else { initCheckin(); showScreen('checkin'); }
+  const firstTab = document.querySelector('.nav-tab');
+  if (firstTab) firstTab.classList.add('active');
+}
+
+function exitPreview() {
+  if (!_realRole) return;
+  currentUser.role = _realRole;
+  _previewRole = null;
+  _realRole = null;
+  const banner = document.getElementById('previewBanner');
+  if (banner) banner.style.display = 'none';
+  buildNav();
+  loadDashboard(); showScreen('dashboard');
+  const firstTab = document.querySelector('.nav-tab');
+  if (firstTab) firstTab.classList.add('active');
+}
 
 function buildNav() {
   const nav = document.getElementById('navRight');
@@ -1690,7 +1731,8 @@ function buildNav() {
   }
   nav.innerHTML = `
     <div class="nav-tabs">${tabs.map(([k,l])=>`<button class="nav-tab" onclick="goTab('${k}',this)">${l}</button>`).join('')}</div>
-    <span class="nav-user">${esc(currentUser.name.split(' ')[0])} <span style="font-size:10px;opacity:0.7">${ROLE_LABEL[currentUser.role]||''}</span></span>
+    ${_previewRole ? '' : (currentUser.role==='superadmin' ? `<select onchange="startPreview(this.value)" style="font-size:12px;padding:4px 8px;border-radius:4px;border:1.5px solid rgba(255,255,255,0.3);background:rgba(255,255,255,0.1);color:inherit;cursor:pointer"><option value="">👁 View as…</option><option value="staff">Staff</option><option value="analyst">Analyst</option><option value="trainee">Trainee</option><option value="teamlead">Team Lead</option><option value="manager">Manager</option><option value="hr">HR</option></select>` : '')}
+    <span class="nav-user">${esc(currentUser.name.split(' ')[0])} <span style="font-size:10px;opacity:0.7">${_previewRole ? 'Previewing' : (ROLE_LABEL[currentUser.role]||'')}</span></span>
     <button class="logout-btn" onclick="logout()">Sign out</button>`;
 }
 
