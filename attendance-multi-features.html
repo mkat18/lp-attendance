@@ -5548,38 +5548,29 @@ async function onMsLogin(account) {
   await loadFromSharePoint().catch(()=>{});
   autoSaveMsEmail(account).catch(()=>{});
 
-  // 1. Restore previous session from sessionStorage (refresh case)
+  // Restore session from sessionStorage (refresh case — keeps same user)
   const savedSession = sessionStorage.getItem('lp_session');
   if (savedSession) {
     try {
       const sess = JSON.parse(savedSession);
       if (sess && sess.name && sess.role) {
-        const staff = getStaff();
-        const member = staff.find(s => s.name === sess.name);
-        if (member) {
-          await loginAs(member);
-          return;
-        }
+        const member = getStaff().find(s => s.name === sess.name);
+        if (member) { await loginAs(member); return; }
       }
     } catch(e) {}
   }
 
-  // 2. Auto-login from MS email only if no existing session
-  if (account && account.username) {
+  // Auto-login from MS email ONLY when coming from portal (login_hint in URL)
+  const loginHint = new URLSearchParams(window.location.search).get('login_hint');
+  if (loginHint && account && account.username) {
     const email = account.username.toLowerCase();
-    const staff = getStaff();
-    const emailPrefix = email.split('@')[0].toLowerCase().replace(/[._]/g, ' ');
-    const member = staff.find(s =>
-      (s.email && s.email.toLowerCase() === email) ||
-      s.name.toLowerCase().replace(/\s+/g,' ').includes(emailPrefix.replace(/[._]/g,' ').trim())
-    );
-    if (member) {
-      await loginAs(member);
-      return;
+    if (email === loginHint.toLowerCase()) {
+      const member = getStaff().find(s => s.email && s.email.toLowerCase() === email);
+      if (member) { await loginAs(member); return; }
     }
   }
 
-  // 3. Fallback — show PIN screen
+  // Default — show PIN screen so staff can identify themselves
   populateNameDropdown();
 }
 
