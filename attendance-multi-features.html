@@ -741,6 +741,10 @@ tr.flagged-row:hover td { background: #FFEAEA; }
       <div id="staffList"></div>
     </div>
 
+    <div id="onboardBtn" style="display:none;margin-bottom:1rem">
+      <button class="btn-primary" onclick="showOnboardForm()">+ Onboard new staff member</button>
+    </div>
+
     <div class="card" id="addStaffCard" style="display:none">
       <div class="section-label">Onboard new staff member</div>
 
@@ -872,8 +876,8 @@ tr.flagged-row:hover td { background: #FFEAEA; }
   <!-- ── FILES SCREEN (Team Lead only) ───────────────────────────────────── -->
   <div id="screen-files" class="screen">
     <div class="page-header">
-      <h1>📁 Files</h1>
-      <p>Client applications across your team</p>
+      <h1 id="filesScreenTitle">📁 Files</h1>
+      <p id="filesScreenSub">Client applications across your team</p>
     </div>
     <div style="display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap">
       <button class="tab active" id="ftab-today" onclick="switchFilesTab('today',this)">Today</button>
@@ -883,7 +887,32 @@ tr.flagged-row:hover td { background: #FFEAEA; }
       <button class="tab" id="ftab-analytics" onclick="switchFilesTab('analytics',this)">📊 Analytics</button>
       <button class="tab" id="ftab-archive" onclick="switchFilesTab('archive',this)">Archive</button>
     </div>
-    <input type="text" id="filesSearch" placeholder="🔍 Search client name…" oninput="renderFilesScreen()" style="width:100%;font-size:14px;padding:8px 12px;border-radius:var(--radius-sm);border:1.5px solid var(--border);margin-bottom:12px"/>
+    <!-- Superadmin filters — shown only for superadmin -->
+    <div id="filesAdminFilters" style="display:none;background:var(--surface-2);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:12px">
+      <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">Filter all files</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px">
+        <div>
+          <label style="font-size:11px;color:var(--text-3)">Date from</label>
+          <input type="date" id="filesFilterFrom" oninput="renderFilesScreen()" style="width:100%;font-size:13px;padding:6px 8px;border-radius:var(--radius-sm);border:1.5px solid var(--border)"/>
+        </div>
+        <div>
+          <label style="font-size:11px;color:var(--text-3)">Date to</label>
+          <input type="date" id="filesFilterTo" oninput="renderFilesScreen()" style="width:100%;font-size:13px;padding:6px 8px;border-radius:var(--radius-sm);border:1.5px solid var(--border)"/>
+        </div>
+        <div>
+          <label style="font-size:11px;color:var(--text-3)">Staff assigned</label>
+          <select id="filesFilterStaff" onchange="renderFilesScreen()" style="width:100%;font-size:13px;padding:6px 8px;border-radius:var(--radius-sm);border:1.5px solid var(--border)">
+            <option value="">All staff</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:11px;color:var(--text-3)">Broker</label>
+          <input type="text" id="filesFilterBroker" placeholder="Broker name…" oninput="renderFilesScreen()" style="width:100%;font-size:13px;padding:6px 8px;border-radius:var(--radius-sm);border:1.5px solid var(--border)"/>
+        </div>
+      </div>
+      <button onclick="clearFilesFilters()" style="margin-top:8px;font-size:12px;padding:4px 10px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:transparent;cursor:pointer;color:var(--text-3)">Clear filters</button>
+    </div>
+    <input type="text" id="filesSearch" placeholder="🔍 Search client name, broker, lender…" oninput="renderFilesScreen()" style="width:100%;font-size:14px;padding:8px 12px;border-radius:var(--radius-sm);border:1.5px solid var(--border);margin-bottom:12px"/>
     <div id="filesContent"></div>
   </div>
 
@@ -1649,7 +1678,7 @@ function buildNav() {
   let tabs = [];
   const r = currentUser.role;
   if (r === 'superadmin') {
-    tabs = [['checkin','Check in'],['dashboard','Dashboard'],['admin','Staff'],['files','Files'],['profile','PIN']];
+    tabs = [['dashboard','Dashboard'],['admin','Staff'],['files','All Files'],['profile','PIN']];
   } else if (r === 'manager') {
     tabs = [['checkin','Check in'],['dashboard','Dashboard'],['admin','Staff'],['profile','PIN']];
   } else if (r === 'hr') {
@@ -1965,8 +1994,7 @@ async function loginAs(member) {
   currentUser={name:member.name, role:member.role};
   buildNav();
   if (member.role==='superadmin') {
-    // Superadmin sees check-in first, can navigate to dashboard via nav
-    initCheckin(); showScreen('checkin');
+    loadDashboard(); showScreen('dashboard');
   } else {
     // Debug: show what records are in cache for this user today
     initCheckin(); showScreen('checkin');
@@ -2986,7 +3014,7 @@ function switchDashTab(name,btn) {
 
 // ── Needs Attention — missing clock-outs + unclosed breaks ────────────────
 async function renderNeedsAttention() {
-  if (!isManager()) return;
+  if (!isManager() && !isSuperAdmin()) return;
   const banner = document.getElementById('needsAttentionBanner');
   const list = document.getElementById('needsAttentionList');
   if (!banner || !list) return;
@@ -3688,9 +3716,11 @@ function renderAdmin() {
   document.getElementById('staffCount').textContent=staff.length;
 
   // Show/hide add cards based on role
-  document.getElementById('addManagerCard').style.display=(sa||mgr)?'block':'none';
   const addStaffCard=document.getElementById('addStaffCard');
-  if(addStaffCard) addStaffCard.style.display=canAddStaff()?'block':'none';
+  if(addStaffCard) addStaffCard.style.display='none'; // starts hidden, shown on button click
+  // Show onboard button only for managers and superadmins
+  const onboardBtn=document.getElementById('onboardBtn');
+  if(onboardBtn) onboardBtn.style.display=(sa||mgr)?'block':'none';
   const auditCard=document.getElementById('auditLogCard');
   if(auditCard) auditCard.style.display=sa?'block':'none';
   const officeCard=document.getElementById('officeManagerCard');
@@ -5820,15 +5850,53 @@ function switchMyFilesTab(tab, btn) {
   renderMyFilesScreen();
 }
 
+
+function clearFilesFilters() {
+  ['filesFilterFrom','filesFilterTo','filesFilterBroker'].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.value='';
+  });
+  const staffSel=document.getElementById('filesFilterStaff');
+  if(staffSel) staffSel.value='';
+  renderFilesScreen();
+}
+
 function renderFilesScreen() {
   const el = document.getElementById('filesContent');
   if (!el) return;
 
+  // Show/hide superadmin filter bar and update title
+  const adminFilters = document.getElementById('filesAdminFilters');
+  const titleEl = document.getElementById('filesScreenTitle');
+  const subEl = document.getElementById('filesScreenSub');
+  if (isSuperAdmin()) {
+    if (adminFilters) {
+      adminFilters.style.display = 'block';
+      // Populate staff dropdown
+      const staffSel = document.getElementById('filesFilterStaff');
+      if (staffSel && staffSel.options.length <= 1) {
+        const names = getStaff().filter(s=>s.role!=='superadmin').map(s=>s.name).sort();
+        staffSel.innerHTML = '<option value="">All staff</option>' + names.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('');
+      }
+    }
+    if (titleEl) titleEl.textContent = '📁 All Files';
+    if (subEl) subEl.textContent = 'Every client file across all staff';
+  } else {
+    if (adminFilters) adminFilters.style.display = 'none';
+  }
+
   let allFiles, teamAndSelf;
   if (isSuperAdmin()) {
-    // Superadmin sees all files across all staff
     allFiles = getFileEntries();
     teamAndSelf = getStaff().map(s => s.name);
+    // Apply superadmin filters
+    const filterFrom   = document.getElementById('filesFilterFrom')?.value||'';
+    const filterTo     = document.getElementById('filesFilterTo')?.value||'';
+    const filterStaff  = document.getElementById('filesFilterStaff')?.value||'';
+    const filterBroker = (document.getElementById('filesFilterBroker')?.value||'').toLowerCase().trim();
+    if (filterFrom)   allFiles = allFiles.filter(f => (f.updatedAt||f.date||'') >= filterFrom);
+    if (filterTo)     allFiles = allFiles.filter(f => (f.updatedAt||f.date||'') <= filterTo);
+    if (filterStaff)  allFiles = allFiles.filter(f => f.owner === filterStaff);
+    if (filterBroker) allFiles = allFiles.filter(f => (f.broker||'').toLowerCase().includes(filterBroker));
   } else if (isTeamLead()) {
     const myTeam = getTeamForTL(currentUser.name);
     teamAndSelf = [...myTeam, currentUser.name];
@@ -5839,7 +5907,12 @@ function renderFilesScreen() {
   }
 
   const searchQ = (document.getElementById('filesSearch')?.value||'').toLowerCase().trim();
-  const filtered = searchQ ? allFiles.filter(f=>(f.client||'').toLowerCase().includes(searchQ)||(f.broker||'').toLowerCase().includes(searchQ)||(f.lender||'').toLowerCase().includes(searchQ)) : allFiles;
+  const filtered = searchQ ? allFiles.filter(f=>
+    (f.client||'').toLowerCase().includes(searchQ)||
+    (f.broker||'').toLowerCase().includes(searchQ)||
+    (f.lender||'').toLowerCase().includes(searchQ)||
+    (f.owner||'').toLowerCase().includes(searchQ)
+  ) : allFiles;
 
   if (_activeFilesTab === 'today') {
     renderFilesToday(el, filtered, teamAndSelf);
