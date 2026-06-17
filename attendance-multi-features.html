@@ -460,6 +460,12 @@ tr.flagged-row:hover td { background: #FFEAEA; }
   </div>
 
   <!-- ── GEO BLOCKED ──────────────────────────────────────────────────────── -->
+  <!-- Preview banner — always visible when in preview mode -->
+  <div id="previewBanner" style="display:none;background:#1B2B4B;color:#fff;padding:8px 16px;font-size:12px;align-items:center;justify-content:space-between;position:sticky;top:48px;z-index:999;border-bottom:2px solid #F59E0B">
+    <span>&#128065; Previewing as: <strong id="previewRoleLabel"></strong> &mdash; this is how the app looks to them</span>
+    <button onclick="exitPreview()" style="font-size:12px;padding:5px 14px;background:#F59E0B;color:#000;border:none;border-radius:4px;cursor:pointer;font-weight:700">&#x2715; Exit preview</button>
+  </div>
+
   <div id="screen-geoblocked" class="screen" style="text-align:center;padding:3rem 1.5rem">
     <div style="font-size:56px;margin-bottom:1rem">📍</div>
     <h1 style="font-size:22px;font-weight:700;margin-bottom:8px;color:var(--text)">Location access required</h1>
@@ -619,10 +625,6 @@ tr.flagged-row:hover td { background: #FFEAEA; }
           <button class="icon-btn" onclick="renderMetrics();renderEODCardIfNeeded();" style="padding:5px 10px;font-size:12px">↻</button>
         </div>
       </div>
-      <div id="previewBanner" style="display:none;background:#1B2B4B;color:#fff;padding:8px 16px;font-size:12px;display:none;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:999">
-  <span>👁 Previewing as: <strong id="previewRoleLabel"></strong> — this is how they see the app</span>
-  <button onclick="exitPreview()" style="font-size:12px;padding:4px 12px;background:#fff;color:#1B2B4B;border:none;border-radius:4px;cursor:pointer;font-weight:600">Exit preview</button>
-</div>
 <div id="publicHolidayBanner" style="display:none;background:#FEF3C7;border:1.5px solid #FDE68A;border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:10px;font-size:13px;font-weight:600;color:#92400E;text-align:center"></div>
       <div id="needsAttentionBanner" style="display:none;background:#FEF2F2;border:1.5px solid #FECACA;border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:10px">
         <div style="font-size:12px;font-weight:700;color:var(--danger);margin-bottom:6px">⚠ Needs manager attention</div>
@@ -1731,7 +1733,7 @@ function startPreview(role) {
   currentUser.role = role;
   // Show banner
   const banner = document.getElementById('previewBanner');
-  if (banner) { banner.style.display = 'flex'; }
+  if (banner) banner.style.display = 'flex';
   document.getElementById('previewRoleLabel').textContent = ROLE_LABEL[role]||role;
   buildNav();
   // Show what this role sees first
@@ -1777,7 +1779,7 @@ function buildNav() {
   }
   nav.innerHTML = `
     <div class="nav-tabs">${tabs.map(([k,l])=>`<button class="nav-tab" onclick="goTab('${k}',this)">${l}</button>`).join('')}</div>
-    ${_previewRole ? '' : (currentUser.role==='superadmin' ? `<select class="nav-select" onchange="startPreview(this.value)">
+    ${_previewRole ? '' : (_realRole==='superadmin' || currentUser.role==='superadmin' ? `<select class="nav-select" onchange="startPreview(this.value)">
       <option value="" style="background:#1B2B4B">👁 View as…</option>
       <option value="staff" style="background:#1B2B4B">Staff</option>
       <option value="analyst" style="background:#1B2B4B">Analyst</option>
@@ -6306,7 +6308,8 @@ function populateObsNoteDropdown() {
 function updateObsNoteUI() {
   const card = document.getElementById('workloadNoteCard');
   if (!card) return;
-  const canNote = isManager() || isTeamLead(); // HR excluded by design
+  const displayRole = currentUser.role; // use current role (preview-aware)
+  const canNote = ['manager','superadmin','teamlead'].includes(displayRole);
   card.style.display = canNote ? 'block' : 'none';
   if (canNote) populateObsNoteDropdown();
 }
