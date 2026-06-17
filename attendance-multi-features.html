@@ -460,12 +460,6 @@ tr.flagged-row:hover td { background: #FFEAEA; }
   </div>
 
   <!-- ── GEO BLOCKED ──────────────────────────────────────────────────────── -->
-  <!-- Preview banner — always visible when in preview mode -->
-  <div id="previewBanner" style="display:none;background:#1B2B4B;color:#fff;padding:8px 16px;font-size:12px;align-items:center;justify-content:space-between;position:sticky;top:48px;z-index:999;border-bottom:2px solid #F59E0B">
-    <span>&#128065; Previewing as: <strong id="previewRoleLabel"></strong> &mdash; this is how the app looks to them</span>
-    <button onclick="exitPreview()" style="font-size:12px;padding:5px 14px;background:#F59E0B;color:#000;border:none;border-radius:4px;cursor:pointer;font-weight:700">&#x2715; Exit preview</button>
-  </div>
-
   <div id="screen-geoblocked" class="screen" style="text-align:center;padding:3rem 1.5rem">
     <div style="font-size:56px;margin-bottom:1rem">📍</div>
     <h1 style="font-size:22px;font-weight:700;margin-bottom:8px;color:var(--text)">Location access required</h1>
@@ -585,8 +579,8 @@ tr.flagged-row:hover td { background: #FFEAEA; }
     <div id="staffWeeklyWidgets" style="display:none;margin-top:12px">
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
         <div class="card" style="margin:0">
-          <div class="card-label">🎂 Birthdays this week</div>
-          <div id="staffWidgetBirthdays"><div style="font-size:12px;color:var(--text-3)">No birthdays this week</div></div>
+          <div class="card-label">🎂 Birthdays today</div>
+          <div id="staffWidgetBirthdays"><div style="font-size:12px;color:var(--text-3)">No birthdays today</div></div>
         </div>
         <div class="card" style="margin:0">
           <div class="card-label">🎉 Work anniversaries</div>
@@ -694,7 +688,7 @@ tr.flagged-row:hover td { background: #FFEAEA; }
     <div id="weeklyWidgets" style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:12px">
       <div style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:1rem">
         <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:10px">Birthdays this week</div>
-        <div id="widgetBirthdays"><div style="font-size:12px;color:var(--text-3)">No birthdays this week</div></div>
+        <div id="widgetBirthdays"><div style="font-size:12px;color:var(--text-3)">No birthdays today</div></div>
       </div>
       <div style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:1rem">
         <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:10px">Work anniversaries</div>
@@ -1788,8 +1782,8 @@ function buildNav() {
       <option value="manager" style="background:#1B2B4B">Manager</option>
       <option value="hr" style="background:#1B2B4B">HR</option>
     </select>` : '')}
-    <span class="nav-user">${esc(currentUser.name.split(' ')[0])} <span style="font-size:10px;opacity:0.7">${_previewRole ? 'Previewing' : (ROLE_LABEL[currentUser.role]||'')}</span></span>
-    <button class="logout-btn" onclick="logout()">Sign out</button>`;
+    <span class="nav-user">${esc(currentUser.name.split(' ')[0])} <span style="font-size:10px;opacity:0.7">${_previewRole ? 'Previewing as '+(_previewRole||'') : (ROLE_LABEL[currentUser.role]||'')}</span></span>
+    ${_previewRole ? `<button onclick="exitPreview()" style="font-size:12px;padding:5px 14px;background:#F59E0B;color:#000;border:none;border-radius:4px;cursor:pointer;font-weight:700;margin-left:4px">&#x2715; Exit preview</button>` : `<button class="logout-btn" onclick="logout()">Sign out</button>`}`;
 }
 
 function goTab(name, btn) {
@@ -3835,15 +3829,12 @@ function renderStaffWeeklyWidgets() {
   // Birthdays
   const bdayEl = document.getElementById('staffWidgetBirthdays');
   if (bdayEl) {
-    const birthdays = [];
-    for (const d of weekDates) {
-      const mmdd = d.slice(5);
-      const bday = staff.filter(s=>s.dob&&s.dob.slice(5)===mmdd);
-      if (bday.length) birthdays.push({date:d,people:bday});
-    }
-    bdayEl.innerHTML = birthdays.length
-      ? birthdays.map(b=>`<div style="margin-bottom:8px"><div style="font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.5px">${fmtDate(b.date)}</div>${b.people.map(p=>`<div style="font-size:13px;font-weight:500">${esc(p.name)}</div>`).join('')}</div>`).join('')
-      : '<div style="font-size:12px;color:var(--text-3)">No birthdays this week</div>';
+    // Birthdays today only
+    const todayMMDD = today.slice(5);
+    const todayBdays = staff.filter(s=>s.dob&&s.dob.slice(5)===todayMMDD);
+    bdayEl.innerHTML = todayBdays.length
+      ? todayBdays.map(p=>`<div style="font-size:13px;font-weight:500">${esc(p.name)}</div>`).join('')
+      : '<div style="font-size:12px;color:var(--text-3)">No birthdays today</div>';
   }
 
   // Anniversaries
