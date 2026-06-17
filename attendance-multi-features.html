@@ -4060,7 +4060,7 @@ function removePerson(i) {
   showToast(s.name+' removed.','ok');
 }
 
-function resetPin(i) {
+async function resetPin(i) {
   const staff=getStaff(); const s=staff[i];
   if (!isSuperAdmin() && !(currentUser.role==='manager' && s.role==='staff')) {
     showToast('Permission denied.','err'); return;
@@ -4068,9 +4068,10 @@ function resetPin(i) {
   if(!confirm('Reset PIN for '+s.name+'? A new temporary PIN will be generated.'))return;
   const tempPin=genTempPin();
   staff[i].pin=null; staff[i].tempPin=hashPin(tempPin);
+  console.log('[RESET DEBUG] name:', staff[i].name, 'tempPin plain:', tempPin, 'tempPin hashed:', staff[i].tempPin);
   staff[i].pinResetBy=currentUser.name; staff[i].pinResetAt=new Date().toLocaleString('en-AU');
   saveStaff(staff);
-  spSaveStaffMember(staff[i]);
+  await spSaveStaffMember(staff[i]); // await so SP has the new tempPin before anything re-fetches
   writeAuditLog('PIN Reset', s.name, `PIN reset by ${currentUser.name}`);
   renderAdmin();
   showTempPin(s.name, tempPin);
