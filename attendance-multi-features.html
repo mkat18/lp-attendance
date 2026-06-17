@@ -4376,11 +4376,10 @@ function renderWeeklyWidgets() {
     if (!anniversaries.length) {
       annivEl.innerHTML = '<div style="font-size:12px;color:var(--text-3)">No anniversaries this week</div>';
     } else {
-      annivEl.innerHTML = anniversaries.map(a =>
-        `<div style="margin-bottom:8px">
-          <div style="font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.5px">${fmtDate(a.date)}</div>
-          ${a.people.map(p=>`<div style="font-size:13px;font-weight:500;color:var(--text)">${esc(p.name)} <span style="font-size:11px;color:var(--text-3)">${p.years} yr${p.years!==1?'s':''}</span></div>`).join('')}
-        </div>`).join('');
+      annivEl.innerHTML = anniversaries.map(a => {
+        const peopleHtml = a.people.map(p=>'<div style="font-size:13px;font-weight:500;color:var(--text)">'+esc(p.name)+' <span style="font-size:11px;color:var(--text-3)">'+p.years+' yr'+(p.years!==1?'s':'')+'</span></div>').join('');
+        return '<div style="margin-bottom:8px"><div style="font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.5px">'+fmtDate(a.date)+'</div>'+peopleHtml+'</div>';
+      }).join('');
     }
   }
 
