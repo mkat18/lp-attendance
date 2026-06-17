@@ -629,28 +629,40 @@ function signOut() {
 async function getStaffRole(email) {
   try {
     const token = await getToken();
-    if (!token) return null;
+    if (!token) { console.log('[ROLE] No token'); return null; }
+    // Try email match first
+    console.log('[ROLE] Looking up email:', email);
     const res = await fetch(
       SP_API + "('AttendanceStaff')/items?$select=Title,Role,Email&$filter=Email eq '" + encodeURIComponent(email) + "'&$top=1",
       { headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json;odata=nometadata' } }
     );
-    if (!res.ok) return null;
-    const data = await res.json();
-    if (data?.value?.length > 0) return (data.value[0].Role || 'staff').toLowerCase();
-    // Fallback: try matching by name from email prefix
+    console.log('[ROLE] Email filter status:', res.status);
+    if (res.ok) {
+      const data = await res.json();
+      console.log('[ROLE] Email filter result:', JSON.stringify(data?.value));
+      if (data?.value?.length > 0) return (data.value[0].Role || 'staff').toLowerCase();
+    }
+    // Fallback: load all staff and match by name
+    console.log('[ROLE] Trying name fallback');
     const namePrefix = email.split('@')[0].toLowerCase();
     const res2 = await fetch(
-      SP_API + "('AttendanceStaff')/items?$select=Title,Role&$top=500",
+      SP_API + "('AttendanceStaff')/items?$select=Title,Role,Email&$top=500",
       { headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json;odata=nometadata' } }
     );
     if (res2.ok) {
       const data2 = await res2.json();
+      console.log('[ROLE] All staff count:', data2?.value?.length);
+      // Try exact email match case-insensitive
+      const emailMatch = data2.value?.find(s => s.Email && s.Email.toLowerCase() === email.toLowerCase());
+      if (emailMatch) { console.log('[ROLE] Found by email:', emailMatch.Title); return (emailMatch.Role || 'staff').toLowerCase(); }
+      // Try name match
       const match = data2.value?.find(s => s.Title.toLowerCase().replace(/\s+/g,'').includes(namePrefix.replace(/[._]/g,'')));
-      if (match) return (match.Role || 'staff').toLowerCase();
+      if (match) { console.log('[ROLE] Found by name:', match.Title); return (match.Role || 'staff').toLowerCase(); }
+      console.log('[ROLE] No match found for:', email, 'namePrefix:', namePrefix);
     }
-    return null; // not found — not onboarded
+    return null;
   } catch(e) {
-    console.warn('getStaffRole failed:', e);
+    console.warn('[ROLE] getStaffRole failed:', e);
     return null;
   }
 }
