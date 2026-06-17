@@ -6966,9 +6966,9 @@ function showChecklistModal(fileIdx) {
     '</div>' +
     '<div id="checklistItems">' + sectionsHtml + '</div>' +
     '<div id="checklistError" style="color:var(--danger);font-size:12px;margin:8px 0;display:none">Please answer all items before submitting.</div>' +
-    '<div style="display:flex;gap:8px;margin-top:1rem;flex-wrap:wrap">' +
-    '<button class="btn-primary" onclick="submitChecklist(' + fileIdx + ')">Save checklist</button>' +
-    '<button onclick="deferChecklist(' + fileIdx + ')" style="padding:10px 16px;border:1.5px solid #FDE68A;border-radius:var(--radius-sm);background:#FEF3C7;color:#92400E;cursor:pointer;font-size:13px;font-weight:600">I\'ll submit later</button>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:1rem">' +
+    '<button class="btn-primary" onclick="submitChecklist(' + fileIdx + ')" style="width:100%">Save checklist</button>' +
+    '<button onclick="deferChecklist(' + fileIdx + ')" style="width:100%;padding:10px 16px;border:1.5px solid #FDE68A;border-radius:var(--radius-sm);background:#FEF3C7;color:#92400E;cursor:pointer;font-size:13px;font-weight:600">I\'ll submit later</button>' +
     '</div>' +
     '</div>';
 
@@ -7214,15 +7214,13 @@ async function saveFileEntry() {
 
   const newStatus = document.getElementById('fm_status').value;
 
-  // Gate: cannot move past Ready to Submit without checklist interaction
+  // Gate: cannot move to any stage after Ready to Submit without checklist interaction
   const existingStatus = existing ? existing.status : null;
-  if (existingStatus === 'Ready to Submit' && STAGES_AFTER_READY.includes(newStatus)) {
-    if (!existing.checklistSubmitted && !existing.checklistDeferred) {
-      showToast('Complete or defer the checklist before moving past Ready to Submit.', 'err');
-      const idx = files.findIndex(f => f.id === fileId);
-      if (idx >= 0) setTimeout(() => showChecklistModal(idx), 300);
-      return;
-    }
+  if (STAGES_AFTER_READY.includes(newStatus) && existing && !existing.checklistSubmitted && !existing.checklistDeferred) {
+    showToast('Complete or defer the submission checklist first.', 'err');
+    const gateIdx = files.findIndex(f => f.id === fileId);
+    if (gateIdx >= 0) setTimeout(() => showChecklistModal(gateIdx), 300);
+    return;
   }
   const loanAmtRaw = document.getElementById('fm_loanAmount') ? document.getElementById('fm_loanAmount').value : '';
   const loanAmount = loanAmtRaw ? parseFloat(loanAmtRaw) : (existing ? existing.loanAmount : null);
@@ -8047,14 +8045,17 @@ function quickStatusUpdate(fileId, newStatus) {
   const prevStatus = f.status;
   if (prevStatus === newStatus) return;
 
-  // Gate: cannot move past Ready to Submit without checklist interaction
-  if (prevStatus === 'Ready to Submit' && STAGES_AFTER_READY.includes(newStatus)) {
-    if (!f.checklistSubmitted && !f.checklistDeferred) {
-      // Force checklist modal — must complete or defer first
-      showToast('Please complete or defer the checklist before moving to the next stage.', 'err');
-      setTimeout(() => showChecklistModal(idx), 300);
-      return;
-    }
+  // Gate: cannot move to any stage after Ready to Submit without checklist interaction
+  if (STAGES_AFTER_READY.includes(newStatus) && !f.checklistSubmitted && !f.checklistDeferred) {
+    // Force through checklist — must complete or defer first
+    // First update status to Ready to Submit so they see it in context
+    showToast('Please complete or defer the submission checklist first.', 'err');
+    files[idx].status = 'Ready to Submit';
+    saveFileEntries(files);
+    if (document.getElementById('screen-files')?.classList.contains('active')) renderFilesScreen();
+    if (document.getElementById('screen-myfiles')?.classList.contains('active')) renderMyFilesScreen();
+    setTimeout(() => showChecklistModal(idx), 400);
+    return;
   }
 
   // Moving TO Ready to Submit — show checklist
