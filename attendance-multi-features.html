@@ -5091,6 +5091,26 @@ async function onMsLogin(account) {
   requestGeo();
   await loadFromSharePoint().catch(()=>{});
   populateNameDropdown();
+  // Auto-save MS email to staff record — used by portal for role lookup
+  autoSaveMsEmail(account).catch(()=>{});
+}
+
+async function autoSaveMsEmail(account) {
+  if (!account || !account.username) return;
+  const email = account.username.toLowerCase();
+  const staff = getStaff();
+  // Try to match by existing email or by name from email prefix
+  const emailPrefix = email.split('@')[0].toLowerCase().replace(/[._]/g,' ');
+  const member = staff.find(s =>
+    (s.email && s.email.toLowerCase() === email) ||
+    s.name.toLowerCase().includes(emailPrefix.split(' ')[0])
+  );
+  if (!member) return;
+  if (member.email && member.email.toLowerCase() === email) return; // already saved
+  // Save email to SP
+  member.email = account.username;
+  saveStaff(staff);
+  await spSaveStaffMember(member);
 }
 
 // ── Error logging system ─────────────────────────────────────────────────

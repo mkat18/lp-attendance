@@ -330,6 +330,20 @@
 </head>
 <body>
 
+<!-- Not onboarded -->
+<div id="notOnboardedScreen" style="display:none;min-height:100vh;background:var(--navy);display:none;flex-direction:column;align-items:center;justify-content:center;padding:2rem;text-align:center">
+  <div style="font-size:56px;margin-bottom:1.5rem">👋</div>
+  <div style="max-width:420px">
+    <h2 style="font-size:22px;font-weight:600;color:#fff;margin-bottom:12px">You're not set up yet</h2>
+    <p style="font-size:14px;color:rgba(255,255,255,0.55);line-height:1.7;margin-bottom:8px">
+      Your account is signed in, but hasn't been configured with app access yet.
+      Please reach out to your manager to get set up.
+    </p>
+    <p style="font-size:13px;color:rgba(255,255,255,0.35);margin-bottom:2rem" id="notOnboardedEmail"></p>
+    <button class="portal-signout" onclick="signOut()" style="font-size:13px;padding:10px 24px">Sign out</button>
+  </div>
+</div>
+
 <!-- Loading -->
 <div id="loadingScreen">
   <div class="spinner"></div>
@@ -512,10 +526,10 @@ async function getStaffRole(email) {
       const match = data2.value?.find(s => s.Title.toLowerCase().replace(/\s+/g,'').includes(namePrefix.replace(/[._]/g,'')));
       if (match) return (match.Role || 'staff').toLowerCase();
     }
-    return 'staff';
+    return null; // not found — not onboarded
   } catch(e) {
     console.warn('getStaffRole failed:', e);
-    return 'staff';
+    return null;
   }
 }
 
@@ -579,6 +593,15 @@ async function init() {
 
     // Get role from SharePoint
     const role = await getStaffRole(email);
+
+    if (!role) {
+      // Not onboarded — show friendly message
+      document.getElementById('loadingScreen').style.display = 'none';
+      const screen = document.getElementById('notOnboardedScreen');
+      screen.style.display = 'flex';
+      document.getElementById('notOnboardedEmail').textContent = 'Signed in as ' + email;
+      return;
+    }
 
     renderPortal(userName, role);
   } catch(e) {
