@@ -95,10 +95,12 @@ nav {
 *, *::before, *::after { box-sizing: border-box; }
 main { max-width: 1280px; margin: 0 auto; padding: 1.75rem 2rem 4rem; }
 
-/* Dashboard gets full width, check-in stays narrow */
-#screen-checkin, #screen-profile, #screen-login {
-  max-width: 500px;
-  margin: 0 auto;
+/* Dashboard gets full width, check-in stays narrow on desktop */
+@media (min-width: 600px) {
+  #screen-checkin, #screen-profile, #screen-login {
+    max-width: 500px;
+    margin: 0 auto;
+  }
 }
 
 /* Wider metrics grid on desktop */
@@ -411,11 +413,77 @@ tr.flagged-row:hover td { background: #FFEAEA; }
 /* ─── RESPONSIVE ─────────────────────────────────────────────────────────── */
 @media (max-width: 420px) {
   nav { padding: 0 1rem; }
-  main { padding: 1.25rem 1rem 4rem; }
+  main { padding: 1rem 0.75rem 5rem; }
   .nav-user { display: none; }
   .status-btn { padding: 16px 6px 14px; font-size: 12px; }
   .status-btn .icon { font-size: 28px; }
   .break-time { font-size: 32px; }
+  .card { padding: 1rem; }
+  .page-header { margin-bottom: 1rem; }
+  .page-header h1 { font-size: 20px; }
+}
+
+/* ── Hamburger menu for mobile ─────────────────────────────────────────── */
+.hamburger-btn {
+  display: none;
+  background: rgba(255,255,255,0.12);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 8px;
+  color: #fff;
+  font-size: 18px;
+  padding: 4px 10px;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.mobile-menu {
+  display: none;
+  position: fixed;
+  top: 56px;
+  left: 0; right: 0;
+  background: var(--navy);
+  z-index: 200;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  padding: 8px 0;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+}
+
+.mobile-menu.open { display: block; }
+
+.mobile-menu-tab {
+  display: block;
+  width: 100%;
+  padding: 14px 20px;
+  text-align: left;
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.75);
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+.mobile-menu-tab.active {
+  color: #fff;
+  font-weight: 700;
+  background: rgba(255,255,255,0.08);
+}
+
+.mobile-menu-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 199;
+  background: rgba(0,0,0,0.3);
+}
+
+.mobile-menu-overlay.open { display: block; }
+
+@media (max-width: 767px) {
+  .nav-tabs { display: none; }
+  .hamburger-btn { display: block; }
+  .nav-select { display: none; }
 }
 
 /* ── Desktop dashboard layout ─────────────────────────────────────────── */
@@ -443,7 +511,12 @@ tr.flagged-row:hover td { background: #FFEAEA; }
     <img src="https://loanprocessor.com.au/wp-content/uploads/2021/10/Cropped-and-Trans.png" alt="Loan Processor" style="height:32px;width:auto;display:block" />
   </div>
   <div class="nav-right" id="navRight"></div>
+  <button class="hamburger-btn" id="hamburgerBtn" onclick="toggleMobileMenu()" aria-label="Menu">☰</button>
 </nav>
+
+<!-- Mobile menu overlay -->
+<div class="mobile-menu-overlay" id="mobileMenuOverlay" onclick="closeMobileMenu()"></div>
+<div class="mobile-menu" id="mobileMenu"></div>
 
 <main>
 
@@ -2150,6 +2223,22 @@ async function undoPermissions() {
   selectPermRole(role);
 }
 
+function toggleMobileMenu() {
+  document.getElementById('mobileMenu').classList.toggle('open');
+  document.getElementById('mobileMenuOverlay').classList.toggle('open');
+}
+
+function closeMobileMenu() {
+  document.getElementById('mobileMenu').classList.remove('open');
+  document.getElementById('mobileMenuOverlay').classList.remove('open');
+}
+
+function mobileGoTab(name) {
+  closeMobileMenu();
+  const btn = document.querySelector('.nav-tab[data-tab="' + name + '"]') || document.querySelector('.nav-tab');
+  goTab(name, btn || document.createElement('button'));
+}
+
 function buildNav() {
   const nav = document.getElementById('navRight');
   if (!currentUser) { nav.innerHTML=''; return; }
@@ -2177,15 +2266,27 @@ function buildNav() {
     ? '<button onclick="exitPreview()" style="font-size:12px;padding:5px 14px;background:#F59E0B;color:#000;border:none;border-radius:4px;cursor:pointer;font-weight:700;margin-left:4px">\u2715 Exit preview</button>'
     : '<button class="logout-btn" onclick="logout()">Sign out</button>';
   nav.innerHTML = `
-    <div class="nav-tabs">${tabs.map(([k,l])=>`<button class="nav-tab" onclick="goTab('${k}',this)">${l}</button>`).join('')}</div>
+    <div class="nav-tabs">${tabs.map(([k,l])=>`<button class="nav-tab" data-tab="${k}" onclick="goTab('${k}',this)">${l}</button>`).join('')}</div>
     ${viewAsDropdown}
     <span class="nav-user">${esc(currentUser.name.split(' ')[0])} <span style="font-size:10px;opacity:0.7">${_previewRole ? 'Previewing as '+_previewRole : (ROLE_LABEL[currentUser.role]||'')}</span></span>
     ${exitBtn}`;
+
+  // Build mobile menu
+  const mobileMenu = document.getElementById('mobileMenu');
+  if (mobileMenu) {
+    mobileMenu.innerHTML = tabs.map(([k,l]) =>
+      `<button class="mobile-menu-tab" data-tab="${k}" onclick="mobileGoTab('${k}')">${l}</button>`
+    ).join('') +
+    `<button class="mobile-menu-tab" onclick="logout();closeMobileMenu()" style="color:rgba(255,100,100,0.8);margin-top:4px">Sign out</button>`;
+  }
 }
 
 function goTab(name, btn) {
   document.querySelectorAll('.nav-tab').forEach(b=>b.classList.remove('active'));
-  btn.classList.add('active');
+  document.querySelectorAll('.mobile-menu-tab').forEach(b=>b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  const mobileBtn = document.querySelector('.mobile-menu-tab[data-tab="'+name+'"]');
+  if (mobileBtn) mobileBtn.classList.add('active');
   showScreen(name);
   if (name==='checkin')   initCheckin();
   if (name==='dashboard') loadDashboard();
@@ -6226,7 +6327,7 @@ function requestGeo() {
       currentGeo = { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: Math.round(pos.coords.accuracy), timestamp: Date.now() };
       // If on geoblocked screen, go to login
       if (document.getElementById('screen-geoblocked').classList.contains('active')) {
-        showScreen('login'); populateNameDropdown();
+        if (!currentUser) { showScreen('login'); populateNameDropdown(); }
       }
       // Also update login screen to show after geo granted
     },
