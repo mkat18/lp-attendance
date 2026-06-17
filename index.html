@@ -603,13 +603,14 @@ const SP_SCOPES = ['https://loanprocessorau.sharepoint.com/.default'];
 
 async function getToken() {
   const accounts = msalInstance.getAllAccounts();
-  if (!accounts.length) return null;
+  if (!accounts.length) { console.warn('[TOKEN] No accounts'); return null; }
   try {
     const r = await msalInstance.acquireTokenSilent({ scopes: SP_SCOPES, account: accounts[0] });
+    console.log('[TOKEN] Silent token acquired');
     return r.accessToken;
   } catch(e) {
-    await msalInstance.acquireTokenRedirect({ scopes: SP_SCOPES });
-    return null;
+    console.warn('[TOKEN] Silent failed:', e.name, e.message);
+    return null; // Don't redirect — just return null
   }
 }
 
@@ -628,27 +629,28 @@ function signOut() {
 // ── Get staff role from SharePoint ─────────────────────────────────────────
 async function getStaffRole(email) {
   try {
-    const token = await getToken();
-    if (!token) return null;
+    const token = _portalToken || await getToken();
+    if (!token) { console.warn('[ROLE] No token available'); return null; }
+    console.log('[ROLE] Got token, fetching staff for:', email);
     const emailLower = email.toLowerCase();
-    // Load all staff and match by email or name
     const res = await fetch(
       SP_API + "('AttendanceStaff')/items?$select=Title,Role,Email&$top=500",
       { headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json;odata=nometadata' } }
     );
+    console.log('[ROLE] SP response status:', res.status);
     if (!res.ok) return null;
     const data = await res.json();
+    console.log('[ROLE] Staff count:', data?.value?.length, 'emails:', data?.value?.slice(0,3).map(s=>s.Email));
     if (!data?.value?.length) return null;
-    // Try exact email match first
     const byEmail = data.value.find(s => s.Email && s.Email.toLowerCase() === emailLower);
-    if (byEmail) return (byEmail.Role || 'staff').toLowerCase();
-    // Fallback: name from email prefix
+    if (byEmail) { console.log('[ROLE] Matched by email:', byEmail.Title, byEmail.Role); return (byEmail.Role || 'staff').toLowerCase(); }
     const namePart = emailLower.split('@')[0].replace(/[._]/g,'');
     const byName = data.value.find(s => s.Title && s.Title.toLowerCase().replace(/\s+/g,'').includes(namePart));
-    if (byName) return (byName.Role || 'staff').toLowerCase();
+    if (byName) { console.log('[ROLE] Matched by name:', byName.Title, byName.Role); return (byName.Role || 'staff').toLowerCase(); }
+    console.warn('[ROLE] No match for:', email, 'namePart:', namePart);
     return null;
   } catch(e) {
-    console.warn('getStaffRole failed:', e);
+    console.warn('[ROLE] Failed:', e);
     return null;
   }
 }
@@ -694,17 +696,18 @@ function renderPortal(userName, role) {
 }
 
 // ── Init ───────────────────────────────────────────────────────────────────
+let _portalToken = null; // store token from redirect
+
 async function init() {
   try {
-    // Handle redirect
     const result = await msalInstance.handleRedirectPromise();
     if (result) {
-      // Just redirected back — continue below
+      _portalToken = result.accessToken;
+      console.log('[INIT] Got token from redirect');
     }
 
     const accounts = msalInstance.getAllAccounts();
     if (!accounts.length) {
-      // Not logged in
       document.getElementById('loadingScreen').style.display = 'none';
       document.getElementById('loginScreen').style.display = 'flex';
       return;
@@ -713,12 +716,12 @@ async function init() {
     const account = accounts[0];
     const userName = account.name || account.username.split('@')[0];
     const email = account.username;
+    console.log('[INIT] Account:', email);
 
-    // Get role from SharePoint
     const role = await getStaffRole(email);
+    console.log('[INIT] Role:', role);
 
     if (!role) {
-      // Not onboarded — show friendly message
       document.getElementById('loadingScreen').style.display = 'none';
       const screen = document.getElementById('notOnboardedScreen');
       screen.style.display = 'flex';
@@ -728,7 +731,7 @@ async function init() {
 
     renderPortal(userName, role);
   } catch(e) {
-    console.error('Portal init error:', e);
+    console.error('[INIT] Error:', e);
     document.getElementById('loadingScreen').style.display = 'none';
     document.getElementById('loginScreen').style.display = 'flex';
   }
