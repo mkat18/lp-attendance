@@ -743,7 +743,9 @@ tr.flagged-row:hover td { background: #FFEAEA; }
 
     <div class="card" id="addStaffCard" style="display:none">
       <div class="section-label">Onboard new staff member</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+
+      <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">Personal information</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
         <div class="field"><label>Full name <span style="color:var(--danger)">*</span></label><input type="text" id="newName" placeholder="e.g. Jake Thompson"/></div>
         <div class="field"><label>Date of joining <span style="color:var(--danger)">*</span></label><input type="date" id="newJoinDate"/></div>
         <div class="field"><label>Phone number</label><input type="tel" id="newPhone" placeholder="e.g. 0412 345 678"/></div>
@@ -751,8 +753,44 @@ tr.flagged-row:hover td { background: #FFEAEA; }
         <div class="field"><label>Date of birth</label><input type="date" id="newDOB"/></div>
         <div class="field" style="grid-column:1/-1"><label>Home address</label><textarea id="newAddress" rows="2" placeholder="Street, Suburb, State, Postcode" style="width:100%;font-size:13px;padding:8px;border-radius:var(--radius-sm);border:1.5px solid var(--border);resize:vertical"></textarea></div>
       </div>
-      <div style="font-size:12px;font-weight:600;color:var(--text-2);margin:12px 0 8px;text-transform:uppercase;letter-spacing:0.5px">Emergency contacts</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px">
+
+      <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">Role & schedule</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+        <div class="field">
+          <label>Role <span style="color:var(--danger)">*</span></label>
+          <select id="newRole" style="font-size:14px" onchange="updateOnboardTLVisibility()">
+            <option value="staff">Staff</option>
+            <option value="analyst">Analyst</option>
+            <option value="trainee">Trainee</option>
+            <option value="teamlead">Team Lead</option>
+            <option value="hr">HR</option>
+            <option value="assistant">Assistant</option>
+            <option value="sales">Sales</option>
+            <option value="customerservice">Customer Service</option>
+            <option value="socialmedia">Social Media</option>
+          </select>
+        </div>
+        <div class="field" id="newTLField">
+          <label>Assign team leader</label>
+          <select id="newTL" style="font-size:14px">
+            <option value="">— None —</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Office</label>
+          <select id="newOffice" style="font-size:14px">
+            <option value="Goregaon">Goregaon</option>
+            <option value="Borivali">Borivali</option>
+            <option value="Virar">Virar</option>
+            <option value="WFH">WFH</option>
+          </select>
+        </div>
+        <div class="field"><label>Start time</label><input type="time" id="newStartTime" value="06:00"/></div>
+        <div class="field"><label>End time</label><input type="time" id="newEndTime" value="14:30"/></div>
+      </div>
+
+      <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">Emergency contacts</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px">
         <div class="field"><label>Contact 1 name <span style="color:var(--danger)">*</span></label><input type="text" id="newEC1Name" placeholder="e.g. Sarah Thompson"/></div>
         <div class="field"><label>Relationship <span style="color:var(--danger)">*</span></label><input type="text" id="newEC1Relation" placeholder="e.g. Mother"/></div>
         <div class="field"><label>Phone <span style="color:var(--danger)">*</span></label><input type="tel" id="newEC1Phone" placeholder="e.g. 0412 345 678"/></div>
@@ -760,52 +798,38 @@ tr.flagged-row:hover td { background: #FFEAEA; }
         <div class="field"><label>Relationship</label><input type="text" id="newEC2Relation" placeholder="Optional"/></div>
         <div class="field"><label>Phone</label><input type="tel" id="newEC2Phone" placeholder="Optional"/></div>
       </div>
-      <button class="btn-primary" onclick="addPerson('staff')">Onboard staff member</button>
-      <p style="font-size:12px;color:var(--text-3);margin-top:8px">A temp PIN will be generated — share it with them privately.</p>
-    </div>
 
-    <div class="card" id="addManagerCard">
-      <div class="section-label">Add account</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-        <div class="field"><label>Full name <span style="color:var(--danger)">*</span></label><input type="text" id="newManagerName" placeholder="e.g. Vianney Romeo"/></div>
-        <div class="field"><label>Date of joining</label><input type="date" id="newManagerJoinDate"/></div>
-        <div class="field"><label>Phone number</label><input type="tel" id="newManagerPhone" placeholder="e.g. 0412 345 678"/></div>
-        <div class="field"><label>Email address</label><input type="email" id="newManagerEmail" placeholder="e.g. vianney@email.com"/></div>
-        <div class="field"><label>Date of birth</label><input type="date" id="newManagerDOB"/></div>
-        <div class="field" style="grid-column:1/-1"><label>Home address</label><textarea id="newManagerAddress" rows="2" placeholder="Street, Suburb, State, Postcode" style="width:100%;font-size:13px;padding:8px;border-radius:var(--radius-sm);border:1.5px solid var(--border);resize:vertical"></textarea></div>
+      <div id="addManagerRoleSection" style="display:none;margin-bottom:14px">
+        <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">Manager / Super Admin</div>
+        <div class="field">
+          <label>Role</label>
+          <select id="newManagerOnlyRole" style="font-size:14px">
+            <option value="manager">Manager</option>
+            <option value="superadmin">Super Admin</option>
+          </select>
+        </div>
       </div>
-      <div style="font-size:12px;font-weight:600;color:var(--text-2);margin:12px 0 8px;text-transform:uppercase;letter-spacing:0.5px">Emergency contacts</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px">
-        <div class="field"><label>Contact 1 name</label><input type="text" id="newManagerEC1Name" placeholder="e.g. Sarah"/></div>
-        <div class="field"><label>Relationship</label><input type="text" id="newManagerEC1Relation" placeholder="e.g. Spouse"/></div>
-        <div class="field"><label>Phone</label><input type="tel" id="newManagerEC1Phone" placeholder="e.g. 0412 345 678"/></div>
-        <div class="field"><label>Contact 2 name</label><input type="text" id="newManagerEC2Name" placeholder="Optional"/></div>
-        <div class="field"><label>Relationship</label><input type="text" id="newManagerEC2Relation" placeholder="Optional"/></div>
-        <div class="field"><label>Phone</label><input type="tel" id="newManagerEC2Phone" placeholder="Optional"/></div>
-      </div>
-      <div class="field">
-        <label for="newManagerRole">Role</label>
-        <select id="newManagerRole" style="font-size:14px">
-          <option value="analyst">Analyst</option>
-          <option value="trainee">Trainee</option>
-          <option value="teamlead">Team Lead</option>
-          <option value="hr">HR</option>
-          <option value="assistant">Assistant</option>
-          <option value="sales">Sales</option>
-          <option value="customerservice">Customer Service</option>
-          <option value="socialmedia">Social Media</option>
-          <option value="manager">Manager</option>
-          <option value="superadmin">Super Admin</option>
-        </select>
-      </div>
-      <button class="btn-primary" onclick="addPrivilegedPerson()">Add account</button>
-      <p style="font-size:12px;color:var(--text-3);margin-top:8px">Super Admins can add any role. Managers can add all roles except Super Admin.</p>
+
+      <button class="btn-primary" onclick="addPersonUnified()">Onboard staff member</button>
+      <p style="font-size:12px;color:var(--text-3);margin-top:8px">A temp PIN will be generated — share it with them privately.</p>
     </div>
 
     <div class="card">
       <div class="section-label">Export data</div>
       <p style="font-size:13px;color:var(--text-2);margin-bottom:12px">Download all records as a CSV file you can open in Excel.</p>
       <button class="btn-primary" onclick="exportCSV()">⬇ Download CSV</button>
+    </div>
+
+    <div class="card" id="officeManagerCard" style="display:none">
+      <div class="section-label">Manage offices</div>
+      <p style="font-size:13px;color:var(--text-2);margin-bottom:12px">Add or remove offices. Get GPS coordinates by right-clicking your office on Google Maps.</p>
+      <div id="officeManagerList" style="margin-bottom:14px"></div>
+      <div style="display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:8px;align-items:end">
+        <div class="field" style="margin:0"><label style="font-size:12px">Office name</label><input type="text" id="newOfficeName" placeholder="e.g. Andheri"/></div>
+        <div class="field" style="margin:0"><label style="font-size:12px">Latitude</label><input type="text" id="newOfficeLat" placeholder="e.g. 19.1197"/></div>
+        <div class="field" style="margin:0"><label style="font-size:12px">Longitude</label><input type="text" id="newOfficeLng" placeholder="e.g. 72.8468"/></div>
+        <button class="btn-primary" onclick="addOffice()" style="white-space:nowrap;height:36px">+ Add</button>
+      </div>
     </div>
 
     <div class="card" id="auditLogCard" style="display:none">
@@ -1227,11 +1251,7 @@ const CONFIG = {
   companyName:    'Loan Processor',       // shown in browser tab
   breakFlagMins:  35,              // breaks over this many minutes get flagged
   defaultDateRange: 7,             // days shown in dashboard on load
-  offices: {
-    Goregaon: { lat: 19.1591367, lng: 72.8491711 },
-    Borivali:  { lat: 19.2340345, lng: 72.8585346 },
-    Virar:     { lat: 19.4416228, lng: 72.8098234 },
-  },
+  offices: {}, // loaded dynamically from SharePoint Offices list
   geoThresholdKm: 0.75,   // green within this distance, red beyond
   greetings: {                     // login greeting by time of day
     morning:   'Good morning 👋',
@@ -3142,6 +3162,114 @@ function renderWeeklyWidgets() {
   }
 }
 
+
+// ── Offices — dynamic from SharePoint ────────────────────────────────────
+let _offices = []; // [{name, lat, lng}]
+
+async function loadOfficesFromSP() {
+  try {
+    const token = await getToken();
+    if (!token) return;
+    const res = await fetch(
+      SP_API + "('Offices')/items?$select=Id,Title,Latitude,Longitude&$top=100",
+      { headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json;odata=nometadata' } }
+    );
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data && data.value) {
+      _offices = data.value.map(o => ({
+        id: o.Id,
+        name: o.Title||'',
+        lat: o.Latitude ? parseFloat(o.Latitude) : null,
+        lng: o.Longitude ? parseFloat(o.Longitude) : null,
+      }));
+      // Update CONFIG.offices for geo checks
+      CONFIG.offices = {};
+      for (const o of _offices) {
+        if (o.lat && o.lng) CONFIG.offices[o.name] = { lat: o.lat, lng: o.lng };
+      }
+      // Update all office dropdowns
+      updateOfficeDropdowns();
+      LS.set('ci_offices', _offices);
+    }
+  } catch(e) {
+    // Fall back to cached offices
+    const cached = LS.get('ci_offices');
+    if (cached) {
+      _offices = cached;
+      CONFIG.offices = {};
+      for (const o of _offices) {
+        if (o.lat && o.lng) CONFIG.offices[o.name] = { lat: o.lat, lng: o.lng };
+      }
+    }
+    console.warn('loadOfficesFromSP failed:', e);
+  }
+}
+
+function getOffices() {
+  if (_offices.length) return _offices;
+  const cached = LS.get('ci_offices');
+  return cached || [{name:'Goregaon'},{name:'Borivali'},{name:'Virar'},{name:'WFH'}];
+}
+
+function updateOfficeDropdowns() {
+  const offices = getOffices();
+  const opts = offices.map(o => `<option value="${esc(o.name)}">${esc(o.name)}</option>`).join('');
+  ['newOffice', 'filterOffice', 'editOffice'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { const val = el.value; el.innerHTML = opts; el.value = val; }
+  });
+}
+
+// Superadmin: add office
+async function addOffice() {
+  const name = document.getElementById('newOfficeName').value.trim();
+  const lat  = document.getElementById('newOfficeLat').value.trim();
+  const lng  = document.getElementById('newOfficeLng').value.trim();
+  if (!name) { showToast('Enter an office name.','err'); return; }
+  if (getOffices().find(o => o.name.toLowerCase() === name.toLowerCase())) {
+    showToast('Office already exists.','err'); return;
+  }
+  const token = await getToken();
+  if (!token) { showToast('Not authenticated.','err'); return; }
+  const res = await spPostDirect(SP_API + "('Offices')/items", {
+    Title: name,
+    Latitude: lat||'',
+    Longitude: lng||'',
+  });
+  if (res) {
+    showToast(name + ' added ✓','ok');
+    document.getElementById('newOfficeName').value = '';
+    document.getElementById('newOfficeLat').value = '';
+    document.getElementById('newOfficeLng').value = '';
+    await loadOfficesFromSP();
+    renderOfficeManager();
+  }
+}
+
+// Superadmin: delete office
+async function deleteOffice(id, name) {
+  if (!confirm('Remove ' + name + '? Staff assigned to this office will need updating.')) return;
+  await spDelete(SP_API + "('Offices')/items(" + id + ")");
+  showToast(name + ' removed ✓','ok');
+  await loadOfficesFromSP();
+  renderOfficeManager();
+}
+
+// Render office manager in admin panel
+function renderOfficeManager() {
+  const el = document.getElementById('officeManagerList');
+  if (!el) return;
+  const offices = getOffices();
+  if (!offices.length) { el.innerHTML = '<p style="font-size:13px;color:var(--text-3)">No offices yet.</p>'; return; }
+  el.innerHTML = offices.map(o => `
+    <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:0.5px solid var(--border);font-size:13px">
+      <span style="flex:1;font-weight:500">${esc(o.name)}</span>
+      <span style="color:var(--text-3);font-size:12px">${o.lat && o.lng ? o.lat.toFixed(4)+', '+o.lng.toFixed(4) : 'No coordinates'}</span>
+      <button onclick="deleteOffice(${o.id},'${esc(o.name)}')" style="font-size:11px;padding:3px 8px;background:var(--danger);color:#fff;border:none;border-radius:4px;cursor:pointer">Remove</button>
+    </div>`).join('');
+}
+
 function loadDashboard() { renderMetrics(); loadTabs(); renderNeedsAttention(); renderWeeklyWidgets(); }
 
 function getWorkdays(from,to){
@@ -3565,6 +3693,11 @@ function renderAdmin() {
   if(addStaffCard) addStaffCard.style.display=canAddStaff()?'block':'none';
   const auditCard=document.getElementById('auditLogCard');
   if(auditCard) auditCard.style.display=sa?'block':'none';
+  const officeCard=document.getElementById('officeManagerCard');
+  if(officeCard) {
+    officeCard.style.display=sa?'block':'none';
+    if(sa) renderOfficeManager();
+  }
   const obsCard=document.getElementById('obsNotesStatsCard');
   if(obsCard) {
     obsCard.style.display=(sa||mgr)?'block':'none';
@@ -3700,6 +3833,107 @@ function changeRole(i, newRole) {
   writeAuditLog('Role Change', name, `Changed from ${ROLE_LABEL[oldRole]} to ${ROLE_LABEL[newRole]}`);
   renderAdmin();
   showToast(`${name.split(' ')[0]} is now ${ROLE_LABEL[newRole]}.`,'ok');
+}
+
+
+// ── Unified onboarding form ───────────────────────────────────────────────
+function showOnboardForm() {
+  const card = document.getElementById('addStaffCard');
+  if (!card) return;
+  card.style.display = card.style.display === 'none' ? 'block' : 'none';
+  if (card.style.display === 'block') {
+    // Populate TL dropdown
+    populateOnboardTLDropdown();
+    // Show manager role option only for superadmin
+    const mgrSection = document.getElementById('addManagerRoleSection');
+    if (mgrSection) mgrSection.style.display = isSuperAdmin() ? 'block' : 'none';
+    // Populate office dropdown dynamically
+    const offSel = document.getElementById('newOffice');
+    if (offSel) {
+      const offices = getOffices();
+      offSel.innerHTML = offices.map(o => `<option value="${esc(o.name)}">${esc(o.name)}</option>`).join('');
+    }
+  }
+}
+
+function populateOnboardTLDropdown() {
+  const sel = document.getElementById('newTL');
+  if (!sel) return;
+  const tls = getStaff().filter(s => s.role === 'teamlead');
+  sel.innerHTML = '<option value="">— None —</option>' +
+    tls.map(s => `<option value="${esc(s.name)}">${esc(s.name)}</option>`).join('');
+}
+
+function updateOnboardTLVisibility() {
+  // TL field only relevant for non-manager/non-TL roles
+  const role = document.getElementById('newRole').value;
+  const tlField = document.getElementById('newTLField');
+  if (tlField) tlField.style.display = (role === 'teamlead' || role === 'manager' || role === 'superadmin') ? 'none' : 'block';
+}
+
+async function addPersonUnified() {
+  if (!isManager() && !isSuperAdmin()) { showToast('Permission denied.','err'); return; }
+
+  const name = document.getElementById('newName').value.trim();
+  const ec1Name = document.getElementById('newEC1Name').value.trim();
+  const ec1Phone = document.getElementById('newEC1Phone').value.trim();
+  const ec1Relation = document.getElementById('newEC1Relation').value.trim();
+  if (!name) { showToast('Enter a full name.','err'); return; }
+  if (!ec1Name || !ec1Phone || !ec1Relation) { showToast('Emergency contact 1 is required.','err'); return; }
+
+  const staff = getStaff();
+  if (staff.find(s => s.name.toLowerCase() === name.toLowerCase())) { showToast('Name already exists.','err'); return; }
+
+  const gv = id => (document.getElementById(id) && document.getElementById(id).value) || '';
+  let role = gv('newRole');
+
+  // SuperAdmin can assign manager/superadmin role via the extra section
+  if (isSuperAdmin()) {
+    const mgrRole = gv('newManagerOnlyRole');
+    const mgrSection = document.getElementById('addManagerRoleSection');
+    if (mgrSection && mgrSection.style.display !== 'none' && mgrRole) {
+      // Only use manager role if they actually selected it
+      if (role === 'staff') role = mgrRole; // override only if default staff selected
+    }
+  }
+  if (!isSuperAdmin() && (role === 'manager' || role === 'superadmin')) {
+    showToast('Only Super Admins can add managers.','err'); return;
+  }
+
+  const tempPin = genTempPin();
+  const newMember = {
+    name, role, pin: null, tempPin: hashPin(tempPin),
+    addedBy: currentUser.name, addedAt: new Date().toLocaleString('en-AU'),
+    joinDate: gv('newJoinDate') || new Date().toISOString().split('T')[0],
+    dob: gv('newDOB'),
+    phone: gv('newPhone'),
+    email: gv('newEmail'),
+    address: gv('newAddress'),
+    startTime: gv('newStartTime') || '06:00',
+    endTime: gv('newEndTime') || '14:30',
+    office: gv('newOffice') || 'Goregaon',
+    team: gv('newTL') || '',
+    ec1Name, ec1Phone, ec1Relation,
+    ec2Name: gv('newEC2Name'),
+    ec2Phone: gv('newEC2Phone'),
+    ec2Relation: gv('newEC2Relation'),
+  };
+
+  staff.push(newMember);
+  saveStaff(staff);
+
+  // Clear all form fields
+  ['newName','newPhone','newEmail','newAddress','newDOB','newJoinDate','newStartTime','newEndTime',
+   'newEC1Name','newEC1Phone','newEC1Relation','newEC2Name','newEC2Phone','newEC2Relation'
+  ].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  document.getElementById('newStartTime').value = '06:00';
+  document.getElementById('newEndTime').value = '14:30';
+
+  await spSaveStaffMember(newMember);
+  writeAuditLog('Staff Onboarded', name, `Added as ${ROLE_LABEL[role]||role} by ${currentUser.name}`);
+  renderAdmin(); populateNameDropdown();
+  document.getElementById('addStaffCard').style.display = 'none';
+  showTempPin(name, tempPin);
 }
 
 function addPerson(role) {
@@ -4122,8 +4356,9 @@ async function loadFromSharePoint() {
       spGet(SP_API + "('AttendanceRecords')/items?$top=5000"),
       spGet(SP_API + "('AttendanceBreaks')/items?$top=5000"),
     ]);
-    // Load obs notes in background (non-blocking)
+    // Load obs notes and offices in background (non-blocking)
     loadObsNotesFromSP().catch(()=>{});
+    loadOfficesFromSP().catch(()=>{});
     // Only overwrite local data if SharePoint has data
     if (staffRes && staffRes.value && staffRes.value.length > 0) {
       _staff = staffRes.value.map(spToStaff);
