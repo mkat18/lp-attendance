@@ -6920,7 +6920,10 @@ const SUBMISSION_CHECKLIST = [
   ]},
 ];
 
-// Show checklist modal when file reaches Ready to Submit
+// ── Checklist modal ──────────────────────────────────────────────────────
+const READY_TO_SUBMIT_IDX = FILE_STATUSES.indexOf('Ready to Submit');
+const STAGES_AFTER_READY = FILE_STATUSES.slice(READY_TO_SUBMIT_IDX + 1);
+
 function showChecklistModal(fileIdx) {
   const files = getFileEntries();
   const file = files[fileIdx];
@@ -6966,9 +6969,9 @@ function showChecklistModal(fileIdx) {
     '</div>' +
     '<div id="checklistItems">' + sectionsHtml + '</div>' +
     '<div id="checklistError" style="color:var(--danger);font-size:12px;margin:8px 0;display:none">Please answer all items before submitting.</div>' +
-    '<div style="display:flex;gap:8px;margin-top:1rem">' +
+    '<div style="display:flex;gap:8px;margin-top:1rem;flex-wrap:wrap">' +
     '<button class="btn-primary" onclick="submitChecklist(' + fileIdx + ')">Save checklist</button>' +
-    '<button onclick="document.getElementById(\'checklistModal\').remove()" style="padding:10px 16px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:transparent;cursor:pointer;font-size:13px">Cancel</button>' +
+    '<button onclick="deferChecklist(' + fileIdx + ')" style="padding:10px 16px;border:1.5px solid #FDE68A;border-radius:var(--radius-sm);background:#FEF3C7;color:#92400E;cursor:pointer;font-size:13px;font-weight:600">I\'ll submit later</button>' +
     '</div>' +
     '</div>';
 
@@ -6991,6 +6994,19 @@ function selectChecklistItem(btn, idx) {
     b.style.color = selected ? '#fff' : 'var(--text-2)';
     b.style.fontWeight = selected ? '600' : '400';
   });
+}
+
+async function deferChecklist(fileIdx) {
+  // Mark as deferred — stays in "checklist not submitted" counter
+  const files = getFileEntries();
+  if (!files[fileIdx]) return;
+  files[fileIdx].checklistDeferred = true;
+  files[fileIdx].checklistSubmitted = false;
+  saveFileEntries(files);
+  document.getElementById('checklistModal')?.remove();
+  showToast('Checklist deferred — reminder will show in your dashboard ✓', 'ok');
+  renderMyFilesScreen();
+  renderFilesScreen();
 }
 
 async function submitChecklist(fileIdx) {
@@ -7021,6 +7037,8 @@ function getChecklistPendingFiles() {
   const myFiles = isSuperAdmin() || isManager()
     ? files
     : files.filter(f => f.owner === currentUser.name);
+  // Include files at Ready to Submit that haven't completed the checklist
+  // (either not yet touched, or deferred)
   return myFiles.filter(f => f.status === 'Ready to Submit' && !f.checklistSubmitted);
 }
 
@@ -8019,6 +8037,27 @@ function quickStatusUpdate(fileId, newStatus) {
   const prevStatus = f.status;
   if (prevStatus === newStatus) return;
 
+  // Gate: cannot move past Ready to Submit without checklist interaction
+  if (prevStatus === 'Ready to Submit' && STAGES_AFTER_READY.includes(newStatus)) {
+    if (!f.checklistSubmitted && !f.checklistDeferred) {
+      // Force checklist modal — must complete or defer first
+      showToast('Please complete or defer the checklist before moving to the next stage.', 'err');
+      setTimeout(() => showChecklistModal(idx), 300);
+      return;
+    }
+  }
+
+  // Moving TO Ready to Submit — show checklist
+  if (newStatus === 'Ready to Submit' && !f.checklistSubmitted) {
+    // Update status first, then show checklist
+    files[idx].status = newStatus;
+    saveFileEntries(files);
+    if (document.getElementById('screen-files')?.classList.contains('active')) renderFilesScreen();
+    if (document.getElementById('screen-myfiles')?.classList.contains('active')) renderMyFilesScreen();
+    setTimeout(() => showChecklistModal(idx), 400);
+    return;
+  }
+
   // Update stage history
   let stageHistory = f.stageHistory || [];
   if (stageHistory.length > 0) {
@@ -8039,11 +8078,6 @@ function quickStatusUpdate(fileId, newStatus) {
 
   saveFileEntries(files);
   showToast('Stage updated to ' + newStatus + ' ✓', 'ok');
-
-  // Show checklist when reaching Ready to Submit
-  if (newStatus === 'Ready to Submit') {
-    setTimeout(() => showChecklistModal(idx), 400);
-  }
 
   // Refresh whichever screen is active
   if (document.getElementById('screen-files')?.classList.contains('active')) renderFilesScreen();
