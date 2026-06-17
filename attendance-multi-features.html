@@ -1879,7 +1879,7 @@ const DANGEROUS_FEATURES = {
   canDeleteStaff: { label: 'Can delete staff', warning: 'Allows permanent deletion of staff records. This cannot be undone.' },
   canExportData: { label: 'Can export all data', warning: 'Exposes complete attendance data for all staff as a downloadable CSV.' },
   canAddStaff: { label: 'Can add staff', warning: 'Allows creating new accounts in the system.' },
-  canResetPins: { label: 'Can reset PINs', warning: 'Allows resetting another person's PIN — could be used for unauthorised access.' },
+  canResetPins: { label: 'Can reset PINs', warning: 'Allows resetting another person\'s PIN — could be used for unauthorised access.' },
 };
 
 const TAB_LABELS = {
@@ -5975,20 +5975,22 @@ async function initMsal() {
     if (accounts.length > 0) {
       await onMsLogin(accounts[0]);
     } else {
-      // Try silent SSO first — picks up session from portal without redirect
+      // Try to pick up existing session from portal using cached token
       try {
         const loginHint = new URLSearchParams(window.location.search).get('login_hint');
-        const ssoResult = await msalInstance.ssoSilent({ 
-          scopes: SP_SCOPES,
-          loginHint: loginHint || undefined
-        });
-        if (ssoResult) {
-          msalToken = ssoResult.accessToken;
-          await onMsLogin(ssoResult.account);
-          return;
+        const accounts = msalInstance.getAllAccounts();
+        const account = accounts.find(a => loginHint && a.username.toLowerCase() === loginHint.toLowerCase()) || accounts[0];
+        if (account) {
+          const silentResult = await msalInstance.acquireTokenSilent({ scopes: SP_SCOPES, account });
+          if (silentResult) {
+            msalToken = silentResult.accessToken;
+            await onMsLogin(silentResult.account);
+            return;
+          }
         }
       } catch(e) {
-        // ssoSilent failed — fall through to PIN login screen
+        // Silent token failed — fall through to PIN login screen
+        console.warn('Silent token failed:', e.name);
       }
       // No MS session — PIN login flow.
       // Fetch staff AND records from SharePoint before showing PIN screen

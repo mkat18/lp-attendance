@@ -603,13 +603,11 @@ const SP_SCOPES = ['https://loanprocessorau.sharepoint.com/.default'];
 
 async function getToken() {
   const accounts = msalInstance.getAllAccounts();
-  if (!accounts.length) { console.warn('[TOKEN] No accounts'); return null; }
+  if (!accounts.length) { return null; }
   try {
     const r = await msalInstance.acquireTokenSilent({ scopes: SP_SCOPES, account: accounts[0] });
-    console.log('[TOKEN] Silent token acquired');
     return r.accessToken;
   } catch(e) {
-    console.warn('[TOKEN] Silent failed:', e.name, e.message);
     return null; // Don't redirect — just return null
   }
 }
@@ -635,27 +633,22 @@ function signOut() {
 async function getStaffRole(email) {
   try {
     const token = _portalToken || await getToken();
-    if (!token) { console.warn('[ROLE] No token available'); return null; }
-    console.log('[ROLE] Got token, fetching staff for:', email);
+    if (!token) { return null; }
     const emailLower = email.toLowerCase();
     const res = await fetch(
       SP_API + "('AttendanceStaff')/items?$select=Title,Role,Email&$top=500",
       { headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json;odata=nometadata' } }
     );
-    console.log('[ROLE] SP response status:', res.status);
     if (!res.ok) return null;
     const data = await res.json();
-    console.log('[ROLE] Staff count:', data?.value?.length, 'emails:', data?.value?.slice(0,3).map(s=>s.Email));
     if (!data?.value?.length) return null;
     const byEmail = data.value.find(s => s.Email && s.Email.toLowerCase() === emailLower);
-    if (byEmail) { console.log('[ROLE] Matched by email:', byEmail.Title, byEmail.Role); return (byEmail.Role || 'staff').toLowerCase(); }
+    if (byEmail) return (byEmail.Role || 'staff').toLowerCase();
     const namePart = emailLower.split('@')[0].replace(/[._]/g,'');
     const byName = data.value.find(s => s.Title && s.Title.toLowerCase().replace(/\s+/g,'').includes(namePart));
-    if (byName) { console.log('[ROLE] Matched by name:', byName.Title, byName.Role); return (byName.Role || 'staff').toLowerCase(); }
-    console.warn('[ROLE] No match for:', email, 'namePart:', namePart);
+    if (byName) return (byName.Role || 'staff').toLowerCase();
     return null;
   } catch(e) {
-    console.warn('[ROLE] Failed:', e);
     return null;
   }
 }
@@ -710,17 +703,13 @@ async function init() {
       _portalToken = result.accessToken;
       try {
         const payload = JSON.parse(atob(result.accessToken.split('.')[1]));
-        console.log('[TOKEN] aud:', payload.aud, 'scp:', payload.scp);
         // If we got a Graph token instead of SP token, request SP token separately
         if (payload.aud && payload.aud.includes('graph') || payload.aud === '00000003-0000-0ff1-ce00-000000000000') {
-          console.log('[TOKEN] Got Graph token, requesting SP token separately');
           const spToken = await msalInstance.acquireTokenSilent({ scopes: SP_SCOPES, account: result.account });
           _portalToken = spToken.accessToken;
           const spPayload = JSON.parse(atob(spToken.accessToken.split('.')[1]));
-          console.log('[TOKEN] SP token aud:', spPayload.aud);
         }
-      } catch(e) { console.warn('[TOKEN] decode error:', e); }
-      console.log('[INIT] Got token from redirect');
+      } catch(e) {}
     }
 
     const accounts = msalInstance.getAllAccounts();
@@ -733,10 +722,8 @@ async function init() {
     const account = accounts[0];
     const userName = account.name || account.username.split('@')[0];
     const email = account.username;
-    console.log('[INIT] Account:', email);
 
     const role = await getStaffRole(email);
-    console.log('[INIT] Role:', role);
 
     if (!role) {
       document.getElementById('loadingScreen').style.display = 'none';
