@@ -6921,9 +6921,6 @@ const SUBMISSION_CHECKLIST = [
 ];
 
 // ── Checklist modal ──────────────────────────────────────────────────────
-const READY_TO_SUBMIT_IDX = FILE_STATUSES.indexOf('Ready to Submit');
-const STAGES_AFTER_READY = FILE_STATUSES.slice(READY_TO_SUBMIT_IDX + 1);
-
 function showChecklistModal(fileIdx) {
   const files = getFileEntries();
   const file = files[fileIdx];
@@ -7077,6 +7074,8 @@ function renderSubmittedCard(files, containerId) {
 const FILE_STATUSES = ['Data Collection','Pre-Qualification','Application Start',
   'Pending Info','Ready to Submit','Submitted to Lender','MIR','Conditionally Approved',
   'Unconditionally Approved','Loan Documents','Settlement'];
+const READY_TO_SUBMIT_IDX = FILE_STATUSES.indexOf('Ready to Submit');
+const STAGES_AFTER_READY = FILE_STATUSES.slice(READY_TO_SUBMIT_IDX + 1);
 
 const FILE_STATUS_COLORS = {
   'Data Collection':        {bg:'#F3F4F6',color:'#374151'},
@@ -7214,6 +7213,17 @@ async function saveFileEntry() {
   const existing = existingIdx >= 0 ? files[existingIdx] : null;
 
   const newStatus = document.getElementById('fm_status').value;
+
+  // Gate: cannot move past Ready to Submit without checklist interaction
+  const existingStatus = existing ? existing.status : null;
+  if (existingStatus === 'Ready to Submit' && STAGES_AFTER_READY.includes(newStatus)) {
+    if (!existing.checklistSubmitted && !existing.checklistDeferred) {
+      showToast('Complete or defer the checklist before moving past Ready to Submit.', 'err');
+      const idx = files.findIndex(f => f.id === fileId);
+      if (idx >= 0) setTimeout(() => showChecklistModal(idx), 300);
+      return;
+    }
+  }
   const loanAmtRaw = document.getElementById('fm_loanAmount') ? document.getElementById('fm_loanAmount').value : '';
   const loanAmount = loanAmtRaw ? parseFloat(loanAmtRaw) : (existing ? existing.loanAmount : null);
 
