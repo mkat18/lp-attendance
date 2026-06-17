@@ -1649,7 +1649,7 @@ function buildNav() {
   let tabs = [];
   const r = currentUser.role;
   if (r === 'superadmin') {
-    tabs = [['dashboard','Dashboard'],['admin','Admin'],['files','Files'],['profile','PIN']];
+    tabs = [['checkin','Check in'],['dashboard','Dashboard'],['admin','Staff'],['files','Files'],['profile','PIN']];
   } else if (r === 'manager') {
     tabs = [['checkin','Check in'],['dashboard','Dashboard'],['admin','Staff'],['profile','PIN']];
   } else if (r === 'hr') {
@@ -1965,8 +1965,8 @@ async function loginAs(member) {
   currentUser={name:member.name, role:member.role};
   buildNav();
   if (member.role==='superadmin') {
-    // Data already loaded in onMsLogin — just show dashboard
-    loadDashboard(); showScreen('dashboard');
+    // Superadmin sees check-in first, can navigate to dashboard via nav
+    initCheckin(); showScreen('checkin');
   } else {
     // Debug: show what records are in cache for this user today
     initCheckin(); showScreen('checkin');
