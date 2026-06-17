@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<title>LP Portal</title>
+<script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --navy: #0F1E35;
+    --navy-2: #1B2B4B;
+    --navy-3: #243353;
+    --gold: #C9A84C;
+    --gold-light: #E8C96A;
+    --surface: #ffffff;
+    --surface-2: #F7F8FA;
+    --border: #E2E6ED;
+    --text: #0F1E35;
+    --text-2: #4A5568;
+    --text-3: #8A96A8;
+    --radius: 16px;
+    --radius-sm: 10px;
+    --shadow: 0 4px 24px rgba(15,30,53,0.08);
+    --shadow-hover: 0 8px 40px rgba(15,30,53,0.14);
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--surface-2);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  /* ── Login screen ─────────────────────────────────────────────── */
+  #loginScreen {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: var(--navy);
+    padding: 2rem;
+  }
+
+  .login-logo {
+    margin-bottom: 2.5rem;
+    text-align: center;
+  }
+
+  .login-logo img {
+    height: 52px;
+    margin-bottom: 1rem;
+  }
+
+  .login-logo-text {
+    font-size: 13px;
+    color: rgba(255,255,255,0.45);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  .login-card {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: var(--radius);
+    padding: 2.5rem;
+    width: 100%;
+    max-width: 380px;
+    text-align: center;
+  }
+
+  .login-card h1 {
+    font-size: 22px;
+    font-weight: 600;
+    color: #fff;
+    margin-bottom: 8px;
+  }
+
+  .login-card p {
+    font-size: 14px;
+    color: rgba(255,255,255,0.5);
+    margin-bottom: 2rem;
+    line-height: 1.5;
+  }
+
+  .ms-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+    padding: 13px 20px;
+    background: #fff;
+    border: none;
+    border-radius: var(--radius-sm);
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--navy);
+    cursor: pointer;
+    transition: background .15s, transform .1s;
+  }
+
+  .ms-btn:hover { background: #f0f0f0; transform: translateY(-1px); }
+  .ms-btn:active { transform: translateY(0); }
+
+  .ms-btn svg { width: 20px; height: 20px; }
+
+  .login-err {
+    margin-top: 1rem;
+    font-size: 12px;
+    color: #FC8181;
+    min-height: 18px;
+  }
+
+  /* ── Portal screen ─────────────────────────────────────────────── */
+  #portalScreen { display: none; min-height: 100vh; }
+
+  .portal-nav {
+    background: var(--navy);
+    padding: 0 2rem;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .portal-nav-logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .portal-nav-logo img { height: 32px; }
+
+  .portal-nav-logo span {
+    font-size: 15px;
+    font-weight: 600;
+    color: #fff;
+  }
+
+  .portal-nav-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .portal-user {
+    font-size: 13px;
+    color: rgba(255,255,255,0.7);
+  }
+
+  .portal-user strong {
+    color: #fff;
+    font-weight: 600;
+  }
+
+  .portal-signout {
+    font-size: 12px;
+    padding: 6px 14px;
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 6px;
+    color: rgba(255,255,255,0.8);
+    cursor: pointer;
+    transition: background .15s;
+  }
+
+  .portal-signout:hover { background: rgba(255,255,255,0.18); }
+
+  .portal-body {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 3rem 2rem;
+  }
+
+  .portal-greeting {
+    margin-bottom: 2.5rem;
+  }
+
+  .portal-greeting h2 {
+    font-size: 26px;
+    font-weight: 600;
+    color: var(--navy);
+    margin-bottom: 4px;
+  }
+
+  .portal-greeting p {
+    font-size: 14px;
+    color: var(--text-3);
+  }
+
+  .portal-section-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-3);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 1rem;
+  }
+
+  .app-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 16px;
+    margin-bottom: 2.5rem;
+  }
+
+  .app-card {
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    cursor: pointer;
+    text-decoration: none;
+    color: inherit;
+    transition: box-shadow .18s, transform .18s, border-color .18s;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .app-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: var(--card-accent, var(--navy));
+    border-radius: var(--radius) var(--radius) 0 0;
+  }
+
+  .app-card:hover {
+    box-shadow: var(--shadow-hover);
+    transform: translateY(-3px);
+    border-color: rgba(15,30,53,0.15);
+  }
+
+  .app-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    background: var(--icon-bg, #EFF2F7);
+  }
+
+  .app-name {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--navy);
+  }
+
+  .app-desc {
+    font-size: 12px;
+    color: var(--text-3);
+    line-height: 1.5;
+  }
+
+  .app-badge {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 99px;
+    background: #EFF9F0;
+    color: #2E7D32;
+    letter-spacing: 0.3px;
+  }
+
+  .app-badge.soon {
+    background: #FFF8E7;
+    color: #B45309;
+  }
+
+  /* ── Coming soon cards ─────────────────────────────────────────── */
+  .app-card.disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+
+  /* ── Loading ───────────────────────────────────────────────────── */
+  #loadingScreen {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--navy);
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .spinner {
+    width: 32px;
+    height: 32px;
+    border: 3px solid rgba(255,255,255,0.15);
+    border-top-color: var(--gold);
+    border-radius: 50%;
+    animation: spin .7s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .loading-text {
+    font-size: 13px;
+    color: rgba(255,255,255,0.5);
+  }
+
+  .portal-footer {
+    text-align: center;
+    padding: 2rem;
+    font-size: 12px;
+    color: var(--text-3);
+    border-top: 1px solid var(--border);
+  }
+</style>
+</head>
+<body>
+
+<!-- Loading -->
+<div id="loadingScreen">
+  <div class="spinner"></div>
+  <div class="loading-text">Signing you in…</div>
+</div>
+
+<!-- Login -->
+<div id="loginScreen" style="display:none">
+  <div class="login-logo">
+    <div class="login-logo-text">Loan Processor</div>
+  </div>
+  <div class="login-card">
+    <h1>Welcome back</h1>
+    <p>Sign in with your Loan Processor Microsoft account to access your apps.</p>
+    <button class="ms-btn" onclick="msLogin()">
+      <svg viewBox="0 0 21 21" xmlns="http://www.w3.org/2000/svg">
+        <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
+        <rect x="11" y="1" width="9" height="9" fill="#7fba00"/>
+        <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/>
+        <rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
+      </svg>
+      Sign in with Microsoft
+    </button>
+    <div class="login-err" id="loginErr"></div>
+  </div>
+</div>
+
+<!-- Portal -->
+<div id="portalScreen">
+  <nav class="portal-nav">
+    <div class="portal-nav-logo">
+      <span>LP Portal</span>
+    </div>
+    <div class="portal-nav-right">
+      <span class="portal-user">Signed in as <strong id="portalUserName"></strong></span>
+      <button class="portal-signout" onclick="signOut()">Sign out</button>
+    </div>
+  </nav>
+
+  <div class="portal-body">
+    <div class="portal-greeting">
+      <h2 id="portalGreeting">Good morning</h2>
+      <p id="portalDate"></p>
+    </div>
+
+    <div class="portal-section-label">Your apps</div>
+    <div class="app-grid" id="appGrid"></div>
+  </div>
+
+  <div class="portal-footer">
+    Loan Processor &copy; 2026 &nbsp;·&nbsp; Internal use only
+  </div>
+</div>
+
+<script>
+// ── Config ─────────────────────────────────────────────────────────────────
+const TENANT_ID   = 'c8838da3-903c-4e2d-ae8a-de9fc6f28d35';
+const CLIENT_ID   = 'a16413fb-880c-4ae0-948d-a6e8e7b833ba';
+const REDIRECT_URI = window.location.href.split('?')[0].split('#')[0];
+const SP_SITE     = 'https://loanprocessorau.sharepoint.com/sites/lpattendance';
+const SP_API      = SP_SITE + '/_api/lists/getbytitle';
+const BASE_URL    = 'https://mkat18.github.io/lp-attendance/';
+
+// ── App definitions ────────────────────────────────────────────────────────
+const ALL_APPS = [
+  {
+    id: 'attendance',
+    name: 'Attendance',
+    desc: 'Check in, track breaks, view team attendance and EOD reports.',
+    icon: '📋',
+    iconBg: '#EEF2FF',
+    accent: '#4F46E5',
+    url: BASE_URL + 'attendance-multi-features.html',
+    badge: 'Live',
+    roles: ['superadmin','manager','teamlead','analyst','trainee','staff','hr','assistant','sales','customerservice','socialmedia'],
+  },
+  {
+    id: 'lms',
+    name: 'Learning Hub',
+    desc: 'Access training modules, watch session recordings and complete assessments.',
+    icon: '🎓',
+    iconBg: '#FFF8E7',
+    accent: '#C9A84C',
+    url: BASE_URL + 'lms.html',
+    badge: 'Soon',
+    roles: ['superadmin','manager','teamlead','analyst'],
+  },
+  {
+    id: 'broker',
+    name: 'Broker Portal',
+    desc: 'Manage broker files, client communications and SLA tracking.',
+    icon: '🏦',
+    iconBg: '#F0FDF4',
+    accent: '#16A34A',
+    url: BASE_URL + 'broker.html',
+    badge: 'Soon',
+    roles: ['superadmin','teamlead','analyst'],
+  },
+  {
+    id: 'hr',
+    name: 'HR Suite',
+    desc: 'Onboarding, offboarding, documents and HR reports.',
+    icon: '👥',
+    iconBg: '#FFF1F2',
+    accent: '#E11D48',
+    url: BASE_URL + 'hr.html',
+    badge: 'Soon',
+    roles: ['superadmin'],
+  },
+  {
+    id: 'payroll',
+    name: 'Payroll',
+    desc: 'Salary processing, leave encashment and payslips.',
+    icon: '💰',
+    iconBg: '#F0FDF4',
+    accent: '#15803D',
+    url: BASE_URL + 'payroll.html',
+    badge: 'Soon',
+    roles: ['superadmin'],
+  },
+];
+
+// ── MSAL ───────────────────────────────────────────────────────────────────
+const msalInstance = new msal.PublicClientApplication({
+  auth: {
+    clientId: CLIENT_ID,
+    authority: 'https://login.microsoftonline.com/' + TENANT_ID,
+    redirectUri: REDIRECT_URI,
+    navigateToLoginRequestUrl: true,
+  },
+  cache: { cacheLocation: 'localStorage', storeAuthStateInCookie: true }
+});
+
+const SP_SCOPES = ['https://loanprocessorau.sharepoint.com/.default'];
+
+async function getToken() {
+  const accounts = msalInstance.getAllAccounts();
+  if (!accounts.length) return null;
+  try {
+    const r = await msalInstance.acquireTokenSilent({ scopes: SP_SCOPES, account: accounts[0] });
+    return r.accessToken;
+  } catch(e) {
+    await msalInstance.acquireTokenRedirect({ scopes: SP_SCOPES });
+    return null;
+  }
+}
+
+async function msLogin() {
+  try {
+    await msalInstance.loginRedirect({ scopes: SP_SCOPES });
+  } catch(e) {
+    document.getElementById('loginErr').textContent = 'Sign in failed. Please try again.';
+  }
+}
+
+function signOut() {
+  msalInstance.logoutRedirect();
+}
+
+// ── Get staff role from SharePoint ─────────────────────────────────────────
+async function getStaffRole(email) {
+  try {
+    const token = await getToken();
+    if (!token) return null;
+    const res = await fetch(
+      SP_API + "('AttendanceStaff')/items?$select=Title,Role,Email&$filter=Email eq '" + encodeURIComponent(email) + "'&$top=1",
+      { headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json;odata=nometadata' } }
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data?.value?.length > 0) return (data.value[0].Role || 'staff').toLowerCase();
+    // Fallback: try matching by name from email prefix
+    const namePrefix = email.split('@')[0].toLowerCase();
+    const res2 = await fetch(
+      SP_API + "('AttendanceStaff')/items?$select=Title,Role&$top=500",
+      { headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json;odata=nometadata' } }
+    );
+    if (res2.ok) {
+      const data2 = await res2.json();
+      const match = data2.value?.find(s => s.Title.toLowerCase().replace(/\s+/g,'').includes(namePrefix.replace(/[._]/g,'')));
+      if (match) return (match.Role || 'staff').toLowerCase();
+    }
+    return 'staff';
+  } catch(e) {
+    console.warn('getStaffRole failed:', e);
+    return 'staff';
+  }
+}
+
+// ── Render portal ──────────────────────────────────────────────────────────
+function getGreeting() {
+  const h = new Date().getHours();
+  if (h < 12) return 'Good morning';
+  if (h < 17) return 'Good afternoon';
+  return 'Good evening';
+}
+
+function renderPortal(userName, role) {
+  document.getElementById('portalUserName').textContent = userName;
+  document.getElementById('portalGreeting').textContent = getGreeting() + ', ' + userName.split(' ')[0];
+  document.getElementById('portalDate').textContent = new Date().toLocaleDateString('en-AU', {
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+  });
+
+  const grid = document.getElementById('appGrid');
+  const visibleApps = ALL_APPS.filter(app => app.roles.includes(role));
+
+  grid.innerHTML = visibleApps.map(app => {
+    const isLive = app.badge === 'Live';
+    return `
+      <a href="${isLive ? app.url : '#'}" class="app-card${isLive ? '' : ' disabled'}"
+         style="--card-accent:${app.accent};--icon-bg:${app.iconBg}"
+         ${isLive ? 'target="_self"' : 'onclick="return false"'}>
+        <span class="app-badge${isLive ? '' : ' soon'}">${app.badge}</span>
+        <div class="app-icon">${app.icon}</div>
+        <div>
+          <div class="app-name">${app.name}</div>
+          <div class="app-desc">${app.desc}</div>
+        </div>
+      </a>`;
+  }).join('');
+
+  document.getElementById('loadingScreen').style.display = 'none';
+  document.getElementById('portalScreen').style.display = 'block';
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────
+async function init() {
+  try {
+    // Handle redirect
+    const result = await msalInstance.handleRedirectPromise();
+    if (result) {
+      // Just redirected back — continue below
+    }
+
+    const accounts = msalInstance.getAllAccounts();
+    if (!accounts.length) {
+      // Not logged in
+      document.getElementById('loadingScreen').style.display = 'none';
+      document.getElementById('loginScreen').style.display = 'flex';
+      return;
+    }
+
+    const account = accounts[0];
+    const userName = account.name || account.username.split('@')[0];
+    const email = account.username;
+
+    // Get role from SharePoint
+    const role = await getStaffRole(email);
+
+    renderPortal(userName, role);
+  } catch(e) {
+    console.error('Portal init error:', e);
+    document.getElementById('loadingScreen').style.display = 'none';
+    document.getElementById('loginScreen').style.display = 'flex';
+  }
+}
+
+init();
+</script>
+</body>
+</html>
