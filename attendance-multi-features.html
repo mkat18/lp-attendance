@@ -5539,14 +5539,29 @@ async function getToken() {
 }
 
 async function onMsLogin(account) {
-  msalAccount = account; // Store M365 account for audit trail
-  populateNameDropdown();
+  msalAccount = account;
   showScreen('geoblocked');
   requestGeo();
   await loadFromSharePoint().catch(()=>{});
-  populateNameDropdown();
-  // Auto-save MS email to staff record — used by portal for role lookup
+  // Auto-save MS email to staff record
   autoSaveMsEmail(account).catch(()=>{});
+  // Try to auto-login from MS email — skip PIN if email matches a staff record
+  if (account && account.username) {
+    const email = account.username.toLowerCase();
+    const staff = getStaff();
+    const emailPrefix = email.split('@')[0].toLowerCase().replace(/[._]/g, ' ');
+    const member = staff.find(s =>
+      (s.email && s.email.toLowerCase() === email) ||
+      s.name.toLowerCase().replace(/\s+/g,' ').includes(emailPrefix.replace(/[._]/g,' ').trim())
+    );
+    if (member) {
+      // Auto-login — no PIN needed
+      await loginAs(member);
+      return;
+    }
+  }
+  // Fallback — show PIN screen
+  populateNameDropdown();
 }
 
 async function autoSaveMsEmail(account) {
@@ -5672,21 +5687,262 @@ async function spDelete(url) {
 
 const SP_API = 'https://loanprocessorau.sharepoint.com/sites/lpattendance/_api/lists/getbytitle';
 
+
+// ══════════════════════════════════════════════════════════════════════════
+// ── SP JSON-BLOB SYNC ─────────────────────────────────────────────────────
+// Pattern: each list has Title (owner/key) + Data (JSON blob)
+// ══════════════════════════════════════════════════════════════════════════
+
+async function spLoadJsonList(listName) {
+  try {
+    const res = await spGet(SP_API + "('" + listName + "')/items?$select=Id,Title,Data&$top=5000");
+    if (res && res.value) return res.value;
+    return [];
+  } catch(e) { console.warn('spLoadJsonList failed:', listName, e); return []; }
+}
+
+async function spSaveJsonItem(listName, titleKey, dataObj, existingId) {
+  const payload = { Title: String(titleKey||''), Data: JSON.stringify(dataObj) };
+  try {
+    if (existingId) {
+      await spPatch(SP_API + "('" + listName + "')/items(" + existingId + ")", payload);
+      return existingId;
+    } else {
+      const res = await spPostDirect(SP_API + "('" + listName + "')/items", payload);
+      return res ? (res.Id || res.ID) : null;
+    }
+  } catch(e) { console.warn('spSaveJsonItem failed:', listName, e); return null; }
+}
+
+async function spDeleteJsonItem(listName, itemId) {
+  try { await spDelete(SP_API + "('" + listName + "')/items(" + itemId + ")"); }
+  catch(e) { console.warn('spDeleteJsonItem failed:', listName, e); }
+}
+
+// ── In-memory caches ──────────────────────────────────────────────────────
+let _fileEntries = null;      // { id: {data, spId} }
+let _eodReports = null;       // { key: {data, spId} }
+let _brokerFeedback = null;   // { id: {data, spId} }
+let _otherTasks = null;       // { id: {data, spId} }
+let _teamAssignments = null;  // { key: {data, spId} }
+
+// ── FileEntries ───────────────────────────────────────────────────────────
+async function loadFileEntriesFromSP() {
+  const items = await spLoadJsonList('FileEntries');
+  _fileEntries = {};
+  for (const item of items) {
+    try {
+      const data = JSON.parse(item.Data || '{}');
+      _fileEntries[data.id || item.Title] = { data, spId: item.Id };
+    } catch(e) {}
+  }
+  LS.set('ci_files', Object.values(_fileEntries).map(e => e.data));
+}
+
+function getFileEntries() {
+  if (_fileEntries) return Object.values(_fileEntries).map(e => e.data);
+  return LS.get('ci_files') || [];
+}
+
+function saveFileEntries(arr) {
+  // Update memory cache
+  _fileEntries = _fileEntries || {};
+  // Rebuild from array
+  const newCache = {};
+  for (const f of arr) { if (f.id) newCache[f.id] = _fileEntries[f.id] || { data: f, spId: null }; newCache[f.id].data = f; }
+  _fileEntries = newCache;
+  LS.set('ci_files', arr);
+}
+
+async function spSyncFileEntry(entry) {
+  if (!entry || !entry.id) return;
+  _fileEntries = _fileEntries || {};
+  const existing = _fileEntries[entry.id];
+  const spId = await spSaveJsonItem('FileEntries', entry.owner || currentUser.name, entry, existing ? existing.spId : null);
+  _fileEntries[entry.id] = { data: entry, spId };
+}
+
+async function spDeleteFileEntry(fileId) {
+  if (!_fileEntries || !_fileEntries[fileId]) return;
+  const spId = _fileEntries[fileId].spId;
+  if (spId) await spDeleteJsonItem('FileEntries', spId);
+  delete _fileEntries[fileId];
+  LS.set('ci_files', getFileEntries());
+}
+
+// ── EOD Reports ───────────────────────────────────────────────────────────
+async function loadEODFromSP() {
+  const items = await spLoadJsonList('EODReports');
+  _eodReports = {};
+  for (const item of items) {
+    try {
+      const data = JSON.parse(item.Data || '{}');
+      const key = item.Title;
+      _eodReports[key] = { data, spId: item.Id };
+    } catch(e) {}
+  }
+  const arr = Object.values(_eodReports).map(e => e.data);
+  LS.set('ci_eod', arr);
+}
+
+function getEODReports() {
+  if (_eodReports) return Object.values(_eodReports).map(e => e.data);
+  return LS.get('ci_eod') || [];
+}
+
+function saveEODReports(arr) {
+  _eodReports = _eodReports || {};
+  for (const r of arr) {
+    const key = (r.name||'') + '_' + (r.date||'');
+    if (!_eodReports[key]) _eodReports[key] = { data: r, spId: null };
+    _eodReports[key].data = r;
+  }
+  LS.set('ci_eod', arr);
+}
+
+async function spSyncEOD(report) {
+  if (!report) return;
+  _eodReports = _eodReports || {};
+  const key = (report.name||'') + '_' + (report.date||'');
+  const existing = _eodReports[key];
+  const spId = await spSaveJsonItem('EODReports', key, report, existing ? existing.spId : null);
+  _eodReports[key] = { data: report, spId };
+}
+
+// ── Broker Feedback ───────────────────────────────────────────────────────
+async function loadBrokerFeedbackFromSP() {
+  const items = await spLoadJsonList('BrokerFeedback');
+  _brokerFeedback = {};
+  for (const item of items) {
+    try {
+      const data = JSON.parse(item.Data || '{}');
+      _brokerFeedback[data.id || item.Title] = { data, spId: item.Id };
+    } catch(e) {}
+  }
+  LS.set('ci_bfeedback', Object.values(_brokerFeedback).map(e => e.data));
+}
+
+function getBrokerFeedback() {
+  if (_brokerFeedback) return Object.values(_brokerFeedback).map(e => e.data);
+  return LS.get('ci_bfeedback') || [];
+}
+
+function saveBrokerFeedback_(arr) {
+  _brokerFeedback = _brokerFeedback || {};
+  for (const f of arr) {
+    if (f.id) { if (!_brokerFeedback[f.id]) _brokerFeedback[f.id] = { data: f, spId: null }; _brokerFeedback[f.id].data = f; }
+  }
+  LS.set('ci_bfeedback', arr);
+}
+
+async function spSyncBrokerFeedback(entry) {
+  if (!entry || !entry.id) return;
+  _brokerFeedback = _brokerFeedback || {};
+  const existing = _brokerFeedback[entry.id];
+  const spId = await spSaveJsonItem('BrokerFeedback', entry.id, entry, existing ? existing.spId : null);
+  _brokerFeedback[entry.id] = { data: entry, spId };
+}
+
+async function spDeleteBrokerFeedback(feedbackId) {
+  if (!_brokerFeedback || !_brokerFeedback[feedbackId]) return;
+  const spId = _brokerFeedback[feedbackId].spId;
+  if (spId) await spDeleteJsonItem('BrokerFeedback', spId);
+  delete _brokerFeedback[feedbackId];
+  LS.set('ci_bfeedback', getBrokerFeedback());
+}
+
+// ── Other Tasks ───────────────────────────────────────────────────────────
+async function loadOtherTasksFromSP() {
+  const items = await spLoadJsonList('OtherTasks');
+  _otherTasks = {};
+  for (const item of items) {
+    try {
+      const data = JSON.parse(item.Data || '{}');
+      _otherTasks[data.id || item.Title] = { data, spId: item.Id };
+    } catch(e) {}
+  }
+  LS.set('ci_othertasks', Object.values(_otherTasks).map(e => e.data));
+}
+
+function getOtherTasks() {
+  if (_otherTasks) return Object.values(_otherTasks).map(e => e.data);
+  return LS.get('ci_othertasks') || [];
+}
+
+function saveOtherTasks(arr) {
+  _otherTasks = _otherTasks || {};
+  for (const t of arr) {
+    if (t.id) { if (!_otherTasks[t.id]) _otherTasks[t.id] = { data: t, spId: null }; _otherTasks[t.id].data = t; }
+  }
+  LS.set('ci_othertasks', arr);
+}
+
+async function spSyncOtherTask(task) {
+  if (!task || !task.id) return;
+  _otherTasks = _otherTasks || {};
+  const existing = _otherTasks[task.id];
+  const spId = await spSaveJsonItem('OtherTasks', task.id, task, existing ? existing.spId : null);
+  _otherTasks[task.id] = { data: task, spId };
+}
+
+async function spDeleteOtherTask(taskId) {
+  if (!_otherTasks || !_otherTasks[taskId]) return;
+  const spId = _otherTasks[taskId].spId;
+  if (spId) await spDeleteJsonItem('OtherTasks', spId);
+  delete _otherTasks[taskId];
+  LS.set('ci_othertasks', getOtherTasks());
+}
+
+// ── Team Assignments ──────────────────────────────────────────────────────
+async function loadTeamsFromSP() {
+  const items = await spLoadJsonList('TeamAssignments');
+  _teamAssignments = {};
+  for (const item of items) {
+    try {
+      const data = JSON.parse(item.Data || '{}');
+      _teamAssignments[item.Title] = { data, spId: item.Id };
+    } catch(e) {}
+  }
+  // Rebuild ci_teams format { tlName: [memberNames] }
+  const teamsObj = {};
+  for (const [key, val] of Object.entries(_teamAssignments)) teamsObj[key] = val.data;
+  LS.set('ci_teams', teamsObj);
+}
+
+function getTeams() {
+  if (_teamAssignments) {
+    const t = {};
+    for (const [k,v] of Object.entries(_teamAssignments)) t[k] = v.data;
+    return t;
+  }
+  return LS.get('ci_teams') || {};
+}
+
+function saveTeams(teamsObj) {
+  _teamAssignments = _teamAssignments || {};
+  for (const [k, v] of Object.entries(teamsObj)) {
+    if (!_teamAssignments[k]) _teamAssignments[k] = { data: v, spId: null };
+    _teamAssignments[k].data = v;
+  }
+  LS.set('ci_teams', teamsObj);
+}
+
+async function spSyncTeams(teamsObj) {
+  _teamAssignments = _teamAssignments || {};
+  for (const [tlName, members] of Object.entries(teamsObj)) {
+    const existing = _teamAssignments[tlName];
+    const spId = await spSaveJsonItem('TeamAssignments', tlName, members, existing ? existing.spId : null);
+    _teamAssignments[tlName] = { data: members, spId };
+  }
+}
+
 async function loadFromSharePoint() {
-  // loading silently
   try {
     const [staffRes, recRes, brkRes] = await Promise.all([
       spGet(SP_API + "('AttendanceStaff')/items?$top=500"),
       spGet(SP_API + "('AttendanceRecords')/items?$top=5000"),
       spGet(SP_API + "('AttendanceBreaks')/items?$top=5000"),
     ]);
-    // Load obs notes, offices and leave data in background (non-blocking)
-    loadObsNotesFromSP().catch(()=>{});
-    loadOfficesFromSP().catch(()=>{});
-    loadLeaveData().catch(()=>{});
-    loadPublicHolidays().catch(()=>{});
-    loadPermissions().catch(()=>{});
-    // Only overwrite local data if SharePoint has data
     if (staffRes && staffRes.value && staffRes.value.length > 0) {
       _staff = staffRes.value.map(spToStaff);
       LS.set('ci_staff', _staff);
@@ -5699,10 +5955,21 @@ async function loadFromSharePoint() {
       _breaks = brkRes.value.map(spToBreak);
       LS.set('ci_breaks', _breaks);
     }
-  // loaded silently
+    // Load all other data from SP in parallel
+    await Promise.all([
+      loadObsNotesFromSP(),
+      loadOfficesFromSP(),
+      loadLeaveData(),
+      loadPublicHolidays(),
+      loadPermissions(),
+      loadFileEntriesFromSP(),
+      loadEODFromSP(),
+      loadBrokerFeedbackFromSP(),
+      loadOtherTasksFromSP(),
+      loadTeamsFromSP(),
+    ]).catch(e => console.warn('Some SP loads failed:', e));
   } catch(e) {
     console.error('SharePoint load error:', e);
-  // using cache silently
   }
 }
 
@@ -6233,6 +6500,7 @@ function removeFromTeamByIndex(idx) {
   const name = currentTeam[idx];
   teams[_managingTL] = currentTeam.filter((_, i) => i !== idx);
   saveTeams(teams);
+  spSyncTeams(teams).catch(()=>{});
   showToast(name.split(' ')[0] + ' removed from team.', 'ok');
   renderManageTeamModal();
 }
@@ -6251,6 +6519,7 @@ function addToTeam() {
   });
   teams[_managingTL].push(name);
   saveTeams(teams);
+  spSyncTeams(teams).catch(()=>{});
   showToast(name.split(' ')[0] + ' added to team.', 'ok');
   renderManageTeamModal();
 }
@@ -6261,6 +6530,7 @@ function removeFromTeam(name) {
   if (!teams[_managingTL]) return;
   teams[_managingTL] = teams[_managingTL].filter(n => n !== name);
   saveTeams(teams);
+  spSyncTeams(teams).catch(()=>{});
   showToast(name.split(' ')[0] + ' removed from team.', 'ok');
   renderManageTeamModal();
 }
@@ -7002,6 +7272,7 @@ async function deferChecklist(fileIdx) {
   files[fileIdx].checklistDeferred = true;
   files[fileIdx].checklistSubmitted = false;
   saveFileEntries(files);
+  spSyncFileEntry(files[fileIdx]).catch(()=>{});
   document.getElementById('checklistModal')?.remove();
   showToast('Checklist deferred — reminder will show in your dashboard ✓', 'ok');
   renderMyFilesScreen();
@@ -7025,6 +7296,7 @@ async function submitChecklist(fileIdx) {
   files[fileIdx].checklistSubmitted = true;
   files[fileIdx].checklistDate = today;
   saveFileEntries(files);
+  spSyncFileEntry(files[fileIdx]).catch(()=>{});
   modal.remove();
   showToast('Checklist saved ✓', 'ok');
   renderMyFilesScreen();
@@ -7301,6 +7573,7 @@ async function saveFileEntry() {
     files.push(entry);
   }
   saveFileEntries(files);
+  spSyncFileEntry(entry).catch(()=>{});
   closeFileModal();
   showToast('File saved ✓', 'ok');
   updateFileLogUI();
@@ -8132,6 +8405,7 @@ function quickStatusUpdate(fileId, newStatus) {
   if (newStatus === 'Settlement') { files[idx].active = false; files[idx].settledAt = today; }
 
   saveFileEntries(files);
+  spSyncFileEntry(files[idx]).catch(()=>{});
   showToast('Stage updated to ' + newStatus + ' ✓', 'ok');
 
   // Refresh whichever screen is active
@@ -8689,6 +8963,7 @@ function saveBrokerFeedback() {
   if (idx >= 0) all[idx] = entry;
   else all.push(entry);
   saveBrokerFeedback_(all);
+  spSyncBrokerFeedback(entry).catch(()=>{});
   closeBrokerFeedbackModal();
   showToast('Feedback saved ✓', 'ok');
   renderFeedbackScreen();
@@ -8696,6 +8971,7 @@ function saveBrokerFeedback() {
 
 function deleteBrokerFeedback(feedbackId) {
   if (!confirm('Delete this feedback entry?')) return;
+  spDeleteBrokerFeedback(feedbackId).catch(()=>{});
   const all = getBrokerFeedback().filter(f => f.id !== feedbackId);
   saveBrokerFeedback_(all);
   renderFeedbackScreen();
@@ -9291,6 +9567,7 @@ function submitEOD(e) {
   const all = getEODReports().filter(r => !(r.name===currentUser.name && r.date===today));
   all.push(report);
   saveEODReports(all);
+  spSyncEOD(report).catch(()=>{});
 
   showToast('✓ EOD report submitted!', 'ok');
   updateEODPromptCard();
@@ -9511,11 +9788,13 @@ function saveOtherTask() {
   const tasks = getOtherTasks();
   tasks.push(task);
   saveOtherTasks(tasks);
+  spSyncOtherTask(task).catch(()=>{});
   showToast('Task logged ✓','ok');
   renderOtherTasksScreen();
 }
 
 function deleteOtherTask(id) {
+  spDeleteOtherTask(id).catch(()=>{});
   const tasks = getOtherTasks().filter(t => t.id !== id);
   saveOtherTasks(tasks);
   renderOtherTasksScreen();
@@ -9843,6 +10122,7 @@ function submitEODv2(e) {
   const all = getEODReports().filter(r=>!(r.name===currentUser.name&&r.date===today));
   all.push(report);
   saveEODReports(all);
+  spSyncEOD(report).catch(()=>{});
   showToast('✓ EOD report submitted!','ok');
   updateEODPromptCard();
   window.renderEODScreen();
