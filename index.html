@@ -703,6 +703,11 @@ async function init() {
     const result = await msalInstance.handleRedirectPromise();
     if (result) {
       _portalToken = result.accessToken;
+      // Decode token to check audience
+      try {
+        const payload = JSON.parse(atob(result.accessToken.split('.')[1]));
+        console.log('[TOKEN] aud:', payload.aud, 'scp:', payload.scp);
+      } catch(e) {}
       console.log('[INIT] Got token from redirect');
     }
 
