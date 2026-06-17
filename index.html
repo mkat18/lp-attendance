@@ -675,8 +675,11 @@ function renderPortal(userName, role) {
 
   grid.innerHTML = visibleApps.map(app => {
     const isLive = app.badge === 'Live';
+    const accounts = msalInstance.getAllAccounts();
+    const hint = accounts.length ? '?login_hint=' + encodeURIComponent(accounts[0].username) : '';
+    const appUrl = isLive ? app.url + hint : '#';
     return `
-      <a href="${isLive ? app.url : '#'}" class="app-card${isLive ? '' : ' disabled'}"
+      <a href="${appUrl}" class="app-card${isLive ? '' : ' disabled'}"
          style="--card-accent:${app.accent};--icon-bg:${app.iconBg}"
          ${isLive ? 'target="_self"' : 'onclick="return false"'}>
         <span class="app-badge${isLive ? '' : ' soon'}">${app.badge}</span>
