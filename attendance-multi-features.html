@@ -7971,7 +7971,7 @@ function renderFilesScreen() {
   }
 
   let allFiles, teamAndSelf;
-  if (isManager()) { el.innerHTML = '<div class="card">Access not available for this role.</div>'; return; }
+  if (currentUser.role === 'hrmanager') { el.innerHTML = '<div class="card">Files not available for HR Manager.</div>'; return; }
   if (isSuperAdmin()) {
     allFiles = getFileEntries();
     teamAndSelf = getStaff().map(s => s.name);
@@ -8431,6 +8431,7 @@ let _myFilesTab = 'today';
 function renderMyFilesScreen() {
   const el = document.getElementById('myFilesContent');
   if (!el) return;
+  if (currentUser.role === 'hrmanager') { el.innerHTML = '<div class="card">Files not available for HR Manager.</div>'; return; }
 
   // Determine whose files to show based on role + lookup selector
   let ownerPool;
