@@ -2306,7 +2306,7 @@ function goTab(name, btn) {
   if (mobileBtn) mobileBtn.classList.add('active');
   showScreen(name);
   if (name==='checkin')   initCheckin();
-  if (name==='dashboard') loadDashboard();
+  if (name==='dashboard') { loadDashboard(); if (!window._dashRefreshTimer) window._dashRefreshTimer = setInterval(() => { if (document.getElementById('screen-dashboard')?.classList.contains('active')) loadDashboard(); }, 120000); }
   if (name==='myteam')    renderMyTeam();
   if (name==='files')     renderFilesScreen();
   if (name==='myfiles')   renderMyFilesScreen();
@@ -4688,7 +4688,15 @@ function renderOfficeManager() {
     </div>`).join('');
 }
 
-function loadDashboard() { renderMetrics(); loadTabs(); renderNeedsAttention(); renderWeeklyWidgets(); }
+function loadDashboard() {
+  // Refresh live data from SP before rendering
+  Promise.all([
+    spGet(SP_API + "('AttendanceRecords')/items?$top=5000").then(r => { if (r&&r.value) { _records=r.value.map(spToRecord); LS.set('ci_records',_records); } }),
+    spGet(SP_API + "('AttendanceBreaks')/items?$top=5000").then(r => { if (r&&r.value) { _breaks=r.value.map(spToBreak); LS.set('ci_breaks',_breaks); } }),
+  ]).catch(()=>{}).finally(() => {
+    renderMetrics(); loadTabs(); renderNeedsAttention(); renderWeeklyWidgets();
+  });
+}
 
 function getWorkdays(from,to){
   const days=[],d=new Date(from),end=new Date(to);
