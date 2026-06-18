@@ -668,19 +668,19 @@ tr.flagged-row:hover td { background: #FFEAEA; }
 
     <!-- Weekly widgets — visible to all staff after check-in -->
     <div id="staffWeeklyWidgets" style="display:none;margin-top:12px">
-      <div style="display:flex;gap:12px">
-        <div class="card" style="margin:0;flex:1">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+        <div class="card" style="margin:0">
           <div class="card-label">🎂 Birthdays today</div>
           <div id="staffWidgetBirthdays"><div style="font-size:12px;color:var(--text-3)">No birthdays today</div></div>
         </div>
-        <div class="card" style="margin:0;flex:1">
+        <div class="card" style="margin:0">
           <div class="card-label">🎉 Work anniversaries</div>
           <div id="staffWidgetAnniversaries"><div style="font-size:12px;color:var(--text-3)">No anniversaries this week</div></div>
         </div>
-        <div class="card" style="margin:0;flex:1">
-          <div class="card-label">🏖 On leave this week</div>
-          <div id="staffWidgetLeaves"><div style="font-size:12px;color:var(--text-3)">No leave this week</div></div>
-        </div>
+      </div>
+      <div class="card" style="margin:0">
+        <div class="card-label">🏖 On leave this week</div>
+        <div id="staffWidgetLeaves" style="display:flex;flex-wrap:wrap;gap:8px 20px"><div style="font-size:12px;color:var(--text-3)">No leave this week</div></div>
       </div>
     </div>
   </div>
@@ -4443,7 +4443,8 @@ function renderStaffWeeklyWidgets() {
     for (const r of leaveRecs) { if(!byDate[r.date]) byDate[r.date]=[]; byDate[r.date].push(r); }
     const leaveDates = Object.keys(byDate).sort();
     leaveEl.innerHTML = leaveDates.length
-      ? leaveDates.map(d=>`<div style="margin-bottom:8px"><div style="font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.5px">${fmtDate(d)}</div>${byDate[d].map(r=>`<div style="font-size:13px;font-weight:500">${esc(r.name)}</div>`).join('')}</div>`).join('')
+    leaveEl.innerHTML = leaveDates.length
+      ? leaveDates.map(d=>`<div style="margin-right:16px;margin-bottom:4px"><span style="font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.5px">${fmtDate(d)} &nbsp;</span>${byDate[d].map(r=>`<span style="font-size:13px;font-weight:500">${esc(r.name)}</span>`).join(', ')}</div>`).join('')
       : '<div style="font-size:12px;color:var(--text-3)">No leave this week</div>';
   }
 }
