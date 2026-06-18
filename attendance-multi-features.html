@@ -2790,6 +2790,15 @@ function closeCameraAndSubmit(photoDataUrl) {
   showToast('Getting your location…', 'ok');
 
   captureGeoAndSubmit(function(geo) {
+    if (!geo) {
+      showToast('Location required to check in. Please allow location access and try again.', 'err');
+      // Try requesting geo again
+      navigator.geolocation && navigator.geolocation.getCurrentPosition(
+        pos => { currentGeo = { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: Math.round(pos.coords.accuracy), timestamp: Date.now() }; },
+        () => {}
+      );
+      return;
+    }
     const recs2=getRecords();
     if (recs2.findIndex(r=>r.date===today&&r.name===currentUser.name)>=0) return;
     const newRec={name:currentUser.name,date:today,status:selectedStatus,reason,clockIn,clockOut:null,geo:geo||null,submittedBy:currentUser.name,msAccount:msalAccount?msalAccount.username:'',hasPhoto:!!photoDataUrl,ts:Date.now()};
@@ -6337,22 +6346,28 @@ function geoTag(rec) {
 
 function requestGeo() {
   if (!navigator.geolocation) {
-    showScreen('geoblocked'); return;
+    // No geo support — just proceed to login
+    if (!currentUser) { showScreen('login'); populateNameDropdown(); }
+    return;
   }
   navigator.geolocation.getCurrentPosition(
     pos => {
       currentGeo = { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: Math.round(pos.coords.accuracy), timestamp: Date.now() };
-      // If on geoblocked screen, go to login
       if (document.getElementById('screen-geoblocked').classList.contains('active')) {
         if (!currentUser) { showScreen('login'); populateNameDropdown(); }
+        else { initCheckin(); showScreen('checkin'); }
       }
-      // Also update login screen to show after geo granted
     },
     err => {
+      // On error — still let them through with null geo rather than blocking
       currentGeo = null;
-      showScreen('geoblocked');
+      console.warn('Geo error:', err.code, err.message);
+      if (document.getElementById('screen-geoblocked').classList.contains('active')) {
+        if (!currentUser) { showScreen('login'); populateNameDropdown(); }
+        else { initCheckin(); showScreen('checkin'); }
+      }
     },
-    { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+    { enableHighAccuracy: false, timeout: 15000, maximumAge: 300000 }
   );
 }
 
