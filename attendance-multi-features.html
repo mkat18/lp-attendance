@@ -5066,34 +5066,40 @@ function renderChart() {
 
 // ── Admin ─────────────────────────────────────────────────────────────────
 
-function startEditName(i) {
-  document.getElementById('name-display-'+i).style.display='none';
-  document.getElementById('name-edit-'+i).style.display='block';
-  document.getElementById('name-input-'+i).focus();
-  document.getElementById('name-input-'+i).select();
+// Name-based wrappers — fix for filtered list index mismatch
+function getStaffIdxByName(name) { return getStaff().findIndex(s => s.name === name); }
+function resetPinByName(name) { const i = getStaffIdxByName(name); if (i>=0) resetPin(i); }
+function changeRoleByName(name, role) { const i = getStaffIdxByName(name); if (i>=0) changeRole(i, role); }
+function editScheduleByName(name) { const i = getStaffIdxByName(name); if (i>=0) editSchedule(i); }
+function removePersonByName(name) { const i = getStaffIdxByName(name); if (i>=0) removePerson(i); }
+
+function startEditName(name) {
+  document.getElementById('name-display-'+name).style.display='none';
+  document.getElementById('name-edit-'+name).style.display='block';
+  const inp = document.getElementById('name-input-'+name);
+  if (inp) { inp.focus(); inp.select(); }
 }
 
-function cancelEditName(i) {
-  document.getElementById('name-display-'+i).style.display='block';
-  document.getElementById('name-edit-'+i).style.display='none';
+function cancelEditName(name) {
+  document.getElementById('name-display-'+name).style.display='block';
+  document.getElementById('name-edit-'+name).style.display='none';
 }
 
-async function saveEditName(i) {
-  const newName = document.getElementById('name-input-'+i).value.trim();
+async function saveEditName(name) {
+  const newName = document.getElementById('name-input-'+name)?.value.trim();
   if (!newName) { showToast('Name cannot be empty.','err'); return; }
   const staff = getStaff();
+  const i = staff.findIndex(s => s.name === name);
+  if (i < 0) return;
   const oldName = staff[i].name;
-  if (newName === oldName) { cancelEditName(i); return; }
-  // Check for duplicates
+  if (newName === oldName) { cancelEditName(name); return; }
   if (staff.some((s,idx)=>idx!==i&&s.name.toLowerCase()===newName.toLowerCase())) {
     showToast('A staff member with that name already exists.','err'); return;
   }
   staff[i].name = newName;
   saveStaff(staff);
-  // Save to SharePoint
   await spSaveStaffMember(staff[i]);
   showToast('Name updated to '+newName+' ✓','ok');
-  writeAuditLog('Name Changed', currentUser.name, `${oldName} renamed to ${newName}`);
   renderAdmin();
 }
 
@@ -5291,17 +5297,18 @@ function renderAllStaffCards(staff) {
         const canManageTeam = (sa || mgr) && s.role==='teamlead';
         const canAssignBroker = (sa || mgr || isTeamLead()) && s.role==='trainee';
 
+        const sname = s.name.replace(/'/g,"\\'");
         return `<div class="staff-row" style="flex-wrap:wrap;gap:6px">
           <div class="staff-avatar ${['superadmin','hrmanager'].includes(s.role)?'mgr':''}">${initials(s.name)}</div>
           <div class="staff-info" style="min-width:140px;flex:1">
-            <div class="staff-name-txt" id="name-display-${i}">
+            <div class="staff-name-txt" id="name-display-${s.name}">
               ${esc(s.name)} ${roleTag}
-              ${sa?`<button onclick="startEditName(${i})" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--text-3);margin-left:4px;padding:1px 4px;border-radius:4px;vertical-align:middle" title="Edit name">✏️</button>`:''}
+              ${sa?`<button onclick="startEditName('${sname}')" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--text-3);margin-left:4px;padding:1px 4px;border-radius:4px;vertical-align:middle" title="Edit name">✏️</button>`:''}
             </div>
-            <div id="name-edit-${i}" style="display:none;margin-top:2px">
-              <input id="name-input-${i}" type="text" value="${esc(s.name)}" style="font-size:13px;padding:4px 8px;border-radius:var(--radius-sm);border:1.5px solid var(--brand);width:160px"/>
-              <button onclick="saveEditName(${i})" style="font-size:12px;padding:4px 8px;border-radius:var(--radius-sm);background:var(--brand);color:#fff;border:none;cursor:pointer;margin-left:4px">Save</button>
-              <button onclick="cancelEditName(${i})" style="font-size:12px;padding:4px 8px;border-radius:var(--radius-sm);background:var(--border);color:var(--text-1);border:none;cursor:pointer;margin-left:2px">Cancel</button>
+            <div id="name-edit-${s.name}" style="display:none;margin-top:2px">
+              <input id="name-input-${s.name}" type="text" value="${esc(s.name)}" style="font-size:13px;padding:4px 8px;border-radius:var(--radius-sm);border:1.5px solid var(--brand);width:160px"/>
+              <button onclick="saveEditName('${sname}')" style="font-size:12px;padding:4px 8px;border-radius:var(--radius-sm);background:var(--brand);color:#fff;border:none;cursor:pointer;margin-left:4px">Save</button>
+              <button onclick="cancelEditName('${sname}')" style="font-size:12px;padding:4px 8px;border-radius:var(--radius-sm);background:var(--border);color:var(--text-1);border:none;cursor:pointer;margin-left:2px">Cancel</button>
             </div>
             <div class="staff-pin-status" style="color:${pinColor}">${pinStatus}</div>
             <div style="font-size:11px;color:var(--text-3);margin-top:2px">🕐 ${schedule}${s.office?` &nbsp;📍 ${s.office}`:''}</div>
@@ -5309,7 +5316,7 @@ function renderAllStaffCards(staff) {
             <div style="font-size:11px;color:var(--text-3);margin-top:1px">${s.role==='trainee'?(s.assignedBroker?'🎯 Broker: '+esc(s.assignedBroker):'⚠️ No broker assigned yet'):''}${s.role==='analyst'&&s.assignedBroker?'🎯 Broker: '+esc(s.assignedBroker):''}</div>
           </div>
           <div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center">
-            ${canChangeRoleThis?`<select onchange="changeRole(${i},this.value)" style="font-size:12px;padding:3px 6px;border-radius:var(--radius-sm);border:1.5px solid var(--border)">
+            ${canChangeRoleThis?`<select onchange="changeRoleByName('${sname}',this.value)" style="font-size:12px;padding:3px 6px;border-radius:var(--radius-sm);border:1.5px solid var(--border)">
               ${sa?'<option value="superadmin"'+(s.role==='superadmin'?' selected':'')+'>Super Admin</option>':''}
               <option value="hrmanager"${s.role==='hrmanager'?' selected':''}>HR Manager</option>
               <option value="hr"${s.role==='hr'?' selected':''}>HR</option>
@@ -5321,11 +5328,11 @@ function renderAllStaffCards(staff) {
               <option value="customerservice"${s.role==='customerservice'?' selected':''}>Customer Service</option>
               <option value="socialmedia"${s.role==='socialmedia'?' selected':''}>Social Media</option>
             </select>`:''}
-            ${canManageTeam?`<button class="btn-sm" style="background:#FEF3C7;color:#92400E;border-color:#FDE68A" onclick="openManageTeam('${s.name}')">👥 Manage Team</button>`:''}
-            ${canAssignBroker?`<button class="btn-sm" style="background:#FFF7ED;color:#C2410C;border-color:#FED7AA" onclick="openAssignBrokerModal('${s.name}')">🎯 Assign broker</button>`:''}
-            ${canEditScheduleThis?`<button class="btn-sm" onclick="editSchedule(${i})">Schedule & Office</button>`:''}
-            ${canResetThis?`<button class="btn-sm" onclick="resetPin(${i})">Reset PIN</button>`:''}
-            ${canDeleteThis?`<button class="btn-sm btn-danger" onclick="removePerson(${i})">Remove</button>`:''}
+            ${canManageTeam?`<button class="btn-sm" style="background:#FEF3C7;color:#92400E;border-color:#FDE68A" onclick="openManageTeam('${sname}')">👥 Manage Team</button>`:''}
+            ${canAssignBroker?`<button class="btn-sm" style="background:#FFF7ED;color:#C2410C;border-color:#FED7AA" onclick="openAssignBrokerModal('${sname}')">🎯 Assign broker</button>`:''}
+            ${canEditScheduleThis?`<button class="btn-sm" onclick="editScheduleByName('${sname}')">Schedule & Office</button>`:''}
+            ${canResetThis?`<button class="btn-sm" onclick="resetPinByName('${sname}')">Reset PIN</button>`:''}
+            ${canDeleteThis?`<button class="btn-sm btn-danger" onclick="removePersonByName('${sname}')">Remove</button>`:''}
           </div>
         </div>`;
       }).join('')
