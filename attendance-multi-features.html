@@ -525,7 +525,8 @@ tr.flagged-row:hover td { background: #FFEAEA; }
 
 <nav>
   <div id="navLogo" style="display:flex;align-items:center">
-    <img src="https://loanprocessor.com.au/wp-content/uploads/2021/10/Cropped-and-Trans.png" alt="Loan Processor" style="height:32px;width:auto;display:block" />
+    <img src="https://loanprocessor.com.au/wp-content/uploads/2021/10/Cropped-and-Trans.png" alt="Loan Processor" style="height:32px;width:auto;display:block" onerror="this.style.display='none';this.nextElementSibling.style.display='block'"/>
+    <span style="display:none;color:#fff;font-size:18px;font-weight:800;letter-spacing:-0.5px">LP</span>
   </div>
   <div class="nav-right" id="navRight"></div>
 </nav>
@@ -775,18 +776,20 @@ tr.flagged-row:hover td { background: #FFEAEA; }
     </div><!-- end dashboard-grid -->
 
     <!-- Weekly widgets: birthdays, anniversaries, leaves -->
-    <div id="weeklyWidgets" style="display:flex;gap:12px;margin-top:12px">
-      <div style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:1rem;flex:1">
-        <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:10px">Birthdays today</div>
-        <div id="widgetBirthdays"><div style="font-size:12px;color:var(--text-3)">No birthdays today</div></div>
+    <div id="weeklyWidgets" style="margin-top:12px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+        <div style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:1rem">
+          <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:10px">🎂 Birthdays today</div>
+          <div id="widgetBirthdays"><div style="font-size:12px;color:var(--text-3)">No birthdays today</div></div>
+        </div>
+        <div style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:1rem">
+          <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:10px">🎉 Work anniversaries</div>
+          <div id="widgetAnniversaries"><div style="font-size:12px;color:var(--text-3)">No anniversaries this week</div></div>
+        </div>
       </div>
-      <div style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:1rem;flex:1">
-        <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:10px">Work anniversaries</div>
-        <div id="widgetAnniversaries"><div style="font-size:12px;color:var(--text-3)">No anniversaries this week</div></div>
-      </div>
-      <div style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:1rem;flex:1">
-        <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:10px">On leave this week</div>
-        <div id="widgetLeaves"><div style="font-size:12px;color:var(--text-3)">No leave this week</div></div>
+      <div style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:1rem">
+        <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:10px">🏖 On leave this week</div>
+        <div id="widgetLeaves" style="display:flex;flex-wrap:wrap;gap:6px 20px"><div style="font-size:12px;color:var(--text-3)">No leave this week</div></div>
       </div>
     </div>
     <button class="btn-primary" style="margin-top:.75rem" onclick="exportCSV()">⬇ Download CSV</button>
@@ -855,8 +858,19 @@ tr.flagged-row:hover td { background: #FFEAEA; }
     <div class="page-header"><h1>Admin</h1><p>Manage accounts and permissions.</p></div>
 
     <div class="card" style="padding:0;overflow:hidden;margin-bottom:1rem">
-      <div class="list-header"><span>All accounts</span><span class="list-count" id="staffCount">0</span></div>
-      <div id="staffList"></div>
+      <div class="list-header" style="cursor:pointer" onclick="toggleStaffList()">
+        <span>All accounts</span>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="list-count" id="staffCount">0</span>
+          <span id="staffListToggleIcon" style="font-size:12px;color:rgba(255,255,255,0.7)">▼</span>
+        </div>
+      </div>
+      <div id="staffListBody" style="display:none">
+        <div style="padding:8px 12px;border-bottom:1px solid var(--border)">
+          <input type="text" id="staffSearchInput" placeholder="🔍 Search by name or role…" oninput="filterStaffList()" style="width:100%;font-size:14px;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)"/>
+        </div>
+        <div id="staffList"></div>
+      </div>
     </div>
 
     <div id="onboardBtn" style="display:none;margin-bottom:1rem">
@@ -985,19 +999,24 @@ tr.flagged-row:hover td { background: #FFEAEA; }
     </div>
 
     <div class="card" id="needsAttentionAdminCard" style="display:none">
-      <div class="section-label">⚠ Needs Attention</div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center">
-        <button onclick="filterAttention('today')" class="att-filter active" style="font-size:12px;padding:5px 12px;border-radius:20px;border:1.5px solid var(--danger);background:var(--danger);color:#fff;cursor:pointer">Today</button>
-        <button onclick="filterAttention('yesterday')" class="att-filter" style="font-size:12px;padding:5px 12px;border-radius:20px;border:1.5px solid var(--border);background:transparent;cursor:pointer">Yesterday</button>
-        <button onclick="filterAttention('week')" class="att-filter" style="font-size:12px;padding:5px 12px;border-radius:20px;border:1.5px solid var(--border);background:transparent;cursor:pointer">This week</button>
-        <button onclick="filterAttention('all')" class="att-filter" style="font-size:12px;padding:5px 12px;border-radius:20px;border:1.5px solid var(--border);background:transparent;cursor:pointer">All time</button>
-        <div style="display:flex;gap:4px;align-items:center;margin-left:auto">
-          <input type="date" id="attFromDate" style="font-size:12px;padding:4px 6px;border-radius:var(--radius-sm);border:1.5px solid var(--border)" onchange="filterAttention('custom')"/>
-          <span style="font-size:11px;color:var(--text-3)">to</span>
-          <input type="date" id="attToDate" style="font-size:12px;padding:4px 6px;border-radius:var(--radius-sm);border:1.5px solid var(--border)" onchange="filterAttention('custom')"/>
-        </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;margin-bottom:0" onclick="toggleAttentionCard()">
+        <div class="section-label" style="margin-bottom:0">⚠ Needs Attention</div>
+        <span id="attToggleIcon" style="font-size:13px;color:var(--text-3)">▼ Show</span>
       </div>
-      <div id="needsAttentionList"></div>
+      <div id="attentionCardBody" style="display:none;margin-top:12px">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center">
+          <button onclick="filterAttention('today')" class="att-filter active" style="font-size:12px;padding:5px 12px;border-radius:20px;border:1.5px solid var(--danger);background:var(--danger);color:#fff;cursor:pointer">Today</button>
+          <button onclick="filterAttention('yesterday')" class="att-filter" style="font-size:12px;padding:5px 12px;border-radius:20px;border:1.5px solid var(--border);background:transparent;cursor:pointer">Yesterday</button>
+          <button onclick="filterAttention('week')" class="att-filter" style="font-size:12px;padding:5px 12px;border-radius:20px;border:1.5px solid var(--border);background:transparent;cursor:pointer">This week</button>
+          <button onclick="filterAttention('all')" class="att-filter" style="font-size:12px;padding:5px 12px;border-radius:20px;border:1.5px solid var(--border);background:transparent;cursor:pointer">All time</button>
+          <div style="display:flex;gap:4px;align-items:center">
+            <input type="date" id="attFromDate" style="font-size:12px;padding:4px 6px;border-radius:var(--radius-sm);border:1.5px solid var(--border)" onchange="filterAttention('custom')"/>
+            <span style="font-size:11px;color:var(--text-3)">to</span>
+            <input type="date" id="attToDate" style="font-size:12px;padding:4px 6px;border-radius:var(--radius-sm);border:1.5px solid var(--border)" onchange="filterAttention('custom')"/>
+          </div>
+        </div>
+        <div id="needsAttentionList"></div>
+      </div>
     </div>
 
     <div class="card" id="permissionsEditorCard" style="display:none">
@@ -3668,6 +3687,15 @@ function switchDashTab(name,btn) {
 // ── Needs Attention ───────────────────────────────────────────────────────
 let _attentionIssues = [];
 
+function toggleAttentionCard() {
+  const body = document.getElementById('attentionCardBody');
+  const icon = document.getElementById('attToggleIcon');
+  if (!body) return;
+  const open = body.style.display !== 'none';
+  body.style.display = open ? 'none' : 'block';
+  if (icon) icon.textContent = open ? '▼ Show' : '▲ Hide';
+}
+
 async function renderNeedsAttention() {
   if (!isManager() && !isSuperAdmin()) return;
 
@@ -5209,8 +5237,35 @@ function renderAdmin() {
     }
   }
 
-  document.getElementById('staffList').innerHTML = staff.length
-    ? staff.map((s,i)=>{
+  const staffListHtml = renderAllStaffCards(staff);
+  document.getElementById('staffList').innerHTML = staffListHtml;
+}
+
+function toggleStaffList() {
+  const body = document.getElementById('staffListBody');
+  const icon = document.getElementById('staffListToggleIcon');
+  if (!body) return;
+  const open = body.style.display !== 'none';
+  body.style.display = open ? 'none' : 'block';
+  if (icon) icon.textContent = open ? '▼' : '▲';
+  if (!open) setTimeout(() => document.getElementById('staffSearchInput')?.focus(), 100);
+}
+
+function filterStaffList() {
+  const q = (document.getElementById('staffSearchInput')?.value || '').toLowerCase().trim();
+  const staff = getStaff();
+  const filtered = q ? staff.filter(s =>
+    s.name.toLowerCase().includes(q) ||
+    (ROLE_LABEL[s.role] || s.role || '').toLowerCase().includes(q)
+  ) : staff;
+  const el = document.getElementById('staffList');
+  if (el) el.innerHTML = filtered.length ? renderAllStaffCards(filtered) : '<div style="padding:12px;font-size:13px;color:var(--text-3)">No staff found.</div>';
+}
+
+function renderAllStaffCards(staff) {
+  const sa=isSuperAdmin();
+  const mgr=currentUser.role==='hrmanager';
+  return staff.length ? staff.map((s,i)=>{
         const pinStatus = s.pin ? 'PIN set' : s.tempPin ? 'Awaiting first login' : 'No PIN — reset required';
         const pinColor = s.pin ? 'var(--text-3)' : s.tempPin ? 'var(--warn)' : 'var(--danger)';
         const schedule = (s.startTime&&s.endTime) ? `${fmt12(s.startTime)} – ${fmt12(s.endTime)}` : s.role==='superadmin'?'—':'No schedule';
