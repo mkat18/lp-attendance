@@ -528,7 +528,6 @@ tr.flagged-row:hover td { background: #FFEAEA; }
     <img src="https://loanprocessor.com.au/wp-content/uploads/2021/10/Cropped-and-Trans.png" alt="Loan Processor" style="height:32px;width:auto;display:block" />
   </div>
   <div class="nav-right" id="navRight"></div>
-  <button class="hamburger-btn" id="hamburgerBtn" onclick="toggleMobileMenu()" aria-label="Menu">☰</button>
 </nav>
 
 <!-- Mobile menu overlay -->
@@ -711,9 +710,9 @@ tr.flagged-row:hover td { background: #FFEAEA; }
         </div>
       </div>
 <div id="publicHolidayBanner" style="display:none;background:#FEF3C7;border:1.5px solid #FDE68A;border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:10px;font-size:13px;font-weight:600;color:#92400E;text-align:center"></div>
-      <div id="needsAttentionBanner" style="display:none;background:#FEF2F2;border:1.5px solid #FECACA;border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:10px">
-        <div style="font-size:12px;font-weight:700;color:var(--danger);margin-bottom:6px">⚠ Needs manager attention</div>
-        <div id="needsAttentionList"></div>
+      <div id="needsAttentionBanner" style="display:none;background:#FEF2F2;border:1.5px solid #FECACA;border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:10px;cursor:pointer;display:flex;align-items:center;justify-content:space-between" onclick="goTab('admin',document.querySelector('.nav-tab[data-tab=admin]'))">
+        <div style="font-size:13px;font-weight:600;color:var(--danger)">⚠ <span id="needsAttentionCount">0</span> issue<span id="needsAttentionPlural">s</span> need attention</div>
+        <div style="font-size:12px;color:var(--danger);opacity:0.7">View in Staff tab →</div>
       </div>
       <div class="metrics" id="metrics" style="margin-bottom:0"></div>
     </div>
@@ -983,6 +982,22 @@ tr.flagged-row:hover td { background: #FFEAEA; }
       <p style="font-size:13px;color:var(--text-2);margin-bottom:12px">All PIN resets, role changes and account changes.</p>
       <button class="btn-primary" id="auditLogBtn" onclick="toggleAuditLog()">View audit log</button>
       <div id="auditLogList" style="margin-top:12px;display:none"></div>
+    </div>
+
+    <div class="card" id="needsAttentionAdminCard" style="display:none">
+      <div class="section-label">⚠ Needs Attention</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center">
+        <button onclick="filterAttention('today')" class="att-filter active" style="font-size:12px;padding:5px 12px;border-radius:20px;border:1.5px solid var(--danger);background:var(--danger);color:#fff;cursor:pointer">Today</button>
+        <button onclick="filterAttention('yesterday')" class="att-filter" style="font-size:12px;padding:5px 12px;border-radius:20px;border:1.5px solid var(--border);background:transparent;cursor:pointer">Yesterday</button>
+        <button onclick="filterAttention('week')" class="att-filter" style="font-size:12px;padding:5px 12px;border-radius:20px;border:1.5px solid var(--border);background:transparent;cursor:pointer">This week</button>
+        <button onclick="filterAttention('all')" class="att-filter" style="font-size:12px;padding:5px 12px;border-radius:20px;border:1.5px solid var(--border);background:transparent;cursor:pointer">All time</button>
+        <div style="display:flex;gap:4px;align-items:center;margin-left:auto">
+          <input type="date" id="attFromDate" style="font-size:12px;padding:4px 6px;border-radius:var(--radius-sm);border:1.5px solid var(--border)" onchange="filterAttention('custom')"/>
+          <span style="font-size:11px;color:var(--text-3)">to</span>
+          <input type="date" id="attToDate" style="font-size:12px;padding:4px 6px;border-radius:var(--radius-sm);border:1.5px solid var(--border)" onchange="filterAttention('custom')"/>
+        </div>
+      </div>
+      <div id="needsAttentionList"></div>
     </div>
 
     <div class="card" id="permissionsEditorCard" style="display:none">
@@ -2286,7 +2301,8 @@ function buildNav() {
     <div class="nav-tabs">${tabs.map(([k,l])=>`<button class="nav-tab" data-tab="${k}" onclick="goTab('${k}',this)">${l}</button>`).join('')}</div>
     ${viewAsDropdown}
     <span class="nav-user">${esc(currentUser.name.split(' ')[0])} <span style="font-size:10px;opacity:0.7">${_previewRole ? 'Previewing as '+_previewRole : (ROLE_LABEL[currentUser.role]||'')}</span></span>
-    ${exitBtn}`;
+    ${exitBtn}
+    <button class="hamburger-btn" id="hamburgerBtn" onclick="toggleMobileMenu()" aria-label="Menu">&#9776;</button>`;
 
   // Build mobile menu
   const mobileMenu = document.getElementById('mobileMenu');
@@ -3649,49 +3665,86 @@ function switchDashTab(name,btn) {
 }
 
 
-// ── Needs Attention — missing clock-outs + unclosed breaks ────────────────
+// ── Needs Attention ───────────────────────────────────────────────────────
+let _attentionIssues = [];
+
 async function renderNeedsAttention() {
   if (!isManager() && !isSuperAdmin()) return;
-  const banner = document.getElementById('needsAttentionBanner');
-  const list = document.getElementById('needsAttentionList');
-  if (!banner || !list) return;
 
-  const issues = [];
-
-  // 1. Missing clock-outs — records with no clockOut for dates before today
+  // Build full issues list
+  _attentionIssues = [];
   const recs = getRecords().filter(r => r.date < today && !r.clockOut && r.status !== 'leave' && r.status !== 'absent');
-  for (const r of recs) {
-    issues.push({
-      type: 'no-clockout',
-      name: r.name,
-      date: r.date,
-      detail: 'No clock-out recorded',
-      id: r.id
-    });
-  }
-
-  // 2. Open breaks from SP (IsOpen = 'true' and date < today)
+  for (const r of recs) _attentionIssues.push({ type:'no-clockout', name:r.name, date:r.date, detail:'No clock-out', id:r.id });
   const brks = getBreaks().filter(b => b.isOpen && b.date < today);
-  for (const b of brks) {
-    issues.push({
-      type: 'open-break',
-      name: b.name,
-      date: b.date,
-      detail: 'Break started ' + (b.startTime ? fmtTime(b.startTime) : '') + ' — never ended',
-      id: b.id
-    });
+  for (const b of brks) _attentionIssues.push({ type:'open-break', name:b.name, date:b.date, detail:'Break never ended', id:b.id });
+
+  // Dashboard — just show count
+  const banner = document.getElementById('needsAttentionBanner');
+  if (banner) {
+    if (_attentionIssues.length) {
+      banner.style.display = 'flex';
+      const countEl = document.getElementById('needsAttentionCount');
+      const pluralEl = document.getElementById('needsAttentionPlural');
+      if (countEl) countEl.textContent = _attentionIssues.length;
+      if (pluralEl) pluralEl.textContent = _attentionIssues.length !== 1 ? 's' : '';
+    } else {
+      banner.style.display = 'none';
+    }
   }
 
-  if (!issues.length) { banner.style.display = 'none'; return; }
+  // Admin panel — show full list with default filter (yesterday)
+  filterAttention('yesterday');
+}
 
-  banner.style.display = 'block';
-  list.innerHTML = issues.map((iss, i) => `
-    <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:0.5px solid #FECACA;font-size:12px">
-      <span style="flex:1"><b>${esc(iss.name)}</b> · ${iss.date} · ${iss.detail}</span>
+let _currentAttFilter = 'yesterday';
+
+function filterAttention(period) {
+  _currentAttFilter = period;
+  const card = document.getElementById('needsAttentionAdminCard');
+  const list = document.getElementById('needsAttentionList');
+  if (!card || !list) return;
+
+  // Update filter button styles
+  document.querySelectorAll('.att-filter').forEach(b => {
+    const isActive = b.getAttribute('onclick') === 'filterAttention(\'' + period + '\')';
+    b.style.background = isActive ? 'var(--danger)' : 'transparent';
+    b.style.color = isActive ? '#fff' : '';
+    b.style.borderColor = isActive ? 'var(--danger)' : 'var(--border)';
+  });
+
+  // Calculate date range
+  const now = new Date();
+  let fromDate, toDate;
+  if (period === 'today') {
+    fromDate = toDate = today;
+  } else if (period === 'yesterday') {
+    const y = new Date(now); y.setDate(y.getDate()-1);
+    fromDate = toDate = y.toISOString().split('T')[0];
+  } else if (period === 'week') {
+    const mon = new Date(now); mon.setDate(now.getDate() - now.getDay() + 1);
+    fromDate = mon.toISOString().split('T')[0];
+    toDate = today;
+  } else if (period === 'custom') {
+    fromDate = document.getElementById('attFromDate')?.value || '';
+    toDate = document.getElementById('attToDate')?.value || today;
+  } else {
+    fromDate = '2020-01-01'; toDate = today;
+  }
+
+  const filtered = _attentionIssues.filter(i => i.date >= fromDate && i.date <= toDate);
+
+  if (!filtered.length) {
+    list.innerHTML = '<div style="font-size:13px;color:var(--text-3);padding:8px 0">No issues in this period ✓</div>';
+    return;
+  }
+
+  list.innerHTML = filtered.map((iss, i) => `
+    <div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:0.5px solid #FECACA;font-size:13px;flex-wrap:wrap">
+      <span style="flex:1;min-width:150px"><b>${esc(iss.name)}</b> · ${iss.date} · ${iss.detail}</span>
       ${iss.type==='no-clockout'
-        ? `<input type="time" id="co-time-${i}" style="font-size:12px;padding:3px 6px;border-radius:4px;border:1px solid #FECACA" />
-           <button onclick="managerClockOut('${iss.id}','${iss.name}','${iss.date}','co-time-${i}')" style="font-size:11px;padding:4px 8px;background:var(--danger);color:#fff;border:none;border-radius:4px;cursor:pointer">Set clock-out</button>`
-        : `<button onclick="managerCloseBreak('${iss.id}','${iss.name}','${iss.date}')" style="font-size:11px;padding:4px 8px;background:var(--danger);color:#fff;border:none;border-radius:4px;cursor:pointer">Close break</button>`
+        ? `<input type="time" id="co-time-${i}" style="font-size:13px;padding:4px 8px;border-radius:4px;border:1px solid #FECACA"/>
+           <button onclick="managerClockOut('${iss.id}','${iss.name}','${iss.date}','co-time-${i}')" style="font-size:12px;padding:5px 10px;background:var(--danger);color:#fff;border:none;border-radius:4px;cursor:pointer">Set clock-out</button>`
+        : `<button onclick="managerCloseBreak('${iss.id}','${iss.name}','${iss.date}')" style="font-size:12px;padding:5px 10px;background:var(--danger);color:#fff;border:none;border-radius:4px;cursor:pointer">Close break</button>`
       }
     </div>`).join('');
 }
@@ -5113,6 +5166,13 @@ function renderAdmin() {
   const sa=isSuperAdmin();
   const mgr=currentUser.role==='hrmanager';
   document.getElementById('staffCount').textContent=staff.length;
+
+  // Needs attention card — show for managers and superadmin
+  const attCard=document.getElementById('needsAttentionAdminCard');
+  if(attCard) {
+    attCard.style.display=(sa||mgr)?'block':'none';
+    if(sa||mgr) renderNeedsAttention();
+  }
 
   // Show/hide add cards based on role
   const addStaffCard=document.getElementById('addStaffCard');
