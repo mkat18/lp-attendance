@@ -1680,7 +1680,7 @@ function spToBreak(item) {
 // ── Data access functions ─────────────────────────────────────────────────
 function getStaff()   { return _staff && _staff.length > 0 ? _staff : (LS.get('ci_staff') || BUILTIN_STAFF || []); }
 function getRecords() { return _records || LS.get('ci_records') || []; }
-function getBreaks()  { return _breaks  || LS.get('ci_breaks')  || []; }
+function getBreaks()  { return _breaks !== null ? _breaks : (LS.get('ci_breaks') || []); }
 
 function saveStaff(s)  { _staff=s;   LS.set('ci_staff',s); }
 function saveRecords(r){ _records=r; LS.set('ci_records',r); }
@@ -2869,7 +2869,7 @@ function clockOut() {
     }
   }
   // Gate behind open break
-  const ob = LS.get('ci_ongoingBreaks')||{};
+  const ob = getOngoingBreaks();
   if (ob[currentUser.name]) { showToast('End your break before clocking out.','err'); return; }
   // Require selfie + location for clock-out (same as check-in)
   _pendingClockOut = true;
@@ -2923,6 +2923,15 @@ function getTodayBreakTotal() {
   return getBreaks().filter(b=>b.name===currentUser.name&&b.date===today&&b.durationMs)
     .reduce((sum,b)=>sum+b.durationMs,0);
 }
+
+// Get currently open breaks from SP data (not localStorage)
+function getOngoingBreaks() {
+  const breaks = getBreaks();
+  const ob = {};
+  breaks.filter(b => b.date === today && b.isOpen === true).forEach(b => { ob[b.name] = true; });
+  return ob;
+}
+
 function updateBreakUI() {
   if (!currentUser) return;
   const btn=document.getElementById('breakBtn');
@@ -2938,9 +2947,8 @@ function updateBreakUI() {
   }
 }
 function setOngoingBreak(name, active) {
-  const ob=LS.get('ci_ongoingBreaks')||{};
+  const ob=getOngoingBreaks();
   if(active) ob[name]=true; else delete ob[name];
-  LS.set('ci_ongoingBreaks', ob);
 }
 
 async function toggleBreak() {
@@ -3105,9 +3113,11 @@ function renderMetrics() {
     missing.length = missingCount; // trick to reuse missing.length for color
   }
 
-  // Break status (today only)
-  const ongoingBreaks  = LS.get('ci_ongoingBreaks')||{};
-  const onBreakNames   = isToday ? Object.keys(ongoingBreaks).filter(n=>ongoingBreaks[n]) : [];
+  // Break status (today only) — use SP breaks data (IsOpen='true') not local cache
+  const allBreaks = getBreaks();
+  const onBreakNames = isToday
+    ? allBreaks.filter(b => b.date === today && b.isOpen === true).map(b => b.name)
+    : [];
   const todayRecs      = allRecs.filter(r=>r.date===today);
   const workingToday   = todayRecs.filter(r=>r.status==='office'||r.status==='wfh').map(r=>r.name);
   const availableNames = workingToday.filter(n=>!onBreakNames.includes(n));
@@ -4793,7 +4803,7 @@ function renderBreaks() {
   const fn=document.getElementById('filterName').value.trim().toLowerCase();
   const singleDay=from===to;
   const isViewingToday=singleDay&&from===today;
-  const ongoingBreaks=LS.get('ci_ongoingBreaks')||{};
+  const ongoingBreaks=getOngoingBreaks();
   const brks=getBreaks().filter(b=>b.date>=from&&b.date<=to&&(!fn||b.name.toLowerCase().includes(fn)));
 
   // Group by date+name, keep individual segments
@@ -6689,7 +6699,7 @@ function renderMyTeam() {
 
   const allStaff = getStaff();
   const dayRecs = getRecords().filter(r => r.date === date);
-  const ongoingBreaks = LS.get('ci_ongoingBreaks') || {};
+  const ongoingBreaks = getOngoingBreaks();
 
   // Summary counts
   const statuses = { notsubmitted:0, office:0, wfh:0, halfday:0, leave:0, onbreak:0, available:0 };
