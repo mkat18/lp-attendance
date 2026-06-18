@@ -2299,6 +2299,7 @@ function buildNav() {
     tabs = [['dashboard','Dashboard'],['admin','Staff'],['files','All Files'],['profile','PIN']];
   } else if (r === 'hrmanager') {
     tabs = [['checkin','Check in'],['leave','🌴 Leave'],['dashboard','Dashboard'],['admin','Staff'],['profile','PIN']];
+    // hrmanager explicitly excluded from All Files tab
   } else {
     // All other roles — build tabs dynamically from permissions
     const ALL_TABS_DEF = [
@@ -7970,6 +7971,7 @@ function renderFilesScreen() {
   }
 
   let allFiles, teamAndSelf;
+  if (isManager()) { el.innerHTML = '<div class="card">Access not available for this role.</div>'; return; }
   if (isSuperAdmin()) {
     allFiles = getFileEntries();
     teamAndSelf = getStaff().map(s => s.name);
@@ -8016,15 +8018,6 @@ function renderFilesScreen() {
 
 function renderFilesToday(el, allFiles, teamNames) {
   const todayFiles = allFiles.filter(f => f.updatedAt === today);
-  const staff = getStaff();
-
-  // Group by owner
-  const byOwner = {};
-  teamNames.forEach(n => { byOwner[n] = []; });
-  todayFiles.forEach(f => {
-    if (byOwner[f.owner]) byOwner[f.owner].push(f);
-    else byOwner[f.owner] = [f];
-  });
 
   if (todayFiles.length === 0) {
     el.innerHTML = `<div class="card" style="text-align:center;padding:2rem">
@@ -8035,16 +8028,18 @@ function renderFilesToday(el, allFiles, teamNames) {
     return;
   }
 
-  el.innerHTML = Object.entries(byOwner).map(([name, files]) => {
-    if (files.length === 0) return `<div class="card" style="margin-bottom:10px">
-      <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px">${esc(name)}</div>
-      <div style="font-size:12px;color:var(--text-3)">No files logged today</div>
-    </div>`;
-    return `<div class="card" style="margin-bottom:10px">
+  // Group by owner — only show staff who have files today
+  const byOwner = {};
+  todayFiles.forEach(f => {
+    if (!byOwner[f.owner]) byOwner[f.owner] = [];
+    byOwner[f.owner].push(f);
+  });
+
+  el.innerHTML = Object.entries(byOwner).map(([name, files]) => `
+    <div class="card" style="margin-bottom:10px">
       <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">${esc(name)}</div>
       ${files.map(f => fileCard(f, true)).join('')}
-    </div>`;
-  }).join('');
+    </div>`).join('');
 }
 
 function renderFilesActive(el, allFiles) {
