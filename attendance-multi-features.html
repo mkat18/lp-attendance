@@ -597,15 +597,14 @@ tr.flagged-row:hover td { background: #FFEAEA; }
 
   <!-- ── LOGIN ─────────────────────────────────────────────────────────── -->
   <!-- ── MS LOGIN ─────────────────────────────────────────────────────────── -->
-  <div id="screen-mslogin" class="screen active" style="background:var(--navy,#0F2A5E);position:fixed;inset:0;z-index:160;display:flex;align-items:center;justify-content:center;flex-direction:column;text-align:center;padding:2rem">
-    <div style="animation:lp-fadein 0.4s ease both">
-      <img src="https://loanprocessor.com.au/wp-content/uploads/2021/10/Cropped-and-Trans.png" style="height:48px;margin-bottom:1.5rem;display:block;margin-left:auto;margin-right:auto" onerror="this.style.display='none';this.nextElementSibling.style.display='block'"/>
-      <div style="display:none;font-size:22px;font-weight:800;color:#fff;margin-bottom:1.5rem">LP</div>
-      <p style="color:rgba(255,255,255,0.6);font-size:14px;margin-bottom:1.5rem;max-width:280px">Please sign in through the LP Portal to access this app.</p>
-      <a href="index.html" style="display:inline-flex;align-items:center;gap:8px;padding:12px 24px;background:#C9A84C;color:#0F1E35;border-radius:10px;font-size:14px;font-weight:700;text-decoration:none">
-        ← Go to LP Portal
-      </a>
-      <p id="msLoginErr" style="font-size:12px;color:#FC8181;margin-top:1rem"></p>
+  <div id="screen-mslogin" class="screen active" style="background:var(--navy,#0F2A5E);position:fixed;inset:0;z-index:160">
+    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:2rem;animation:lp-fadein 0.4s ease both">
+      <img src="https://loanprocessor.com.au/wp-content/uploads/2021/10/Cropped-and-Trans.png" style="height:48px;margin-bottom:2rem;display:block" onerror="this.style.display='none';this.nextElementSibling.style.display='block'"/>
+      <div style="display:none;font-size:22px;font-weight:800;color:#fff;margin-bottom:2rem">LP</div>
+      <div style="width:40px;height:40px;border:3px solid rgba(255,255,255,0.15);border-top-color:#C9A84C;border-radius:50%;animation:spin 0.8s linear infinite;margin-bottom:1.5rem"></div>
+      <p style="color:rgba(255,255,255,0.6);font-size:14px;margin-bottom:1.5rem;text-align:center">Signing you in to Microsoft…</p>
+      <p id="msLoginErr" style="font-size:12px;color:#FC8181;margin-top:1rem;text-align:center"></p>
+      <a href="index.html" style="margin-top:2rem;font-size:12px;color:rgba(255,255,255,0.3);text-decoration:none">← Back to portal</a>
     </div>
   </div>
 
@@ -6057,7 +6056,7 @@ const msalConfig = {
   auth: {
     clientId: 'e2905b6d-7f90-41dc-9c57-7c5bfc4af1c7',
     authority: 'https://login.microsoftonline.com/c8838da3-903c-4e2d-ae8a-de9fc6f28d35',
-    redirectUri: 'https://mkat18.github.io/lp-attendance/',
+    redirectUri: 'https://mkat18.github.io/lp-attendance/attendance-multi-features.html',
     navigateToLoginRequestUrl: true,
   },
   cache: { 
@@ -6904,12 +6903,21 @@ async function initMsal() {
       console.warn('ssoSilent failed:', e.name);
     }
 
-    // Truly no session — redirect to portal
-    window.location.href = 'index.html';
+    // No session found — do MS login directly from this app
+    try {
+      await msalInstance.loginRedirect({ scopes: SP_SCOPES });
+    } catch(e) {
+      console.error('loginRedirect failed:', e);
+      window.location.href = 'index.html';
+    }
 
   } catch(e) {
     console.error('MSAL init error:', e);
-    window.location.href = 'index.html';
+    try {
+      await msalInstance.loginRedirect({ scopes: SP_SCOPES });
+    } catch(e2) {
+      window.location.href = 'index.html';
+    }
   }
 }
 
