@@ -4209,11 +4209,15 @@ function showLeaveWarningModal(msg, onConfirm) {
     <div style="font-size:15px;font-weight:700;margin-bottom:10px">⚠ Leave balance warning</div>
     <div style="font-size:13px;color:var(--text-2);margin-bottom:16px">${msg}</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-      <button onclick="document.getElementById('leaveWarningModal').remove();(${onConfirm.toString()})()" style="padding:10px;background:var(--brand);color:#fff;border:none;border-radius:var(--radius-sm);font-size:14px;font-weight:600;cursor:pointer">Submit anyway</button>
+      <button id="leaveWarnConfirmBtn" style="padding:10px;background:var(--brand);color:#fff;border:none;border-radius:var(--radius-sm);font-size:14px;font-weight:600;cursor:pointer">Submit anyway</button>
       <button onclick="document.getElementById('leaveWarningModal').remove()" style="padding:10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-size:14px;background:transparent;cursor:pointer">Cancel</button>
     </div>
   </div>`;
   document.body.appendChild(modal);
+  document.getElementById('leaveWarnConfirmBtn').onclick = () => {
+    document.getElementById('leaveWarningModal').remove();
+    onConfirm();
+  };
 }
 
 async function doSubmitLeave(leaveType, startDate, endDate, halfDay, halfDaySession, reason, brokerName, days) {
@@ -4431,21 +4435,24 @@ async function renderLeaveScreen() {
       <button class="btn-primary" onclick="submitLeaveRequest()">Submit leave request</button>` : ''}
     </div>`;
 
-    // My leave history with date filter
-    const allMyReqs = _leaveRequests.filter(r => r.Title === currentUser.name);
-    if (allMyReqs.length) {
-      const sixMonthsAgo = new Date(); sixMonthsAgo.setMonth(sixMonthsAgo.getMonth()-6);
-      const defaultFrom = sixMonthsAgo.toISOString().split('T')[0];
-      html += `<div class="card"><div class="section-label">My leave history</div>
+    // My leave history — collapsible
+    const sixMonthsAgo = new Date(); sixMonthsAgo.setMonth(sixMonthsAgo.getMonth()-6);
+    const defaultFrom = sixMonthsAgo.toISOString().split('T')[0];
+    html += `<div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer" onclick="toggleLeaveHistory()">
+        <div class="section-label" style="margin-bottom:0">My leave requests</div>
+        <span id="leaveHistToggleIcon" style="font-size:13px;color:var(--text-3)">▼ Show</span>
+      </div>
+      <div id="leaveHistoryBody" style="display:none;margin-top:12px">
         <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
           <input type="date" id="leaveHistFrom" value="${defaultFrom}" onchange="filterMyLeaveHistory()" style="font-size:13px;padding:5px 8px;border-radius:var(--radius-sm);border:1.5px solid var(--border)"/>
           <span style="font-size:12px;color:var(--text-3)">to</span>
           <input type="date" id="leaveHistTo" value="${today}" onchange="filterMyLeaveHistory()" style="font-size:13px;padding:5px 8px;border-radius:var(--radius-sm);border:1.5px solid var(--border)"/>
           <button onclick="document.getElementById('leaveHistFrom').value='2020-01-01';filterMyLeaveHistory()" style="font-size:12px;padding:4px 10px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:transparent;cursor:pointer">All time</button>
         </div>
-        <div id="myLeaveHistoryTable"></div>
-      </div>`;
-    }
+        <div id="myLeaveHistoryTable"><div style="font-size:13px;color:var(--text-3)">No leave requests found.</div></div>
+      </div>
+    </div>`;
   }
 
   // ── Approval section for TL / Manager ────────────────────────────────────
@@ -4542,11 +4549,19 @@ async function renderLeaveScreen() {
 
   el.innerHTML = html;
 
-  // Populate leave history table with default filter
+  // Populate tables after HTML is in the DOM
   filterMyLeaveHistory();
-
-  // Populate leave requests list
   if (isMgr || isTL) filterLeaveRequests();
+}
+
+function toggleLeaveHistory() {
+  const body = document.getElementById('leaveHistoryBody');
+  const icon = document.getElementById('leaveHistToggleIcon');
+  if (!body) return;
+  const open = body.style.display !== 'none';
+  body.style.display = open ? 'none' : 'block';
+  if (icon) icon.textContent = open ? '▼ Show' : '▲ Hide';
+  if (!open) filterMyLeaveHistory();
 }
 
 function toggleBrokerField() {
