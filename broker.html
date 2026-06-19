@@ -599,10 +599,13 @@ tr.flagged-row:hover td { background: #FFEAEA; }
   <!-- ── MS LOGIN ─────────────────────────────────────────────────────────── -->
   <div id="screen-mslogin" class="screen active" style="background:var(--navy,#0F2A5E);position:fixed;inset:0;z-index:160">
     <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:2rem;animation:lp-fadein 0.4s ease both">
-      <img src="https://loanprocessor.com.au/wp-content/uploads/2021/10/Cropped-and-Trans.png" style="height:48px;margin-bottom:2rem;display:block" onerror="this.style.display='none';this.nextElementSibling.style.display='block'"/>
-      <div style="display:none;font-size:22px;font-weight:800;color:#fff;margin-bottom:2rem">LP</div>
-      <div style="width:40px;height:40px;border:3px solid rgba(255,255,255,0.15);border-top-color:#C9A84C;border-radius:50%;animation:spin 0.8s linear infinite;margin-bottom:1.5rem"></div>
-      <p style="color:rgba(255,255,255,0.6);font-size:14px;margin-bottom:1.5rem;text-align:center">Signing you in to Microsoft…</p>
+      <img src="https://loanprocessor.com.au/wp-content/uploads/2021/10/Cropped-and-Trans.png" style="height:48px;margin-bottom:2rem;display:block;margin-left:auto;margin-right:auto" onerror="this.style.display='none';this.nextElementSibling.style.display='block'"/>
+      <div style="display:none;font-size:22px;font-weight:800;color:#fff;margin-bottom:2rem;text-align:center">LP</div>
+      <p style="color:rgba(255,255,255,0.6);font-size:14px;margin-bottom:1.5rem;text-align:center;max-width:280px">Sign in with your Loan Processor Microsoft account to continue.</p>
+      <button onclick="msSignIn()" style="display:flex;align-items:center;justify-content:center;gap:10px;padding:13px 24px;background:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;color:#0F1E35;cursor:pointer;width:100%;max-width:280px">
+        <svg width="20" height="20" viewBox="0 0 21 21"><rect x="1" y="1" width="9" height="9" fill="#f25022"/><rect x="11" y="1" width="9" height="9" fill="#7fba00"/><rect x="1" y="11" width="9" height="9" fill="#00a4ef"/><rect x="11" y="11" width="9" height="9" fill="#ffb900"/></svg>
+        Sign in with Microsoft
+      </button>
       <p id="msLoginErr" style="font-size:12px;color:#FC8181;margin-top:1rem;text-align:center"></p>
       <a href="index.html" style="margin-top:2rem;font-size:12px;color:rgba(255,255,255,0.3);text-decoration:none">← Back to portal</a>
     </div>
@@ -6830,9 +6833,8 @@ if (document.readyState === 'loading') {
 async function initMsal() {
   try {
     msalInstance = new msal.PublicClientApplication(msalConfig);
-    await msalInstance.initialize();
 
-    // Handle redirect (in case of direct MSAL redirect)
+    // Handle redirect first — catches the token after MS login redirect
     const redirectResult = await msalInstance.handleRedirectPromise();
     if (redirectResult) {
       msalToken = redirectResult.accessToken;
@@ -6840,7 +6842,7 @@ async function initMsal() {
       return;
     }
 
-    // Check for cached account in MSAL
+    // Already have a cached account (same client ID, same localStorage)
     const accounts = msalInstance.getAllAccounts();
     if (accounts.length > 0) {
       try {
@@ -6849,52 +6851,31 @@ async function initMsal() {
         await onMsLogin(silentResult.account);
         return;
       } catch(e) {
-        console.warn('acquireTokenSilent failed:', e.name);
+        console.warn('Silent token failed:', e.name);
       }
     }
 
-    // Read token stored by portal after login
+    // Check for token stored by portal
     try {
       const stored = localStorage.getItem('lp_portal_token');
       if (stored) {
         const parsed = JSON.parse(stored);
         if (parsed && parsed.token && parsed.expiry > Date.now()) {
           msalToken = parsed.token;
-          // Create a minimal account object for onMsLogin
-          const fakeAccount = { username: parsed.username, name: parsed.name };
-          await onMsLogin(fakeAccount);
+          await onMsLogin({ username: parsed.username, name: parsed.name });
           return;
         }
       }
-    } catch(e) {
-      console.warn('Portal token read failed:', e);
-    }
+    } catch(e) {}
 
-    // Try ssoSilent as last resort
-    try {
-      const ssoResult = await msalInstance.ssoSilent({ scopes: SP_SCOPES });
-      msalToken = ssoResult.accessToken;
-      await onMsLogin(ssoResult.account);
-      return;
-    } catch(e) {
-      console.warn('ssoSilent failed:', e.name);
-    }
-
-    // No session found — do MS login directly from this app
-    try {
-      await msalInstance.loginRedirect({ scopes: SP_SCOPES });
-    } catch(e) {
-      console.error('loginRedirect failed:', e);
-      window.location.href = 'index.html';
-    }
+    // No session — show MS login button
+    buildNav();
+    showScreen('mslogin');
 
   } catch(e) {
     console.error('MSAL init error:', e);
-    try {
-      await msalInstance.loginRedirect({ scopes: SP_SCOPES });
-    } catch(e2) {
-      window.location.href = 'index.html';
-    }
+    buildNav();
+    showScreen('mslogin');
   }
 }
 
