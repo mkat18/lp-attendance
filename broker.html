@@ -597,15 +597,16 @@ tr.flagged-row:hover td { background: #FFEAEA; }
 
   <!-- ── LOGIN ─────────────────────────────────────────────────────────── -->
   <!-- ── MS LOGIN ─────────────────────────────────────────────────────────── -->
-  <div id="screen-mslogin" class="screen active" style="text-align:center;padding:4rem 1.5rem">
-    <img src="https://loanprocessor.com.au/wp-content/uploads/2021/10/Cropped-and-Trans.png" style="height:60px;margin-bottom:2rem" onerror="this.style.display='none'"/>
-    <h1 style="font-size:22px;font-weight:700;margin-bottom:8px;color:var(--text)">Staff Attendance</h1>
-    <p style="color:var(--text-2);margin-bottom:2rem">Sign in with your Loan Processor Microsoft account to continue.</p>
-    <button class="btn-primary" onclick="msSignIn()" style="max-width:280px;margin:0 auto;display:flex;align-items:center;justify-content:center;gap:10px">
-      <svg width="20" height="20" viewBox="0 0 21 21" fill="none"><rect x="1" y="1" width="9" height="9" fill="#f25022"/><rect x="11" y="1" width="9" height="9" fill="#7fba00"/><rect x="1" y="11" width="9" height="9" fill="#00a4ef"/><rect x="11" y="11" width="9" height="9" fill="#ffb900"/></svg>
-      Sign in with Microsoft
-    </button>
-    <p id="msLoginErr" style="font-size:12px;color:var(--danger);margin-top:1rem"></p>
+  <div id="screen-mslogin" class="screen active" style="background:var(--navy,#0F2A5E);position:fixed;inset:0;z-index:160;display:flex;align-items:center;justify-content:center;flex-direction:column;text-align:center;padding:2rem">
+    <div style="animation:lp-fadein 0.4s ease both">
+      <img src="https://loanprocessor.com.au/wp-content/uploads/2021/10/Cropped-and-Trans.png" style="height:48px;margin-bottom:1.5rem;display:block;margin-left:auto;margin-right:auto" onerror="this.style.display='none';this.nextElementSibling.style.display='block'"/>
+      <div style="display:none;font-size:22px;font-weight:800;color:#fff;margin-bottom:1.5rem">LP</div>
+      <p style="color:rgba(255,255,255,0.6);font-size:14px;margin-bottom:1.5rem;max-width:280px">Please sign in through the LP Portal to access this app.</p>
+      <a href="index.html" style="display:inline-flex;align-items:center;gap:8px;padding:12px 24px;background:#C9A84C;color:#0F1E35;border-radius:10px;font-size:14px;font-weight:700;text-decoration:none">
+        ← Go to LP Portal
+      </a>
+      <p id="msLoginErr" style="font-size:12px;color:#FC8181;margin-top:1rem"></p>
+    </div>
   </div>
 
   <!-- ── LOADING ─────────────────────────────────────────────────────────── -->
