@@ -2473,7 +2473,7 @@ function buildNav() {
   let tabs = [];
   const r = currentUser.role;
   if (r === 'superadmin') {
-    tabs = [['checkin','Check in'],['dashboard','Dashboard'],['admin','Staff'],['profile','PIN']];
+    tabs = [['dashboard','Dashboard'],['admin','Staff'],['profile','PIN']];
   } else if (r === 'hrmanager') {
     tabs = [['checkin','Check in'],['leave','🌴 Leave'],['dashboard','Dashboard'],['admin','Staff'],['profile','PIN']];
     // hrmanager explicitly excluded from All Files tab
