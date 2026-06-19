@@ -6108,8 +6108,19 @@ async function loadFileEntriesFromSP() {
 }
 
 function getFileEntries() {
-  if (_fileEntries) return Object.values(_fileEntries).map(e => e.data);
-  return LS.get('ci_files') || [];
+  // Only use SP cache if it has actual entries, otherwise fall back to localStorage
+  if (_fileEntries && Object.keys(_fileEntries).length > 0) return Object.values(_fileEntries).map(e => e.data);
+  if (_fileEntries === null) return LS.get('ci_files') || []; // not loaded yet
+  // SP returned empty — merge with localStorage to recover any unsynced files
+  const lsFiles = LS.get('ci_files') || [];
+  if (lsFiles.length > 0) {
+    // Sync these to SP so they're not lost next time
+    lsFiles.forEach(f => { if (f.id) spSyncFileEntry(f).catch(()=>{}); });
+    _fileEntries = {};
+    lsFiles.forEach(f => { if (f.id) _fileEntries[f.id] = { data: f, spId: null }; });
+    return lsFiles;
+  }
+  return [];
 }
 
 function saveFileEntries(arr) {
@@ -7682,12 +7693,12 @@ async function submitChecklist(fileIdx) {
 
 function getChecklistPendingFiles() {
   const files = getFileEntries();
-  const myFiles = isSuperAdmin() || isManager()
+  const myFiles = (isSuperAdmin() && !_previewRole) || isManager()
     ? files
     : files.filter(f => f.owner === currentUser.name);
-  // Include files that are deferred (regardless of stage) OR at Ready to Submit without checklist
   const atOrPastReady = ['Ready to Submit', ...STAGES_AFTER_READY];
-  return myFiles.filter(f => !f.checklistSubmitted && atOrPastReady.includes(f.status));
+  // Only include files that actually exist and are active
+  return myFiles.filter(f => f && f.id && f.active !== false && !f.checklistSubmitted && atOrPastReady.includes(f.status));
 }
 
 
@@ -9135,17 +9146,11 @@ function initMyFilesLookupBar() {
   const sel = document.getElementById('mfLookupOwner');
   if (!bar || !sel) return;
 
-  if (isSuperAdmin()) {
+  if (isSuperAdmin() && !_previewRole) {
     bar.style.display = 'flex';
     const staff = getStaff().filter(s => ANALYST_ROLES.includes(s.role));
     sel.innerHTML = '<option value="">All staff</option>' +
       staff.map(s => `<option value="${esc(s.name)}">${esc(s.name)} (${esc(ROLE_LABEL[s.role]||s.role)})</option>`).join('');
-  } else if (isTeamLead()) {
-    bar.style.display = 'flex';
-    const myTeam = getTeamForTL(currentUser.name);
-    const members = getStaff().filter(s => myTeam.includes(s.name) || s.name === currentUser.name);
-    sel.innerHTML = '<option value="">All my team</option>' +
-      members.map(s => `<option value="${esc(s.name)}">${esc(s.name)}</option>`).join('');
   } else {
     bar.style.display = 'none';
   }
