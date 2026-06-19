@@ -550,6 +550,12 @@ tr.flagged-row:hover td { background: #FFEAEA; }
     <p id="msLoginErr" style="font-size:12px;color:var(--danger);margin-top:1rem"></p>
   </div>
 
+  <!-- ── LOADING ─────────────────────────────────────────────────────────── -->
+  <div id="screen-loading" class="screen" style="text-align:center;padding:4rem 1.5rem;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh">
+    <div style="width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--brand);border-radius:50%;animation:spin .7s linear infinite;margin-bottom:1rem"></div>
+    <p style="color:var(--text-3);font-size:14px" id="loadingMsg">Loading…</p>
+  </div>
+
   <!-- ── GEO BLOCKED ──────────────────────────────────────────────────────── -->
   <div id="screen-geoblocked" class="screen" style="text-align:center;padding:3rem 1.5rem">
     <div style="font-size:56px;margin-bottom:1rem">📍</div>
@@ -2414,6 +2420,8 @@ function goTab(name, btn) {
   if (btn) btn.classList.add('active');
   const mobileBtn = document.querySelector('.mobile-menu-tab[data-tab="'+name+'"]');
   if (mobileBtn) mobileBtn.classList.add('active');
+  // Save last tab for session restore
+  try { sessionStorage.setItem('lp_last_tab', name); } catch(e) {}
   showScreen(name);
   if (name==='checkin')   initCheckin();
   if (name==='dashboard') { loadDashboard(); if (!window._dashRefreshTimer) window._dashRefreshTimer = setInterval(() => { if (document.getElementById('screen-dashboard')?.classList.contains('active')) loadDashboard(); }, 120000); }
@@ -2699,13 +2707,27 @@ async function loginAs(member) {
   currentUser={name:member.name, role:member.role};
   sessionStorage.setItem('lp_session', JSON.stringify({name:member.name, role:member.role}));
   buildNav();
-  if (member.role==='superadmin') {
-    loadDashboard(); showScreen('dashboard');
+
+  // Restore last tab the user was on, otherwise go to default
+  const lastTab = sessionStorage.getItem('lp_last_tab');
+  const availableTabs = Array.from(document.querySelectorAll('.nav-tab')).map(b => b.getAttribute('data-tab'));
+
+  if (lastTab && availableTabs.includes(lastTab)) {
+    // Restore last tab
+    const tabBtn = document.querySelector('.nav-tab[data-tab="'+lastTab+'"]');
+    goTab(lastTab, tabBtn);
   } else {
-    // Debug: show what records are in cache for this user today
-    initCheckin(); showScreen('checkin');
+    // Default: dashboard for superadmin/hrmanager, checkin for everyone else
+    if (member.role==='superadmin' || member.role==='hrmanager') {
+      loadDashboard(); showScreen('dashboard');
+      const dashBtn = document.querySelector('.nav-tab[data-tab="dashboard"]');
+      if (dashBtn) dashBtn.classList.add('active');
+    } else {
+      initCheckin(); showScreen('checkin');
+      const firstTab = document.querySelector('.nav-tab');
+      if (firstTab) firstTab.classList.add('active');
+    }
   }
-  setTimeout(()=>{ const t=document.querySelectorAll('.nav-tab'); if(t[0]) t[0].classList.add('active'); }, 50);
   showToast('Welcome back, '+member.name.split(' ')[0]+'!', 'ok');
 }
 
@@ -5883,11 +5905,13 @@ async function getToken() {
 
 async function onMsLogin(account) {
   msalAccount = account;
-  showScreen('geoblocked');
+  showScreen('loading');
+  const loadingMsg = document.getElementById('loadingMsg');
+  if (loadingMsg) loadingMsg.textContent = 'Loading your workspace…';
   requestGeo();
   await loadFromSharePoint().catch(()=>{});
   autoSaveMsEmail(account).catch(()=>{});
-  // Restore session on refresh
+  // Restore session from sessionStorage
   const saved = sessionStorage.getItem('lp_session');
   if (saved) {
     try {
@@ -5900,6 +5924,7 @@ async function onMsLogin(account) {
   }
   // No session — show PIN screen
   populateNameDropdown();
+  showScreen('login');
 }
 
 async function autoSaveMsEmail(account) {
