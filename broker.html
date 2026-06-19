@@ -1412,7 +1412,7 @@ tr.flagged-row:hover td { background: #FFEAEA; }
       </div>
     </div>
     <div class="field" id="fm_settleDateField" style="display:none">
-      <label>Expected settlement date <span style="font-size:11px;color:var(--brand)">(drives Settling Soon tab)</span></label>
+      <label>Settlement date</label>
       <input type="date" id="fm_settleDate"/>
     </div>
     <div class="field">
@@ -7940,21 +7940,26 @@ function renderNoteHistory(elId, note) {
   const el = document.getElementById(elId);
   if (!el) return;
   const history = Array.isArray(note) ? note : (note ? [{text: note, by: 'Previous', at: '', ts: 0}] : []);
-  const past = history.slice(1); // skip latest — already in textarea
-  if (!past.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
-  el.style.display = 'block';
+  if (!history.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
+  
+  // Always show who last updated and when
+  const latest = history[0];
+  const past = history.slice(1);
   const id = elId + '_body';
+  
+  el.style.display = 'block';
   el.innerHTML = `
-    <div onclick="toggleNoteHistory('${id}')" style="font-size:11px;color:var(--text-3);cursor:pointer;padding:4px 0;display:flex;align-items:center;gap:4px">
-      <span id="${id}_icon">▶</span> View history (${past.length} previous ${past.length===1?'entry':'entries'})
+    <div style="font-size:11px;color:var(--text-3);margin-bottom:${past.length?'4px':'0'}">
+      Last updated${latest.by&&latest.by!=='Previous'?' by <strong>'+esc(latest.by)+'</strong>':''}${latest.at?' on '+latest.at:''}
+      ${past.length ? `· <span onclick="toggleNoteHistory('${id}')" style="color:var(--brand);cursor:pointer"><span id="${id}_icon">▶</span> ${past.length} previous ${past.length===1?'entry':'entries'}</span>` : ''}
     </div>
-    <div id="${id}" style="display:none;margin-top:4px">
+    ${past.length ? `<div id="${id}" style="display:none;margin-top:4px">
       ${past.map(e => `
         <div style="border-left:2px solid var(--border);padding:6px 10px;margin-bottom:6px;background:var(--surface-2);border-radius:0 var(--radius-sm) var(--radius-sm) 0">
           <div style="font-size:11px;color:var(--text-3);margin-bottom:3px">${esc(e.by||'')}${e.at?' · '+e.at:''}</div>
           <div style="font-size:12px;color:var(--text-2)">${esc(e.text||'')}</div>
         </div>`).join('')}
-    </div>`;
+    </div>` : ''}`;
 }
 
 function toggleNoteHistory(id) {
@@ -8023,6 +8028,10 @@ function openFileModal(fileId) {
     document.getElementById('fm_status').value = 'Data Collection';
     document.getElementById('fm_done').value = '';
     document.getElementById('fm_pending').value = '';
+    const dh = document.getElementById('fm_done_history');
+    const ph = document.getElementById('fm_pending_history');
+    if (dh) { dh.innerHTML = ''; dh.style.display = 'none'; }
+    if (ph) { ph.innerHTML = ''; ph.style.display = 'none'; }
     document.getElementById('fm_fileId').value = '';
     document.getElementById('fm_attachment').value = '';
     document.getElementById('fm_attachmentStatus').textContent = '';
