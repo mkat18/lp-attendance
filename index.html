@@ -752,6 +752,19 @@ async function init() {
     }
 
     renderPortal(userName, role);
+
+    // Store token in localStorage so individual apps can use it directly
+    try {
+      const freshToken = _portalToken || await getToken();
+      if (freshToken) {
+        localStorage.setItem('lp_portal_token', JSON.stringify({
+          token: freshToken,
+          expiry: Date.now() + 55 * 60 * 1000, // 55 min (tokens last 1hr)
+          username: email,
+          name: userName
+        }));
+      }
+    } catch(e) {}
   } catch(e) {
     console.error('[INIT] Error:', e);
     document.getElementById('loadingScreen').style.display = 'none';

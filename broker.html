@@ -6069,6 +6069,9 @@ async function msSignIn() {
 }
 
 async function getToken() {
+  // Use already-acquired token first (e.g. from portal localStorage)
+  if (msalToken) return msalToken;
+  if (!msalInstance) return null;
   const accounts = msalInstance.getAllAccounts();
   if (!accounts.length) return null;
   try {
@@ -6076,7 +6079,7 @@ async function getToken() {
     msalToken = result.accessToken;
     return msalToken;
   } catch(e) {
-    await msalInstance.acquireTokenRedirect({ scopes: SP_SCOPES });
+    console.warn('getToken silent failed:', e.name);
     return null;
   }
 }
