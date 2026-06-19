@@ -2555,6 +2555,7 @@ function goTab(name, btn) {
 
 function logout() {
   sessionStorage.removeItem('lp_session');
+  localStorage.removeItem('lp_portal_token');
   currentUser=null; pinBuffer=''; pinStage='login'; pinFirst='';
   stopBreakTimer(false); // preserve ongoing break across logout
   buildNav(); window.location.href = 'index.html';
@@ -6852,7 +6853,7 @@ async function initMsal() {
     msalInstance = new msal.PublicClientApplication(msalConfig);
     await msalInstance.initialize();
 
-    // Handle redirect response first (in case user was redirected back here)
+    // Handle redirect (in case of direct MSAL redirect)
     const redirectResult = await msalInstance.handleRedirectPromise();
     if (redirectResult) {
       msalToken = redirectResult.accessToken;
@@ -6860,11 +6861,10 @@ async function initMsal() {
       return;
     }
 
-    // Check for cached account from any previous login (portal or direct)
+    // Check for cached account in MSAL
     const accounts = msalInstance.getAllAccounts();
     if (accounts.length > 0) {
       try {
-        // Try silent token first using cached account
         const silentResult = await msalInstance.acquireTokenSilent({ scopes: SP_SCOPES, account: accounts[0] });
         msalToken = silentResult.accessToken;
         await onMsLogin(silentResult.account);
@@ -6874,7 +6874,24 @@ async function initMsal() {
       }
     }
 
-    // No cached account — try ssoSilent using browser's existing MS session
+    // Read token stored by portal after login
+    try {
+      const stored = localStorage.getItem('lp_portal_token');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed && parsed.token && parsed.expiry > Date.now()) {
+          msalToken = parsed.token;
+          // Create a minimal account object for onMsLogin
+          const fakeAccount = { username: parsed.username, name: parsed.name };
+          await onMsLogin(fakeAccount);
+          return;
+        }
+      }
+    } catch(e) {
+      console.warn('Portal token read failed:', e);
+    }
+
+    // Try ssoSilent as last resort
     try {
       const ssoResult = await msalInstance.ssoSilent({ scopes: SP_SCOPES });
       msalToken = ssoResult.accessToken;
@@ -6884,7 +6901,7 @@ async function initMsal() {
       console.warn('ssoSilent failed:', e.name);
     }
 
-    // No MS session at all — redirect to portal to sign in
+    // Truly no session — redirect to portal
     window.location.href = 'index.html';
 
   } catch(e) {
