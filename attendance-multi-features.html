@@ -1893,8 +1893,14 @@ const CHECKIN_ROLES = ['manager','hr','teamlead','analyst','trainee','assistant'
 const DASHBOARD_ROLES = ['manager','hr','teamlead','assistant']; // see dashboard
 const ADMIN_ROLES = ['manager','superadmin']; // see admin panel
 
-function isSuperAdmin()    { return currentUser&&(_realRole||currentUser.role)==='superadmin'; }
-function isManager()       { return currentUser&&(['hrmanager','superadmin'].includes(_realRole||currentUser.role)); }
+function isSuperAdmin()    { 
+  if (_previewRole) return false; // during preview, act as preview role only
+  return currentUser&&(_realRole||currentUser.role)==='superadmin'; 
+}
+function isManager()       { 
+  if (_previewRole) return ['hrmanager','superadmin'].includes(currentUser.role); // use preview role
+  return currentUser&&(['hrmanager','superadmin'].includes(_realRole||currentUser.role)); 
+}
 function isHR()            { return currentUser&&currentUser.role==='hr'; }
 function isAssistant()     { return currentUser&&currentUser.role==='assistant'; }
 function isTeamLead()      { return currentUser&&currentUser.role==='teamlead'; }
@@ -1917,7 +1923,8 @@ let _previewRole = null;
 let _realRole = null;
 
 function startPreview(role) {
-  if (!role || !isSuperAdmin()) return;
+  const realRole = _realRole || (currentUser && currentUser.role);
+  if (!role || realRole !== 'superadmin') return;
   _previewRole = role;
   _realRole = currentUser.role;
   currentUser.role = role;
@@ -4295,7 +4302,7 @@ async function renderLeaveScreen() {
   let html = '';
 
   // ── Personal leave balance ───────────────────────────────────────────────
-  const isHRView = isSuperAdmin() || canDo('canSeeLeaveBalance'); // Controlled by permissions
+  const isHRView = (isSuperAdmin() && !_previewRole) || canDo('canSeeLeaveBalance'); // Controlled by permissions, preview-safe
 
   if (!isSuperAdmin() || _previewRole) {
     const staff = getStaff().find(s => s.name === currentUser.name);
