@@ -4362,6 +4362,16 @@ async function doSubmitLeave(leaveType, startDate, endDate, halfDay, halfDaySess
 }
 
 // ── Approve/Reject leave request ───────────────────────────────────────────
+function requireNoteAndProcess(id, action) {
+  const notes = document.getElementById('notes-'+id)?.value.trim()||'';
+  if (!notes) {
+    showToast('Please add a remark explaining the ' + (action==='reject'?'rejection':'forced leave') + ' before proceeding.', 'err');
+    document.getElementById('notes-'+id)?.focus();
+    return;
+  }
+  processLeaveRequest(id, action, notes);
+}
+
 async function processLeaveRequest(id, action, notes) {
   const req = _leaveRequests.find(r => r.Id == id);
   if (!req) return;
@@ -4449,12 +4459,18 @@ function filterMyLeaveHistory() {
     </tr></thead><tbody>
     ${reqs.map(r => {
       const sc = r.Status==='Approved'?'var(--success)':r.Status==='Rejected'?'var(--danger)':r.Status==='Forced'?'var(--warn)':'var(--text-3)';
-      return `<tr style="border-bottom:0.5px solid var(--border)">
+      const hasNote = r.ApprovalNotes && r.ApprovalNotes.trim();
+      return `<tr style="border-bottom:${hasNote?'none':'0.5px solid var(--border)'}">
         <td style="padding:8px 0">${esc(r.LeaveType||'')}</td>
         <td style="padding:8px 0;color:var(--text-2)">${r.StartDate}${r.EndDate&&r.EndDate!==r.StartDate?' → '+r.EndDate:''}</td>
         <td style="padding:8px 0">${r.DaysRequested||'?'}</td>
         <td style="padding:8px 0;color:${sc};font-weight:600">${r.Status||'Pending'}</td>
-      </tr>`;
+      </tr>
+      ${hasNote ? `<tr style="border-bottom:0.5px solid var(--border)"><td colspan="4" style="padding:0 0 10px 0">
+        <div style="background:${r.Status==='Rejected'?'#FEF2F2':r.Status==='Forced'?'#FFFBEB':'#F0FDF4'};border-left:3px solid ${sc};border-radius:0 4px 4px 0;padding:8px 12px;font-size:12px;color:var(--text-2)">
+          💬 <strong>${esc(r.ApprovedBy||'Manager')}:</strong> ${esc(r.ApprovalNotes)}
+        </div>
+      </td></tr>` : ''}`;
     }).join('')}
   </tbody></table>`;
 }
@@ -4592,11 +4608,11 @@ async function renderLeaveScreen() {
           ${r.HalfDay==='true'?`<div style="font-size:12px;color:var(--text-3)">Half day — ${r.HalfDaySession||''}</div>`:''}
           ${r.BrokerName?`<div style="font-size:12px;color:var(--text-3)">Broker: ${esc(r.BrokerName)}</div>`:''}
           <div style="font-size:13px;color:var(--text-3);margin-bottom:8px">${esc(r.Reason||'')}</div>
-          <textarea id="notes-${r.Id}" placeholder="Approval notes (optional)…" rows="1" style="width:100%;font-size:12px;padding:6px;border-radius:4px;border:1.5px solid var(--border);margin-bottom:6px;resize:none"></textarea>
-          <div style="display:flex;gap:6px">
+          <textarea id="notes-${r.Id}" placeholder="Remarks (required for Reject/Forced, optional for Approve)…" rows="2" style="width:100%;font-size:12px;padding:6px;border-radius:4px;border:1.5px solid var(--border);margin-bottom:6px;resize:vertical"></textarea>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
             <button onclick="processLeaveRequest(${r.Id},'approve',document.getElementById('notes-${r.Id}').value)" class="btn-primary" style="font-size:12px;padding:6px 14px">✓ Approve</button>
-            <button onclick="processLeaveRequest(${r.Id},'reject',document.getElementById('notes-${r.Id}').value)" style="font-size:12px;padding:6px 14px;background:var(--danger);color:#fff;border:none;border-radius:var(--radius-sm);cursor:pointer">✗ Reject</button>
-            <button onclick="processLeaveRequest(${r.Id},'force',document.getElementById('notes-${r.Id}').value)" style="font-size:12px;padding:6px 14px;background:var(--warn);color:#fff;border:none;border-radius:var(--radius-sm);cursor:pointer">⚡ Forced</button>
+            <button onclick="requireNoteAndProcess(${r.Id},'reject')" style="font-size:12px;padding:6px 14px;background:var(--danger);color:#fff;border:none;border-radius:var(--radius-sm);cursor:pointer">✗ Reject</button>
+            <button onclick="requireNoteAndProcess(${r.Id},'force')" style="font-size:12px;padding:6px 14px;background:var(--warn);color:#fff;border:none;border-radius:var(--radius-sm);cursor:pointer">⚡ Forced</button>
           </div>
         </div>`).join('');
     }
