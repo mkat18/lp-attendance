@@ -1095,6 +1095,12 @@ tr.flagged-row:hover td { background: #FFEAEA; }
       <button onclick="clearFilesFilters()" style="margin-top:8px;font-size:12px;padding:4px 10px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:transparent;cursor:pointer;color:var(--text-3)">Clear filters</button>
     </div>
     <input type="text" id="filesSearch" placeholder="🔍 Search client name, broker, lender…" oninput="renderFilesScreen()" style="width:100%;font-size:14px;padding:8px 12px;border-radius:var(--radius-sm);border:1.5px solid var(--border);margin-bottom:12px"/>
+    <!-- TL team member filter — shown only for team leads in analytics tab -->
+    <div id="filesTLFilter" style="display:none;margin-bottom:12px">
+      <select id="filesTLMemberFilter" onchange="renderFilesScreen()" style="font-size:13px;padding:7px 10px;border-radius:var(--radius-sm);border:1.5px solid var(--border);width:100%">
+        <option value="">All team members</option>
+      </select>
+    </div>
     <div id="filesContent"></div>
   </div>
 
@@ -7697,8 +7703,9 @@ function getChecklistPendingFiles() {
     ? files
     : files.filter(f => f.owner === currentUser.name);
   const atOrPastReady = ['Ready to Submit', ...STAGES_AFTER_READY];
-  // Only include files that actually exist and are active
-  return myFiles.filter(f => f && f.id && f.active !== false && !f.checklistSubmitted && atOrPastReady.includes(f.status));
+  // Include ALL files (including archived/settled) where checklist not done
+  // but only files that actually have an ID and a valid status
+  return myFiles.filter(f => f && f.id && f.client && !f.checklistSubmitted && atOrPastReady.includes(f.status));
 }
 
 
@@ -7993,6 +8000,36 @@ async function uploadFileAttachment(file, fileId) {
   return safeName;
 }
 
+function deleteFileEntry(fileId) {
+  const files = getFileEntries();
+  const f = files.find(f => f.id === fileId);
+  if (!f) return;
+  // Show in-app confirm modal
+  const existing = document.getElementById('deleteFileModal');
+  if (existing) existing.remove();
+  const modal = document.createElement('div');
+  modal.id = 'deleteFileModal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem';
+  modal.innerHTML = '<div style="background:var(--surface);border-radius:var(--radius);padding:1.5rem;max-width:360px;width:100%">' +
+    '<div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:8px">Delete file?</div>' +
+    '<div style="font-size:13px;color:var(--text-2);margin-bottom:16px">This will permanently delete <strong>' + esc(f.client||'this file') + '</strong>. This cannot be undone.</div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">' +
+    '<button onclick="confirmDeleteFile(\'' + fileId + '\')" style="padding:10px;background:var(--danger);color:#fff;border:none;border-radius:var(--radius-sm);font-size:14px;font-weight:600;cursor:pointer">Yes, delete</button>' +
+    '<button onclick="document.getElementById(\'deleteFileModal\').remove()" style="padding:10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-size:14px;background:transparent;cursor:pointer">Cancel</button>' +
+    '</div></div>';
+  document.body.appendChild(modal);
+}
+
+async function confirmDeleteFile(fileId) {
+  document.getElementById('deleteFileModal')?.remove();
+  await spDeleteFileEntry(fileId).catch(()=>{});
+  const updated = getFileEntries().filter(f => f.id !== fileId);
+  saveFileEntries(updated);
+  showToast('File deleted ✓', 'ok');
+  renderMyFilesScreen();
+  renderFilesScreen();
+}
+
 function markFileInactive(fileId) {
   const files = getFileEntries();
   const idx = files.findIndex(f => f.id === fileId);
@@ -8108,6 +8145,22 @@ function renderFilesScreen() {
     const myTeam = getTeamForTL(currentUser.name);
     teamAndSelf = [...myTeam, currentUser.name];
     allFiles = getFileEntries().filter(f => teamAndSelf.includes(f.owner));
+    // Show team member filter only in analytics tab
+    const tlFilter = document.getElementById('filesTLFilter');
+    const tlSel = document.getElementById('filesTLMemberFilter');
+    if (tlFilter && tlSel) {
+      if (_activeFilesTab === 'analytics') {
+        tlFilter.style.display = 'block';
+        if (tlSel.options.length <= 1) {
+          tlSel.innerHTML = '<option value="">All team members</option>' +
+            teamAndSelf.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
+        }
+        const picked = tlSel.value;
+        if (picked) allFiles = allFiles.filter(f => f.owner === picked);
+      } else {
+        tlFilter.style.display = 'none';
+      }
+    }
   } else {
     teamAndSelf = [currentUser.name];
     allFiles = getFileEntries().filter(f => f.owner === currentUser.name);
@@ -8363,7 +8416,7 @@ function renderFilesAnalytics(el, allFiles, teamNames) {
   const submittedFiles = filteredFiles.filter(f => f.status === 'Submitted to Lender' || f.stageHistory?.some(h => h.stage === 'Submitted to Lender'));
   const submittedCount = filteredFiles.filter(f => f.status === 'Submitted to Lender').length;
   const atOrPastReady2 = ['Ready to Submit', ...STAGES_AFTER_READY];
-  const checklistPending = filteredFiles.filter(f => !f.checklistSubmitted && atOrPastReady2.includes(f.status));
+  const checklistPending = filteredFiles.filter(f => f && f.id && f.client && !f.checklistSubmitted && atOrPastReady2.includes(f.status));
   const isAnalystOrTL = ['analyst','teamlead'].includes(currentUser && currentUser.role);
 
   const fmt$ = v => '$' + Math.round(v).toLocaleString('en-AU');
@@ -8406,9 +8459,13 @@ function renderFilesAnalytics(el, allFiles, teamNames) {
         <button onclick="toggleChecklistPendingAnalytics()" style="font-size:11px;background:none;border:none;color:#92400E;cursor:pointer;font-weight:600">✕ Close</button>
       </div>
       ${checklistPending.map(f =>
-        '<div style="font-size:13px;padding:6px 0;border-bottom:0.5px solid #FDE68A;display:flex;justify-content:space-between;align-items:center">' +
-        '<span>' + esc(f.client||'Unnamed') + (f.broker ? ' — ' + esc(f.broker) : '') + (f.status !== 'Ready to Submit' ? ' <span style="font-size:10px;color:#92400E;background:#FDE68A;padding:1px 5px;border-radius:3px">' + esc(f.status) + '</span>' : '') + '</span>' +
-        '<button onclick="showChecklistByFileId(\'' + f.id + '\')" style="font-size:11px;padding:3px 10px;background:#92400E;color:#fff;border:none;border-radius:4px;cursor:pointer;flex-shrink:0;margin-left:8px">Fill</button>' +
+        '<div style="padding:8px 0;border-bottom:0.5px solid #FDE68A">' +
+        '<div style="font-size:13px;font-weight:600;color:#92400E;margin-bottom:2px">' + esc(f.client||'Unnamed') + (f.broker ? ' — ' + esc(f.broker) : '') + '</div>' +
+        '<div style="font-size:11px;color:#92400E;opacity:0.75;margin-bottom:6px">Owner: ' + esc(f.owner||'Unknown') + (f.status !== 'Ready to Submit' ? ' · <span style="font-weight:600">' + esc(f.status) + '</span>' : '') + '</div>' +
+        '<div style="display:flex;gap:6px">' +
+        '<button onclick="showChecklistByFileId(\'' + f.id + '\')" style="font-size:11px;padding:4px 10px;background:#92400E;color:#fff;border:none;border-radius:4px;cursor:pointer">Fill checklist</button>' +
+        '<button onclick="openFileModal(\'' + f.id + '\')" style="font-size:11px;padding:4px 10px;background:transparent;color:#92400E;border:1px solid #92400E;border-radius:4px;cursor:pointer">View file</button>' +
+        '</div>' +
         '</div>'
       ).join('')}
     </div>` : ''}
@@ -8582,9 +8639,13 @@ function renderMyFilesScreen() {
         '<div style="font-size:22px;font-weight:700;color:#92400E">' + checklistPending.length + '</div>' +
         '</div>' +
         '<div id="checklistPendingList" style="display:none;margin-top:10px">' +
-        checklistPending.map((f,i) => '<div style="font-size:13px;padding:4px 0;border-top:0.5px solid #FDE68A;display:flex;align-items:center;justify-content:space-between">' +
-          '<span>' + esc(f.client||'Unnamed') + (f.broker ? ' — ' + esc(f.broker) : '') + '</span>' +
-          '<button onclick="event.stopPropagation();showChecklistByFileId(\'' + f.id + '\')" style="font-size:11px;padding:3px 8px;background:#92400E;color:#fff;border:none;border-radius:4px;cursor:pointer">Fill checklist</button>' +
+        checklistPending.map((f,i) => '<div style="padding:8px 0;border-top:0.5px solid #FDE68A">' +
+          '<div style="font-size:13px;font-weight:600;color:#92400E;margin-bottom:2px">' + esc(f.client||'Unnamed') + (f.broker ? ' — ' + esc(f.broker) : '') + '</div>' +
+          '<div style="font-size:11px;color:#92400E;opacity:0.75;margin-bottom:6px">Owner: ' + esc(f.owner||'Unknown') + (f.status ? ' · ' + esc(f.status) : '') + '</div>' +
+          '<div style="display:flex;gap:6px">' +
+          '<button onclick="event.stopPropagation();showChecklistByFileId(\'' + f.id + '\')" style="font-size:11px;padding:4px 10px;background:#92400E;color:#fff;border:none;border-radius:4px;cursor:pointer">Fill checklist</button>' +
+          '<button onclick="event.stopPropagation();openFileModal(\'' + f.id + '\')" style="font-size:11px;padding:4px 10px;background:transparent;color:#92400E;border:1px solid #92400E;border-radius:4px;cursor:pointer">View file</button>' +
+          '</div>' +
           '</div>').join('') +
         '</div>' +
         '</div>';
@@ -8869,6 +8930,7 @@ function fileCard(f, showControls) {
     `<option value="${esc(s)}" ${f.status===s?'selected':''}>${esc(s)}</option>`
   ).join('');
 
+  const canDelete = showControls && (isSuperAdmin() || f.owner === currentUser.name);
   return `<div style="padding:12px 14px${stale?';border-left:3px solid #EF4444':''}${urgent?';border-left:3px solid #F59E0B':''}">
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:6px">
       <div style="flex:1;min-width:0">
@@ -8894,6 +8956,7 @@ function fileCard(f, showControls) {
         ${statusOptions}
       </select>
       ${isActiveFile(f)?`<button onclick="markFileInactive('${f.id}')" style="font-size:11px;padding:4px 10px;border-radius:var(--radius-sm);border:1px solid var(--border);background:transparent;color:var(--text-3);cursor:pointer">Archive</button>`:''}
+      ${canDelete?`<button onclick="deleteFileEntry('${f.id}')" style="font-size:11px;padding:4px 10px;border-radius:var(--radius-sm);border:1px solid var(--danger);background:transparent;color:var(--danger);cursor:pointer">🗑 Delete</button>`:''}
     </div>`:''}
   </div>`;
 }
