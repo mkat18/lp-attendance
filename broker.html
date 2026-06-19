@@ -6331,7 +6331,7 @@ async function spDeleteFileEntry(fileId) {
 
 // ── EOD Reports ───────────────────────────────────────────────────────────
 async function loadEODFromSP() {
-  const items = await spLoadJsonList('EODReports', 'EODReports');
+  const items = await spLoadJsonList('EODReports');
   _eodReports = {};
   for (const item of items) {
     try {
@@ -6364,13 +6364,13 @@ async function spSyncEOD(report) {
   _eodReports = _eodReports || {};
   const key = (report.name||'') + '_' + (report.date||'');
   const existing = _eodReports[key];
-  const spId = await spSaveJsonItem('EODReports', key, report, existing ? existing.spId : null, 'EODReports');
+  const spId = await spSaveJsonItem('EODReports', key, report, existing ? existing.spId : null);
   _eodReports[key] = { data: report, spId };
 }
 
 // ── Broker Feedback ───────────────────────────────────────────────────────
 async function loadBrokerFeedbackFromSP() {
-  const items = await spLoadJsonList('BrokerFeedback', 'BrokerFeedback');
+  const items = await spLoadJsonList('BrokerFeedback');
   _brokerFeedback = {};
   for (const item of items) {
     try {
@@ -6398,7 +6398,7 @@ async function spSyncBrokerFeedback(entry) {
   if (!entry || !entry.id) return;
   _brokerFeedback = _brokerFeedback || {};
   const existing = _brokerFeedback[entry.id];
-  const spId = await spSaveJsonItem('BrokerFeedback', entry.id, entry, existing ? existing.spId : null, 'BrokerFeedback');
+  const spId = await spSaveJsonItem('BrokerFeedback', entry.id, entry, existing ? existing.spId : null);
   _brokerFeedback[entry.id] = { data: entry, spId };
 }
 
@@ -6454,7 +6454,7 @@ async function spDeleteOtherTask(taskId) {
 
 // ── Team Assignments ──────────────────────────────────────────────────────
 async function loadTeamsFromSP() {
-  const items = await spLoadJsonList('TeamAssignments', 'TeamAssignments');
+  const items = await spLoadJsonList('TeamAssignments');
   _teamAssignments = {};
   for (const item of items) {
     try {
@@ -6490,7 +6490,7 @@ async function spSyncTeams(teamsObj) {
   _teamAssignments = _teamAssignments || {};
   for (const [tlName, members] of Object.entries(teamsObj)) {
     const existing = _teamAssignments[tlName];
-    const spId = await spSaveJsonItem('TeamAssignments', tlName, members, existing ? existing.spId : null, 'TeamAssignments');
+    const spId = await spSaveJsonItem('TeamAssignments', tlName, members, existing ? existing.spId : null);
     _teamAssignments[tlName] = { data: members, spId };
   }
 }
