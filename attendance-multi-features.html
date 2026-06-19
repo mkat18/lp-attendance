@@ -12,6 +12,10 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <style>
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes lp-pulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
+@keyframes lp-fadein { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
+
 /* ─── DESIGN TOKENS — edit here to restyle the whole app ─────────────────── */
 :root {
   --brand:       #1A56C4;   /* primary blue — buttons, active states */
@@ -605,10 +609,21 @@ tr.flagged-row:hover td { background: #FFEAEA; }
   </div>
 
   <!-- ── LOADING ─────────────────────────────────────────────────────────── -->
-  <div id="screen-loading" class="screen" style="text-align:center;padding:4rem 1.5rem">
-    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:40vh">
-      <div style="width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--brand);border-radius:50%;animation:spin .7s linear infinite;margin-bottom:1rem"></div>
-      <p style="color:var(--text-3);font-size:14px" id="loadingMsg">Loading…</p>
+  <div id="screen-loading" class="screen" style="background:var(--navy,#0F2A5E);display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:2rem">
+    <div style="animation:lp-fadein 0.4s ease both">
+      <img src="https://loanprocessor.com.au/wp-content/uploads/2021/10/Cropped-and-Trans.png" style="height:48px;width:auto;margin-bottom:2rem;display:block;margin-left:auto;margin-right:auto" onerror="this.style.display='none';this.nextElementSibling.style.display='block'"/>
+      <div style="display:none;font-size:22px;font-weight:800;color:#fff;letter-spacing:-0.5px;margin-bottom:2rem;text-align:center">LP</div>
+      <!-- Spinner -->
+      <div style="display:flex;justify-content:center;margin-bottom:1.5rem">
+        <div style="width:40px;height:40px;border:3px solid rgba(255,255,255,0.15);border-top-color:#C9A84C;border-radius:50%;animation:spin 0.8s linear infinite"></div>
+      </div>
+      <!-- Dots -->
+      <div style="display:flex;gap:6px;justify-content:center;margin-bottom:1.5rem">
+        <div style="width:6px;height:6px;border-radius:50%;background:#C9A84C;animation:lp-pulse 1.2s ease infinite"></div>
+        <div style="width:6px;height:6px;border-radius:50%;background:#C9A84C;animation:lp-pulse 1.2s ease 0.2s infinite"></div>
+        <div style="width:6px;height:6px;border-radius:50%;background:#C9A84C;animation:lp-pulse 1.2s ease 0.4s infinite"></div>
+      </div>
+      <p style="color:rgba(255,255,255,0.5);font-size:14px;text-align:center;margin:0" id="loadingMsg">Loading your workspace…</p>
     </div>
   </div>
 
@@ -2253,8 +2268,8 @@ function renderPermissionsEditor() {
       <button class="btn-primary" onclick="initiatePermSave()">Save permissions</button>
       <button onclick="selectPermRole('')" style="font-size:13px;padding:8px 16px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:transparent;cursor:pointer">Cancel</button>
     </div>
-    <div id="undoPermBanner" style="display:none;margin-top:10px;background:#FEF3C7;border:1.5px solid #FDE68A;border-radius:var(--radius-sm);padding:10px 14px;font-size:13px;display:flex;align-items:center;justify-content:space-between">
-      <span>Permissions saved. <span id="undoCountdown">60</span>s to undo.</span>
+    <div id="undoPermBanner" style="display:none;margin-top:10px;background:#FEF3C7;border:1.5px solid #FDE68A;border-radius:var(--radius-sm);padding:10px 14px;font-size:13px;align-items:center;justify-content:space-between">
+      <span>Permissions saved. <span id="undoCountdown">15</span>s to undo.</span>
       <button onclick="undoPermissions()" style="font-size:12px;padding:4px 10px;background:var(--warn);color:#fff;border:none;border-radius:4px;cursor:pointer">Undo</button>
     </div>`;
 
@@ -2390,8 +2405,8 @@ async function confirmPermSave(role) {
   renderPermissionsEditor();
   const undoBanner = document.getElementById('undoPermBanner');
   if (undoBanner) {
-    undoBanner.style.display = 'flex';
-    let secs = 60;
+    undoBanner.style.display = 'flex'; undoBanner.style.alignItems = 'center'; undoBanner.style.justifyContent = 'space-between';
+    let secs = 15;
     _undoTimer = setInterval(() => {
       secs--;
       const countdown = document.getElementById('undoCountdown');
@@ -2473,9 +2488,9 @@ function buildNav() {
   let tabs = [];
   const r = currentUser.role;
   if (r === 'superadmin') {
-    tabs = [['dashboard','Dashboard'],['admin','Staff'],['profile','PIN']];
+    tabs = [['dashboard','Dashboard'],['admin','Staff'],['profile','My Details']];
   } else if (r === 'hrmanager') {
-    tabs = [['checkin','Check in'],['leave','🌴 Leave'],['dashboard','Dashboard'],['admin','Staff'],['profile','PIN']];
+    tabs = [['checkin','Check in'],['leave','🌴 Leave'],['dashboard','Dashboard'],['admin','Staff'],['profile','My Details']];
     // hrmanager explicitly excluded from All Files tab
   } else {
     // All other roles — build tabs dynamically from permissions
@@ -2483,10 +2498,10 @@ function buildNav() {
       ['checkin','Check in'], ['leave','🌴 Leave'], ['dashboard','Dashboard'],
       ['admin','Staff'], ['files','All Files'], ['myfiles','My Files'],
       ['myteam','My Team'], ['eod','EOD'], ['performance','📊 Performance'],
-      ['othertasks','Other Tasks'], ['feedback','📣 Feedback'], ['profile','PIN']
+      ['othertasks','Other Tasks'], ['feedback','📣 Feedback'], ['profile','My Details']
     ];
     tabs = ALL_TABS_DEF.filter(([key]) => hasTab(key));
-    if (!tabs.length) tabs = [['checkin','Check in'],['profile','PIN']];
+    if (!tabs.length) tabs = [['checkin','Check in'],['profile','My Details']];
   }
   const viewAsDropdown = (!_previewRole && (_realRole==='superadmin' || currentUser.role==='superadmin'))
     ? '<select class="nav-select" onchange="startPreview(this.value)">' + buildViewAsOptions() + '</select>'
