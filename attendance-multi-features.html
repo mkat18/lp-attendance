@@ -895,15 +895,7 @@ tr.flagged-row:hover td { background: #FFEAEA; }
         <div class="field">
           <label>Role <span style="color:var(--danger)">*</span></label>
           <select id="newRole" style="font-size:14px" onchange="updateOnboardTLVisibility()">
-            <option value="staff">Staff</option>
-            <option value="analyst">Analyst</option>
-            <option value="trainee">Trainee</option>
-            <option value="teamlead">Team Lead</option>
-            <option value="hr">HR</option>
-            <option value="assistant">Assistant</option>
-            <option value="sales">Sales</option>
-            <option value="customerservice">Customer Service</option>
-            <option value="socialmedia">Social Media</option>
+            <option value="">— Select role —</option>
           </select>
         </div>
         <div class="field" id="newTLField">
@@ -1825,6 +1817,76 @@ function showScreen(name) {
 }
 
 // ── Role helpers ──────────────────────────────────────────────────────────
+
+// ══════════════════════════════════════════════════════════════════════════
+// ── DYNAMIC ROLES SYSTEM ──────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════
+
+let _roles = []; // [{title:'staff', label:'Staff'}, ...]
+
+// Superadmin always hardcoded — never from SP
+const SUPERADMIN_ROLE = { title: 'superadmin', label: 'Super Admin' };
+
+async function loadRolesFromSP() {
+  try {
+    const res = await spGet(SP_API + "('Roles')/items?$select=Title,Label&$top=100&$orderby=Title");
+    if (res && res.value && res.value.length) {
+      _roles = res.value.map(r => ({ title: (r.Title||'').toLowerCase(), label: r.Label || r.Title }));
+      LS.set('ci_roles', _roles);
+      updateRoleLabel();
+      return;
+    }
+  } catch(e) { console.warn('loadRolesFromSP failed:', e); }
+  // Fallback to cache
+  const cached = LS.get('ci_roles');
+  if (cached && cached.length) { _roles = cached; updateRoleLabel(); }
+}
+
+function updateRoleLabel() {
+  // Rebuild ROLE_LABEL from dynamic roles
+  for (const r of _roles) {
+    ROLE_LABEL[r.title] = r.label;
+  }
+  ROLE_LABEL['superadmin'] = 'Super Admin'; // always hardcoded
+}
+
+function getRoles() { return _roles.length ? _roles : getDefaultRoles(); }
+
+function getDefaultRoles() {
+  return [
+    {title:'hrmanager',label:'HR Manager'},
+    {title:'teamlead',label:'Team Lead'},
+    {title:'analyst',label:'Analyst'},
+    {title:'trainee',label:'Trainee'},
+    {title:'staff',label:'Staff'},
+    {title:'hr',label:'HR'},
+    {title:'assistant',label:'Assistant'},
+    {title:'sales',label:'Sales'},
+    {title:'customerservice',label:'Customer Service'},
+    {title:'socialmedia',label:'Social Media'},
+    {title:'accountant',label:'Accountant'},
+  ];
+}
+
+function buildRoleOptions(currentRole, includeSuperAdmin) {
+  const roles = getRoles();
+  let opts = '';
+  if (includeSuperAdmin) opts += '<option value="superadmin"' + (currentRole==='superadmin'?' selected':'') + '>Super Admin</option>';
+  for (const r of roles) {
+    opts += '<option value="' + r.title + '"' + (currentRole===r.title?' selected':'') + '>' + r.label + '</option>';
+  }
+  return opts;
+}
+
+function buildViewAsOptions() {
+  const roles = getRoles();
+  let opts = '<option value="" style="background:#1B2B4B">\uD83D\uDC41 View as\u2026</option>';
+  for (const r of roles) {
+    opts += '<option value="' + r.title + '" style="background:#1B2B4B">' + r.label + '</option>';
+  }
+  return opts;
+}
+
 const ROLE_LABEL = { superadmin:'Super Admin', hrmanager:'HR Manager', hr:'HR', teamlead:'Team Lead', analyst:'Analyst', trainee:'Trainee', assistant:'Assistant', sales:'Sales', customerservice:'Customer Service', socialmedia:'Social Media' };
 const ANALYST_ROLES = ['analyst','teamlead']; // roles that get Files tab
 const CHECKIN_ROLES = ['manager','hr','teamlead','analyst','trainee','assistant','sales','customerservice','socialmedia']; // all check in except superadmin
@@ -1887,43 +1949,47 @@ function exitPreview() {
 const DEFAULT_PERMISSIONS = {
   hrmanager: {
     tabs: { checkin:true, leave:true, dashboard:true, admin:true, files:false, myfiles:false, myteam:false, eod:false, performance:false, othertasks:false, feedback:false, profile:true },
-    features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canApproveLeave:true, canSeeTeamLeaveBalances:true, canSeeAllFiles:false, canAddStaff:true, canResetPins:true, canChangeRoles:false, canDeleteStaff:false, canExportData:true, canAddObsNotes:true }
+    features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canApproveLeave:true, canSeeLeaveBalance:true, canSeeTeamLeaveBalances:true, canSeeAllFiles:false, canAddStaff:true, canResetPins:true, canChangeRoles:false, canDeleteStaff:false, canExportData:true, canAddObsNotes:true }
   },
   teamlead: {
     tabs: { checkin:true, leave:true, dashboard:false, admin:false, files:true, myfiles:true, myteam:true, eod:false, performance:true, othertasks:true, feedback:true, profile:true },
-    features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canApproveLeave:true, canSeeTeamLeaveBalances:false, canSeeAllFiles:false, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:true }
+    features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canSeeLeaveBalance:false, canApproveLeave:true, canSeeTeamLeaveBalances:false, canSeeAllFiles:false, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:true }
   },
   analyst: {
     tabs: { checkin:true, leave:true, dashboard:false, admin:false, files:false, myfiles:true, myteam:false, eod:true, performance:false, othertasks:true, feedback:false, profile:true },
-    features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canApproveLeave:false, canSeeTeamLeaveBalances:false, canSeeAllFiles:false, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:false }
+    features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canSeeLeaveBalance:false, canApproveLeave:false, canSeeTeamLeaveBalances:false, canSeeAllFiles:false, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:false }
   },
   trainee: {
     tabs: { checkin:true, leave:true, dashboard:false, admin:false, files:false, myfiles:false, myteam:false, eod:false, performance:false, othertasks:false, feedback:false, profile:true },
-    features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canApproveLeave:false, canSeeTeamLeaveBalances:false, canSeeAllFiles:false, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:false }
+    features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canSeeLeaveBalance:false, canApproveLeave:false, canSeeTeamLeaveBalances:false, canSeeAllFiles:false, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:false }
   },
   staff: {
     tabs: { checkin:true, leave:true, dashboard:false, admin:false, files:false, myfiles:false, myteam:false, eod:false, performance:false, othertasks:false, feedback:false, profile:true },
-    features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canApproveLeave:false, canSeeTeamLeaveBalances:false, canSeeAllFiles:false, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:false }
+    features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canSeeLeaveBalance:false, canApproveLeave:false, canSeeTeamLeaveBalances:false, canSeeAllFiles:false, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:false }
   },
   hr: {
     tabs: { checkin:true, leave:true, dashboard:true, admin:false, files:false, myfiles:false, myteam:false, eod:false, performance:false, othertasks:false, feedback:false, profile:true },
-    features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canApproveLeave:false, canSeeTeamLeaveBalances:false, canSeeAllFiles:false, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:false }
+    features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canSeeLeaveBalance:false, canApproveLeave:false, canSeeTeamLeaveBalances:false, canSeeAllFiles:false, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:false }
   },
   assistant: {
     tabs: { checkin:true, leave:true, dashboard:false, admin:false, files:false, myfiles:false, myteam:false, eod:false, performance:false, othertasks:false, feedback:false, profile:true },
-    features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canApproveLeave:false, canSeeTeamLeaveBalances:false, canSeeAllFiles:false, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:false }
+    features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canSeeLeaveBalance:false, canApproveLeave:false, canSeeTeamLeaveBalances:false, canSeeAllFiles:false, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:false }
   },
   sales: {
     tabs: { checkin:true, leave:true, dashboard:false, admin:false, files:false, myfiles:false, myteam:false, eod:false, performance:false, othertasks:false, feedback:false, profile:true },
-    features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canApproveLeave:false, canSeeTeamLeaveBalances:false, canSeeAllFiles:false, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:false }
+    features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canSeeLeaveBalance:false, canApproveLeave:false, canSeeTeamLeaveBalances:false, canSeeAllFiles:false, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:false }
   },
   customerservice: {
     tabs: { checkin:true, leave:true, dashboard:false, admin:false, files:false, myfiles:false, myteam:false, eod:false, performance:false, othertasks:false, feedback:false, profile:true },
-    features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canApproveLeave:false, canSeeTeamLeaveBalances:false, canSeeAllFiles:false, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:false }
+    features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canSeeLeaveBalance:false, canApproveLeave:false, canSeeTeamLeaveBalances:false, canSeeAllFiles:false, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:false }
   },
   socialmedia: {
     tabs: { checkin:true, leave:true, dashboard:false, admin:false, files:false, myfiles:false, myteam:false, eod:false, performance:false, othertasks:false, feedback:false, profile:true },
-    features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canApproveLeave:false, canSeeTeamLeaveBalances:false, canSeeAllFiles:false, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:false }
+    features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canApproveLeave:false, canSeeLeaveBalance:false, canSeeTeamLeaveBalances:false, canSeeAllFiles:false, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:false }
+  },
+  accountant: {
+    tabs: { checkin:true, leave:true, dashboard:false, admin:false, files:false, myfiles:false, myteam:false, eod:false, performance:false, othertasks:false, feedback:false, profile:true },
+    features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canApproveLeave:false, canSeeLeaveBalance:false, canSeeTeamLeaveBalances:false, canSeeAllFiles:false, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:false }
   },
 };
 
@@ -2030,6 +2096,7 @@ const TAB_LABELS = {
 };
 
 const FEATURE_LABELS = {
+  canSeeLeaveBalance: 'Can see full leave balance (entitlement & remaining)',
   canBreak: 'Can take breaks',
   canClockOut: 'Can clock out',
   requiresSelfie: 'Must take selfie on check-in',
@@ -2046,7 +2113,7 @@ const FEATURE_LABELS = {
   canAddObsNotes: 'Can add observation notes',
 };
 
-const EDITABLE_ROLES = ['hrmanager','teamlead','analyst','trainee','staff','hr','assistant','sales','customerservice','socialmedia'];
+let EDITABLE_ROLES = ['hrmanager','teamlead','analyst','trainee','staff','hr','assistant','sales','customerservice','socialmedia','accountant']; // Updated dynamically from SP
 
 let _editingRole = null;
 let _pendingPermissions = null;
@@ -2312,7 +2379,7 @@ function buildNav() {
     if (!tabs.length) tabs = [['checkin','Check in'],['profile','PIN']];
   }
   const viewAsDropdown = (!_previewRole && (_realRole==='superadmin' || currentUser.role==='superadmin'))
-    ? '<select class="nav-select" onchange="startPreview(this.value)"><option value="" style="background:#1B2B4B">\uD83D\uDC41 View as\u2026</option><option value="staff" style="background:#1B2B4B">Staff</option><option value="analyst" style="background:#1B2B4B">Analyst</option><option value="trainee" style="background:#1B2B4B">Trainee</option><option value="teamlead" style="background:#1B2B4B">Team Lead</option><option value="hrmanager" style="background:#1B2B4B">HR Manager</option><option value="hr" style="background:#1B2B4B">HR</option></select>'
+    ? '<select class="nav-select" onchange="startPreview(this.value)">' + buildViewAsOptions() + '</select>'
     : '';
   const exitBtn = _previewRole
     ? '<button onclick="exitPreview()" style="font-size:12px;padding:5px 14px;background:#F59E0B;color:#000;border:none;border-radius:4px;cursor:pointer;font-weight:700;margin-left:4px">\u2715 Exit preview</button>'
@@ -4228,7 +4295,7 @@ async function renderLeaveScreen() {
   let html = '';
 
   // ── Personal leave balance ───────────────────────────────────────────────
-  const isHRView = isSuperAdmin() || isManager(); // HR Manager or Superadmin see full view
+  const isHRView = isSuperAdmin() || canDo('canSeeLeaveBalance'); // Controlled by permissions
 
   if (!isSuperAdmin() || _previewRole) {
     const staff = getStaff().find(s => s.name === currentUser.name);
@@ -4380,8 +4447,8 @@ async function renderLeaveScreen() {
       <table style="width:100%;font-size:13px;border-collapse:collapse">
         <thead><tr style="border-bottom:1.5px solid var(--border)">
           <th style="padding:6px 0;text-align:left;font-size:11px;color:var(--text-3);font-weight:600">Staff</th>
-          <th style="padding:6px 0;text-align:center;font-size:11px;color:var(--text-3);font-weight:600">Annual rem.</th>
-          <th style="padding:6px 0;text-align:center;font-size:11px;color:var(--text-3);font-weight:600">Sick rem.</th>
+          <th style="padding:6px 0;text-align:center;font-size:11px;color:var(--text-3);font-weight:600">${isHRView ? 'Annual rem.' : 'Annual used'}</th>
+          <th style="padding:6px 0;text-align:center;font-size:11px;color:var(--text-3);font-weight:600">${isHRView ? 'Sick rem.' : 'Sick used'}</th>
           <th style="padding:6px 0;text-align:center;font-size:11px;color:var(--text-3);font-weight:600">Unpaid</th>
           <th style="padding:6px 0;text-align:center;font-size:11px;color:var(--text-3);font-weight:600">Broker days</th>
           <th style="padding:6px 0;text-align:center;font-size:11px;color:var(--text-3);font-weight:600">Total taken</th>
@@ -4395,8 +4462,8 @@ async function renderLeaveScreen() {
           const encashCleared = ent ? ent.EncashmentCleared === 'true' : false;
           return `<tr style="border-bottom:0.5px solid var(--border)">
             <td style="padding:8px 0;font-weight:500">${esc(s.name)}${onProb?'<span style="font-size:10px;color:var(--warn);margin-left:4px">Probation</span>':''}</td>
-            <td style="padding:8px 0;text-align:center;color:${bal.annualRemaining<=2?'var(--danger)':'inherit'}">${bal.annualRemaining}</td>
-            <td style="padding:8px 0;text-align:center">${bal.sickRemaining}</td>
+            <td style="padding:8px 0;text-align:center;color:${isHRView&&bal.annualRemaining<=2?'var(--danger)':'inherit'}">${isHRView ? bal.annualRemaining : '—'}</td>
+            <td style="padding:8px 0;text-align:center">${isHRView ? bal.sickRemaining : '—'}</td>
             <td style="padding:8px 0;text-align:center">${bal.unpaidUsed}</td>
             <td style="padding:8px 0;text-align:center">${bal.brokerCount}</td>
             <td style="padding:8px 0;text-align:center;font-weight:600">${bal.totalUsed}</td>
@@ -5317,16 +5384,7 @@ function renderAllStaffCards(staff) {
           </div>
           <div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center">
             ${canChangeRoleThis?`<select onchange="changeRoleByName('${sname}',this.value)" style="font-size:12px;padding:3px 6px;border-radius:var(--radius-sm);border:1.5px solid var(--border)">
-              ${sa?'<option value="superadmin"'+(s.role==='superadmin'?' selected':'')+'>Super Admin</option>':''}
-              <option value="hrmanager"${s.role==='hrmanager'?' selected':''}>HR Manager</option>
-              <option value="hr"${s.role==='hr'?' selected':''}>HR</option>
-              <option value="teamlead"${s.role==='teamlead'?' selected':''}>Team Lead</option>
-              <option value="analyst"${s.role==='analyst'?' selected':''}>Analyst</option>
-              <option value="trainee"${s.role==='trainee'?' selected':''}>Trainee</option>
-              <option value="assistant"${s.role==='assistant'?' selected':''}>Assistant</option>
-              <option value="sales"${s.role==='sales'?' selected':''}>Sales</option>
-              <option value="customerservice"${s.role==='customerservice'?' selected':''}>Customer Service</option>
-              <option value="socialmedia"${s.role==='socialmedia'?' selected':''}>Social Media</option>
+              ${buildRoleOptions(s.role, sa)}
             </select>`:''}
             ${canManageTeam?`<button class="btn-sm" style="background:#FEF3C7;color:#92400E;border-color:#FDE68A" onclick="openManageTeam('${sname}')">👥 Manage Team</button>`:''}
             ${canAssignBroker?`<button class="btn-sm" style="background:#FFF7ED;color:#C2410C;border-color:#FED7AA" onclick="openAssignBrokerModal('${sname}')">🎯 Assign broker</button>`:''}
@@ -5417,6 +5475,13 @@ function showOnboardForm() {
   if (!card) return;
   card.style.display = card.style.display === 'none' ? 'block' : 'none';
   if (card.style.display === 'block') {
+    // Populate role dropdown dynamically
+    const roleSel = document.getElementById('newRole');
+    if (roleSel) {
+      const roles = getRoles();
+      roleSel.innerHTML = '<option value="">— Select role —</option>' +
+        roles.map(r => `<option value="${r.title}">${r.label}</option>`).join('');
+    }
     // Populate TL dropdown
     populateOnboardTLDropdown();
     // Show manager role option only for superadmin
@@ -6231,12 +6296,15 @@ async function loadFromSharePoint() {
       loadLeaveData(),
       loadPublicHolidays(),
       loadPermissions(),
+      loadRolesFromSP(),
       loadFileEntriesFromSP(),
       loadEODFromSP(),
       loadBrokerFeedbackFromSP(),
       loadOtherTasksFromSP(),
       loadTeamsFromSP(),
     ]).catch(e => console.warn('Some SP loads failed:', e));
+    // Update EDITABLE_ROLES from loaded roles
+    if (_roles.length) EDITABLE_ROLES = _roles.map(r => r.title);
   } catch(e) {
     console.error('SharePoint load error:', e);
   }
