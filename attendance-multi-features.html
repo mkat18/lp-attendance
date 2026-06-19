@@ -4185,15 +4185,38 @@ async function submitLeaveRequest() {
   const days = countLeaveDays(startDate, endDate, halfDay);
   if (days <= 0) { showToast('No working days in selected range.','err'); return; }
 
-  // Check balance for annual/sick
+  // Check balance — show in-app warning instead of confirm() which is blocked on mobile
   const bal = getLeaveBalance(currentUser.name);
   if (leaveType === 'Annual Leave' && days > bal.annualRemaining) {
-    if (!confirm(`You only have ${bal.annualRemaining} annual leave days remaining. Excess will be unpaid. Continue?`)) return;
+    showLeaveWarningModal(`You only have ${bal.annualRemaining} annual leave day(s) remaining. The excess will be treated as unpaid leave.`, () => doSubmitLeave(leaveType, startDate, endDate, halfDay, halfDaySession, reason, brokerName, days));
+    return;
   }
   if (leaveType === 'Sick Leave' && days > bal.sickRemaining) {
-    if (!confirm(`You only have ${bal.sickRemaining} sick leave days remaining. Excess will be unpaid. Continue?`)) return;
+    showLeaveWarningModal(`You only have ${bal.sickRemaining} sick leave day(s) remaining. The excess will be treated as unpaid leave.`, () => doSubmitLeave(leaveType, startDate, endDate, halfDay, halfDaySession, reason, brokerName, days));
+    return;
   }
 
+  await doSubmitLeave(leaveType, startDate, endDate, halfDay, halfDaySession, reason, brokerName, days);
+}
+
+function showLeaveWarningModal(msg, onConfirm) {
+  const existing = document.getElementById('leaveWarningModal');
+  if (existing) existing.remove();
+  const modal = document.createElement('div');
+  modal.id = 'leaveWarningModal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem';
+  modal.innerHTML = `<div style="background:var(--surface);border-radius:var(--radius);padding:1.5rem;max-width:360px;width:100%">
+    <div style="font-size:15px;font-weight:700;margin-bottom:10px">⚠ Leave balance warning</div>
+    <div style="font-size:13px;color:var(--text-2);margin-bottom:16px">${msg}</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <button onclick="document.getElementById('leaveWarningModal').remove();(${onConfirm.toString()})()" style="padding:10px;background:var(--brand);color:#fff;border:none;border-radius:var(--radius-sm);font-size:14px;font-weight:600;cursor:pointer">Submit anyway</button>
+      <button onclick="document.getElementById('leaveWarningModal').remove()" style="padding:10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-size:14px;background:transparent;cursor:pointer">Cancel</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+}
+
+async function doSubmitLeave(leaveType, startDate, endDate, halfDay, halfDaySession, reason, brokerName, days) {
   const ly = getLeaveYear(startDate);
   const payload = {
     Title: currentUser.name,
@@ -4212,12 +4235,18 @@ async function submitLeaveRequest() {
     BrokerName: brokerName,
   };
 
-  const res = await spPostDirect(SP_API + "('LeaveRequests')/items", payload);
-  if (res) {
-    _leaveRequests.unshift({...payload, Id: res.Id||res.ID});
-    LS.set('ci_leaveReq', _leaveRequests);
-    showToast('Leave request submitted ✓','ok');
-    renderLeaveScreen();
+  try {
+    const res = await spPostDirect(SP_API + "('LeaveRequests')/items", payload);
+    if (res) {
+      _leaveRequests.unshift({...payload, Id: res.Id||res.ID});
+      LS.set('ci_leaveReq', _leaveRequests);
+      showToast('Leave request submitted ✓','ok');
+      renderLeaveScreen();
+    } else {
+      showToast('Failed to submit leave request. Please try again.','err');
+    }
+  } catch(e) {
+    showToast('Error submitting leave: ' + (e.message||'unknown error'), 'err');
   }
 }
 
