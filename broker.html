@@ -1427,10 +1427,12 @@ tr.flagged-row:hover td { background: #FFEAEA; }
     <div class="field">
       <label>What's been done</label>
       <textarea id="fm_done" placeholder="e.g. ID verified, payslips received, valuation ordered…" style="width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:14px;color:var(--text);background:var(--surface-2);outline:none;resize:none;min-height:72px;line-height:1.5"></textarea>
+      <div id="fm_done_history" style="display:none;margin-top:6px"></div>
     </div>
     <div class="field">
       <label>What's pending / next steps</label>
       <textarea id="fm_pending" placeholder="e.g. Waiting on bank statements, need to call client re: rates…" style="width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:14px;color:var(--text);background:var(--surface-2);outline:none;resize:none;min-height:72px;line-height:1.5"></textarea>
+      <div id="fm_pending_history" style="display:none;margin-top:6px"></div>
     </div>
     <div class="field" id="fm_loanAmountField" style="display:none">
       <label>Loan amount ($) <span style="font-size:11px;color:var(--text-3)">— enter when at Settlement or Unconditionally Approved</span></label>
@@ -7912,6 +7914,53 @@ function genFileId() {
 let _editingFileId = null;
 let _activeFilesTab = 'today';
 
+// ── File note history helpers ─────────────────────────────────────────────
+// Notes are stored as array [{text, by, at, ts}] or legacy string
+function getNoteLatest(note) {
+  if (!note) return '';
+  if (typeof note === 'string') return note;
+  if (Array.isArray(note) && note.length > 0) return note[0].text || '';
+  return '';
+}
+
+function noteAddEntry(existing, newText, byName) {
+  const history = Array.isArray(existing) ? existing : (existing ? [{text: existing, by: 'Previous', at: '', ts: 0}] : []);
+  if (!newText) return history;
+  // Don't add duplicate if text unchanged
+  if (history.length > 0 && history[0].text === newText) return history;
+  return [{ text: newText, by: byName, at: today, ts: Date.now() }, ...history];
+}
+
+function renderNoteHistory(elId, note) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  const history = Array.isArray(note) ? note : (note ? [{text: note, by: 'Previous', at: '', ts: 0}] : []);
+  const past = history.slice(1); // skip latest — already in textarea
+  if (!past.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
+  el.style.display = 'block';
+  const id = elId + '_body';
+  el.innerHTML = `
+    <div onclick="toggleNoteHistory('${id}')" style="font-size:11px;color:var(--text-3);cursor:pointer;padding:4px 0;display:flex;align-items:center;gap:4px">
+      <span id="${id}_icon">▶</span> View history (${past.length} previous ${past.length===1?'entry':'entries'})
+    </div>
+    <div id="${id}" style="display:none;margin-top:4px">
+      ${past.map(e => `
+        <div style="border-left:2px solid var(--border);padding:6px 10px;margin-bottom:6px;background:var(--surface-2);border-radius:0 var(--radius-sm) var(--radius-sm) 0">
+          <div style="font-size:11px;color:var(--text-3);margin-bottom:3px">${esc(e.by||'')}${e.at?' · '+e.at:''}</div>
+          <div style="font-size:12px;color:var(--text-2)">${esc(e.text||'')}</div>
+        </div>`).join('')}
+    </div>`;
+}
+
+function toggleNoteHistory(id) {
+  const el = document.getElementById(id);
+  const icon = document.getElementById(id + '_icon');
+  if (!el) return;
+  const open = el.style.display !== 'none';
+  el.style.display = open ? 'none' : 'block';
+  if (icon) icon.textContent = open ? '▶' : '▼';
+}
+
 function openFileModal(fileId) {
   _editingFileId = fileId || null;
   const modal = document.getElementById('fileModal');
@@ -7940,8 +7989,10 @@ function openFileModal(fileId) {
     document.getElementById('fm_broker').value = entry.broker || '';
     document.getElementById('fm_type').value = entry.appType || 'Home Loan';
     document.getElementById('fm_status').value = entry.status || 'Data Collection';
-    document.getElementById('fm_done').value = entry.done || '';
-    document.getElementById('fm_pending').value = entry.pending || '';
+    document.getElementById('fm_done').value = getNoteLatest(entry.done);
+    document.getElementById('fm_pending').value = getNoteLatest(entry.pending);
+    renderNoteHistory('fm_done_history', entry.done);
+    renderNoteHistory('fm_pending_history', entry.pending);
     document.getElementById('fm_fileId').value = fileId;
     if (isTL && entry.owner) ownerSel.value = entry.owner;
     // Priority, lender, settle date
@@ -8068,8 +8119,8 @@ async function saveFileEntry() {
     broker,
     appType: document.getElementById('fm_type').value,
     status: newStatus,
-    done: document.getElementById('fm_done').value.trim(),
-    pending: document.getElementById('fm_pending').value.trim(),
+    done: noteAddEntry(existing ? existing.done : null, document.getElementById('fm_done').value.trim(), currentUser.name),
+    pending: noteAddEntry(existing ? existing.pending : null, document.getElementById('fm_pending').value.trim(), currentUser.name),
     priority: document.getElementById('fm_priority') ? document.getElementById('fm_priority').value : 'normal',
     fileBlocker: document.getElementById('fm_blocker') ? document.getElementById('fm_blocker').value : '',
     lender: document.getElementById('fm_lender') ? document.getElementById('fm_lender').value.trim() : '',
@@ -8212,8 +8263,8 @@ function renderFileLogList() {
         <span style="background:${sc.bg};color:${sc.color};border-radius:50px;padding:2px 8px;font-size:11px;font-weight:600">${esc(f.status)}</span>
       </div>
       <div style="font-size:12px;color:var(--text-3);margin-bottom:4px">🏦 ${esc(f.appType)}</div>
-      ${f.done?`<div style="font-size:12px;color:var(--text-2);margin-bottom:2px">✅ ${esc(f.done)}</div>`:''}
-      ${f.pending?`<div style="font-size:12px;color:var(--warn)">⏳ ${esc(f.pending)}</div>`:''}
+      ${getNoteLatest(f.done)?`<div style="font-size:12px;color:var(--text-2);margin-bottom:2px">✅ ${esc(getNoteLatest(f.done))}</div>`:''}
+      ${getNoteLatest(f.pending)?`<div style="font-size:12px;color:var(--warn)">⏳ ${esc(getNoteLatest(f.pending))}</div>`:''}
       <button onclick="openFileModal('${f.id}')" style="margin-top:8px;font-size:12px;padding:4px 12px;border-radius:var(--radius-sm);border:1px solid var(--border);background:transparent;cursor:pointer">Edit</button>
     </div>`;
   }).join('');
@@ -9072,8 +9123,8 @@ function fileCard(f, showControls) {
       <span style="background:${sc.bg};color:${sc.color};border-radius:50px;padding:3px 9px;font-size:11px;font-weight:600;white-space:nowrap;flex-shrink:0">${esc(f.status)}</span>
     </div>
     ${f.fileBlocker?`<div style="font-size:12px;color:var(--danger);margin-bottom:3px">🔴 <b>Blocked:</b> ${esc(f.fileBlocker)}</div>`:''}
-    ${f.done?`<div style="font-size:12px;color:var(--text-2);margin-bottom:3px">✅ <b>Done:</b> ${esc(f.done)}</div>`:''}
-    ${f.pending?`<div style="font-size:12px;color:var(--warn);margin-bottom:3px">⏳ <b>Pending:</b> ${esc(f.pending)}</div>`:''}
+    ${getNoteLatest(f.done)?`<div style="font-size:12px;color:var(--text-2);margin-bottom:3px">✅ <b>Done:</b> ${esc(getNoteLatest(f.done))}</div>`:''}
+    ${getNoteLatest(f.pending)?`<div style="font-size:12px;color:var(--warn);margin-bottom:3px">⏳ <b>Pending:</b> ${esc(getNoteLatest(f.pending))}</div>`:''}
     ${f.attachments&&f.attachments.length>0?`<div style="font-size:11px;color:var(--text-3);margin-top:4px">📎 ${f.attachments.length} attachment${f.attachments.length>1?'s':''}${hasExpiredSoon?' · ⚠️ expiring soon':''}</div>`:''}
     ${canEdit?`<div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;align-items:center">
       <button onclick="openFileModal('${f.id}')" style="font-size:12px;padding:4px 12px;border-radius:var(--radius-sm);border:1px solid var(--border);background:transparent;cursor:pointer">✏️ Edit</button>
