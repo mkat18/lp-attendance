@@ -1394,6 +1394,8 @@ tr.flagged-row:hover td { background: #FFEAEA; }
         <option value="Unconditionally Approved">Unconditionally Approved</option>
         <option value="Loan Documents">Loan Documents</option>
         <option value="Settlement">Settlement</option>
+        <option value="Withdrawn">Withdrawn</option>
+        <option value="Declined">Declined</option>
       </select>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
@@ -1410,7 +1412,7 @@ tr.flagged-row:hover td { background: #FFEAEA; }
       </div>
     </div>
     <div class="field" id="fm_settleDateField" style="display:none">
-      <label>Expected settlement date</label>
+      <label>Expected settlement date <span style="font-size:11px;color:var(--brand)">(drives Settling Soon tab)</span></label>
       <input type="date" id="fm_settleDate"/>
     </div>
     <div class="field">
@@ -7887,7 +7889,8 @@ function renderSubmittedCard(files, containerId) {
 
 const FILE_STATUSES = ['Data Collection','Pre-Qualification','Application Start',
   'Pending Info','Ready to Submit','Submitted to Lender','MIR','Conditionally Approved',
-  'Unconditionally Approved','Loan Documents','Settlement'];
+  'Unconditionally Approved','Loan Documents','Settlement','Withdrawn','Declined'];
+const AUTO_ARCHIVE_STATUSES = ['Withdrawn','Declined'];
 const READY_TO_SUBMIT_IDX = FILE_STATUSES.indexOf('Ready to Submit');
 const STAGES_AFTER_READY = FILE_STATUSES.slice(READY_TO_SUBMIT_IDX + 1);
 
@@ -7902,6 +7905,8 @@ const FILE_STATUS_COLORS = {
   'Unconditionally Approved':{bg:'#A7F3D0',color:'#064E3B'},
   'Loan Documents':         {bg:'#FEF9C3',color:'#713F12'},
   'Settlement':             {bg:'#BBF7D0',color:'#14532D'},
+  'Withdrawn':              {bg:'#F3F4F6',color:'#6B7280'},
+  'Declined':               {bg:'#FFE4E6',color:'#9F1239'},
 };
 
 // ── Storage ───────────────────────────────────────────────────────────────
@@ -8134,7 +8139,7 @@ async function saveFileEntry() {
     loanAmount: loanAmount || null,
     settledAt: newStatus === 'Settlement' ? (existing&&existing.settledAt ? existing.settledAt : today) : (existing ? existing.settledAt : null),
     unconditionalAt: newStatus === 'Unconditionally Approved' ? (existing&&existing.unconditionalAt ? existing.unconditionalAt : today) : (existing ? existing.unconditionalAt : null),
-    active: true,
+    active: AUTO_ARCHIVE_STATUSES.includes(newStatus) ? false : true,
   };
 
   // Handle attachment upload
@@ -8472,7 +8477,7 @@ function toggleLoanAmountField() {
   const field = document.getElementById('fm_loanAmountField');
   if (!sel || !field) return;
   const showStages = ['Unconditionally Approved','Loan Documents','Settlement'];
-  field.style.display = showStages.includes(sel.value) ? 'block' : 'none';
+
 }
 
 // ── Stage history display in modal ────────────────────────────────────────
@@ -8497,7 +8502,7 @@ function renderStageHistoryInModal(entry) {
 
 // ── Core analytics calculations ───────────────────────────────────────────
 function calcFileAnalytics(files) {
-  const closed = files.filter(f => f.active === false || f.status === 'Settlement');
+  const closed = files.filter(f => f.active === false || f.status === 'Settlement' || AUTO_ARCHIVE_STATUSES.includes(f.status));
   const withHistory = files.filter(f => f.stageHistory && f.stageHistory.length > 0);
 
   // Average time per stage (days) — across all files that passed through each stage
@@ -8958,8 +8963,8 @@ function toggleSettleDateField() {
   const sel = document.getElementById('fm_status');
   const field = document.getElementById('fm_settleDateField');
   if (!sel || !field) return;
-  const showStages = ['Loan Documents','Settlement','Unconditionally Approved'];
-  field.style.display = showStages.includes(sel.value) ? 'block' : 'none';
+  const hideStages = ['Withdrawn','Declined'];
+  field.style.display = !hideStages.includes(sel.value) ? 'block' : 'none';
 }
 
 // ── 1. STALE FILE ALERT ────────────────────────────────────────────────────
