@@ -2557,7 +2557,7 @@ function logout() {
   sessionStorage.removeItem('lp_session');
   currentUser=null; pinBuffer=''; pinStage='login'; pinFirst='';
   stopBreakTimer(false); // preserve ongoing break across logout
-  buildNav(); showScreen('mslogin');
+  buildNav(); window.location.href = 'index.html';
   clearName();
   document.getElementById('loginGreeting').textContent = getGreeting();
   // Refresh staff from SharePoint so PIN resets are reflected immediately
@@ -6056,7 +6056,7 @@ const msalConfig = {
   auth: {
     clientId: 'e2905b6d-7f90-41dc-9c57-7c5bfc4af1c7',
     authority: 'https://login.microsoftonline.com/c8838da3-903c-4e2d-ae8a-de9fc6f28d35',
-    redirectUri: 'https://mkat18.github.io/lp-attendance/attendance-multi-features.html',
+    redirectUri: 'https://mkat18.github.io/lp-attendance/',
     navigateToLoginRequestUrl: true,
   },
   cache: { 
@@ -6882,7 +6882,7 @@ async function initMsal() {
       // No MS session — PIN login flow.
       // Fetch staff AND records from SharePoint before showing PIN screen
       // so PIN resets and existing check-ins are always reflected on any device.
-      showScreen('mslogin');
+      window.location.href = 'index.html';
       try {
         const token = await getToken();
         if (token) {
@@ -6919,11 +6919,11 @@ async function initMsal() {
       } catch(e) {
         console.warn('Pre-login SP fetch failed — using cache:', e);
       }
-      showScreen('mslogin');
+      window.location.href = 'index.html';
     }
   } catch(e) {
     console.error('MSAL init error:', e);
-    showScreen('mslogin');
+    window.location.href = 'index.html';
   }
 }
 
