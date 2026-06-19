@@ -6828,76 +6828,42 @@ async function initMsal() {
   try {
     msalInstance = new msal.PublicClientApplication(msalConfig);
     await msalInstance.initialize();
-    // Handle redirect response first
+
+    // Handle redirect response first (in case user was redirected back here)
     const redirectResult = await msalInstance.handleRedirectPromise();
     if (redirectResult) {
       msalToken = redirectResult.accessToken;
       await onMsLogin(redirectResult.account);
       return;
     }
+
+    // Check for cached account from any previous login (portal or direct)
     const accounts = msalInstance.getAllAccounts();
     if (accounts.length > 0) {
-      await onMsLogin(accounts[0]);
-    } else {
-      // Try to pick up existing session from portal using cached token
       try {
-        const loginHint = new URLSearchParams(window.location.search).get('login_hint');
-        const accounts = msalInstance.getAllAccounts();
-        const account = accounts.find(a => loginHint && a.username.toLowerCase() === loginHint.toLowerCase()) || accounts[0];
-        if (account) {
-          const silentResult = await msalInstance.acquireTokenSilent({ scopes: SP_SCOPES, account });
-          if (silentResult) {
-            msalToken = silentResult.accessToken;
-            await onMsLogin(silentResult.account);
-            return;
-          }
-        }
+        // Try silent token first using cached account
+        const silentResult = await msalInstance.acquireTokenSilent({ scopes: SP_SCOPES, account: accounts[0] });
+        msalToken = silentResult.accessToken;
+        await onMsLogin(silentResult.account);
+        return;
       } catch(e) {
-        // Silent token failed — fall through to PIN login screen
-        console.warn('Silent token failed:', e.name);
+        console.warn('acquireTokenSilent failed:', e.name);
       }
-      // No MS session — PIN login flow.
-      // Fetch staff AND records from SharePoint before showing PIN screen
-      // so PIN resets and existing check-ins are always reflected on any device.
-      window.location.href = 'index.html';
-      try {
-        const token = await getToken();
-        if (token) {
-          const [staffRes, recRes, brkRes] = await Promise.all([
-            fetch(`${SP_API}('AttendanceStaff')/items?$select=Title,Role,Pin,TempPin,StartTime,EndTime,Office,Team,JoinDate,DOB,Phone,Email,Address,EmergencyContact1Name,EmergencyContact1Phone,EmergencyContact1Relation,EmergencyContact2Name,EmergencyContact2Phone,EmergencyContact2Relation&$top=500`,
-              { headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json;odata=nometadata' } }),
-            fetch(`${SP_API}('AttendanceRecords')/items?$top=5000`,
-              { headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json;odata=nometadata' } }),
-            fetch(`${SP_API}('AttendanceBreaks')/items?$top=5000`,
-              { headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json;odata=nometadata' } }),
-          ]);
-          if (staffRes.ok) {
-            const staffData = await staffRes.json();
-            if (staffData && staffData.value && staffData.value.length > 0) {
-              _staff = staffData.value.map(spToStaff);
-              LS.set('ci_staff', _staff);
-            }
-          }
-          if (recRes.ok) {
-            const recData = await recRes.json();
-            if (recData && recData.value && recData.value.length > 0) {
-              _records = recData.value.map(spToRecord);
-              LS.set('ci_records', _records);
-            }
-          }
-          if (brkRes.ok) {
-            const brkData = await brkRes.json();
-            if (brkData && brkData.value && brkData.value.length > 0) {
-              _breaks = brkData.value.map(spToBreak);
-              LS.set('ci_breaks', _breaks);
-            }
-          }
-        }
-      } catch(e) {
-        console.warn('Pre-login SP fetch failed — using cache:', e);
-      }
-      window.location.href = 'index.html';
     }
+
+    // No cached account — try ssoSilent using browser's existing MS session
+    try {
+      const ssoResult = await msalInstance.ssoSilent({ scopes: SP_SCOPES });
+      msalToken = ssoResult.accessToken;
+      await onMsLogin(ssoResult.account);
+      return;
+    } catch(e) {
+      console.warn('ssoSilent failed:', e.name);
+    }
+
+    // No MS session at all — redirect to portal to sign in
+    window.location.href = 'index.html';
+
   } catch(e) {
     console.error('MSAL init error:', e);
     window.location.href = 'index.html';
