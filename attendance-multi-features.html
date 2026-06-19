@@ -6792,8 +6792,6 @@ function exportCSV() {
 
 // ── Teams storage helpers ─────────────────────────────────────────────────
 // Teams stored as: { [tlName]: [staffName, staffName, ...] }
-function getTeams() { return LS.get('ci_teams') || {}; }
-function saveTeams(t) { LS.set('ci_teams', t); }
 
 function getMyTeam() {
   if (!currentUser) return [];
@@ -7760,8 +7758,6 @@ const FILE_STATUS_COLORS = {
 };
 
 // ── Storage ───────────────────────────────────────────────────────────────
-function getFileEntries() { return LS.get('ci_files') || []; }
-function saveFileEntries(f) { LS.set('ci_files', f); }
 
 function genFileId() {
   return 'f_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6);
@@ -8245,31 +8241,6 @@ function renderFilesActive(el, allFiles) {
   }).join('');
 }
 
-function fileCard(f, showControls) {
-  const sc = FILE_STATUS_COLORS[f.status] || {bg:'#F3F4F6',color:'#374151'};
-  const daysAgo = Math.floor((Date.now() - f.updatedTs) / 86400000);
-  const ageLabel = daysAgo === 0 ? 'today' : daysAgo === 1 ? 'yesterday' : daysAgo + ' days ago';
-  const hasExpiredSoon = f.attachments && f.attachments.some(a => a.expiresAt - Date.now() < 3 * 86400000 && a.expiresAt > Date.now());
-
-  return `<div style="padding:12px 14px">
-    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:6px">
-      <div>
-        <div style="font-size:14px;font-weight:700;color:var(--text)">${esc(f.client)}</div>
-        <div style="font-size:12px;color:var(--text-3)">📋 ${esc(f.appType)} &nbsp;·&nbsp; ${esc(f.owner.split(' ')[0])} &nbsp;·&nbsp; ${ageLabel}</div>
-      </div>
-      <span style="background:${sc.bg};color:${sc.color};border-radius:50px;padding:3px 9px;font-size:11px;font-weight:600;white-space:nowrap;flex-shrink:0">${esc(f.status)}</span>
-    </div>
-    ${f.fileBlocker?`<div style="font-size:12px;color:var(--danger);margin-bottom:3px">🔴 <b>Blocked:</b> ${esc(f.fileBlocker)}</div>`:''}
-    ${f.done?`<div style="font-size:12px;color:var(--text-2);margin-bottom:3px">✅ <b>Done:</b> ${esc(f.done)}</div>`:''}
-    ${f.pending?`<div style="font-size:12px;color:var(--warn);margin-bottom:3px">⏳ <b>Pending:</b> ${esc(f.pending)}</div>`:''}
-    ${f.attachments&&f.attachments.length>0?`<div style="font-size:11px;color:var(--text-3);margin-top:4px">📎 ${f.attachments.length} attachment${f.attachments.length>1?'s':''}${hasExpiredSoon?' · ⚠️ expiring soon':''}</div>`:''}
-    ${showControls&&(isTeamLead()||isSuperAdmin())?`<div style="display:flex;gap:6px;margin-top:8px">
-      <button onclick="openFileModal('${f.id}')" style="font-size:12px;padding:4px 12px;border-radius:var(--radius-sm);border:1px solid var(--border);background:transparent;cursor:pointer">Edit</button>
-      <button onclick="markFileInactive('${f.id}')" style="font-size:12px;padding:4px 12px;border-radius:var(--radius-sm);border:1px solid var(--border);background:transparent;color:var(--text-3);cursor:pointer">Close file</button>
-    </div>`:''}
-  </div>`;
-}
-
 // ── updateFileLogUI override: show "Add file" button any time after check-in
 // Already handled above — this ensures card shows on re-init
 
@@ -8677,6 +8648,15 @@ function showChecklistByFileId(fileId) {
 function toggleChecklistPendingAnalytics() {
   const el = document.getElementById('checklistPendingAnalytics');
   if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+function toggleSubmittedList() {
+  const el = document.getElementById('submittedFilesList');
+  const card = document.getElementById('submittedCountCard');
+  if (!el) return;
+  const open = el.style.display !== 'none';
+  el.style.display = open ? 'none' : 'block';
+  if (card) card.querySelector('.toggle-hint') && (card.querySelector('.toggle-hint').textContent = open ? '▼' : '▲');
 }
 
 function toggleChecklistPendingList() {
@@ -9296,8 +9276,6 @@ const BF_TAG_COLORS = {
 };
 
 // ── Storage ───────────────────────────────────────────────────────────────
-function getBrokerFeedback() { return LS.get('ci_bfeedback') || []; }
-function saveBrokerFeedback_(f) { LS.set('ci_bfeedback', f); }
 
 let _selectedBFTags = new Set();
 let _bfSentiment = '';
@@ -9662,8 +9640,6 @@ window.initCheckin = function() {
 const EOD_ROLES = ['analyst','trainee','teamlead'];
 
 // ── Storage ────────────────────────────────────────────────────────────────
-function getEODReports() { return LS.get('ci_eod') || []; }
-function saveEODReports(r) { LS.set('ci_eod', r); }
 
 function getTodayEOD(name) {
   return getEODReports().find(r => r.name === name && r.date === today) || null;
@@ -10153,8 +10129,6 @@ const OTHER_TASK_TYPES = [
   'Onboarding support','Other'
 ];
 
-function getOtherTasks() { return LS.get('ci_othertasks') || []; }
-function saveOtherTasks(t) { LS.set('ci_othertasks', t); }
 
 function renderOtherTasksScreen() {
   const el = document.getElementById('otherTasksContent');
