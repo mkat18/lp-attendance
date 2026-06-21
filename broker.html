@@ -1444,6 +1444,14 @@ function getGreeting() {
 try { (function(){ LS.set('ci_seeded12', true); })(); } catch(e) { console.warn("IIFE skipped:", e.message); }
 
 // ── State ─────────────────────────────────────────────────────────────────
+function fmtDate(d) {
+  if (!d) return '';
+  const s = String(d).substring(0, 10);
+  const p = s.split('-');
+  if (p.length !== 3 || p[0].length !== 4) return d;
+  return p[2] + '-' + p[1] + '-' + p[0];
+}
+
 const today = new Date().toLocaleDateString('en-CA', {timeZone:'Asia/Kolkata'}); // YYYY-MM-DD in AU time
 let currentUser = null;
 let pinBuffer=''; let pinStage='login'; let pinFirst='';
@@ -2677,7 +2685,7 @@ async function uploadPhoto(dataUrl, rec) {
     // Convert base64 to blob
     const res = await fetch(dataUrl);
     const blob = await res.blob();
-    const filename = `${rec.date}_${rec.name.replace(/\s+/g,'_')}_${Date.now()}.jpg`;
+    const filename = `${fmtDate(rec.date)}_${rec.name.replace(/\s+/g,'_')}_${Date.now()}.jpg`;
     const uploadUrl = `https://loanprocessorau.sharepoint.com/sites/lpattendance/_api/web/lists/getbytitle('AttendancePhotos')/RootFolder/Files/Add(url='${encodeURIComponent(filename)}',overwrite=true)`;
     const uploadRes = await fetch(uploadUrl, {
       method: 'POST',
@@ -3381,7 +3389,7 @@ function renderLateTab() {
     }
     const severity = r.minsLate>60?'var(--danger)':r.minsLate>30?'#D97706':'var(--warn)';
     html+=`<tr>
-      ${singleDay?'':('<td style="font-size:12px;color:var(--text-3)">'+r.date+'</td>')}
+      ${singleDay?'':('<td style="font-size:12px;color:var(--text-3)">'+fmtDate(r.date)+'</td>')}
       <td style="font-weight:600">${esc(r.name)}</td>
       <td style="font-size:13px;color:var(--text-2)">${fmt12(r.scheduled)}</td>
       <td style="font-size:13px;color:var(--text-2)">${r.actual}</td>
@@ -3428,7 +3436,7 @@ function renderEarlyTab() {
     }
     const severity = r.minsEarly>60?'var(--danger)':r.minsEarly>30?'#D97706':'var(--warn)';
     html+=`<tr>
-      ${singleDay?'':('<td style="font-size:12px;color:var(--text-3)">'+r.date+'</td>')}
+      ${singleDay?'':('<td style="font-size:12px;color:var(--text-3)">'+fmtDate(r.date)+'</td>')}
       <td style="font-weight:600">${esc(r.name)}</td>
       <td style="font-size:13px;color:var(--text-2)">${fmt12(r.scheduled)}</td>
       <td style="font-size:13px;color:var(--text-2)">${r.actual}</td>
@@ -3466,7 +3474,7 @@ function renderSuspiciousTab() {
       html+=`<tr><td colspan="5" style="background:var(--surface-2);font-size:11px;font-weight:700;color:var(--text-3);letter-spacing:0.5px;text-transform:uppercase;padding:6px 14px">${label}</td></tr>`;
     }
     html+=`<tr>
-      ${singleDay?'':('<td style="font-size:12px;color:var(--text-3)">'+r.date+'</td>')}
+      ${singleDay?'':('<td style="font-size:12px;color:var(--text-3)">'+fmtDate(r.date)+'</td>')}
       <td style="font-weight:600">${esc(r.name)}</td>
       <td style="color:#B45309;font-size:12px">${esc(r.msAccount)}</td>
       <td><span class="tag" style="background:#FEF3C7;color:#92400E">${esc(r.status||'')}</span></td>
@@ -3570,11 +3578,11 @@ function filterAttention(period) {
 
   list.innerHTML = filtered.map((iss, i) => `
     <div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:0.5px solid #FECACA;font-size:13px;flex-wrap:wrap">
-      <span style="flex:1;min-width:150px"><b>${esc(iss.name)}</b> · ${iss.date} · ${iss.detail}</span>
+      <span style="flex:1;min-width:150px"><b>${esc(iss.name)}</b> · ${fmtDate(iss.date)} · ${iss.detail}</span>
       ${iss.type==='no-clockout'
         ? `<input type="time" id="co-time-${i}" style="font-size:13px;padding:4px 8px;border-radius:4px;border:1px solid #FECACA"/>
-           <button onclick="managerClockOut('${iss.id}','${iss.name}','${iss.date}','co-time-${i}')" style="font-size:12px;padding:5px 10px;background:var(--danger);color:#fff;border:none;border-radius:4px;cursor:pointer">Set clock-out</button>`
-        : `<button onclick="managerCloseBreak('${iss.id}','${iss.name}','${iss.date}')" style="font-size:12px;padding:5px 10px;background:var(--danger);color:#fff;border:none;border-radius:4px;cursor:pointer">Close break</button>`
+           <button onclick="managerClockOut('${iss.id}','${iss.name}','${fmtDate(iss.date)}','co-time-${i}')" style="font-size:12px;padding:5px 10px;background:var(--danger);color:#fff;border:none;border-radius:4px;cursor:pointer">Set clock-out</button>`
+        : `<button onclick="managerCloseBreak('${iss.id}','${iss.name}','${fmtDate(iss.date)}')" style="font-size:12px;padding:5px 10px;background:var(--danger);color:#fff;border:none;border-radius:4px;cursor:pointer">Close break</button>`
       }
     </div>`).join('');
 }
@@ -4041,7 +4049,7 @@ function filterMyLeaveHistory() {
       const sc = r.Status==='Approved'?'var(--success)':r.Status==='Rejected'?'var(--danger)':r.Status==='Forced'?'var(--warn)':'var(--text-3)';
       return `<tr style="border-bottom:0.5px solid var(--border)">
         <td style="padding:8px 0">${esc(r.LeaveType||'')}</td>
-        <td style="padding:8px 0;color:var(--text-2)">${r.StartDate}${r.EndDate&&r.EndDate!==r.StartDate?' → '+r.EndDate:''}</td>
+        <td style="padding:8px 0;color:var(--text-2)">${fmtDate(r.StartDate)}${r.EndDate&&r.EndDate!==r.StartDate?' → '+fmtDate(r.EndDate):''}</td>
         <td style="padding:8px 0">${r.DaysRequested||'?'}</td>
         <td style="padding:8px 0;color:${sc};font-weight:600">${r.Status||'Pending'}</td>
       </tr>`;
@@ -4178,7 +4186,7 @@ async function renderLeaveScreen() {
             <div style="font-weight:600;font-size:14px">${esc(r.Title)}</div>
             <span class="badge badge-warn">Pending</span>
           </div>
-          <div style="font-size:13px;color:var(--text-2);margin-bottom:4px">${esc(r.LeaveType||'')} · ${r.StartDate}${r.EndDate&&r.EndDate!==r.StartDate?' → '+r.EndDate:''} · ${r.DaysRequested||'?'} day${parseFloat(r.DaysRequested)!==1?'s':''}</div>
+          <div style="font-size:13px;color:var(--text-2);margin-bottom:4px">${esc(r.LeaveType||'')} · ${fmtDate(r.StartDate)}${r.EndDate&&r.EndDate!==r.StartDate?' → '+fmtDate(r.EndDate):''} · ${r.DaysRequested||'?'} day${parseFloat(r.DaysRequested)!==1?'s':''}</div>
           ${r.HalfDay==='true'?`<div style="font-size:12px;color:var(--text-3)">Half day — ${r.HalfDaySession||''}</div>`:''}
           ${r.BrokerName?`<div style="font-size:12px;color:var(--text-3)">Broker: ${esc(r.BrokerName)}</div>`:''}
           <div style="font-size:13px;color:var(--text-3);margin-bottom:8px">${esc(r.Reason||'')}</div>
@@ -4326,7 +4334,7 @@ function filterLeaveRequests() {
       return `<tr style="border-bottom:0.5px solid var(--border)">
         <td style="padding:7px 0;font-weight:500">${esc(r.Title||'')}</td>
         <td style="padding:7px 0;color:var(--text-2)">${esc(r.LeaveType||'')}</td>
-        <td style="padding:7px 0;color:var(--text-2)">${r.StartDate}${r.EndDate&&r.EndDate!==r.StartDate?' → '+r.EndDate:''}</td>
+        <td style="padding:7px 0;color:var(--text-2)">${fmtDate(r.StartDate)}${r.EndDate&&r.EndDate!==r.StartDate?' → '+fmtDate(r.EndDate):''}</td>
         <td style="padding:7px 0">${r.DaysRequested||'?'}</td>
         <td style="padding:7px 0;color:${sc};font-weight:600">${r.Status||'Pending'}</td>
         <td style="padding:7px 0;font-size:12px;color:var(--text-3)">${esc(r.ApprovedBy||'—')}</td>
@@ -4409,10 +4417,10 @@ function renderPublicHolidaysManager() {
   if (!hols.length) { el.innerHTML = '<div style="font-size:13px;color:var(--text-3)">No holidays for ' + year + '. Click "Import from API" to fetch.</div>'; return; }
   el.innerHTML = hols.sort((a,b)=>a.date.localeCompare(b.date)).map(h => `
     <div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:0.5px solid var(--border);font-size:13px">
-      <span style="color:var(--text-3);min-width:90px">${h.date}</span>
+      <span style="color:var(--text-3);min-width:90px">${fmtDate(h.date)}</span>
       <span style="flex:1;font-weight:500">${esc(h.name)}</span>
       ${h.isManual?'<span style="font-size:10px;background:var(--surface-2);padding:2px 6px;border-radius:4px;color:var(--text-3)">Manual</span>':''}
-      <button onclick="deletePublicHoliday('${h.date}')" style="font-size:11px;padding:3px 8px;background:var(--danger);color:#fff;border:none;border-radius:4px;cursor:pointer">Remove</button>
+      <button onclick="deletePublicHoliday('${fmtDate(h.date)}')" style="font-size:11px;padding:3px 8px;background:var(--danger);color:#fff;border:none;border-radius:4px;cursor:pointer">Remove</button>
     </div>`).join('');
 }
 
@@ -4687,7 +4695,7 @@ function renderRecords() {
     const workedMins=calcWorkedMins(r);
     const isLeave=r.status==='leave';
     html+=`<tr>
-      <td style="color:var(--text-3);${singleDay?'display:none':''}">${r.date}</td>
+      <td style="color:var(--text-3);${singleDay?'display:none':''}">${fmtDate(r.date)}</td>
       <td style="font-weight:600">${esc(r.name)}</td>
       <td>${tag(r.status)}</td>
       <td style="font-size:12px;color:var(--text-2)">${isLeave?'—':r.clockIn?fmtTime(r.clockIn):'—'}</td>
@@ -4806,7 +4814,7 @@ function renderBreaks() {
     else statusTag='<span class="tag tag-ok">OK</span>';
 
     html+=`<tr class="${flagged&&!onBreakNow?'flagged-row':onBreakNow?'flagged-row':''}" style="cursor:pointer" onclick="toggleBreakDetail('bd-${i}')">
-      <td style="color:var(--text-3);${singleDay?'display:none':''}">${r.date}</td>
+      <td style="color:var(--text-3);${singleDay?'display:none':''}">${fmtDate(r.date)}</td>
       <td style="font-weight:600">${esc(r.name)}</td>
       <td>${r.segments.length}</td>
       <td style="font-weight:600;color:${onBreakNow?'var(--warn)':'inherit'}">${onBreakNow?'Not ended ⚠':fmtDur(r.totalMs)}</td>
@@ -5048,14 +5056,14 @@ function renderObsStats() {
       <div style="background:var(--surface-2);border-radius:99px;height:6px;margin-bottom:8px">
         <div style="background:${barColor};width:${barPct}%;height:6px;border-radius:99px;transition:width .3s"></div>
       </div>
-      <div style="font-size:11px;color:var(--text-3);margin-bottom:8px">Noted by: ${esc(uniqueBy)} &nbsp;·&nbsp; Last: ${esc(sortedNotes[0].date)}</div>
+      <div style="font-size:11px;color:var(--text-3);margin-bottom:8px">Noted by: ${esc(uniqueBy)} &nbsp;·&nbsp; Last: ${esc(fmtDate(sortedNotes[0].date))}</div>
       <details>
         <summary style="font-size:12px;color:var(--brand);cursor:pointer;user-select:none">View all notes</summary>
         <div style="margin-top:8px">
           ${sortedNotes.map(n=>`
             <div style="background:var(--surface-2);border-radius:var(--radius-sm);padding:8px 10px;margin-bottom:6px">
               <div style="font-size:13px;color:var(--text);margin-bottom:3px">${esc(n.note)}</div>
-              <div style="font-size:11px;color:var(--text-3)">${esc(n.date)} · by ${esc(n.by)}</div>
+              <div style="font-size:11px;color:var(--text-3)">${esc(fmtDate(n.date))} · by ${esc(n.by)}</div>
             </div>`).join('')}
         </div>
       </details>
@@ -6943,7 +6951,7 @@ function refreshObsNotes() {
       ${items.map(n=>`
         <div style="padding:4px 0;border-bottom:1px solid rgba(0,0,0,0.08)">
           <span style="font-weight:600">${esc(n.target?.split(' ')[0])}</span>
-          <span style="opacity:.6;margin-left:4px">· ${n.date} · by ${esc(n.by?.split(' ')[0]||'')}</span>
+          <span style="opacity:.6;margin-left:4px">· ${fmtDate(n.date)} · by ${esc(n.by?.split(' ')[0]||'')}</span>
           <div style="font-size:11px;opacity:.85;margin-top:2px">${esc(n.note)}</div>
         </div>`).join('')}
     </div>`;
@@ -6973,7 +6981,7 @@ function refreshObsNotes() {
             ${[...data.notes].sort((a,b)=>b.ts-a.ts).map(n=>`
               <div style="background:${n.sentiment==='positive'?'#F0FDF4':n.sentiment==='negative'?'#FEF2F2':'var(--surface-2)'};padding:6px 8px;border-radius:var(--radius-sm);margin-bottom:4px;border-left:2px solid ${n.sentiment==='positive'?'var(--success)':n.sentiment==='negative'?'var(--danger)':'var(--border)'}">
                 <div style="font-size:12px">${n.sentiment==='positive'?'👍':n.sentiment==='negative'?'👎':'😐'} ${esc(n.note)}</div>
-                <div style="font-size:10px;color:var(--text-3)">${n.date} · by ${esc(n.by)}</div>
+                <div style="font-size:10px;color:var(--text-3)">${fmtDate(n.date)} · by ${esc(n.by)}</div>
               </div>`).join('')}
           </div>
         </details>
@@ -7374,7 +7382,7 @@ function renderObsNotesForStaff(staffName) {
   return notes.sort((a,b)=>b.ts-a.ts).slice(0,5).map(n =>
     `<div style="background:var(--surface-2);border-radius:var(--radius-sm);padding:8px 10px;margin-bottom:6px;font-size:12px">
       <div style="color:var(--text);margin-bottom:2px">${esc(n.note)}</div>
-      <div style="color:var(--text-3)">${esc(n.date)} · by ${esc(n.by)}</div>
+      <div style="color:var(--text-3)">${esc(fmtDate(n.date))} · by ${esc(n.by)}</div>
     </div>`
   ).join('');
 }
@@ -8919,7 +8927,7 @@ function fileCard(f, showControls) {
         </div>
         <div style="font-size:11px;color:var(--text-3)">
           📋 ${esc(f.appType)}${f.lender?' · 🏦 '+esc(f.lender):''} · 👤 ${esc(f.owner)} · ${ageLabel}
-          ${f.settleDate?' · 📅 settle '+esc(f.settleDate):''}
+          ${f.settleDate?' · 📅 settle '+esc(fmtDate(f.settleDate)):''}
         </div>
       </div>
       <span style="background:${sc.bg};color:${sc.color};border-radius:50px;padding:3px 9px;font-size:11px;font-weight:600;white-space:nowrap;flex-shrink:0">${esc(f.status)}</span>
@@ -9440,7 +9448,7 @@ function feedbackCard(f) {
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:6px">
       <div>
         <div style="font-size:14px;font-weight:700;color:var(--text)">${esc(f.analyst)} ${sentIcon}</div>
-        <div style="font-size:11px;color:var(--text-3)">From ${esc(f.broker)} · ${esc(f.date)} · by ${esc(f.loggedBy.split(' ')[0])}</div>
+        <div style="font-size:11px;color:var(--text-3)">From ${esc(f.broker)} · ${esc(fmtDate(f.date))} · by ${esc(f.loggedBy.split(' ')[0])}</div>
       </div>
       <div style="display:flex;gap:4px">
         <button onclick="openBrokerFeedbackModal('${f.id}')" style="font-size:11px;padding:3px 8px;border-radius:4px;border:1px solid var(--border);background:transparent;cursor:pointer">Edit</button>
@@ -9840,7 +9848,7 @@ function renderEODScreen() {
       <button type="submit" class="btn-primary" style="width:100%;padding:14px;font-size:16px">
         ${existing ? 'Update EOD report' : 'Submit EOD report'}
       </button>
-      ${existing ? `<div style="text-align:center;font-size:12px;color:var(--text-3);margin-top:8px">Last submitted: ${esc(existing.submittedAt||existing.date)}</div>` : ''}
+      ${existing ? `<div style="text-align:center;font-size:12px;color:var(--text-3);margin-top:8px">Last submitted: ${esc(fmtDate(existing.submittedAt||existing.date))}</div>` : ''}
     </form>`;
 }
 
@@ -10039,7 +10047,7 @@ function renderEODSummary(el, teamNames, date) {
 
         return `<div style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:8px">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
-            <div style="font-size:13px;font-weight:700;color:var(--text)">${esc(r.name.split(' ')[0])} <span style="font-size:11px;color:var(--text-3)">· ${esc(r.submittedAt||'')}</span></div>
+            <div style="font-size:13px;font-weight:700;color:var(--text)">${esc(r.name.split(' ')[0])} <span style="font-size:11px;color:var(--text-3)">· ${esc(fmtDate(r.submittedAt||''))}</span></div>
             <div style="font-size:16px;font-weight:700;color:${confColor}">${r.confidence}/5</div>
           </div>
           ${flags.length>0?`<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px">${flags.join('')}</div>`:''}
@@ -10120,7 +10128,7 @@ function refreshMyTeamEOD() {
       ${details.length ? details.map(r=>`
         <div style="padding:4px 0;border-bottom:1px solid rgba(0,0,0,0.06)">
           <span style="font-weight:600">${esc(r.name?.split(' ')[0]||r)}</span>
-          ${r.date&&r.date!==today?`<span style="opacity:.6;margin-left:4px">· ${r.date}</span>`:''}
+          ${r.date&&r.date!==today?`<span style="opacity:.6;margin-left:4px">· ${fmtDate(r.date)}</span>`:''}
           ${r.confidence?`<span style="float:right;opacity:.7">${r.confidence}/5 ⭐</span>`:''}
           ${r.brokerConcernDetail?`<div style="font-size:11px;opacity:.8">📣 ${esc(r.brokerConcernDetail)}</div>`:''}
           ${r.challengeDetail?`<div style="font-size:11px;opacity:.8">⚠️ ${esc(r.challengeDetail)}</div>`:''}
@@ -10495,7 +10503,7 @@ window.renderEODScreen = function() {
     <button type="submit" class="btn-primary" style="width:100%;padding:14px;font-size:16px;margin-bottom:4px">
       ${existing ? 'Update EOD report' : 'Submit EOD report'}
     </button>
-    ${existing ? `<div style="text-align:center;font-size:12px;color:var(--text-3);margin-top:4px">Last submitted: ${esc(existing.submittedAt||existing.date)}</div>` : ''}
+    ${existing ? `<div style="text-align:center;font-size:12px;color:var(--text-3);margin-top:4px">Last submitted: ${esc(fmtDate(existing.submittedAt||existing.date))}</div>` : ''}
   </form>`;
 };
 
@@ -10668,7 +10676,7 @@ window.renderEODSummary = function(el, teamNames, date) {
       if (r.handover) flags.push('<span style="background:#EDE9FE;color:#5B21B6;border-radius:4px;padding:1px 6px;font-size:11px;font-weight:600">Off tomorrow</span>');
       return `<div style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:8px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
-          <div style="font-size:13px;font-weight:700;color:var(--text)">${esc(r.name.split(' ')[0])} ${moodEmoji[r.mood]||''} <span style="font-size:11px;color:var(--text-3)">· ${esc(r.submittedAt||'')}</span></div>
+          <div style="font-size:13px;font-weight:700;color:var(--text)">${esc(r.name.split(' ')[0])} ${moodEmoji[r.mood]||''} <span style="font-size:11px;color:var(--text-3)">· ${esc(fmtDate(r.submittedAt||''))}</span></div>
           <div style="display:flex;align-items:center;gap:6px">
             <span style="font-size:15px;font-weight:700;color:${confColor}">${r.confidence}/5</span>
             <span style="font-size:12px;color:var(--text-3)">${r.checklist||''}</span>
@@ -11023,7 +11031,7 @@ function renderPerformanceScreen() {
             ${p.brokerComplaints.length>0?`
             <div style="margin-top:8px">
               <div style="font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Broker complaint detail</div>
-              ${p.brokerComplaints.map(r=>`<div style="font-size:12px;color:var(--danger)">${esc(r.date)}: ${(r.brokerConcernTags||[]).filter(t=>BROKER_COMPLAINT_TAGS.includes(t)).map(t=>esc(t)).join(', ')}${r.brokerConcernDetail?' — '+esc(r.brokerConcernDetail):''}</div>`).join('')}
+              ${p.brokerComplaints.map(r=>`<div style="font-size:12px;color:var(--danger)">${esc(fmtDate(r.date))}: ${(r.brokerConcernTags||[]).filter(t=>BROKER_COMPLAINT_TAGS.includes(t)).map(t=>esc(t)).join(', ')}${r.brokerConcernDetail?' — '+esc(r.brokerConcernDetail):''}</div>`).join('')}
             </div>`:''}
           </div>
         </div>`;
