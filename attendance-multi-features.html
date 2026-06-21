@@ -4524,28 +4524,31 @@ async function renderLeaveScreen() {
 
     // All leave requests with filter
     html += `<div class="card"><div class="section-label">All leave requests</div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
-        <select id="leaveFilterStatus" onchange="filterLeaveRequests()" style="font-size:12px;padding:5px 8px;border-radius:var(--radius-sm);border:1.5px solid var(--border)">
+      <div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
+        <select id="leaveFilterStatus" onchange="filterLeaveRequests()" style="font-size:12px;padding:4px 6px;border-radius:var(--radius-sm);border:1.5px solid var(--border)">
           <option value="">All statuses</option>
           <option value="Pending">Pending</option>
           <option value="Approved">Approved</option>
           <option value="Rejected">Rejected</option>
           <option value="Forced">Forced</option>
         </select>
-        <select id="leaveFilterType" onchange="filterLeaveRequests()" style="font-size:12px;padding:5px 8px;border-radius:var(--radius-sm);border:1.5px solid var(--border)">
+        <select id="leaveFilterType" onchange="filterLeaveRequests()" style="font-size:12px;padding:4px 6px;border-radius:var(--radius-sm);border:1.5px solid var(--border)">
           <option value="">All types</option>
           <option value="Annual Leave">Annual</option>
           <option value="Sick Leave">Sick</option>
           <option value="Unpaid Leave">Unpaid</option>
           <option value="Broker Holiday">Broker</option>
         </select>
-        <input type="text" id="leaveFilterName" placeholder="Name…" oninput="filterLeaveRequests()" style="font-size:12px;padding:5px 8px;border-radius:var(--radius-sm);border:1.5px solid var(--border);width:90px"/>
-        <span style="font-size:11px;color:var(--text-3);margin-left:4px">Start date:</span>
-        ${['Today','Yesterday','This week','This month'].map(p=>`<button id="lfBtn_${p.replace(/ /g,'_')}" onclick="setLeavePreset('${p}',this)" style="font-size:12px;padding:5px 10px;border-radius:50px;border:1.5px solid var(--border);background:var(--surface-2);color:var(--text-2);cursor:pointer">${p}</button>`).join('')}
-        <input type="date" id="leaveFilterFrom" onchange="filterLeaveRequests();clearLeavePresetBtns()" style="font-size:12px;padding:5px 7px;border-radius:var(--radius-sm);border:1.5px solid var(--border)"/>
-        <span style="font-size:11px;color:var(--text-3)">–</span>
-        <input type="date" id="leaveFilterTo" onchange="filterLeaveRequests();clearLeavePresetBtns()" style="font-size:12px;padding:5px 7px;border-radius:var(--radius-sm);border:1.5px solid var(--border)"/>
-        <button onclick="clearLeaveFilters()" style="font-size:12px;padding:5px 10px;border-radius:50px;border:1.5px solid var(--border);background:transparent;cursor:pointer;color:var(--text-3)">Clear</button>
+        <input type="text" id="leaveFilterName" placeholder="Name…" oninput="filterLeaveRequests()" style="font-size:12px;padding:4px 6px;border-radius:var(--radius-sm);border:1.5px solid var(--border);width:80px"/>
+        ${['Today','Yesterday','This week','This month'].map(p=>`<button id="lfBtn_${p.replace(/ /g,'_')}" onclick="setLeavePreset('${p}',this)" style="font-size:12px;padding:4px 9px;border-radius:50px;border:1.5px solid var(--border);background:var(--surface-2);color:var(--text-2);cursor:pointer">${p}</button>`).join('')}
+        <button id="lfBtn_custom" onclick="toggleLeaveCustomRange(this)" style="font-size:12px;padding:4px 9px;border-radius:50px;border:1.5px solid var(--border);background:var(--surface-2);color:var(--text-2);cursor:pointer">📅 Custom</button>
+        <button onclick="clearLeaveFilters()" style="font-size:12px;padding:4px 9px;border-radius:50px;border:1.5px solid var(--border);background:transparent;cursor:pointer;color:var(--text-3)">Clear</button>
+      </div>
+      <div id="leaveCustomRange" style="display:none;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
+        <span style="font-size:12px;color:var(--text-3)">From</span>
+        <input type="date" id="leaveFilterFrom" onchange="filterLeaveRequests();clearLeavePresetBtns()" style="font-size:12px;padding:4px 7px;border-radius:var(--radius-sm);border:1.5px solid var(--border)"/>
+        <span style="font-size:12px;color:var(--text-3)">to</span>
+        <input type="date" id="leaveFilterTo" onchange="filterLeaveRequests();clearLeavePresetBtns()" style="font-size:12px;padding:4px 7px;border-radius:var(--radius-sm);border:1.5px solid var(--border)"/>
       </div>
       <div id="leaveRequestsList"></div>
     </div>`;
@@ -4672,6 +4675,20 @@ function filterTeamLeaveBalances() {
     </tr></thead><tbody>${rows}</tbody></table>`;
 }
 
+function toggleLeaveCustomRange(btn) {
+  const div = document.getElementById('leaveCustomRange');
+  if (!div) return;
+  const open = div.style.display !== 'none';
+  div.style.display = open ? 'none' : 'flex';
+  if (btn) {
+    const active = !open;
+    btn.style.background   = active ? 'var(--brand-light)' : 'var(--surface-2)';
+    btn.style.borderColor  = active ? 'var(--brand)' : 'var(--border)';
+    btn.style.color        = active ? 'var(--brand)' : 'var(--text-2)';
+    btn.style.fontWeight   = active ? '700' : '400';
+  }
+}
+
 function setLeavePreset(preset, btn) {
   const d = new Date();
   const fmt = d2 => d2.toISOString().split('T')[0];
@@ -4685,6 +4702,11 @@ function setLeavePreset(preset, btn) {
   if(toEl) toEl.value=to;
   // Highlight button
   clearLeavePresetBtns();
+  // Hide custom range and reset its button
+  const customDiv = document.getElementById('leaveCustomRange');
+  if (customDiv) customDiv.style.display = 'none';
+  const customBtn = document.getElementById('lfBtn_custom');
+  if (customBtn) { customBtn.style.background='var(--surface-2)'; customBtn.style.borderColor='var(--border)'; customBtn.style.color='var(--text-2)'; customBtn.style.fontWeight='400'; }
   if(btn) { btn.style.background='var(--brand-light)'; btn.style.borderColor='var(--brand)'; btn.style.color='var(--brand)'; btn.style.fontWeight='700'; }
   filterLeaveRequests();
 }
