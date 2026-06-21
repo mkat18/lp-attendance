@@ -731,10 +731,15 @@ tr.flagged-row:hover td { background: #FFEAEA; }
 
     <div class="card" id="workloadNoteCard" style="display:none">
       <div class="card-label">📝 Observation note</div>
-      <div style="font-size:13px;color:var(--text-2);margin-bottom:10px">Private note visible to managers only.</div>
+      <div style="font-size:13px;color:var(--text-2);margin-bottom:10px">Private note visible to managers and team leads only.</div>
       <select id="workloadNoteTarget" style="width:100%;font-size:14px;margin-bottom:8px">
         <option value="">— select a staff member —</option>
       </select>
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <button type="button" id="obsBtn_positive" onclick="setObsSentiment('positive')" style="flex:1;padding:7px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:var(--surface-2);cursor:pointer;font-size:13px">👍 Positive</button>
+        <button type="button" id="obsBtn_neutral" onclick="setObsSentiment('neutral')" style="flex:1;padding:7px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:var(--surface-2);cursor:pointer;font-size:13px">😐 Neutral</button>
+        <button type="button" id="obsBtn_negative" onclick="setObsSentiment('negative')" style="flex:1;padding:7px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:var(--surface-2);cursor:pointer;font-size:13px">👎 Negative</button>
+      </div>
       <textarea id="workloadNoteText" placeholder="e.g. Seemed disengaged today, may need a check-in…" style="width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:14px;color:var(--text);background:var(--surface-2);outline:none;resize:none;min-height:68px;line-height:1.5"></textarea>
       <button class="btn-primary" onclick="saveObservationNote()" style="margin-top:8px">Save note</button>
     </div>
@@ -4282,7 +4287,8 @@ async function processLeaveRequest(id, action, notes) {
     ApprovalNotes: notes||'',
   };
 
-  await spPatch(SP_API + "('LeaveRequests')/items(" + id + ")", payload);
+  const ok = await spPatch(SP_API + "('LeaveRequests')/items(" + id + ")", payload);
+  if (!ok) { showToast('Failed to save to SharePoint. Please try again.', 'err'); return; }
   Object.assign(req, payload);
   LS.set('ci_leaveReq', _leaveRequests);
 
@@ -4545,38 +4551,22 @@ async function renderLeaveScreen() {
 
   // ── Team leave balances for manager/TL ────────────────────────────────────
   if (canApprove) {
-    let teamStaff = isTL && !isMgr && !isSuperAdmin()
-      ? getStaff().filter(s => getTeamForTL(currentUser.name).includes(s.name))
-      : getStaff().filter(s => s.role !== 'superadmin');
-
-    html += `<div class="card"><div class="section-label">Team leave balances — ${getCurrentLeaveYear()}</div>
-      <table style="width:100%;font-size:13px;border-collapse:collapse">
-        <thead><tr style="border-bottom:1.5px solid var(--border)">
-          <th style="padding:6px 0;text-align:left;font-size:11px;color:var(--text-3);font-weight:600">Staff</th>
-          <th style="padding:6px 0;text-align:center;font-size:11px;color:var(--text-3);font-weight:600">${isHRView ? 'Annual rem.' : 'Annual used'}</th>
-          <th style="padding:6px 0;text-align:center;font-size:11px;color:var(--text-3);font-weight:600">${isHRView ? 'Sick rem.' : 'Sick used'}</th>
-          <th style="padding:6px 0;text-align:center;font-size:11px;color:var(--text-3);font-weight:600">Unpaid</th>
-          <th style="padding:6px 0;text-align:center;font-size:11px;color:var(--text-3);font-weight:600">Broker days</th>
-          <th style="padding:6px 0;text-align:center;font-size:11px;color:var(--text-3);font-weight:600">Total taken</th>
-          ${isMgr?'<th style="padding:6px 0;text-align:center;font-size:11px;color:var(--text-3);font-weight:600">Encash</th>':''}
-        </tr></thead><tbody>
-        ${teamStaff.map(s => {
-          const bal = getLeaveBalance(s.name);
-          const onProb = isOnProbation(s);
-          const ent = getLeaveEntitlement(s.name, bal.leaveYear);
-          const encashed = ent ? parseFloat(ent.AnnualEncashed||0) : 0;
-          const encashCleared = ent ? ent.EncashmentCleared === 'true' : false;
-          return `<tr style="border-bottom:0.5px solid var(--border)">
-            <td style="padding:8px 0;font-weight:500">${esc(s.name)}${onProb?'<span style="font-size:10px;color:var(--warn);margin-left:4px">Probation</span>':''}</td>
-            <td style="padding:8px 0;text-align:center;color:${isHRView&&bal.annualRemaining<=2?'var(--danger)':'inherit'}">${isHRView ? bal.annualRemaining : '—'}</td>
-            <td style="padding:8px 0;text-align:center">${isHRView ? bal.sickRemaining : '—'}</td>
-            <td style="padding:8px 0;text-align:center">${bal.unpaidUsed}</td>
-            <td style="padding:8px 0;text-align:center">${bal.brokerCount}</td>
-            <td style="padding:8px 0;text-align:center;font-weight:600">${bal.totalUsed}</td>
-            ${isMgr?`<td style="padding:8px 0;text-align:center">${encashed>0&&!encashCleared?`<button onclick="markEncashed('${esc(s.name)}','${bal.leaveYear}')" style="font-size:11px;padding:3px 8px;background:var(--success);color:#fff;border:none;border-radius:4px;cursor:pointer">Mark encashed (${encashed}d)</button>`:'—'}</td>`:''}
-          </tr>`;
-        }).join('')}
-      </tbody></table>
+    const curYear = getCurrentLeaveYear();
+    const prevYear = (() => { const [s,e] = curYear.split('-'); return `${parseInt(s)-1}-${parseInt(e)-1}`; })();
+    html += `<div class="card">
+      <div class="section-label">Team leave balances</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
+        <select id="leaveBalYearSel" onchange="filterTeamLeaveBalances()" style="font-size:13px;padding:5px 8px;border-radius:var(--radius-sm);border:1.5px solid var(--border)">
+          <option value="${curYear}">${curYear} (current)</option>
+          <option value="${prevYear}">${prevYear}</option>
+        </select>
+        <span style="font-size:12px;color:var(--text-3)">or filter by dates taken:</span>
+        <input type="date" id="leaveBalFrom" onchange="filterTeamLeaveBalances()" style="font-size:13px;padding:5px 8px;border-radius:var(--radius-sm);border:1.5px solid var(--border)"/>
+        <span style="font-size:12px;color:var(--text-3)">to</span>
+        <input type="date" id="leaveBalTo" onchange="filterTeamLeaveBalances()" style="font-size:13px;padding:5px 8px;border-radius:var(--radius-sm);border:1.5px solid var(--border)"/>
+        <button onclick="document.getElementById('leaveBalFrom').value='';document.getElementById('leaveBalTo').value='';filterTeamLeaveBalances()" style="font-size:12px;padding:4px 10px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:transparent;cursor:pointer;color:var(--text-3)">Clear</button>
+      </div>
+      <div id="teamLeaveBalTable"></div>
     </div>`;
   }
 
@@ -4584,7 +4574,7 @@ async function renderLeaveScreen() {
 
   // Populate tables after HTML is in the DOM
   filterMyLeaveHistory();
-  if (canApprove) filterLeaveRequests();
+  if (canApprove) { filterLeaveRequests(); filterTeamLeaveBalances(); }
 }
 
 function toggleLeaveHistory() {
@@ -4607,6 +4597,76 @@ function toggleHalfDaySession() {
   const cb = document.getElementById('leaveHalfDay');
   const sel = document.getElementById('leaveHalfDaySession');
   if (sel) sel.style.display = cb && cb.checked ? 'inline-block' : 'none';
+}
+
+function filterTeamLeaveBalances() {
+  const el = document.getElementById('teamLeaveBalTable');
+  if (!el) return;
+  const yearSel = document.getElementById('leaveBalYearSel')?.value || getCurrentLeaveYear();
+  const from = document.getElementById('leaveBalFrom')?.value || '';
+  const to = document.getElementById('leaveBalTo')?.value || '';
+  const useDateRange = from || to;
+  const isMgr = isManager() || isSuperAdmin();
+  const isTL = isTeamLead();
+  const isHRV = (isSuperAdmin() && !_previewRole) || canDo('canSeeLeaveBalance');
+
+  let teamStaff = isTL && !isMgr && !isSuperAdmin()
+    ? getStaff().filter(s => getTeamForTL(currentUser.name).includes(s.name))
+    : getStaff().filter(s => s.role !== 'superadmin');
+
+  const rows = teamStaff.map(s => {
+    const onProb = isOnProbation(s);
+    let annualUsed, sickUsed, unpaid, broker, total, annualRem, sickRem;
+
+    if (useDateRange) {
+      // Filter actual leave requests by date range
+      const reqs = _leaveRequests.filter(r =>
+        r.Title === s.name && r.Status === 'Approved' &&
+        (!from || r.StartDate >= from) && (!to || r.StartDate <= to)
+      );
+      annualUsed = reqs.filter(r=>r.LeaveType==='Annual Leave'||r.LeaveType==='Forced Leave').reduce((a,r)=>a+parseFloat(r.DaysRequested||0),0);
+      sickUsed = reqs.filter(r=>r.LeaveType==='Sick Leave').reduce((a,r)=>a+parseFloat(r.DaysRequested||0),0);
+      unpaid = reqs.filter(r=>r.LeaveType==='Unpaid Leave').reduce((a,r)=>a+parseFloat(r.DaysRequested||0),0);
+      broker = reqs.filter(r=>r.LeaveType==='Broker Holiday').reduce((a,r)=>a+parseFloat(r.DaysRequested||0),0);
+      total = reqs.reduce((a,r)=>a+parseFloat(r.DaysRequested||0),0);
+      annualRem = '—'; sickRem = '—';
+    } else {
+      const bal = getLeaveBalance(s.name, yearSel !== getCurrentLeaveYear() ? yearSel : undefined);
+      annualUsed = bal.annualUsed; sickUsed = bal.sickUsed;
+      unpaid = bal.unpaidUsed; broker = bal.brokerCount; total = bal.totalUsed;
+      annualRem = bal.annualRemaining; sickRem = bal.sickRemaining;
+    }
+
+    const ent = getLeaveEntitlement(s.name, yearSel);
+    const encashed = ent ? parseFloat(ent.AnnualEncashed||0) : 0;
+    const encashCleared = ent ? ent.EncashmentCleared === 'true' : false;
+
+    return `<tr style="border-bottom:0.5px solid var(--border)">
+      <td style="padding:8px 0;font-weight:500">${esc(s.name)}${onProb?'<span style="font-size:10px;color:var(--warn);margin-left:4px">Probation</span>':''}</td>
+      <td style="padding:8px 0;text-align:center;color:${isHRV&&annualRem!=='—'&&annualRem<=2?'var(--danger)':'inherit'}">${useDateRange ? annualUsed : (isHRV ? annualRem : annualUsed)}</td>
+      <td style="padding:8px 0;text-align:center">${useDateRange ? sickUsed : (isHRV ? sickRem : sickUsed)}</td>
+      <td style="padding:8px 0;text-align:center">${unpaid}</td>
+      <td style="padding:8px 0;text-align:center">${broker}</td>
+      <td style="padding:8px 0;text-align:center;font-weight:600">${total}</td>
+      ${isMgr&&!useDateRange?`<td style="padding:8px 0;text-align:center">${encashed>0&&!encashCleared?`<button onclick="markEncashed('${esc(s.name)}','${yearSel}')" style="font-size:11px;padding:3px 8px;background:var(--success);color:#fff;border:none;border-radius:4px;cursor:pointer">Mark encashed (${encashed}d)</button>`:'—'}</td>`:''}
+    </tr>`;
+  }).join('');
+
+  const colHeader = useDateRange
+    ? `<th style="padding:6px 0;text-align:center;font-size:11px;color:var(--text-3);font-weight:600">Annual</th>
+       <th style="padding:6px 0;text-align:center;font-size:11px;color:var(--text-3);font-weight:600">Sick</th>`
+    : `<th style="padding:6px 0;text-align:center;font-size:11px;color:var(--text-3);font-weight:600">${isHRV?'Annual rem.':'Annual used'}</th>
+       <th style="padding:6px 0;text-align:center;font-size:11px;color:var(--text-3);font-weight:600">${isHRV?'Sick rem.':'Sick used'}</th>`;
+
+  el.innerHTML = `<table style="width:100%;font-size:13px;border-collapse:collapse">
+    <thead><tr style="border-bottom:1.5px solid var(--border)">
+      <th style="padding:6px 0;text-align:left;font-size:11px;color:var(--text-3);font-weight:600">Staff</th>
+      ${colHeader}
+      <th style="padding:6px 0;text-align:center;font-size:11px;color:var(--text-3);font-weight:600">Unpaid</th>
+      <th style="padding:6px 0;text-align:center;font-size:11px;color:var(--text-3);font-weight:600">Broker</th>
+      <th style="padding:6px 0;text-align:center;font-size:11px;color:var(--text-3);font-weight:600">Total</th>
+      ${isMgr&&!useDateRange?'<th style="padding:6px 0;text-align:center;font-size:11px;color:var(--text-3);font-weight:600">Encash</th>':''}
+    </tr></thead><tbody>${rows}</tbody></table>`;
 }
 
 function clearLeaveFilters() {
@@ -5341,7 +5401,24 @@ function renderObsStats() {
   let html = '';
 
   // Summary bar
-  html += `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px">
+  const posCount = notes.filter(n=>n.sentiment==='positive').length;
+  const negCount = notes.filter(n=>n.sentiment==='negative').length;
+  const neuCount = notes.length - posCount - negCount;
+  html += `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px">
+    <div style="background:#F0FDF4;border-radius:var(--radius-sm);padding:10px;text-align:center">
+      <div style="font-size:22px;font-weight:700;color:var(--success)">${posCount}</div>
+      <div style="font-size:11px;color:var(--success)">👍 Positive</div>
+    </div>
+    <div style="background:var(--surface-2);border-radius:var(--radius-sm);padding:10px;text-align:center">
+      <div style="font-size:22px;font-weight:700;color:var(--text-3)">${neuCount}</div>
+      <div style="font-size:11px;color:var(--text-3)">😐 Neutral</div>
+    </div>
+    <div style="background:#FEF2F2;border-radius:var(--radius-sm);padding:10px;text-align:center">
+      <div style="font-size:22px;font-weight:700;color:var(--danger)">${negCount}</div>
+      <div style="font-size:11px;color:var(--danger)">👎 Negative</div>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:16px">
     <div style="background:var(--surface-2);border-radius:var(--radius-sm);padding:10px;text-align:center">
       <div style="font-size:22px;font-weight:700;color:var(--brand)">${notes.length}</div>
       <div style="font-size:11px;color:var(--text-3)">Total notes</div>
@@ -5350,35 +5427,39 @@ function renderObsStats() {
       <div style="font-size:22px;font-weight:700;color:var(--brand)">${sorted.length}</div>
       <div style="font-size:11px;color:var(--text-3)">Staff observed</div>
     </div>
-    <div style="background:var(--surface-2);border-radius:var(--radius-sm);padding:10px;text-align:center">
-      <div style="font-size:22px;font-weight:700;color:${maxCount>=5?'var(--danger)':'var(--warn)'}">${maxCount}</div>
-      <div style="font-size:11px;color:var(--text-3)">Most for one person</div>
-    </div>
-  </div>`;
+  </div>`
 
   // Per-person cards
   for (const [name, personNotes] of sorted) {
     const count = personNotes.length;
     const barPct = Math.round((count/maxCount)*100);
-    const barColor = count>=5?'var(--danger)':count>=3?'var(--warn)':'var(--brand)';
+    const pos = personNotes.filter(n=>n.sentiment==='positive').length;
+    const neg = personNotes.filter(n=>n.sentiment==='negative').length;
+    const neu = count - pos - neg;
+    const barColor = neg>=3?'var(--danger)':neg>=1?'var(--warn)':pos>0?'var(--success)':'var(--brand)';
     const sortedNotes = [...personNotes].sort((a,b)=>b.ts-a.ts);
     const uniqueBy = [...new Set(personNotes.map(n=>n.by))].join(', ');
+    const sentimentIcon = n => n.sentiment==='positive'?'👍':n.sentiment==='negative'?'👎':'😐';
 
     html += `<div style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:10px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
         <div style="font-size:14px;font-weight:700;color:var(--text)">${esc(name)}</div>
-        <span style="font-size:13px;font-weight:700;color:${barColor};background:${count>=5?'var(--danger-light)':count>=3?'#FEF3C7':'var(--brand-light)'};padding:2px 10px;border-radius:99px">${count} note${count!==1?'s':''}</span>
+        <div style="display:flex;gap:4px">
+          ${pos?`<span style="font-size:12px;background:#F0FDF4;color:var(--success);padding:2px 8px;border-radius:99px">👍 ${pos}</span>`:''}
+          ${neu?`<span style="font-size:12px;background:var(--surface-2);color:var(--text-3);padding:2px 8px;border-radius:99px">😐 ${neu}</span>`:''}
+          ${neg?`<span style="font-size:12px;background:#FEF2F2;color:var(--danger);padding:2px 8px;border-radius:99px">👎 ${neg}</span>`:''}
+        </div>
       </div>
       <div style="background:var(--surface-2);border-radius:99px;height:6px;margin-bottom:8px">
         <div style="background:${barColor};width:${barPct}%;height:6px;border-radius:99px;transition:width .3s"></div>
       </div>
       <div style="font-size:11px;color:var(--text-3);margin-bottom:8px">Noted by: ${esc(uniqueBy)} &nbsp;·&nbsp; Last: ${esc(sortedNotes[0].date)}</div>
       <details>
-        <summary style="font-size:12px;color:var(--brand);cursor:pointer;user-select:none">View all notes</summary>
+        <summary style="font-size:12px;color:var(--brand);cursor:pointer;user-select:none">View all notes (${count})</summary>
         <div style="margin-top:8px">
           ${sortedNotes.map(n=>`
-            <div style="background:var(--surface-2);border-radius:var(--radius-sm);padding:8px 10px;margin-bottom:6px">
-              <div style="font-size:13px;color:var(--text);margin-bottom:3px">${esc(n.note)}</div>
+            <div style="background:${n.sentiment==='positive'?'#F0FDF4':n.sentiment==='negative'?'#FEF2F2':'var(--surface-2)'};border-radius:var(--radius-sm);padding:8px 10px;margin-bottom:6px;border-left:3px solid ${n.sentiment==='positive'?'var(--success)':n.sentiment==='negative'?'var(--danger)':'var(--border)'}">
+              <div style="font-size:13px;color:var(--text);margin-bottom:3px">${sentimentIcon(n)} ${esc(n.note)}</div>
               <div style="font-size:11px;color:var(--text-3)">${esc(n.date)} · by ${esc(n.by)}</div>
             </div>`).join('')}
         </div>
@@ -7100,12 +7181,72 @@ function renderMyTeam() {
       <div style="background:${m.statusBg};color:${m.statusColor};border-radius:50px;padding:4px 10px;font-size:12px;font-weight:600;white-space:nowrap;flex-shrink:0">${m.statusIcon} ${m.statusLabel}</div>
     </div>`).join('');
 
+  // Build obs notes stats for this TL's team
+  const teamNotes = getObsNotes().filter(n => teamNames.includes(n.target));
+  const last30 = new Date(); last30.setDate(last30.getDate()-30);
+  const last30str = last30.toISOString().split('T')[0];
+  const recentNotes = teamNotes.filter(n => n.date >= last30str);
+  const posN = recentNotes.filter(n=>n.sentiment==='positive').length;
+  const negN = recentNotes.filter(n=>n.sentiment==='negative').length;
+  const neuN = recentNotes.length - posN - negN;
+
+  let obsHTML = '';
+  if (teamNotes.length > 0) {
+    const byPerson = {};
+    for (const n of recentNotes) {
+      if (!byPerson[n.target]) byPerson[n.target] = {pos:0,neg:0,neu:0,notes:[]};
+      if (n.sentiment==='positive') byPerson[n.target].pos++;
+      else if (n.sentiment==='negative') byPerson[n.target].neg++;
+      else byPerson[n.target].neu++;
+      byPerson[n.target].notes.push(n);
+    }
+    obsHTML = `<div class="card" style="margin-top:1rem">
+      <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">📝 Observation Notes — Last 30 days</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:12px">
+        <div style="background:#F0FDF4;border-radius:var(--radius-sm);padding:8px;text-align:center">
+          <div style="font-size:20px;font-weight:700;color:var(--success)">${posN}</div>
+          <div style="font-size:10px;color:var(--success)">👍 Positive</div>
+        </div>
+        <div style="background:var(--surface-2);border-radius:var(--radius-sm);padding:8px;text-align:center">
+          <div style="font-size:20px;font-weight:700;color:var(--text-3)">${neuN}</div>
+          <div style="font-size:10px;color:var(--text-3)">😐 Neutral</div>
+        </div>
+        <div style="background:#FEF2F2;border-radius:var(--radius-sm);padding:8px;text-align:center">
+          <div style="font-size:20px;font-weight:700;color:var(--danger)">${negN}</div>
+          <div style="font-size:10px;color:var(--danger)">👎 Negative</div>
+        </div>
+      </div>
+      ${Object.entries(byPerson).map(([name, data]) => `
+        <div style="border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px;margin-bottom:8px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+            <div style="font-size:13px;font-weight:600">${esc(name)}</div>
+            <div style="display:flex;gap:3px">
+              ${data.pos?`<span style="font-size:11px;background:#F0FDF4;color:var(--success);padding:1px 6px;border-radius:99px">👍${data.pos}</span>`:''}
+              ${data.neu?`<span style="font-size:11px;background:var(--surface-2);color:var(--text-3);padding:1px 6px;border-radius:99px">😐${data.neu}</span>`:''}
+              ${data.neg?`<span style="font-size:11px;background:#FEF2F2;color:var(--danger);padding:1px 6px;border-radius:99px">👎${data.neg}</span>`:''}
+            </div>
+          </div>
+          <details>
+            <summary style="font-size:11px;color:var(--brand);cursor:pointer">View notes</summary>
+            <div style="margin-top:6px">
+              ${[...data.notes].sort((a,b)=>b.ts-a.ts).map(n=>`
+                <div style="background:${n.sentiment==='positive'?'#F0FDF4':n.sentiment==='negative'?'#FEF2F2':'var(--surface-2)'};padding:6px 8px;border-radius:var(--radius-sm);margin-bottom:4px;border-left:2px solid ${n.sentiment==='positive'?'var(--success)':n.sentiment==='negative'?'var(--danger)':'var(--border)'}">
+                  <div style="font-size:12px">${n.sentiment==='positive'?'👍':n.sentiment==='negative'?'👎':'😐'} ${esc(n.note)}</div>
+                  <div style="font-size:10px;color:var(--text-3)">${n.date} · by ${esc(n.by)}</div>
+                </div>`).join('')}
+            </div>
+          </details>
+        </div>`).join('')}
+    </div>`;
+  }
+
   el.innerHTML = `
     <div class="card" style="margin-bottom:1rem">${summaryHTML}</div>
     <div class="card">
       <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Team members (${teamNames.length})</div>
       ${cardsHTML}
     </div>
+    ${obsHTML}
     <div style="text-align:center;margin-top:8px">
       <button onclick="renderMyTeam()" style="background:transparent;border:1.5px solid var(--border);border-radius:50px;padding:8px 20px;font-size:13px;color:var(--text-2);cursor:pointer">↻ Refresh</button>
     </div>`;
@@ -7459,16 +7600,30 @@ async function spSaveObsNote(note) {
   } catch(e) { console.warn('ObsNote SP save failed:', e); }
 }
 
+let _obsSentiment = 'neutral';
+function setObsSentiment(s) {
+  _obsSentiment = s;
+  ['positive','neutral','negative'].forEach(v => {
+    const btn = document.getElementById('obsBtn_' + v);
+    if (!btn) return;
+    const active = v === s;
+    btn.style.background = active ? (v==='positive'?'var(--success)':v==='negative'?'var(--danger)':'var(--text-3)') : 'var(--surface-2)';
+    btn.style.color = active ? '#fff' : 'inherit';
+    btn.style.borderColor = active ? 'transparent' : 'var(--border)';
+  });
+}
+
 async function saveObservationNote() {
   const target = document.getElementById('workloadNoteTarget').value;
   const text = document.getElementById('workloadNoteText').value.trim();
   if (!target) { showToast('Select a staff member.', 'err'); return; }
   if (!text) { showToast('Enter a note.', 'err'); return; }
-  const note = { by: currentUser.name, target, date: today, note: text, ts: Date.now() };
+  const note = { by: currentUser.name, target, date: today, note: text, sentiment: _obsSentiment, ts: Date.now() };
   const notes = getObsNotes();
   notes.unshift(note);
   saveObsNotes(notes);
   document.getElementById('workloadNoteText').value = '';
+  setObsSentiment('neutral');
   showToast('Note saved ✓', 'ok');
   await spSaveObsNote(note);
 }
