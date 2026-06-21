@@ -680,209 +680,7 @@ tr.flagged-row:hover td { background: #FFEAEA; }
   </div>
 
   <!-- ── CHECK-IN ───────────────────────────────────────────────────────── -->
-  <div id="screen-checkin" class="screen">
-    <div class="page-header">
-      <h1 id="checkinGreeting">How are you working today?</h1>
-      <p id="checkinDate2"></p>
-    </div>
-    <div class="card">
-      <div class="field" style="margin-bottom:1.35rem">
-        <label>Your status</label>
-        <div class="status-row" role="group" aria-label="Work status">
-          <button class="status-btn" data-val="office" onclick="pick(this)" type="button">
-            <span class="icon">🏢</span>In office
-          </button>
-          <button class="status-btn" data-val="wfh" onclick="pick(this)" type="button">
-            <span class="icon">🏠</span>WFH
-          </button>
-          <button class="status-btn" data-val="leave" onclick="pick(this)" type="button">
-            <span class="icon">🌴</span>On leave
-          </button>
-          <button class="status-btn" data-val="halfday" onclick="pick(this)" type="button">
-            <span class="icon">🕐</span>Half day
-          </button>
-        </div>
-      </div>
-      <div id="leaveReasonField" style="display:none;margin-bottom:1.1rem">
-        <label style="display:block;font-size:12px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;font-family:var(--font-ui)">Reason <span style="color:var(--danger)">*</span></label>
-        <textarea id="leaveReason" placeholder="e.g. Annual leave, sick day, working morning only…" style="width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:14px;color:var(--text);background:var(--surface-2);outline:none;resize:none;min-height:76px;line-height:1.5;transition:border-color .15s" onfocus="this.style.borderColor='var(--brand)'" onblur="this.style.borderColor='var(--border)'"></textarea>
-      </div>
-      <button class="btn-primary" id="submitBtn" onclick="submitCheckin()">Submit</button>
-      <div id="submittedMsg" style="display:none;text-align:center;padding:10px 0 2px;font-size:13px;color:var(--success);font-weight:600">✓ Submitted for today</div>
-    </div>
-
-    <div class="card" id="breakCard" style="display:none">
-      <div class="card-label">Breaks</div>
-      <div class="break-box">
-        <div class="break-status-txt" id="breakStatus">Not on a break</div>
-        <div class="break-time" id="breakTimer">00:00</div>
-        <button class="break-btn start" id="breakBtn" onclick="toggleBreak()">Start break</button>
-      </div>
-    </div>
-
-
-    <div class="card" id="eodPromptCard" style="display:none;border-color:#6366F1;background:#EEF2FF">
-      <div class="card-label" style="color:#4338CA">📋 End of Day Report</div>
-      <div style="font-size:13px;color:#4338CA;margin-bottom:10px" id="eodPromptStatus">Required before clock-out</div>
-      <button onclick="goToEOD()" class="btn-primary" style="background:#4F46E5;font-size:13px;padding:9px">Fill in EOD report</button>
-    </div>
-
-    <div class="card" id="workloadNoteCard" style="display:none">
-      <div class="card-label">📝 Observation note</div>
-      <div style="font-size:13px;color:var(--text-2);margin-bottom:10px">Private note visible to managers only.</div>
-      <select id="workloadNoteTarget" style="width:100%;font-size:14px;margin-bottom:8px">
-        <option value="">— select a staff member —</option>
-      </select>
-      <textarea id="workloadNoteText" placeholder="e.g. Seemed disengaged today, may need a check-in…" style="width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:14px;color:var(--text);background:var(--surface-2);outline:none;resize:none;min-height:68px;line-height:1.5"></textarea>
-      <button class="btn-primary" onclick="saveObservationNote()" style="margin-top:8px">Save note</button>
-    </div>
-    <div class="card" id="clockOutCard" style="display:none">
-      <div class="card-label">Clock out</div>
-      <div class="break-box">
-        <div class="break-status-txt" id="clockInDisplay" style="margin-bottom:4px">—</div>
-        <div id="clockOutDisplay" style="font-size:13px;color:var(--text-3);margin-bottom:14px">—</div>
-        <button class="break-btn end" id="clockOutBtn" onclick="clockOut()">Clock out for today</button>
-        <div id="clockOutDone" style="display:none;text-align:center;font-size:13px;font-weight:600;color:var(--success);padding:4px 0">✓ Clocked out</div>
-      </div>
-    </div>
-
-    <!-- Weekly widgets — visible to all staff after check-in -->
-    <div id="staffWeeklyWidgets" style="display:none;margin-top:12px">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
-        <div class="card" style="margin:0">
-          <div class="card-label">🎂 Birthdays today</div>
-          <div id="staffWidgetBirthdays"><div style="font-size:12px;color:var(--text-3)">No birthdays today</div></div>
-        </div>
-        <div class="card" style="margin:0">
-          <div class="card-label">🎉 Work anniversaries</div>
-          <div id="staffWidgetAnniversaries"><div style="font-size:12px;color:var(--text-3)">No anniversaries this week</div></div>
-        </div>
-      </div>
-      <div class="card" style="margin:0">
-        <div class="card-label">🏖 On leave this week</div>
-        <div id="staffWidgetLeaves" style="display:flex;flex-wrap:wrap;gap:8px 20px"><div style="font-size:12px;color:var(--text-3)">No leave this week</div></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ── DASHBOARD ──────────────────────────────────────────────────────── -->
-  <div id="screen-dashboard" class="screen">
-    <div class="page-header">
-      <h1>Attendance</h1>
-    </div>
-
-    <div class="dashboard-grid">
-
-    <!-- Cards — single day or range -->
-    <div class="dashboard-snapshot" style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:.75rem 1rem;box-shadow:var(--shadow-sm)">
-      <div class="snapshot-header" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px">
-        <span style="font-family:var(--font-ui);font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.6px">Snapshot</span>
-        <div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap">
-          <button class="quick-date-btn active" id="qbtn-today" onclick="setCardRange('today',this)">Today</button>
-          <button class="quick-date-btn" id="qbtn-yesterday" onclick="setCardRange('yesterday',this)">Yesterday</button>
-          <button class="quick-date-btn" id="qbtn-week" onclick="setCardRange('week',this)">This week</button>
-          <button class="quick-date-btn" id="qbtn-month" onclick="setCardRange('month',this)">This month</button>
-        </div>
-        <div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap">
-          <input type="date" id="selectedDate" style="min-width:110px;padding:5px 8px;font-size:12px"/>
-          <span style="font-size:12px;color:var(--text-3)">to</span>
-          <input type="date" id="selectedDateTo" style="min-width:110px;padding:5px 8px;font-size:12px"/>
-          <button class="icon-btn" onclick="renderMetrics();renderEODCardIfNeeded();" style="padding:5px 10px;font-size:12px">↻</button>
-        </div>
-      </div>
-<div id="publicHolidayBanner" style="display:none;background:#FEF3C7;border:1.5px solid #FDE68A;border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:10px;font-size:13px;font-weight:600;color:#92400E;text-align:center"></div>
-      <div id="needsAttentionBanner" style="display:none;background:#FEF2F2;border:1.5px solid #FECACA;border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:10px;cursor:pointer;display:flex;align-items:center;justify-content:space-between" onclick="goTab('admin',document.querySelector('.nav-tab[data-tab=admin]'))">
-        <div style="font-size:13px;font-weight:600;color:var(--danger)">⚠ <span id="needsAttentionCount">0</span> issue<span id="needsAttentionPlural">s</span> need attention</div>
-        <div style="font-size:12px;color:var(--danger);opacity:0.7">View in Staff tab →</div>
-      </div>
-      <div class="metrics" id="metrics" style="margin-bottom:0"></div>
-    </div>
-
-    <!-- Tabs — date range -->
-    <div class="dashboard-tabs" style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:1rem 1.1rem;box-shadow:var(--shadow-sm)">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
-        <span style="font-family:var(--font-ui);font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.6px;white-space:nowrap">Date range</span>
-        <input type="date" id="fromDate" style="flex:1;min-width:110px;padding:5px 8px;font-size:12px"/>
-        <span style="font-size:12px;color:var(--text-3)">to</span>
-        <input type="date" id="toDate" style="flex:1;min-width:110px;padding:5px 8px;font-size:12px"/>
-        <button class="icon-btn" onclick="loadTabs()" style="padding:5px 10px;font-size:12px">↻</button>
-      </div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
-        <button class="quick-date-btn" id="rbtn-today" onclick="setTabRange('today',this)">Today</button>
-        <button class="quick-date-btn" id="rbtn-week" onclick="setTabRange('week',this)">This week</button>
-        <button class="quick-date-btn active" id="rbtn-month" onclick="setTabRange('month',this)">This month</button>
-      </div>
-      <div style="margin-bottom:10px">
-        <input type="text" id="filterName" placeholder="Filter by name…" oninput="loadTabs()" style="font-size:13px"/>
-      </div>
-      <div class="tab-bar" style="margin-bottom:.75rem">
-        <button class="tab active" onclick="switchDashTab('records',this)">Records</button>
-        <button class="tab" onclick="switchDashTab('people',this)">By person</button>
-        <button class="tab" onclick="switchDashTab('missing',this)">Not submitted</button>
-        <button class="tab" onclick="switchDashTab('breaks',this)">Breaks</button>
-        <button class="tab" onclick="switchDashTab('late',this)">⏰ Late</button>
-        <button class="tab" onclick="switchDashTab('early',this)">🏃 Early out</button>
-        <button class="tab" onclick="switchDashTab('suspicious',this)">🔍 Suspicious</button>
-        <button class="tab" onclick="switchDashTab('chart',this)">Chart</button>
-      </div>
-      <div id="dpanel-records" class="panel active">
-        <div class="tbl-card"><div class="tbl-wrap"><table id="recordsTable"></table></div></div>
-      </div>
-      <div id="dpanel-people" class="panel">
-        <div class="tbl-card"><div class="tbl-wrap"><table id="peopleTable"></table></div></div>
-      </div>
-      <div id="dpanel-missing" class="panel">
-        <div class="tbl-card"><div class="tbl-wrap"><table id="missingTable"></table></div></div>
-      </div>
-      <div id="dpanel-breaks" class="panel">
-        <div class="tbl-card"><div class="tbl-wrap"><table id="breaksTable"></table></div></div>
-      </div>
-      <div id="dpanel-late" class="panel">
-        <div class="tbl-card"><div class="tbl-wrap"><table id="lateTable"></table></div></div>
-      </div>
-      <div id="dpanel-early" class="panel">
-        <div class="tbl-card"><div class="tbl-wrap"><table id="earlyTable"></table></div></div>
-      </div>
-      <div id="dpanel-suspicious" class="panel">
-        <div class="tbl-card"><div class="tbl-wrap"><table id="suspiciousTable"></table></div></div>
-      </div>
-      <div id="dpanel-chart" class="panel">
-        <div class="tbl-card" style="padding:1.25rem">
-          <div class="chart-outer"><canvas id="dailyChart" role="img" aria-label="Stacked bar chart of attendance over date range">Attendance chart.</canvas></div>
-        </div>
-      </div>
-    </div>
-
-    </div><!-- end dashboard-grid -->
-
-    <!-- Weekly widgets: birthdays, anniversaries, leaves -->
-    <div id="weeklyWidgets" style="margin-top:12px">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
-        <div style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:1rem">
-          <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:10px">🎂 Birthdays today</div>
-          <div id="widgetBirthdays"><div style="font-size:12px;color:var(--text-3)">No birthdays today</div></div>
-        </div>
-        <div style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:1rem">
-          <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:10px">🎉 Work anniversaries</div>
-          <div id="widgetAnniversaries"><div style="font-size:12px;color:var(--text-3)">No anniversaries this week</div></div>
-        </div>
-      </div>
-      <div style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:1rem">
-        <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:10px">🏖 On leave this week</div>
-        <div id="widgetLeaves" style="display:flex;flex-wrap:wrap;gap:6px 20px"><div style="font-size:12px;color:var(--text-3)">No leave this week</div></div>
-      </div>
-    </div>
-    <button class="btn-primary" style="margin-top:.75rem" onclick="exportCSV()">⬇ Download CSV</button>
-  </div>
-
-  <!-- ── LEAVE ─────────────────────────────────────────────────────────── -->
-  <div id="screen-leave" class="screen">
-    <div class="page-header"><h1>🌴 Leave</h1><p id="leaveScreenSub">Your leave balance and requests</p></div>
-    <div id="leaveScreenContent"></div>
-  </div>
-
-  <!-- ── CHANGE PIN ──────────────────────────────────────────────────────── -->
-  <div id="screen-profile" class="screen">
+<div id="screen-profile" class="screen">
     <div class="page-header"><h1>My profile</h1><p>Update your personal details and PIN.</p></div>
 
     <div class="card" style="margin-bottom:1rem">
@@ -934,192 +732,7 @@ tr.flagged-row:hover td { background: #FFEAEA; }
   </div>
 
   <!-- ── ADMIN ───────────────────────────────────────────────────────────── -->
-  <div id="screen-admin" class="screen">
-    <div class="page-header"><h1>Admin</h1><p>Manage accounts and permissions.</p></div>
-
-    <div class="card" style="padding:0;overflow:hidden;margin-bottom:1rem">
-      <div class="list-header" style="cursor:pointer" onclick="toggleStaffList()">
-        <span>All accounts</span>
-        <div style="display:flex;align-items:center;gap:8px">
-          <span class="list-count" id="staffCount">0</span>
-          <span id="staffListToggleIcon" style="font-size:12px;color:rgba(255,255,255,0.7)">▼</span>
-        </div>
-      </div>
-      <div id="staffListBody" style="display:none">
-        <div style="padding:8px 12px;border-bottom:1px solid var(--border)">
-          <input type="text" id="staffSearchInput" placeholder="🔍 Search by name or role…" oninput="filterStaffList()" style="width:100%;font-size:14px;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)"/>
-        </div>
-        <div id="staffList"></div>
-      </div>
-    </div>
-
-    <div id="onboardBtn" style="display:none;margin-bottom:1rem">
-      <button class="btn-primary" onclick="showOnboardForm()">+ Onboard new staff member</button>
-    </div>
-
-    <div class="card" id="addStaffCard" style="display:none">
-      <div class="section-label">Onboard new staff member</div>
-
-      <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">Personal information</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
-        <div class="field"><label>Full name <span style="color:var(--danger)">*</span></label><input type="text" id="newName" placeholder="e.g. Jake Thompson"/></div>
-        <div class="field"><label>Date of joining <span style="color:var(--danger)">*</span></label><input type="date" id="newJoinDate"/></div>
-        <div class="field"><label>Phone number</label><input type="tel" id="newPhone" placeholder="e.g. 0412 345 678"/></div>
-        <div class="field"><label>Email address</label><input type="email" id="newEmail" placeholder="e.g. jake@email.com"/></div>
-        <div class="field"><label>Date of birth</label><input type="date" id="newDOB"/></div>
-        <div class="field" style="grid-column:1/-1"><label>Home address</label><textarea id="newAddress" rows="2" placeholder="Street, Suburb, State, Postcode" style="width:100%;font-size:13px;padding:8px;border-radius:var(--radius-sm);border:1.5px solid var(--border);resize:vertical"></textarea></div>
-      </div>
-
-      <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">Role & schedule</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
-        <div class="field">
-          <label>Role <span style="color:var(--danger)">*</span></label>
-          <select id="newRole" style="font-size:14px" onchange="updateOnboardTLVisibility()">
-            <option value="">— Select role —</option>
-          </select>
-        </div>
-        <div class="field" id="newTLField">
-          <label>Assign team leader</label>
-          <select id="newTL" style="font-size:14px">
-            <option value="">— None —</option>
-          </select>
-        </div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px">
-        <div class="field">
-          <label>Office</label>
-          <select id="newOffice" style="font-size:14px">
-            <option value="Goregaon">Goregaon</option>
-            <option value="Borivali">Borivali</option>
-            <option value="Virar">Virar</option>
-            <option value="WFH">WFH</option>
-          </select>
-        </div>
-        <div class="field"><label>Start time</label><input type="time" id="newStartTime" value="06:00"/></div>
-        <div class="field"><label>End time</label><input type="time" id="newEndTime" value="14:30"/></div>
-      </div>
-
-      <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">Emergency contacts</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px">
-        <div class="field"><label>Contact 1 name <span style="color:var(--danger)">*</span></label><input type="text" id="newEC1Name" placeholder="e.g. Sarah Thompson"/></div>
-        <div class="field"><label>Relationship <span style="color:var(--danger)">*</span></label><input type="text" id="newEC1Relation" placeholder="e.g. Mother"/></div>
-        <div class="field"><label>Phone <span style="color:var(--danger)">*</span></label><input type="tel" id="newEC1Phone" placeholder="e.g. 0412 345 678"/></div>
-        <div class="field"><label>Contact 2 name</label><input type="text" id="newEC2Name" placeholder="Optional"/></div>
-        <div class="field"><label>Relationship</label><input type="text" id="newEC2Relation" placeholder="Optional"/></div>
-        <div class="field"><label>Phone</label><input type="tel" id="newEC2Phone" placeholder="Optional"/></div>
-      </div>
-
-      <div id="addManagerRoleSection" style="display:none;margin-bottom:14px">
-        <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">Manager / Super Admin</div>
-        <div class="field">
-          <label>Role</label>
-          <select id="newManagerOnlyRole" style="font-size:14px">
-            <option value="hrmanager">HR Manager</option>
-            <option value="superadmin">Super Admin</option>
-          </select>
-        </div>
-      </div>
-
-      <button class="btn-primary" onclick="addPersonUnified()">Onboard staff member</button>
-      <p style="font-size:12px;color:var(--text-3);margin-top:8px">A temp PIN will be generated — share it with them privately.</p>
-    </div>
-
-    <div class="card">
-      <div class="section-label">Export data</div>
-      <p style="font-size:13px;color:var(--text-2);margin-bottom:12px">Download all records as a CSV file you can open in Excel.</p>
-      <button class="btn-primary" onclick="exportCSV()">⬇ Download CSV</button>
-    </div>
-
-    <div class="card" id="publicHolidaysCard" style="display:none">
-      <div class="section-label">📅 Public Holidays</div>
-      <p style="font-size:13px;color:var(--text-2);margin-bottom:12px">Manage Australian national public holidays + 15 August. These are excluded from leave day counts.</p>
-      <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
-        <select id="phYear" onchange="renderPublicHolidaysManager()" style="font-size:13px;width:auto">
-          <option value="2024">2024</option>
-          <option value="2025">2025</option>
-          <option value="2026" selected>2026</option>
-          <option value="2027">2027</option>
-        </select>
-        <button class="btn-primary" onclick="fetchAndSaveAUHolidays(parseInt(document.getElementById('phYear').value))">⬇ Import from API</button>
-      </div>
-      <div id="publicHolidaysManagerList" style="margin-bottom:14px"></div>
-      <div style="font-size:12px;font-weight:600;color:var(--text-2);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px">Add manual holiday</div>
-      <div style="display:grid;grid-template-columns:1fr 2fr auto;gap:8px;align-items:end">
-        <div class="field" style="margin:0"><label style="font-size:12px">Date</label><input type="date" id="phNewDate"/></div>
-        <div class="field" style="margin:0"><label style="font-size:12px">Name</label><input type="text" id="phNewName" placeholder="e.g. Indian Independence Day"/></div>
-        <button class="btn-primary" onclick="addPublicHolidayManual()" style="height:36px">+ Add</button>
-      </div>
-    </div>
-
-    <div class="card" id="officeManagerCard" style="display:none">
-      <div class="section-label">Manage offices</div>
-      <p style="font-size:13px;color:var(--text-2);margin-bottom:12px">Add or remove offices. Get GPS coordinates by right-clicking your office on Google Maps.</p>
-      <div id="officeManagerList" style="margin-bottom:14px"></div>
-      <div style="display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:8px;align-items:end">
-        <div class="field" style="margin:0"><label style="font-size:12px">Office name</label><input type="text" id="newOfficeName" placeholder="e.g. Andheri"/></div>
-        <div class="field" style="margin:0"><label style="font-size:12px">Latitude</label><input type="text" id="newOfficeLat" placeholder="e.g. 19.1197"/></div>
-        <div class="field" style="margin:0"><label style="font-size:12px">Longitude</label><input type="text" id="newOfficeLng" placeholder="e.g. 72.8468"/></div>
-        <button class="btn-primary" onclick="addOffice()" style="white-space:nowrap;height:36px">+ Add</button>
-      </div>
-    </div>
-
-    <div class="card" id="auditLogCard" style="display:none">
-      <div class="section-label">Audit log</div>
-      <p style="font-size:13px;color:var(--text-2);margin-bottom:12px">All PIN resets, role changes and account changes.</p>
-      <button class="btn-primary" id="auditLogBtn" onclick="toggleAuditLog()">View audit log</button>
-      <div id="auditLogList" style="margin-top:12px;display:none"></div>
-    </div>
-
-    <div class="card" id="needsAttentionAdminCard" style="display:none">
-      <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;margin-bottom:0" onclick="toggleAttentionCard()">
-        <div class="section-label" style="margin-bottom:0">⚠ Needs Attention</div>
-        <span id="attToggleIcon" style="font-size:13px;color:var(--text-3)">▼ Show</span>
-      </div>
-      <div id="attentionCardBody" style="display:none;margin-top:12px">
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center">
-          <button onclick="filterAttention('today')" class="att-filter active" style="font-size:12px;padding:5px 12px;border-radius:20px;border:1.5px solid var(--danger);background:var(--danger);color:#fff;cursor:pointer">Today</button>
-          <button onclick="filterAttention('yesterday')" class="att-filter" style="font-size:12px;padding:5px 12px;border-radius:20px;border:1.5px solid var(--border);background:transparent;cursor:pointer">Yesterday</button>
-          <button onclick="filterAttention('week')" class="att-filter" style="font-size:12px;padding:5px 12px;border-radius:20px;border:1.5px solid var(--border);background:transparent;cursor:pointer">This week</button>
-          <button onclick="filterAttention('all')" class="att-filter" style="font-size:12px;padding:5px 12px;border-radius:20px;border:1.5px solid var(--border);background:transparent;cursor:pointer">All time</button>
-          <div style="display:flex;gap:4px;align-items:center">
-            <input type="date" id="attFromDate" style="font-size:12px;padding:4px 6px;border-radius:var(--radius-sm);border:1.5px solid var(--border)" onchange="filterAttention('custom')"/>
-            <span style="font-size:11px;color:var(--text-3)">to</span>
-            <input type="date" id="attToDate" style="font-size:12px;padding:4px 6px;border-radius:var(--radius-sm);border:1.5px solid var(--border)" onchange="filterAttention('custom')"/>
-          </div>
-        </div>
-        <div id="needsAttentionList"></div>
-      </div>
-    </div>
-
-    <div class="card" id="permissionsEditorCard" style="display:none">
-      <div class="section-label">🔐 Role permissions</div>
-      <p style="font-size:13px;color:var(--text-2);margin-bottom:12px">Control what each role can see and do. Superadmin permissions are fixed and cannot be changed.</p>
-      <div id="permissionsEditorContent"></div>
-    </div>
-
-    <div class="card" id="obsNotesStatsCard" style="display:none">
-      <div class="section-label">📝 Observation Notes — Stats</div>
-      <p style="font-size:13px;color:var(--text-2);margin-bottom:12px">Track how often staff have been observed. Select a date range to analyse patterns.</p>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
-        <input type="date" id="obsFromDate" style="font-size:13px;padding:5px 8px;border-radius:var(--radius-sm);border:1.5px solid var(--border)"/>
-        <span style="font-size:12px;color:var(--text-3)">to</span>
-        <input type="date" id="obsToDate" style="font-size:13px;padding:5px 8px;border-radius:var(--radius-sm);border:1.5px solid var(--border)"/>
-        <button class="btn-sm" onclick="renderObsStats()">Apply</button>
-        <button class="btn-sm" onclick="setObsRange('month')">This month</button>
-        <button class="btn-sm" onclick="setObsRange('3month')">3 months</button>
-        <button class="btn-sm" onclick="setObsRange('6month')">6 months</button>
-        <button class="btn-sm" onclick="setObsRange('all')">All time</button>
-      </div>
-      <div style="margin-bottom:10px">
-        <input type="text" id="obsFilterName" placeholder="Filter by staff name…" oninput="renderObsStats()" style="font-size:13px;width:100%;padding:7px 10px;border-radius:var(--radius-sm);border:1.5px solid var(--border)"/>
-      </div>
-      <div id="obsStatsContent"></div>
-    </div>
-  </div>
-
-
-  <!-- ── MY TEAM ─────────────────────────────────────────────────────────── -->
-  <div id="screen-myteam" class="screen">
+<div id="screen-myteam" class="screen">
     <div class="page-header">
       <h1>My Team</h1>
       <p id="myteamSubtitle">Live status of your team today</p>
@@ -1216,16 +829,7 @@ tr.flagged-row:hover td { background: #FFEAEA; }
   </div>
 
   <!-- ── EOD REPORT SCREEN ────────────────────────────────────────────── -->
-  <div id="screen-eod" class="screen">
-    <div class="page-header">
-      <h1>📋 End of Day Report</h1>
-      <p id="eodScreenSub">Complete before clocking out</p>
-    </div>
-    <div id="eodScreenContent"></div>
-  </div>
-
-  <!-- ── OTHER TASKS SCREEN ────────────────────────────────────────────── -->
-  <div id="screen-othertasks" class="screen">
+<div id="screen-othertasks" class="screen">
     <div class="page-header">
       <h1>📌 Other Tasks</h1>
       <p>Tasks not linked to a client file</p>
@@ -2106,7 +1710,12 @@ async function loadPermissions() {
     const data = await res.json();
     if (data?.value?.length) {
       for (const item of data.value) {
-        const role = item.Title?.toLowerCase();
+        const rawTitle = (item.Title || '').toLowerCase();
+        // Only load broker-app permissions (broker_ prefixed or legacy)
+        const role = rawTitle.startsWith('broker_')
+          ? rawTitle.replace('broker_', '')
+          : (rawTitle.startsWith('attendance_') ? null : rawTitle);
+        if (!role) continue;
         if (role && item.Permissions) {
           try {
             const parsed = JSON.parse(item.Permissions);
@@ -2159,9 +1768,9 @@ function hasTab(tab) {
 async function saveRolePermissions(role, perms) {
   const token = await getToken();
   if (!token) return false;
-  const payload = { Title: role, Permissions: JSON.stringify(perms) };
+  const payload = { Title: 'broker_' + role, Permissions: JSON.stringify(perms) };
   // Check if exists
-  const checkRes = await fetch(SP_API + "('RolePermissions')/items?$filter=Title eq '" + role + "'&$select=Id",
+  const checkRes = await fetch(SP_API + "('RolePermissions')/items?$filter=Title eq 'broker_" + role + "'&$select=Id",
     { headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json;odata=nometadata' } });
   if (checkRes.ok) {
     const checkData = await checkRes.json();
@@ -2495,20 +2104,20 @@ function buildNav() {
   let tabs = [];
   const r = currentUser.role;
   if (r === 'superadmin') {
-    tabs = [['files','All Files'],['admin','Staff'],['profile','My Details']];
+    tabs = [['files','All Files'],['profile','My Details']];
   } else if (r === 'hrmanager') {
     tabs = [['profile','My Details']];
     // hrmanager has no broker portal tabs
   } else {
     // All other roles — build tabs dynamically from permissions
     const ALL_TABS_DEF = [
-      ['checkin','Check in'], ['leave','🌴 Leave'], ['dashboard','Dashboard'],
-      ['admin','Staff'], ['files','All Files'], ['myfiles','My Files'],
-      ['myteam','My Team'], ['eod','EOD'], ['performance','📊 Performance'],
+        
+       ['files','All Files'], ['myfiles','My Files'],
+      ['myteam','My Team'],  ['performance','📊 Performance'],
       ['othertasks','Other Tasks'], ['feedback','📣 Feedback'], ['profile','My Details']
     ];
     tabs = ALL_TABS_DEF.filter(([key]) => hasTab(key));
-    if (!tabs.length) tabs = [['checkin','Check in'],['profile','My Details']];
+    if (!tabs.length) tabs = [['profile','My Details']];
   }
   const viewAsDropdown = (!_previewRole && (_realRole==='superadmin' || currentUser.role==='superadmin'))
     ? '<select class="nav-select" onchange="startPreview(this.value)">' + buildViewAsOptions() + '</select>'
@@ -2543,17 +2152,12 @@ function goTab(name, btn) {
   // Save last tab for session restore
   try { sessionStorage.setItem('lp_last_tab', name); } catch(e) {}
   showScreen(name);
-  if (name==='checkin')   initCheckin();
-  if (name==='dashboard') { loadDashboard(); if (!window._dashRefreshTimer) window._dashRefreshTimer = setInterval(() => { if (document.getElementById('screen-dashboard')?.classList.contains('active')) loadDashboard(); }, 120000); }
   if (name==='myteam')    renderMyTeam();
   if (name==='files')     renderFilesScreen();
   if (name==='myfiles')   renderMyFilesScreen();
   if (name==='feedback')  renderFeedbackScreen();
-  if (name==='eod')       renderEODScreen();
   if (name==='performance') renderPerformanceScreen();
   if (name==='othertasks') renderOtherTasksScreen();
-  if (name==='admin')     renderAdmin();
-  if (name==='leave')      renderLeaveScreen();
   if (name==='profile')   { initCp(); renderProfileScreen(); }
 }
 
@@ -6522,10 +6126,6 @@ async function loadFromSharePoint() {
     }
     // Load all other data from SP in parallel
     await Promise.all([
-      loadObsNotesFromSP(),
-      loadOfficesFromSP(),
-      loadLeaveData(),
-      loadPublicHolidays(),
       loadPermissions(),
       loadRolesFromSP(),
       loadFileEntriesFromSP(),
