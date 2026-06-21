@@ -6732,32 +6732,33 @@ function renderMyTeam() {
   });
 
   // Summary bar
+  // Group names by status for clickable cards
+  const byStatus = {};
+  memberData.forEach(m => {
+    if (!byStatus[m.status]) byStatus[m.status] = [];
+    byStatus[m.status].push(m.name);
+  });
+  const statusCard = (key, count, bg, color, label) => {
+    const names = byStatus[key] || [];
+    const cid = 'sg_' + key + '_' + Date.now();
+    return `<div style="background:${bg};border-radius:var(--radius-sm);padding:10px 8px;text-align:center;cursor:${names.length?'pointer':'default'}"
+      onclick="${names.length?`this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'`:''}">
+      <div style="font-size:22px;font-weight:700;color:${color}">${count}</div>
+      <div style="font-size:11px;color:${color};font-weight:600">${label}${names.length?' ▾':''}</div>
+    </div>
+    <div style="display:none;grid-column:1/-1;background:${bg};border-radius:var(--radius-sm);padding:8px 12px;margin-top:-6px;font-size:12px;color:${color}">
+      ${names.map(n=>`<div style="padding:3px 0;border-bottom:1px solid rgba(0,0,0,0.06)">${esc(n)}</div>`).join('') || '<div style="opacity:.6">None</div>'}
+    </div>`;
+  };
+
   const summaryHTML = `
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:1rem">
-      <div style="background:#FEF2F2;border-radius:var(--radius-sm);padding:10px 8px;text-align:center">
-        <div style="font-size:22px;font-weight:700;color:#B91C1C">${statuses.notsubmitted}</div>
-        <div style="font-size:11px;color:#B91C1C;font-weight:600">Not submitted</div>
-      </div>
-      <div style="background:#EEF4FF;border-radius:var(--radius-sm);padding:10px 8px;text-align:center">
-        <div style="font-size:22px;font-weight:700;color:var(--brand)">${statuses.office}</div>
-        <div style="font-size:11px;color:var(--brand);font-weight:600">In office</div>
-      </div>
-      <div style="background:#E8F7EE;border-radius:var(--radius-sm);padding:10px 8px;text-align:center">
-        <div style="font-size:22px;font-weight:700;color:var(--success)">${statuses.wfh}</div>
-        <div style="font-size:11px;color:var(--success);font-weight:600">WFH</div>
-      </div>
-      <div style="background:#FEF4E4;border-radius:var(--radius-sm);padding:10px 8px;text-align:center">
-        <div style="font-size:22px;font-weight:700;color:#8C5000">${statuses.leave}</div>
-        <div style="font-size:11px;color:#8C5000;font-weight:600">On leave</div>
-      </div>
-      <div style="background:#FEF3C7;border-radius:var(--radius-sm);padding:10px 8px;text-align:center">
-        <div style="font-size:22px;font-weight:700;color:#92400E">${statuses.halfday}</div>
-        <div style="font-size:11px;color:#92400E;font-weight:600">Half day</div>
-      </div>
-      <div style="background:#F3EEFF;border-radius:var(--radius-sm);padding:10px 8px;text-align:center">
-        <div style="font-size:22px;font-weight:700;color:#8C5000">${statuses.onbreak}</div>
-        <div style="font-size:11px;color:#8C5000;font-weight:600">On break</div>
-      </div>
+      ${statusCard('notsubmitted', statuses.notsubmitted, '#FEF2F2', '#B91C1C', 'Not submitted')}
+      ${statusCard('office',       statuses.office,       '#EEF4FF', 'var(--brand)', 'In office')}
+      ${statusCard('wfh',          statuses.wfh,          '#E8F7EE', 'var(--success)', 'WFH')}
+      ${statusCard('leave',        statuses.leave,        '#FEF4E4', '#8C5000', 'On leave')}
+      ${statusCard('halfday',      statuses.halfday,      '#FEF3C7', '#92400E', 'Half day')}
+      ${statusCard('onbreak',      statuses.onbreak,      '#F3EEFF', '#8C5000', 'On break')}
     </div>
     <div style="background:#E8F7EE;border:1.5px solid #BBF7D0;border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:1rem;display:flex;align-items:center;justify-content:space-between">
       <span style="font-size:13px;font-weight:600;color:var(--success)">✅ Available right now</span>
@@ -6777,62 +6778,29 @@ function renderMyTeam() {
       <div style="background:${m.statusBg};color:${m.statusColor};border-radius:50px;padding:4px 10px;font-size:12px;font-weight:600;white-space:nowrap;flex-shrink:0">${m.statusIcon} ${m.statusLabel}</div>
     </div>`).join('');
 
-  // Observation notes stats for this TL's team
-  const teamNotes = getObsNotes().filter(n => teamNames.includes(n.target));
-  const last30 = new Date(); last30.setDate(last30.getDate()-30);
-  const last30str = last30.toISOString().split('T')[0];
-  const recentNotes = teamNotes.filter(n => n.date >= last30str);
-  const posN = recentNotes.filter(n=>n.sentiment==='positive').length;
-  const negN = recentNotes.filter(n=>n.sentiment==='negative').length;
-  const neuN = recentNotes.length - posN - negN;
+  _myTeamNames = teamNames; // share with filter functions
 
+  // Observation notes — filterable
+  const teamNotes = getObsNotes().filter(n => teamNames.includes(n.target));
   let obsHTML = '';
   if (teamNotes.length > 0) {
-    const byPerson = {};
-    for (const n of recentNotes) {
-      if (!byPerson[n.target]) byPerson[n.target] = {pos:0,neg:0,neu:0,notes:[]};
-      if (n.sentiment==='positive') byPerson[n.target].pos++;
-      else if (n.sentiment==='negative') byPerson[n.target].neg++;
-      else byPerson[n.target].neu++;
-      byPerson[n.target].notes.push(n);
-    }
+    const obsStaffOptions = [...new Set(teamNotes.map(n=>n.target))]
+      .map(name=>`<option value="${esc(name)}">${esc(name.split(' ')[0])}</option>`).join('');
+    const last30str = (() => { const d=new Date(); d.setDate(d.getDate()-30); return d.toISOString().split('T')[0]; })();
+
     obsHTML = `<div class="card" style="margin-top:1rem">
-      <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">📝 Observation Notes — Last 30 days</div>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:12px">
-        <div style="background:#F0FDF4;border-radius:var(--radius-sm);padding:8px;text-align:center">
-          <div style="font-size:20px;font-weight:700;color:var(--success)">${posN}</div>
-          <div style="font-size:10px;color:var(--success)">👍 Positive</div>
-        </div>
-        <div style="background:var(--surface-2);border-radius:var(--radius-sm);padding:8px;text-align:center">
-          <div style="font-size:20px;font-weight:700;color:var(--text-3)">${neuN}</div>
-          <div style="font-size:10px;color:var(--text-3)">😐 Neutral</div>
-        </div>
-        <div style="background:#FEF2F2;border-radius:var(--radius-sm);padding:8px;text-align:center">
-          <div style="font-size:20px;font-weight:700;color:var(--danger)">${negN}</div>
-          <div style="font-size:10px;color:var(--danger)">👎 Negative</div>
-        </div>
+      <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">📝 Observation Notes</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
+        <input type="date" id="obsNoteFrom" value="${last30str}" onchange="refreshObsNotes()" style="font-size:12px;padding:4px 6px;border-radius:var(--radius-sm);border:1.5px solid var(--border)"/>
+        <span style="font-size:11px;color:var(--text-3)">to</span>
+        <input type="date" id="obsNoteTo" value="${today}" onchange="refreshObsNotes()" style="font-size:12px;padding:4px 6px;border-radius:var(--radius-sm);border:1.5px solid var(--border)"/>
+        <select id="obsNoteStaff" onchange="refreshObsNotes()" style="font-size:12px;padding:4px 6px;border-radius:var(--radius-sm);border:1.5px solid var(--border)">
+          <option value="">All staff</option>
+          ${obsStaffOptions}
+        </select>
+        <button onclick="document.getElementById('obsNoteFrom').value='2020-01-01';document.getElementById('obsNoteStaff').value='';refreshObsNotes()" style="font-size:11px;padding:3px 8px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:transparent;cursor:pointer;color:var(--text-3)">All time</button>
       </div>
-      ${Object.entries(byPerson).map(([name, data]) => `
-        <div style="border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px;margin-bottom:8px">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-            <div style="font-size:13px;font-weight:600">${esc(name)}</div>
-            <div style="display:flex;gap:3px">
-              ${data.pos?`<span style="font-size:11px;background:#F0FDF4;color:var(--success);padding:1px 6px;border-radius:99px">👍${data.pos}</span>`:''}
-              ${data.neu?`<span style="font-size:11px;background:var(--surface-2);color:var(--text-3);padding:1px 6px;border-radius:99px">😐${data.neu}</span>`:''}
-              ${data.neg?`<span style="font-size:11px;background:#FEF2F2;color:var(--danger);padding:1px 6px;border-radius:99px">👎${data.neg}</span>`:''}
-            </div>
-          </div>
-          <details>
-            <summary style="font-size:11px;color:var(--brand);cursor:pointer">View notes</summary>
-            <div style="margin-top:6px">
-              ${[...data.notes].sort((a,b)=>b.ts-a.ts).map(n=>`
-                <div style="background:${n.sentiment==='positive'?'#F0FDF4':n.sentiment==='negative'?'#FEF2F2':'var(--surface-2)'};padding:6px 8px;border-radius:var(--radius-sm);margin-bottom:4px;border-left:2px solid ${n.sentiment==='positive'?'var(--success)':n.sentiment==='negative'?'var(--danger)':'var(--border)'}">
-                  <div style="font-size:12px">${n.sentiment==='positive'?'👍':n.sentiment==='negative'?'👎':'😐'} ${esc(n.note)}</div>
-                  <div style="font-size:10px;color:var(--text-3)">${n.date} · by ${esc(n.by)}</div>
-                </div>`).join('')}
-            </div>
-          </details>
-        </div>`).join('')}
+      <div id="obsNoteContent"></div>
     </div>`;
   }
 
@@ -6846,6 +6814,76 @@ function renderMyTeam() {
     <div style="text-align:center;margin-top:8px">
       <button onclick="renderMyTeam()" style="background:transparent;border:1.5px solid var(--border);border-radius:50px;padding:8px 20px;font-size:13px;color:var(--text-2);cursor:pointer">↻ Refresh</button>
     </div>`;
+
+  // Init obs notes after DOM is ready
+  if (obsHTML) setTimeout(refreshObsNotes, 50);
+}
+
+function refreshObsNotes() {
+  const el = document.getElementById('obsNoteContent');
+  if (!el) return;
+  const from = document.getElementById('obsNoteFrom')?.value || '';
+  const to   = document.getElementById('obsNoteTo')?.value   || today;
+  const filterStaff = document.getElementById('obsNoteStaff')?.value || '';
+  const teamNames = getTeamForTL(currentUser.name);
+
+  const notes = getObsNotes().filter(n =>
+    teamNames.includes(n.target) &&
+    (!from || n.date >= from) && n.date <= to &&
+    (!filterStaff || n.target === filterStaff)
+  );
+
+  if (!notes.length) { el.innerHTML = '<div style="font-size:13px;color:var(--text-3);text-align:center;padding:12px">No notes in this range.</div>'; return; }
+
+  const posN = notes.filter(n=>n.sentiment==='positive').length;
+  const negN = notes.filter(n=>n.sentiment==='negative').length;
+  const neuN = notes.length - posN - negN;
+
+  const byPerson = {};
+  for (const n of notes) {
+    if (!byPerson[n.target]) byPerson[n.target] = {pos:0,neg:0,neu:0,notes:[]};
+    if (n.sentiment==='positive') byPerson[n.target].pos++;
+    else if (n.sentiment==='negative') byPerson[n.target].neg++;
+    else byPerson[n.target].neu++;
+    byPerson[n.target].notes.push(n);
+  }
+
+  el.innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:12px">
+      <div style="background:#F0FDF4;border-radius:var(--radius-sm);padding:8px;text-align:center">
+        <div style="font-size:20px;font-weight:700;color:var(--success)">${posN}</div>
+        <div style="font-size:10px;color:var(--success)">👍 Positive</div>
+      </div>
+      <div style="background:var(--surface-2);border-radius:var(--radius-sm);padding:8px;text-align:center">
+        <div style="font-size:20px;font-weight:700;color:var(--text-3)">${neuN}</div>
+        <div style="font-size:10px;color:var(--text-3)">😐 Neutral</div>
+      </div>
+      <div style="background:#FEF2F2;border-radius:var(--radius-sm);padding:8px;text-align:center">
+        <div style="font-size:20px;font-weight:700;color:var(--danger)">${negN}</div>
+        <div style="font-size:10px;color:var(--danger)">👎 Negative</div>
+      </div>
+    </div>
+    ${Object.entries(byPerson).map(([name, data]) => `
+      <div style="border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px;margin-bottom:8px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <div style="font-size:13px;font-weight:600">${esc(name)}</div>
+          <div style="display:flex;gap:3px">
+            ${data.pos?`<span style="font-size:11px;background:#F0FDF4;color:var(--success);padding:1px 6px;border-radius:99px">👍${data.pos}</span>`:''}
+            ${data.neu?`<span style="font-size:11px;background:var(--surface-2);color:var(--text-3);padding:1px 6px;border-radius:99px">😐${data.neu}</span>`:''}
+            ${data.neg?`<span style="font-size:11px;background:#FEF2F2;color:var(--danger);padding:1px 6px;border-radius:99px">👎${data.neg}</span>`:''}
+          </div>
+        </div>
+        <details>
+          <summary style="font-size:11px;color:var(--brand);cursor:pointer">View ${data.notes.length} note${data.notes.length!==1?'s':''}</summary>
+          <div style="margin-top:6px">
+            ${[...data.notes].sort((a,b)=>b.ts-a.ts).map(n=>`
+              <div style="background:${n.sentiment==='positive'?'#F0FDF4':n.sentiment==='negative'?'#FEF2F2':'var(--surface-2)'};padding:6px 8px;border-radius:var(--radius-sm);margin-bottom:4px;border-left:2px solid ${n.sentiment==='positive'?'var(--success)':n.sentiment==='negative'?'var(--danger)':'var(--border)'}">
+                <div style="font-size:12px">${n.sentiment==='positive'?'👍':n.sentiment==='negative'?'👎':'😐'} ${esc(n.note)}</div>
+                <div style="font-size:10px;color:var(--text-3)">${n.date} · by ${esc(n.by)}</div>
+              </div>`).join('')}
+          </div>
+        </details>
+      </div>`).join('')}`;
 }
 
 // ── Auto-refresh My Team every 60s when on that screen ───────────────────
@@ -9925,11 +9963,11 @@ function renderEODSummary(el, teamNames, date) {
 const _origRenderMyTeam = window.renderMyTeam;
 window.renderMyTeam = function() {
   if (_origRenderMyTeam) _origRenderMyTeam.apply(this, arguments);
-  // Append EOD summary card to My Team screen
   const myteamEl = document.getElementById('myteamContent');
   if (!myteamEl) return;
   const myTeamNames = getTeamForTL(currentUser.name);
   if (myTeamNames.length === 0) return;
+
   let eodDiv = document.getElementById('myTeamEODSummary');
   if (!eodDiv) {
     eodDiv = document.createElement('div');
@@ -9938,8 +9976,75 @@ window.renderMyTeam = function() {
     eodDiv.style.marginTop = '1rem';
     myteamEl.appendChild(eodDiv);
   }
-  renderEODSummary(eodDiv, myTeamNames, today);
+
+  // Build with filter controls
+  const sixMonthsAgo = new Date(); sixMonthsAgo.setMonth(sixMonthsAgo.getMonth()-6);
+  const defaultFrom = sixMonthsAgo.toISOString().split('T')[0];
+  const analystOptions = getStaff()
+    .filter(s => EOD_ROLES.includes(s.role) && myTeamNames.includes(s.name))
+    .map(s => `<option value="${esc(s.name)}">${esc(s.name.split(' ')[0])}</option>`).join('');
+
+  eodDiv.innerHTML = `
+    <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">📋 EOD Reports</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
+      <input type="date" id="eodSumFrom" value="${today}" onchange="refreshMyTeamEOD()" style="font-size:12px;padding:4px 6px;border-radius:var(--radius-sm);border:1.5px solid var(--border)"/>
+      <span style="font-size:11px;color:var(--text-3)">to</span>
+      <input type="date" id="eodSumTo" value="${today}" onchange="refreshMyTeamEOD()" style="font-size:12px;padding:4px 6px;border-radius:var(--radius-sm);border:1.5px solid var(--border)"/>
+      <select id="eodSumStaff" onchange="refreshMyTeamEOD()" style="font-size:12px;padding:4px 6px;border-radius:var(--radius-sm);border:1.5px solid var(--border)">
+        <option value="">All staff</option>
+        ${analystOptions}
+      </select>
+      <button onclick="document.getElementById('eodSumFrom').value='${defaultFrom}';document.getElementById('eodSumTo').value='${today}';document.getElementById('eodSumStaff').value='';refreshMyTeamEOD()" style="font-size:11px;padding:3px 8px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:transparent;cursor:pointer;color:var(--text-3)">6 months</button>
+    </div>
+    <div id="eodSumContent"></div>`;
+
+  refreshMyTeamEOD();
 };
+
+function refreshMyTeamEOD() {
+  const el = document.getElementById('eodSumContent');
+  if (!el) return;
+  const from = document.getElementById('eodSumFrom')?.value || today;
+  const to   = document.getElementById('eodSumTo')?.value   || today;
+  const filterStaff = document.getElementById('eodSumStaff')?.value || '';
+  const myTeamNames = getTeamForTL(currentUser.name);
+
+  const reports = getEODReports().filter(r =>
+    r.date >= from && r.date <= to &&
+    myTeamNames.includes(r.name) &&
+    (!filterStaff || r.name === filterStaff)
+  );
+
+  const staff = getStaff().filter(s =>
+    EOD_ROLES.includes(s.role) && myTeamNames.includes(s.name) &&
+    (!filterStaff || s.name === filterStaff)
+  );
+
+  const submitted = new Set(reports.map(r => r.name + '_' + r.date));
+  const submittedCount = reports.length;
+  const lowConf = reports.filter(r => (r.confidence||0) <= 2);
+  const brokerFlags = reports.filter(r => r.brokerConcern === 'yes');
+  const supportFlags = reports.filter(r => r.supportNeeded === 'yes');
+
+  const card = (count, total, bg, color, label, details) => `
+    <div style="background:${bg};border-radius:var(--radius-sm);padding:10px;text-align:center;cursor:${details.length?'pointer':'default'}"
+      onclick="${details.length?`const d=this.nextElementSibling;d.style.display=d.style.display==='none'?'block':'none'`:''}">
+      <div style="font-size:22px;font-weight:700;color:${color}">${total!==null?count+'/'+total:count}</div>
+      <div style="font-size:11px;color:${color};font-weight:600">${label}${details.length?' ▾':''}</div>
+    </div>
+    <div style="display:none;grid-column:1/-1;background:${bg};border-radius:var(--radius-sm);padding:8px 12px;font-size:12px;color:${color}">
+      ${details.length ? details.map(r=>`<div style="padding:3px 0;border-bottom:1px solid rgba(0,0,0,0.06)">${esc(r.name?.split(' ')[0]||r)} ${r.date&&r.date!==today?'<span style="opacity:.6">· '+r.date+'</span>':''}
+        ${r.confidence?'<span style="float:right;opacity:.7">'+r.confidence+'/5</span>':''}</div>`).join('') : '<div style="opacity:.6">None</div>'}
+    </div>`;
+
+  el.innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:10px">
+      ${card(submittedCount, staff.length, submittedCount>=staff.length?'var(--success-light)':'var(--danger-light)', submittedCount>=staff.length?'var(--success)':'var(--danger)', 'Submitted', reports)}
+      ${card(lowConf.length, null, lowConf.length>0?'var(--danger-light)':'var(--surface-2)', lowConf.length>0?'var(--danger)':'var(--text-3)', 'Low confidence', lowConf)}
+      ${card(brokerFlags.length, null, brokerFlags.length>0?'#FEF3C7':'var(--surface-2)', brokerFlags.length>0?'#92400E':'var(--text-3)', 'Broker concerns', brokerFlags)}
+      ${card(supportFlags.length, null, supportFlags.length>0?'var(--brand-light)':'var(--surface-2)', supportFlags.length>0?'var(--brand)':'var(--text-3)', 'Need support', supportFlags)}
+    </div>`;
+}
 
 // ── Patch manager dashboard to show EOD summary card ─────────────────────
 const _origRenderMetricsEOD = window.renderMetrics;
@@ -10686,6 +10791,7 @@ function renderPerformancePulse(containerEl, teamNames) {
 // ══════════════════════════════════════════════════════════════════════════
 
 let _perfDays = 7;
+let _myTeamNames = []; // shared for My Team filter functions
 
 function renderPerformanceScreen() {
   if (!isTeamLead()) return;
