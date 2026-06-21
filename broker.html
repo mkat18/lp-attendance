@@ -6833,15 +6833,27 @@ function dateRangePicker(prefix, onChangeFn, staffOptions, defaultPreset) {
       </div>
       <div id="${prefix}_custom" style="display:none;gap:6px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
         <span style="font-size:12px;color:var(--text-3)">From</span>
-        <input type="date" id="${prefix}From" onchange="_drpCallbacks['${prefix}']&&eval(_drpCallbacks['${prefix}'])" style="font-size:12px;padding:4px 8px;border-radius:var(--radius-sm);border:1.5px solid var(--border)"/>
+        <input type="date" id="${prefix}From" onchange="activateDRPCustom('${prefix}');_drpCallbacks['${prefix}']&&eval(_drpCallbacks['${prefix}'])" style="font-size:12px;padding:4px 8px;border-radius:var(--radius-sm);border:1.5px solid var(--border)"/>
         <span style="font-size:12px;color:var(--text-3)">to</span>
-        <input type="date" id="${prefix}To" onchange="_drpCallbacks['${prefix}']&&eval(_drpCallbacks['${prefix}'])" style="font-size:12px;padding:4px 8px;border-radius:var(--radius-sm);border:1.5px solid var(--border)"/>
+        <input type="date" id="${prefix}To" onchange="activateDRPCustom('${prefix}');_drpCallbacks['${prefix}']&&eval(_drpCallbacks['${prefix}'])" style="font-size:12px;padding:4px 8px;border-radius:var(--radius-sm);border:1.5px solid var(--border)"/>
       </div>
       ${staffOptions ? `<select id="${prefix}Staff" onchange="_drpCallbacks['${prefix}']&&eval(_drpCallbacks['${prefix}'])" style="font-size:12px;padding:5px 8px;border-radius:var(--radius-sm);border:1.5px solid var(--border);width:100%;margin-top:4px">
         <option value="">All staff</option>
         ${staffOptions}
       </select>` : ''}
     </div>`;
+}
+
+function activateDRPCustom(prefix) {
+  ['today','yesterday','thisweek','thismonth','last30','last90','custom'].forEach(key => {
+    const btn = document.getElementById(prefix+'_btn_'+key);
+    if (!btn) return;
+    const active = key === 'custom';
+    btn.style.borderColor = active ? 'var(--brand)' : 'var(--border)';
+    btn.style.background  = active ? 'var(--brand-light)' : 'var(--surface-2)';
+    btn.style.color       = active ? 'var(--brand)' : 'var(--text-2)';
+    btn.style.fontWeight  = active ? '700' : '400';
+  });
 }
 
 function setDRP(prefix, preset) {

@@ -4683,12 +4683,14 @@ function toggleLeaveCustomRange(btn) {
   if (!div) return;
   const open = div.style.display !== 'none';
   div.style.display = open ? 'none' : 'flex';
+  const active = !open;
+  // Clear all preset buttons first, then highlight custom if opening
+  clearLeavePresetBtns();
   if (btn) {
-    const active = !open;
-    btn.style.background   = active ? 'var(--brand-light)' : 'var(--surface-2)';
-    btn.style.borderColor  = active ? 'var(--brand)' : 'var(--border)';
-    btn.style.color        = active ? 'var(--brand)' : 'var(--text-2)';
-    btn.style.fontWeight   = active ? '700' : '400';
+    btn.style.background  = active ? 'var(--brand-light)' : 'var(--surface-2)';
+    btn.style.borderColor = active ? 'var(--brand)' : 'var(--border)';
+    btn.style.color       = active ? 'var(--brand)' : 'var(--text-2)';
+    btn.style.fontWeight  = active ? '700' : '400';
   }
 }
 
@@ -4724,8 +4726,9 @@ function toggleLeaveBalCustomRange(btn) {
   if (!div) return;
   const open = div.style.display !== 'none';
   div.style.display = open ? 'none' : 'flex';
+  const active = !open;
+  clearLeaveBalPresetBtns();
   if (btn) {
-    const active = !open;
     btn.style.background  = active ? 'var(--brand-light)' : 'var(--surface-2)';
     btn.style.borderColor = active ? 'var(--brand)' : 'var(--border)';
     btn.style.color       = active ? 'var(--brand)' : 'var(--text-2)';
@@ -4765,6 +4768,11 @@ function clearLeaveFilters() {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
+  clearLeavePresetBtns();
+  const customBtn = document.getElementById('lfBtn_custom');
+  if (customBtn) { customBtn.style.background='var(--surface-2)'; customBtn.style.borderColor='var(--border)'; customBtn.style.color='var(--text-2)'; customBtn.style.fontWeight='400'; }
+  const customDiv = document.getElementById('leaveCustomRange');
+  if (customDiv) customDiv.style.display = 'none';
   filterLeaveRequests();
 }
 
