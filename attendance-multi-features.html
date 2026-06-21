@@ -4560,17 +4560,20 @@ async function renderLeaveScreen() {
     const prevYear = (() => { const [s,e] = curYear.split('-'); return `${parseInt(s)-1}-${parseInt(e)-1}`; })();
     html += `<div class="card">
       <div class="section-label">Team leave balances</div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
-        <select id="leaveBalYearSel" onchange="filterTeamLeaveBalances();clearLeaveBalPresetBtns()" style="font-size:12px;padding:5px 8px;border-radius:var(--radius-sm);border:1.5px solid var(--border)">
+      <div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
+        <select id="leaveBalYearSel" onchange="filterTeamLeaveBalances();clearLeaveBalPresetBtns()" style="font-size:12px;padding:4px 6px;border-radius:var(--radius-sm);border:1.5px solid var(--border)">
           <option value="${curYear}">${curYear} (current)</option>
           <option value="${prevYear}">${prevYear}</option>
         </select>
-        <span style="font-size:11px;color:var(--text-3);margin-left:4px">or dates taken:</span>
-        ${['Today','Yesterday','This week','This month'].map(p=>`<button id="lbBtn_${p.replace(/ /g,'_')}" onclick="setLeaveBalPreset('${p}',this)" style="font-size:12px;padding:5px 10px;border-radius:50px;border:1.5px solid var(--border);background:var(--surface-2);color:var(--text-2);cursor:pointer">${p}</button>`).join('')}
-        <input type="date" id="leaveBalFrom" onchange="filterTeamLeaveBalances();clearLeaveBalPresetBtns()" style="font-size:12px;padding:5px 7px;border-radius:var(--radius-sm);border:1.5px solid var(--border)"/>
-        <span style="font-size:11px;color:var(--text-3)">–</span>
-        <input type="date" id="leaveBalTo" onchange="filterTeamLeaveBalances();clearLeaveBalPresetBtns()" style="font-size:12px;padding:5px 7px;border-radius:var(--radius-sm);border:1.5px solid var(--border)"/>
-        <button onclick="document.getElementById('leaveBalFrom').value='';document.getElementById('leaveBalTo').value='';clearLeaveBalPresetBtns();filterTeamLeaveBalances()" style="font-size:12px;padding:5px 10px;border-radius:50px;border:1.5px solid var(--border);background:transparent;cursor:pointer;color:var(--text-3)">Clear</button>
+        ${['Today','Yesterday','This week','This month'].map(p=>`<button id="lbBtn_${p.replace(/ /g,'_')}" onclick="setLeaveBalPreset('${p}',this)" style="font-size:12px;padding:4px 9px;border-radius:50px;border:1.5px solid var(--border);background:var(--surface-2);color:var(--text-2);cursor:pointer">${p}</button>`).join('')}
+        <button id="lbBtn_custom" onclick="toggleLeaveBalCustomRange(this)" style="font-size:12px;padding:4px 9px;border-radius:50px;border:1.5px solid var(--border);background:var(--surface-2);color:var(--text-2);cursor:pointer">📅 Custom</button>
+        <button onclick="document.getElementById('leaveBalFrom').value='';document.getElementById('leaveBalTo').value='';clearLeaveBalPresetBtns();filterTeamLeaveBalances()" style="font-size:12px;padding:4px 9px;border-radius:50px;border:1.5px solid var(--border);background:transparent;cursor:pointer;color:var(--text-3)">Clear</button>
+      </div>
+      <div id="leaveBalCustomRange" style="display:none;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
+        <span style="font-size:12px;color:var(--text-3)">From</span>
+        <input type="date" id="leaveBalFrom" onchange="filterTeamLeaveBalances();clearLeaveBalPresetBtns()" style="font-size:12px;padding:4px 7px;border-radius:var(--radius-sm);border:1.5px solid var(--border)"/>
+        <span style="font-size:12px;color:var(--text-3)">to</span>
+        <input type="date" id="leaveBalTo" onchange="filterTeamLeaveBalances();clearLeaveBalPresetBtns()" style="font-size:12px;padding:4px 7px;border-radius:var(--radius-sm);border:1.5px solid var(--border)"/>
       </div>
       <div id="teamLeaveBalTable"></div>
     </div>`;
@@ -4716,6 +4719,20 @@ function clearLeavePresetBtns() {
     if(b) { b.style.background='var(--surface-2)'; b.style.borderColor='var(--border)'; b.style.color='var(--text-2)'; b.style.fontWeight='400'; }
   });
 }
+function toggleLeaveBalCustomRange(btn) {
+  const div = document.getElementById('leaveBalCustomRange');
+  if (!div) return;
+  const open = div.style.display !== 'none';
+  div.style.display = open ? 'none' : 'flex';
+  if (btn) {
+    const active = !open;
+    btn.style.background  = active ? 'var(--brand-light)' : 'var(--surface-2)';
+    btn.style.borderColor = active ? 'var(--brand)' : 'var(--border)';
+    btn.style.color       = active ? 'var(--brand)' : 'var(--text-2)';
+    btn.style.fontWeight  = active ? '700' : '400';
+  }
+}
+
 function setLeaveBalPreset(preset, btn) {
   const d = new Date();
   const fmt = d2 => d2.toISOString().split('T')[0];
@@ -4728,6 +4745,11 @@ function setLeaveBalPreset(preset, btn) {
   if(fromEl) fromEl.value=from;
   if(toEl) toEl.value=to;
   clearLeaveBalPresetBtns();
+  // Hide custom range and reset its button
+  const customDiv = document.getElementById('leaveBalCustomRange');
+  if (customDiv) customDiv.style.display = 'none';
+  const customBtn = document.getElementById('lbBtn_custom');
+  if (customBtn) { customBtn.style.background='var(--surface-2)'; customBtn.style.borderColor='var(--border)'; customBtn.style.color='var(--text-2)'; customBtn.style.fontWeight='400'; }
   if(btn) { btn.style.background='var(--brand-light)'; btn.style.borderColor='var(--brand)'; btn.style.color='var(--brand)'; btn.style.fontWeight='700'; }
   filterTeamLeaveBalances();
 }
