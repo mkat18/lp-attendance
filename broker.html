@@ -6790,16 +6790,7 @@ function renderMyTeam() {
 
     obsHTML = `<div class="card" style="margin-top:1rem">
       <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">📝 Observation Notes</div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
-        <input type="date" id="obsNoteFrom" value="${last30str}" onchange="refreshObsNotes()" style="font-size:12px;padding:4px 6px;border-radius:var(--radius-sm);border:1.5px solid var(--border)"/>
-        <span style="font-size:11px;color:var(--text-3)">to</span>
-        <input type="date" id="obsNoteTo" value="${today}" onchange="refreshObsNotes()" style="font-size:12px;padding:4px 6px;border-radius:var(--radius-sm);border:1.5px solid var(--border)"/>
-        <select id="obsNoteStaff" onchange="refreshObsNotes()" style="font-size:12px;padding:4px 6px;border-radius:var(--radius-sm);border:1.5px solid var(--border)">
-          <option value="">All staff</option>
-          ${obsStaffOptions}
-        </select>
-        <button onclick="document.getElementById('obsNoteFrom').value='2020-01-01';document.getElementById('obsNoteStaff').value='';refreshObsNotes()" style="font-size:11px;padding:3px 8px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:transparent;cursor:pointer;color:var(--text-3)">All time</button>
-      </div>
+      ${dateRangePicker('obsNote', 'refreshObsNotes()', obsStaffOptions, 'last30')}
       <div id="obsNoteContent"></div>
     </div>`;
   }
@@ -6816,15 +6807,89 @@ function renderMyTeam() {
     </div>`;
 
   // Init obs notes after DOM is ready
-  if (obsHTML) setTimeout(refreshObsNotes, 50);
+  if (obsHTML) setTimeout(() => { setDRP('obsNote','last30','refreshObsNotes()'); }, 50);
+}
+
+// ── Reusable date range picker ────────────────────────────────────────────
+function dateRangePicker(prefix, onChangeFn, staffOptions, defaultPreset) {
+  const btnStyle = (active) => `padding:5px 10px;border-radius:50px;border:1.5px solid ${active?'var(--brand)':'var(--border)'};background:${active?'var(--brand-light)':'var(--surface-2)'};color:${active?'var(--brand)':'var(--text-2)'};font-size:12px;cursor:pointer;font-weight:${active?'700':'400'}`;
+  const presets = [
+    {key:'today',     label:'Today'},
+    {key:'yesterday', label:'Yesterday'},
+    {key:'thisweek',  label:'This week'},
+    {key:'thismonth', label:'This month'},
+    {key:'last30',    label:'Last 30d'},
+    {key:'last90',    label:'Last 90d'},
+    {key:'custom',    label:'Custom'},
+  ];
+  return `
+    <div style="margin-bottom:10px">
+      <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px" id="${prefix}_presets">
+        ${presets.map(p=>`<button id="${prefix}_btn_${p.key}" style="${btnStyle(p.key===defaultPreset)}" onclick="setDRP('${prefix}','${p.key}',${JSON.stringify(onChangeFn)})">${p.label}</button>`).join('')}
+      </div>
+      <div id="${prefix}_custom" style="display:${defaultPreset==='custom'?'flex':'none'};gap:6px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
+        <input type="date" id="${prefix}From" onchange="${onChangeFn}" style="font-size:12px;padding:4px 8px;border-radius:var(--radius-sm);border:1.5px solid var(--border)"/>
+        <span style="font-size:11px;color:var(--text-3)">to</span>
+        <input type="date" id="${prefix}To" onchange="${onChangeFn}" style="font-size:12px;padding:4px 8px;border-radius:var(--radius-sm);border:1.5px solid var(--border)"/>
+      </div>
+      ${staffOptions ? `<select id="${prefix}Staff" onchange="${onChangeFn}" style="font-size:12px;padding:5px 8px;border-radius:var(--radius-sm);border:1.5px solid var(--border);width:100%;margin-top:6px">
+        <option value="">All staff</option>
+        ${staffOptions}
+      </select>` : ''}
+    </div>`;
+}
+
+function setDRP(prefix, preset, onChangeFn) {
+  const d = new Date();
+  const fmt = d2 => d2.toISOString().split('T')[0];
+  let from = today, to = today;
+
+  if (preset === 'today')     { from = today; to = today; }
+  else if (preset === 'yesterday') { const y=new Date(d); y.setDate(d.getDate()-1); from=to=fmt(y); }
+  else if (preset === 'thisweek')  { const day=d.getDay()||7; const mon=new Date(d); mon.setDate(d.getDate()-day+1); from=fmt(mon); to=today; }
+  else if (preset === 'thismonth') { from=fmt(new Date(d.getFullYear(),d.getMonth(),1)); to=today; }
+  else if (preset === 'last30')    { const x=new Date(d); x.setDate(d.getDate()-30); from=fmt(x); to=today; }
+  else if (preset === 'last90')    { const x=new Date(d); x.setDate(d.getDate()-90); from=fmt(x); to=today; }
+  else if (preset === 'custom')    { /* show custom pickers */ }
+
+  // Update hidden/visible inputs
+  const fromEl = document.getElementById(prefix+'From');
+  const toEl   = document.getElementById(prefix+'To');
+  const customDiv = document.getElementById(prefix+'_custom');
+  if (preset === 'custom') {
+    if (customDiv) customDiv.style.display = 'flex';
+  } else {
+    if (customDiv) customDiv.style.display = 'none';
+    if (fromEl) fromEl.value = from;
+    if (toEl)   toEl.value   = to;
+  }
+
+  // Highlight active button
+  ['today','yesterday','thisweek','thismonth','last30','last90','custom'].forEach(key => {
+    const btn = document.getElementById(prefix+'_btn_'+key);
+    if (!btn) return;
+    const active = key === preset;
+    btn.style.borderColor = active ? 'var(--brand)' : 'var(--border)';
+    btn.style.background  = active ? 'var(--brand-light)' : 'var(--surface-2)';
+    btn.style.color       = active ? 'var(--brand)' : 'var(--text-2)';
+    btn.style.fontWeight  = active ? '700' : '400';
+  });
+
+  // Trigger refresh
+  if (preset !== 'custom') { try { eval(onChangeFn); } catch(e) {} }
+}
+
+function getDRPRange(prefix) {
+  const from = document.getElementById(prefix+'From')?.value || '';
+  const to   = document.getElementById(prefix+'To')?.value   || today;
+  const staff= document.getElementById(prefix+'Staff')?.value|| '';
+  return { from, to, staff };
 }
 
 function refreshObsNotes() {
   const el = document.getElementById('obsNoteContent');
   if (!el) return;
-  const from = document.getElementById('obsNoteFrom')?.value || '';
-  const to   = document.getElementById('obsNoteTo')?.value   || today;
-  const filterStaff = document.getElementById('obsNoteStaff')?.value || '';
+  const { from, to, staff: filterStaff } = getDRPRange('obsNote');
   const teamNames = getTeamForTL(currentUser.name);
 
   const notes = getObsNotes().filter(n =>
@@ -9986,27 +10051,16 @@ window.renderMyTeam = function() {
 
   eodDiv.innerHTML = `
     <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">📋 EOD Reports</div>
-    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
-      <input type="date" id="eodSumFrom" value="${today}" onchange="refreshMyTeamEOD()" style="font-size:12px;padding:4px 6px;border-radius:var(--radius-sm);border:1.5px solid var(--border)"/>
-      <span style="font-size:11px;color:var(--text-3)">to</span>
-      <input type="date" id="eodSumTo" value="${today}" onchange="refreshMyTeamEOD()" style="font-size:12px;padding:4px 6px;border-radius:var(--radius-sm);border:1.5px solid var(--border)"/>
-      <select id="eodSumStaff" onchange="refreshMyTeamEOD()" style="font-size:12px;padding:4px 6px;border-radius:var(--radius-sm);border:1.5px solid var(--border)">
-        <option value="">All staff</option>
-        ${analystOptions}
-      </select>
-      <button onclick="document.getElementById('eodSumFrom').value='${defaultFrom}';document.getElementById('eodSumTo').value='${today}';document.getElementById('eodSumStaff').value='';refreshMyTeamEOD()" style="font-size:11px;padding:3px 8px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:transparent;cursor:pointer;color:var(--text-3)">6 months</button>
-    </div>
+    ${dateRangePicker('eodSum', 'refreshMyTeamEOD()', analystOptions, 'today')}
     <div id="eodSumContent"></div>`;
 
-  refreshMyTeamEOD();
+  setTimeout(() => { setDRP('eodSum','today','refreshMyTeamEOD()'); }, 50);
 };
 
 function refreshMyTeamEOD() {
   const el = document.getElementById('eodSumContent');
   if (!el) return;
-  const from = document.getElementById('eodSumFrom')?.value || today;
-  const to   = document.getElementById('eodSumTo')?.value   || today;
-  const filterStaff = document.getElementById('eodSumStaff')?.value || '';
+  const { from, to, staff: filterStaff } = getDRPRange('eodSum');
   const myTeamNames = getTeamForTL(currentUser.name);
 
   const reports = getEODReports().filter(r =>
