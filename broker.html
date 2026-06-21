@@ -2860,20 +2860,8 @@ function handleCp() {
   setTimeout(()=>{ const tabs=document.querySelectorAll('.nav-tab'); if(tabs[0]) goTab(tabs[0].dataset.tab,tabs[0]); },600);
 }
 
-// ── Dashboard — cards (single day or range) ─────────────────────────────
-if(document.getElementById('selectedDate')) document.getElementById('selectedDate').value=today;
-if(document.getElementById('selectedDateTo')) document.getElementById('selectedDateTo').value=today;
-document.getElementById('selectedDate').addEventListener('change',()=>{
-  document.querySelectorAll('[id^=qbtn]').forEach(b=>b.classList.remove('active'));
-  // If from > to, snap to-date to match
-  if(document.getElementById('selectedDate').value > document.getElementById('selectedDateTo').value)
-    document.getElementById('selectedDateTo').value = document.getElementById('selectedDate').value;
-  renderMetrics(); renderEODCardIfNeeded();
-});
-document.getElementById('selectedDateTo').addEventListener('change',()=>{
-  document.querySelectorAll('[id^=qbtn]').forEach(b=>b.classList.remove('active'));
-  renderMetrics(); renderEODCardIfNeeded();
-});
+// ── Dashboard — cards (single day or range) — attendance only, skipped in broker
+// (selectedDate elements only exist in attendance app)
 
 function setCardRange(range, btn) {
   document.querySelectorAll('[id^=qbtn]').forEach(b=>b.classList.remove('active'));
@@ -3209,8 +3197,6 @@ function confirmOnBehalf() {
   document.getElementById('rbtn-month').classList.add('active');
 })();
 
-document.getElementById('fromDate').addEventListener('change',()=>{ document.querySelectorAll('[id^=rbtn]').forEach(b=>b.classList.remove('active')); loadTabs(); });
-document.getElementById('toDate').addEventListener('change',()=>{ document.querySelectorAll('[id^=rbtn]').forEach(b=>b.classList.remove('active')); loadTabs(); });
 
 function setTabRange(range, btn) {
   document.querySelectorAll('[id^=rbtn]').forEach(b=>b.classList.remove('active'));
