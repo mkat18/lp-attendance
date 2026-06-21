@@ -1711,11 +1711,9 @@ async function loadPermissions() {
     if (data?.value?.length) {
       for (const item of data.value) {
         const rawTitle = (item.Title || '').toLowerCase();
-        // Only load broker-app permissions (broker_ prefixed or legacy)
-        const role = rawTitle.startsWith('broker_')
-          ? rawTitle.replace('broker_', '')
-          : (rawTitle.startsWith('attendance_') ? null : rawTitle);
-        if (!role) continue;
+        // Only load broker-specific permissions
+        if (!rawTitle.startsWith('broker_')) continue;
+        const role = rawTitle.replace('broker_', '');
         if (role && item.Permissions) {
           try {
             const parsed = JSON.parse(item.Permissions);

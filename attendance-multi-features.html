@@ -2001,10 +2001,9 @@ async function loadPermissions() {
     if (data?.value?.length) {
       for (const item of data.value) {
         const rawTitle = (item.Title || '').toLowerCase();
-        // Only load attendance-app permissions (prefixed) or legacy (no prefix)
-        const role = rawTitle.startsWith('attendance_')
-          ? rawTitle.replace('attendance_', '')
-          : rawTitle;
+        // Only load attendance-specific permissions
+        if (!rawTitle.startsWith('attendance_')) continue;
+        const role = rawTitle.replace('attendance_', '');
         if (role && item.Permissions) {
           try {
             const parsed = JSON.parse(item.Permissions);
