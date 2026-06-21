@@ -1441,7 +1441,7 @@ function getGreeting() {
 
 // ── Seed demo data ────────────────────────────────────────────────────────
 // Seed disabled — data lives in SharePoint
-(function(){ LS.set('ci_seeded12', true); })();
+try { (function(){ LS.set('ci_seeded12', true); })(); } catch(e) { console.warn("IIFE skipped:", e.message); }
 
 // ── State ─────────────────────────────────────────────────────────────────
 const today = new Date().toLocaleDateString('en-CA', {timeZone:'Asia/Kolkata'}); // YYYY-MM-DD in AU time
@@ -3190,12 +3190,13 @@ function confirmOnBehalf() {
   showToast('✓ Submitted for '+name.split(' ')[0]+'.','ok');
   renderMetrics(); loadTabs();
 }
-(function initTabDates(){
+// initTabDates: attendance-only dashboard elements, skipped in broker
+if (document.getElementById('fromDate')) {
   const first=new Date(new Date().getFullYear(),new Date().getMonth(),1).toISOString().split('T')[0];
   document.getElementById('fromDate').value=first;
   document.getElementById('toDate').value=today;
-  document.getElementById('rbtn-month').classList.add('active');
-})();
+  if(document.getElementById('rbtn-month')) document.getElementById('rbtn-month').classList.add('active');
+}
 
 
 function setTabRange(range, btn) {
