@@ -4524,26 +4524,28 @@ async function renderLeaveScreen() {
 
     // All leave requests with filter
     html += `<div class="card"><div class="section-label">All leave requests</div>
-      <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center">
-        <select id="leaveFilterStatus" onchange="filterLeaveRequests()" style="font-size:13px;padding:6px 8px;border-radius:var(--radius-sm);border:1.5px solid var(--border)">
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
+        <select id="leaveFilterStatus" onchange="filterLeaveRequests()" style="font-size:12px;padding:5px 8px;border-radius:var(--radius-sm);border:1.5px solid var(--border)">
           <option value="">All statuses</option>
           <option value="Pending">Pending</option>
           <option value="Approved">Approved</option>
           <option value="Rejected">Rejected</option>
           <option value="Forced">Forced</option>
         </select>
-        <select id="leaveFilterType" onchange="filterLeaveRequests()" style="font-size:13px;padding:6px 8px;border-radius:var(--radius-sm);border:1.5px solid var(--border)">
+        <select id="leaveFilterType" onchange="filterLeaveRequests()" style="font-size:12px;padding:5px 8px;border-radius:var(--radius-sm);border:1.5px solid var(--border)">
           <option value="">All types</option>
-          <option value="Annual Leave">Annual Leave</option>
-          <option value="Sick Leave">Sick Leave</option>
-          <option value="Unpaid Leave">Unpaid Leave</option>
-          <option value="Broker Holiday">Broker Holiday</option>
+          <option value="Annual Leave">Annual</option>
+          <option value="Sick Leave">Sick</option>
+          <option value="Unpaid Leave">Unpaid</option>
+          <option value="Broker Holiday">Broker</option>
         </select>
-        <input type="text" id="leaveFilterName" placeholder="Staff name…" oninput="filterLeaveRequests()" style="font-size:13px;padding:6px 10px;border-radius:var(--radius-sm);border:1.5px solid var(--border);width:130px"/>
-        <input type="date" id="leaveFilterFrom" onchange="filterLeaveRequests()" style="font-size:13px;padding:6px 8px;border-radius:var(--radius-sm);border:1.5px solid var(--border)"/>
-        <span style="font-size:12px;color:var(--text-3)">to</span>
-        <input type="date" id="leaveFilterTo" onchange="filterLeaveRequests()" style="font-size:13px;padding:6px 8px;border-radius:var(--radius-sm);border:1.5px solid var(--border)"/>
-        <button onclick="clearLeaveFilters()" style="font-size:12px;padding:5px 10px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:transparent;cursor:pointer;color:var(--text-3)">Clear</button>
+        <input type="text" id="leaveFilterName" placeholder="Name…" oninput="filterLeaveRequests()" style="font-size:12px;padding:5px 8px;border-radius:var(--radius-sm);border:1.5px solid var(--border);width:90px"/>
+        <span style="font-size:11px;color:var(--text-3);margin-left:4px">Start date:</span>
+        ${['Today','Yesterday','This week','This month'].map(p=>`<button id="lfBtn_${p.replace(/ /g,'_')}" onclick="setLeavePreset('${p}',this)" style="font-size:12px;padding:5px 10px;border-radius:50px;border:1.5px solid var(--border);background:var(--surface-2);color:var(--text-2);cursor:pointer">${p}</button>`).join('')}
+        <input type="date" id="leaveFilterFrom" onchange="filterLeaveRequests();clearLeavePresetBtns()" style="font-size:12px;padding:5px 7px;border-radius:var(--radius-sm);border:1.5px solid var(--border)"/>
+        <span style="font-size:11px;color:var(--text-3)">–</span>
+        <input type="date" id="leaveFilterTo" onchange="filterLeaveRequests();clearLeavePresetBtns()" style="font-size:12px;padding:5px 7px;border-radius:var(--radius-sm);border:1.5px solid var(--border)"/>
+        <button onclick="clearLeaveFilters()" style="font-size:12px;padding:5px 10px;border-radius:50px;border:1.5px solid var(--border);background:transparent;cursor:pointer;color:var(--text-3)">Clear</button>
       </div>
       <div id="leaveRequestsList"></div>
     </div>`;
@@ -4555,16 +4557,17 @@ async function renderLeaveScreen() {
     const prevYear = (() => { const [s,e] = curYear.split('-'); return `${parseInt(s)-1}-${parseInt(e)-1}`; })();
     html += `<div class="card">
       <div class="section-label">Team leave balances</div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
-        <select id="leaveBalYearSel" onchange="filterTeamLeaveBalances()" style="font-size:13px;padding:5px 8px;border-radius:var(--radius-sm);border:1.5px solid var(--border)">
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
+        <select id="leaveBalYearSel" onchange="filterTeamLeaveBalances();clearLeaveBalPresetBtns()" style="font-size:12px;padding:5px 8px;border-radius:var(--radius-sm);border:1.5px solid var(--border)">
           <option value="${curYear}">${curYear} (current)</option>
           <option value="${prevYear}">${prevYear}</option>
         </select>
-        <span style="font-size:12px;color:var(--text-3)">or filter by dates taken:</span>
-        <input type="date" id="leaveBalFrom" onchange="filterTeamLeaveBalances()" style="font-size:13px;padding:5px 8px;border-radius:var(--radius-sm);border:1.5px solid var(--border)"/>
-        <span style="font-size:12px;color:var(--text-3)">to</span>
-        <input type="date" id="leaveBalTo" onchange="filterTeamLeaveBalances()" style="font-size:13px;padding:5px 8px;border-radius:var(--radius-sm);border:1.5px solid var(--border)"/>
-        <button onclick="document.getElementById('leaveBalFrom').value='';document.getElementById('leaveBalTo').value='';filterTeamLeaveBalances()" style="font-size:12px;padding:4px 10px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:transparent;cursor:pointer;color:var(--text-3)">Clear</button>
+        <span style="font-size:11px;color:var(--text-3);margin-left:4px">or dates taken:</span>
+        ${['Today','Yesterday','This week','This month'].map(p=>`<button id="lbBtn_${p.replace(/ /g,'_')}" onclick="setLeaveBalPreset('${p}',this)" style="font-size:12px;padding:5px 10px;border-radius:50px;border:1.5px solid var(--border);background:var(--surface-2);color:var(--text-2);cursor:pointer">${p}</button>`).join('')}
+        <input type="date" id="leaveBalFrom" onchange="filterTeamLeaveBalances();clearLeaveBalPresetBtns()" style="font-size:12px;padding:5px 7px;border-radius:var(--radius-sm);border:1.5px solid var(--border)"/>
+        <span style="font-size:11px;color:var(--text-3)">–</span>
+        <input type="date" id="leaveBalTo" onchange="filterTeamLeaveBalances();clearLeaveBalPresetBtns()" style="font-size:12px;padding:5px 7px;border-radius:var(--radius-sm);border:1.5px solid var(--border)"/>
+        <button onclick="document.getElementById('leaveBalFrom').value='';document.getElementById('leaveBalTo').value='';clearLeaveBalPresetBtns();filterTeamLeaveBalances()" style="font-size:12px;padding:5px 10px;border-radius:50px;border:1.5px solid var(--border);background:transparent;cursor:pointer;color:var(--text-3)">Clear</button>
       </div>
       <div id="teamLeaveBalTable"></div>
     </div>`;
@@ -4667,6 +4670,50 @@ function filterTeamLeaveBalances() {
       <th style="padding:6px 0;text-align:center;font-size:11px;color:var(--text-3);font-weight:600">Total</th>
       ${isMgr&&!useDateRange?'<th style="padding:6px 0;text-align:center;font-size:11px;color:var(--text-3);font-weight:600">Encash</th>':''}
     </tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+function setLeavePreset(preset, btn) {
+  const d = new Date();
+  const fmt = d2 => d2.toISOString().split('T')[0];
+  let from = today, to = today;
+  if (preset === 'Yesterday')  { const y=new Date(d); y.setDate(d.getDate()-1); from=to=fmt(y); }
+  else if (preset === 'This week')  { const day=d.getDay()||7; const mon=new Date(d); mon.setDate(d.getDate()-day+1); from=fmt(mon); to=today; }
+  else if (preset === 'This month') { from=fmt(new Date(d.getFullYear(),d.getMonth(),1)); to=today; }
+  const fromEl=document.getElementById('leaveFilterFrom');
+  const toEl=document.getElementById('leaveFilterTo');
+  if(fromEl) fromEl.value=from;
+  if(toEl) toEl.value=to;
+  // Highlight button
+  clearLeavePresetBtns();
+  if(btn) { btn.style.background='var(--brand-light)'; btn.style.borderColor='var(--brand)'; btn.style.color='var(--brand)'; btn.style.fontWeight='700'; }
+  filterLeaveRequests();
+}
+function clearLeavePresetBtns() {
+  ['Today','Yesterday','This_week','This_month'].forEach(k => {
+    const b=document.getElementById('lfBtn_'+k);
+    if(b) { b.style.background='var(--surface-2)'; b.style.borderColor='var(--border)'; b.style.color='var(--text-2)'; b.style.fontWeight='400'; }
+  });
+}
+function setLeaveBalPreset(preset, btn) {
+  const d = new Date();
+  const fmt = d2 => d2.toISOString().split('T')[0];
+  let from = today, to = today;
+  if (preset === 'Yesterday')  { const y=new Date(d); y.setDate(d.getDate()-1); from=to=fmt(y); }
+  else if (preset === 'This week')  { const day=d.getDay()||7; const mon=new Date(d); mon.setDate(d.getDate()-day+1); from=fmt(mon); to=today; }
+  else if (preset === 'This month') { from=fmt(new Date(d.getFullYear(),d.getMonth(),1)); to=today; }
+  const fromEl=document.getElementById('leaveBalFrom');
+  const toEl=document.getElementById('leaveBalTo');
+  if(fromEl) fromEl.value=from;
+  if(toEl) toEl.value=to;
+  clearLeaveBalPresetBtns();
+  if(btn) { btn.style.background='var(--brand-light)'; btn.style.borderColor='var(--brand)'; btn.style.color='var(--brand)'; btn.style.fontWeight='700'; }
+  filterTeamLeaveBalances();
+}
+function clearLeaveBalPresetBtns() {
+  ['Today','Yesterday','This_week','This_month'].forEach(k => {
+    const b=document.getElementById('lbBtn_'+k);
+    if(b) { b.style.background='var(--surface-2)'; b.style.borderColor='var(--border)'; b.style.color='var(--text-2)'; b.style.fontWeight='400'; }
+  });
 }
 
 function clearLeaveFilters() {
