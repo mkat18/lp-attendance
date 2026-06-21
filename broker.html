@@ -6905,10 +6905,6 @@ function refreshObsNotes() {
 
   if (!notes.length) { el.innerHTML = '<div style="font-size:13px;color:var(--text-3);text-align:center;padding:12px">No notes in this range.</div>'; return; }
 
-  const posN = notes.filter(n=>n.sentiment==='positive').length;
-  const negN = notes.filter(n=>n.sentiment==='negative').length;
-  const neuN = notes.length - posN - negN;
-
   const byPerson = {};
   for (const n of notes) {
     if (!byPerson[n.target]) byPerson[n.target] = {pos:0,neg:0,neu:0,notes:[]};
@@ -6918,21 +6914,37 @@ function refreshObsNotes() {
     byPerson[n.target].notes.push(n);
   }
 
+  const posNotes = notes.filter(n=>n.sentiment==='positive');
+  const negNotes = notes.filter(n=>n.sentiment==='negative');
+  const neuNotes = notes.filter(n=>n.sentiment!=='positive'&&n.sentiment!=='negative');
+  const posN = posNotes.length, negN = negNotes.length, neuN = neuNotes.length;
+
+  const sentCard = (id, bg, color, icon, label, count, items) => `
+    <div style="background:${bg};border-radius:var(--radius-sm);padding:8px;text-align:center;cursor:${count?'pointer':'default'}"
+      onclick="${count?`toggleObsCard('${id}')`:''}" >
+      <div style="font-size:20px;font-weight:700;color:${color}">${count}</div>
+      <div style="font-size:10px;color:${color}">${icon} ${label}${count?' ▾':''}</div>
+    </div>`;
+
+  const sentExpand = (id, bg, color, icon, items) => `
+    <div id="obs_exp_${id}" style="display:none;background:${bg};border-radius:var(--radius-sm);padding:8px 12px;margin-bottom:6px;font-size:12px;color:${color}">
+      ${items.map(n=>`
+        <div style="padding:4px 0;border-bottom:1px solid rgba(0,0,0,0.08)">
+          <span style="font-weight:600">${esc(n.target?.split(' ')[0])}</span>
+          <span style="opacity:.6;margin-left:4px">· ${n.date} · by ${esc(n.by?.split(' ')[0]||'')}</span>
+          <div style="font-size:11px;opacity:.85;margin-top:2px">${esc(n.note)}</div>
+        </div>`).join('')}
+    </div>`;
+
   el.innerHTML = `
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:12px">
-      <div style="background:#F0FDF4;border-radius:var(--radius-sm);padding:8px;text-align:center">
-        <div style="font-size:20px;font-weight:700;color:var(--success)">${posN}</div>
-        <div style="font-size:10px;color:var(--success)">👍 Positive</div>
-      </div>
-      <div style="background:var(--surface-2);border-radius:var(--radius-sm);padding:8px;text-align:center">
-        <div style="font-size:20px;font-weight:700;color:var(--text-3)">${neuN}</div>
-        <div style="font-size:10px;color:var(--text-3)">😐 Neutral</div>
-      </div>
-      <div style="background:#FEF2F2;border-radius:var(--radius-sm);padding:8px;text-align:center">
-        <div style="font-size:20px;font-weight:700;color:var(--danger)">${negN}</div>
-        <div style="font-size:10px;color:var(--danger)">👎 Negative</div>
-      </div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:6px">
+      ${sentCard('pos','#F0FDF4','var(--success)','👍','Positive',posN,posNotes)}
+      ${sentCard('neu','var(--surface-2)','var(--text-3)','😐','Neutral',neuN,neuNotes)}
+      ${sentCard('neg','#FEF2F2','var(--danger)','👎','Negative',negN,negNotes)}
     </div>
+    ${sentExpand('pos','#F0FDF4','var(--success)','👍',posNotes)}
+    ${sentExpand('neu','var(--surface-2)','var(--text-3)','😐',neuNotes)}
+    ${sentExpand('neg','#FEF2F2','var(--danger)','👎',negNotes)}
     ${Object.entries(byPerson).map(([name, data]) => `
       <div style="border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px;margin-bottom:8px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
@@ -10079,30 +10091,55 @@ function refreshMyTeamEOD() {
     (!filterStaff || s.name === filterStaff)
   );
 
-  const submitted = new Set(reports.map(r => r.name + '_' + r.date));
   const submittedCount = reports.length;
-  const lowConf = reports.filter(r => (r.confidence||0) <= 2);
-  const brokerFlags = reports.filter(r => r.brokerConcern === 'yes');
-  const supportFlags = reports.filter(r => r.supportNeeded === 'yes');
+  const lowConf    = reports.filter(r => (r.confidence||0) <= 2);
+  const brokerFlags= reports.filter(r => r.brokerConcern === 'yes');
+  const supportFlags=reports.filter(r => r.supportNeeded === 'yes');
 
-  const card = (count, total, bg, color, label, details) => `
+  const card = (id, count, total, bg, color, label, details) => `
     <div style="background:${bg};border-radius:var(--radius-sm);padding:10px;text-align:center;cursor:${details.length?'pointer':'default'}"
-      onclick="${details.length?`const d=this.nextElementSibling;d.style.display=d.style.display==='none'?'block':'none'`:''}">
+      onclick="${details.length?`toggleEodCard('${id}')`:''}">
       <div style="font-size:22px;font-weight:700;color:${color}">${total!==null?count+'/'+total:count}</div>
       <div style="font-size:11px;color:${color};font-weight:600">${label}${details.length?' ▾':''}</div>
-    </div>
-    <div style="display:none;grid-column:1/-1;background:${bg};border-radius:var(--radius-sm);padding:8px 12px;font-size:12px;color:${color}">
-      ${details.length ? details.map(r=>`<div style="padding:3px 0;border-bottom:1px solid rgba(0,0,0,0.06)">${esc(r.name?.split(' ')[0]||r)} ${r.date&&r.date!==today?'<span style="opacity:.6">· '+r.date+'</span>':''}
-        ${r.confidence?'<span style="float:right;opacity:.7">'+r.confidence+'/5</span>':''}</div>`).join('') : '<div style="opacity:.6">None</div>'}
+    </div>`;
+
+  const expand = (id, bg, color, details) => `
+    <div id="eod_exp_${id}" style="display:none;background:${bg};border-radius:var(--radius-sm);padding:8px 12px;margin-top:-4px;margin-bottom:4px;font-size:12px;color:${color}">
+      ${details.length ? details.map(r=>`
+        <div style="padding:4px 0;border-bottom:1px solid rgba(0,0,0,0.06)">
+          <span style="font-weight:600">${esc(r.name?.split(' ')[0]||r)}</span>
+          ${r.date&&r.date!==today?`<span style="opacity:.6;margin-left:4px">· ${r.date}</span>`:''}
+          ${r.confidence?`<span style="float:right;opacity:.7">${r.confidence}/5 ⭐</span>`:''}
+          ${r.brokerConcernDetail?`<div style="font-size:11px;opacity:.8">📣 ${esc(r.brokerConcernDetail)}</div>`:''}
+          ${r.challengeDetail?`<div style="font-size:11px;opacity:.8">⚠️ ${esc(r.challengeDetail)}</div>`:''}
+          ${r.supportDetail?`<div style="font-size:11px;opacity:.8">🙋 ${esc(r.supportDetail)}</div>`:''}
+        </div>`).join('')
+      : '<div style="opacity:.6;padding:4px 0">None</div>'}
     </div>`;
 
   el.innerHTML = `
-    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:10px">
-      ${card(submittedCount, staff.length, submittedCount>=staff.length?'var(--success-light)':'var(--danger-light)', submittedCount>=staff.length?'var(--success)':'var(--danger)', 'Submitted', reports)}
-      ${card(lowConf.length, null, lowConf.length>0?'var(--danger-light)':'var(--surface-2)', lowConf.length>0?'var(--danger)':'var(--text-3)', 'Low confidence', lowConf)}
-      ${card(brokerFlags.length, null, brokerFlags.length>0?'#FEF3C7':'var(--surface-2)', brokerFlags.length>0?'#92400E':'var(--text-3)', 'Broker concerns', brokerFlags)}
-      ${card(supportFlags.length, null, supportFlags.length>0?'var(--brand-light)':'var(--surface-2)', supportFlags.length>0?'var(--brand)':'var(--text-3)', 'Need support', supportFlags)}
-    </div>`;
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:8px">
+      ${card('sub',  submittedCount,  staff.length, submittedCount>=staff.length?'var(--success-light)':'var(--danger-light)', submittedCount>=staff.length?'var(--success)':'var(--danger)', 'Submitted', reports)}
+      ${card('lc',   lowConf.length,  null, lowConf.length>0?'var(--danger-light)':'var(--surface-2)', lowConf.length>0?'var(--danger)':'var(--text-3)', 'Low confidence', lowConf)}
+      ${card('bf',   brokerFlags.length, null, brokerFlags.length>0?'#FEF3C7':'var(--surface-2)', brokerFlags.length>0?'#92400E':'var(--text-3)', 'Broker concerns', brokerFlags)}
+      ${card('sf',   supportFlags.length, null, supportFlags.length>0?'var(--brand-light)':'var(--surface-2)', supportFlags.length>0?'var(--brand)':'var(--text-3)', 'Need support', supportFlags)}
+    </div>
+    ${expand('sub',  submittedCount>=staff.length?'var(--success-light)':'var(--danger-light)', submittedCount>=staff.length?'var(--success)':'var(--danger)', reports)}
+    ${expand('lc',   lowConf.length>0?'var(--danger-light)':'var(--surface-2)', lowConf.length>0?'var(--danger)':'var(--text-3)', lowConf)}
+    ${expand('bf',   brokerFlags.length>0?'#FEF3C7':'var(--surface-2)', brokerFlags.length>0?'#92400E':'var(--text-3)', brokerFlags)}
+    ${expand('sf',   supportFlags.length>0?'var(--brand-light)':'var(--surface-2)', supportFlags.length>0?'var(--brand)':'var(--text-3)', supportFlags)}`;
+}
+
+function toggleEodCard(id) {
+  const el = document.getElementById('eod_exp_'+id);
+  if (!el) return;
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+function toggleObsCard(id) {
+  const el = document.getElementById('obs_exp_'+id);
+  if (!el) return;
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
 }
 
 // ── Patch manager dashboard to show EOD summary card ─────────────────────
