@@ -2857,12 +2857,12 @@ function handleCp() {
   const staff=getStaff(); const idx=staff.findIndex(s=>s.name===currentUser.name);
   if (idx>=0) { staff[idx].pin=hashPin(cpBuffer); saveStaff(staff); spSavePinOnly(staff[idx]); }
   showToast('PIN updated!','ok');
-  setTimeout(()=>{ const tabs=document.querySelectorAll('.nav-tab'); if(tabs[0]) goTab('checkin',tabs[0]); },600);
+  setTimeout(()=>{ const tabs=document.querySelectorAll('.nav-tab'); if(tabs[0]) goTab(tabs[0].dataset.tab,tabs[0]); },600);
 }
 
 // ── Dashboard — cards (single day or range) ─────────────────────────────
-document.getElementById('selectedDate').value=today;
-document.getElementById('selectedDateTo').value=today;
+if(document.getElementById('selectedDate')) document.getElementById('selectedDate').value=today;
+if(document.getElementById('selectedDateTo')) document.getElementById('selectedDateTo').value=today;
 document.getElementById('selectedDate').addEventListener('change',()=>{
   document.querySelectorAll('[id^=qbtn]').forEach(b=>b.classList.remove('active'));
   // If from > to, snap to-date to match
@@ -5658,6 +5658,7 @@ let msalAccount = null; // Stores the logged-in M365 account
 const SP_SCOPES = ['https://loanprocessorau.sharepoint.com/Sites.ReadWrite.All', 'User.Read'];
 
 async function msSignIn() {
+  if (!msalInstance) { await initMsal(); return; }
   if (!msalInstance) { showToast('Auth not ready, please refresh.','err'); return; }
   try {
     const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
