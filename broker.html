@@ -10714,7 +10714,7 @@ function renderPerformanceScreen() {
   el.innerHTML = `
     <!-- Period selector -->
     <div style="display:flex;gap:8px;margin-bottom:1rem">
-      ${[7,14,30].map(d => `<button onclick="setPerfDays(${d},this)"
+      ${[7,14,30,60,90,180].map(d => `<button onclick="setPerfDays(${d},this)"
         style="padding:7px 16px;border-radius:50px;border:1.5px solid ${_perfDays===d?'var(--brand)':'var(--border)'};
         background:${_perfDays===d?'var(--brand-light)':'var(--surface-2)'};
         color:${_perfDays===d?'var(--brand)':'var(--text-2)'};font-size:13px;font-weight:${_perfDays===d?'700':'400'};cursor:pointer">
