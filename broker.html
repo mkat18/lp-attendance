@@ -6112,6 +6112,7 @@ async function loadFromSharePoint() {
     }
     // Load all other data from SP in parallel
     await Promise.all([
+      loadObsNotesFromSP(),
       loadPermissions(),
       loadRolesFromSP(),
       loadFileEntriesFromSP(),
@@ -6776,12 +6777,72 @@ function renderMyTeam() {
       <div style="background:${m.statusBg};color:${m.statusColor};border-radius:50px;padding:4px 10px;font-size:12px;font-weight:600;white-space:nowrap;flex-shrink:0">${m.statusIcon} ${m.statusLabel}</div>
     </div>`).join('');
 
+  // Observation notes stats for this TL's team
+  const teamNotes = getObsNotes().filter(n => teamNames.includes(n.target));
+  const last30 = new Date(); last30.setDate(last30.getDate()-30);
+  const last30str = last30.toISOString().split('T')[0];
+  const recentNotes = teamNotes.filter(n => n.date >= last30str);
+  const posN = recentNotes.filter(n=>n.sentiment==='positive').length;
+  const negN = recentNotes.filter(n=>n.sentiment==='negative').length;
+  const neuN = recentNotes.length - posN - negN;
+
+  let obsHTML = '';
+  if (teamNotes.length > 0) {
+    const byPerson = {};
+    for (const n of recentNotes) {
+      if (!byPerson[n.target]) byPerson[n.target] = {pos:0,neg:0,neu:0,notes:[]};
+      if (n.sentiment==='positive') byPerson[n.target].pos++;
+      else if (n.sentiment==='negative') byPerson[n.target].neg++;
+      else byPerson[n.target].neu++;
+      byPerson[n.target].notes.push(n);
+    }
+    obsHTML = `<div class="card" style="margin-top:1rem">
+      <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">📝 Observation Notes — Last 30 days</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:12px">
+        <div style="background:#F0FDF4;border-radius:var(--radius-sm);padding:8px;text-align:center">
+          <div style="font-size:20px;font-weight:700;color:var(--success)">${posN}</div>
+          <div style="font-size:10px;color:var(--success)">👍 Positive</div>
+        </div>
+        <div style="background:var(--surface-2);border-radius:var(--radius-sm);padding:8px;text-align:center">
+          <div style="font-size:20px;font-weight:700;color:var(--text-3)">${neuN}</div>
+          <div style="font-size:10px;color:var(--text-3)">😐 Neutral</div>
+        </div>
+        <div style="background:#FEF2F2;border-radius:var(--radius-sm);padding:8px;text-align:center">
+          <div style="font-size:20px;font-weight:700;color:var(--danger)">${negN}</div>
+          <div style="font-size:10px;color:var(--danger)">👎 Negative</div>
+        </div>
+      </div>
+      ${Object.entries(byPerson).map(([name, data]) => `
+        <div style="border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px;margin-bottom:8px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+            <div style="font-size:13px;font-weight:600">${esc(name)}</div>
+            <div style="display:flex;gap:3px">
+              ${data.pos?`<span style="font-size:11px;background:#F0FDF4;color:var(--success);padding:1px 6px;border-radius:99px">👍${data.pos}</span>`:''}
+              ${data.neu?`<span style="font-size:11px;background:var(--surface-2);color:var(--text-3);padding:1px 6px;border-radius:99px">😐${data.neu}</span>`:''}
+              ${data.neg?`<span style="font-size:11px;background:#FEF2F2;color:var(--danger);padding:1px 6px;border-radius:99px">👎${data.neg}</span>`:''}
+            </div>
+          </div>
+          <details>
+            <summary style="font-size:11px;color:var(--brand);cursor:pointer">View notes</summary>
+            <div style="margin-top:6px">
+              ${[...data.notes].sort((a,b)=>b.ts-a.ts).map(n=>`
+                <div style="background:${n.sentiment==='positive'?'#F0FDF4':n.sentiment==='negative'?'#FEF2F2':'var(--surface-2)'};padding:6px 8px;border-radius:var(--radius-sm);margin-bottom:4px;border-left:2px solid ${n.sentiment==='positive'?'var(--success)':n.sentiment==='negative'?'var(--danger)':'var(--border)'}">
+                  <div style="font-size:12px">${n.sentiment==='positive'?'👍':n.sentiment==='negative'?'👎':'😐'} ${esc(n.note)}</div>
+                  <div style="font-size:10px;color:var(--text-3)">${n.date} · by ${esc(n.by)}</div>
+                </div>`).join('')}
+            </div>
+          </details>
+        </div>`).join('')}
+    </div>`;
+  }
+
   el.innerHTML = `
     <div class="card" style="margin-bottom:1rem">${summaryHTML}</div>
     <div class="card">
       <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Team members (${teamNames.length})</div>
       ${cardsHTML}
     </div>
+    ${obsHTML}
     <div style="text-align:center;margin-top:8px">
       <button onclick="renderMyTeam()" style="background:transparent;border:1.5px solid var(--border);border-radius:50px;padding:8px 20px;font-size:13px;color:var(--text-2);cursor:pointer">↻ Refresh</button>
     </div>`;
