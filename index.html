@@ -879,11 +879,21 @@ init();
 
       <!-- Content -->
       <div style="padding:20px">
-        <div id="permContent" style="min-height:160px;overflow-x:auto">
-          <div style="text-align:center;padding:40px;color:#9ca3af;font-size:14px">Loading…</div>
+        <!-- Mobile block -->
+        <div id="permMobileBlock" style="display:none;text-align:center;padding:40px 20px">
+          <div style="font-size:48px;margin-bottom:16px">🖥️</div>
+          <div style="font-size:16px;font-weight:600;color:#0F2A5E;margin-bottom:8px">Use a desktop browser</div>
+          <div style="font-size:13px;color:#6b7280;line-height:1.6">Permissions management requires a desktop browser for accuracy and safety.<br>Please sign in on a PC to manage permissions.</div>
         </div>
+        <div id="permDesktopContent">
+          <div id="permContent" style="min-height:160px;overflow-x:auto">
+            <div style="text-align:center;padding:40px;color:#9ca3af;font-size:14px">Loading…</div>
+          </div>
 
-        <!-- Confirm flow (hidden until Save clicked) -->
+        </div><!-- end permDesktopContent -->
+
+        <!-- Confirm flow and save row — hidden on mobile -->
+        <div id="permActionArea">
         <div id="permConfirmBox" style="display:none;margin-top:16px;background:#FEF3C7;border:1.5px solid #F59E0B;border-radius:10px;padding:14px 16px">
           <div style="font-size:13px;font-weight:600;color:#92400E;margin-bottom:8px">⚠ Review changes before saving</div>
           <div id="permChangeSummary" style="font-size:12px;color:#78350F;margin-bottom:12px;max-height:160px;overflow-y:auto"></div>
@@ -900,6 +910,7 @@ init();
           <div id="permSaveStatus" style="font-size:12px;color:#6b7280"></div>
           <button onclick="initiatePermSave()" style="padding:9px 22px;border-radius:8px;border:none;background:#C9A84C;color:#0F1E35;font-size:14px;font-weight:700;cursor:pointer">Save changes</button>
         </div>
+        </div><!-- end permActionArea -->
       </div>
     </div>
   </div>
@@ -1094,9 +1105,17 @@ async function openPermManager() {
   _pmApp = 'portals';
   document.getElementById('permPanel').style.display = 'block';
   document.body.style.overflow = 'hidden';
-  document.getElementById('permContent').innerHTML = '<div style="text-align:center;padding:40px;color:#9ca3af;font-size:14px">Loading…</div>';
   document.getElementById('permSaveStatus').textContent = '';
   cancelConfirm();
+
+  // Mobile check
+  const isMobile = window.innerWidth < 768;
+  document.getElementById('permMobileBlock').style.display    = isMobile ? 'block' : 'none';
+  document.getElementById('permDesktopContent').style.display = isMobile ? 'none'  : 'block';
+  document.getElementById('permActionArea').style.display     = isMobile ? 'none'  : 'block';
+  if (isMobile) return;
+
+  document.getElementById('permContent').innerHTML = '<div style="text-align:center;padding:40px;color:#9ca3af;font-size:14px">Loading…</div>';
   // Reset tab highlights — portals active first
   ['portals','attendance','broker'].forEach(a => {
     const btn = document.getElementById('permTab_'+a);
