@@ -3400,18 +3400,9 @@ function tapCard(key, row) {
     }).map(r => personRow(r.name, 'via '+r.msAccount, '#B45309'));
     title = 'Suspicious activity'; emptyMsg = 'No anomalies detected ✓';
   } else if (key === 'needs') {
-    // Navigate to admin tab and scroll to needs attention section
+    window._scrollToAttention = true;
     const adminTab = document.querySelector('.nav-tab[data-tab=admin]');
     if (adminTab) goTab('admin', adminTab);
-    setTimeout(() => {
-      const card = document.getElementById('needsAttentionAdminCard');
-      if (card) {
-        card.style.display = 'block';
-        const body = document.getElementById('attentionCardBody');
-        if (body) body.style.display = 'block';
-        card.scrollIntoView({ behavior:'smooth', block:'start' });
-      }
-    }, 300);
     return;
   }
 
@@ -4075,6 +4066,14 @@ function filterAttention(period) {
         : `<button onclick="managerCloseBreak('${iss.id}','${iss.name}','${fmtDate(iss.date)}')" style="font-size:12px;padding:5px 10px;background:var(--danger);color:#fff;border:none;border-radius:4px;cursor:pointer">Close break</button>`
       }
     </div>`).join('');
+
+  // Scroll to attention card if requested from dashboard
+  if (window._scrollToAttention) {
+    window._scrollToAttention = false;
+    const body = document.getElementById('attentionCardBody');
+    if (body) body.style.display = 'block';
+    setTimeout(() => card.scrollIntoView({ behavior:'smooth', block:'start' }), 50);
+  }
 }
 
 async function managerClockOut(recId, name, date, timeInputId) {
