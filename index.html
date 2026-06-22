@@ -931,6 +931,14 @@ let _pmApp     = 'attendance';
 let _pmPending = null; // changes pending confirmation
 
 const PM_SEED = [
+  // ── Attendance: Screens ────────────────────────────────────────────────
+  {key:'tab_checkin',   label:'Check-in screen',  app:'attendance', def:'true'},
+  {key:'tab_leave',     label:'Leave',             app:'attendance', def:'true'},
+  {key:'tab_eod',       label:'EOD reports',       app:'attendance', def:'false'},
+  {key:'tab_dashboard', label:'Dashboard',         app:'attendance', def:'false'},
+  {key:'tab_admin',     label:'Admin / Staff',     app:'attendance', def:'false'},
+  {key:'tab_profile',   label:'Profile',           app:'attendance', def:'true'},
+  // ── Attendance: Features ───────────────────────────────────────────────
   {key:'canBreak',                label:'Can take breaks',                  app:'attendance',def:'true'},
   {key:'canClockOut',             label:'Can clock out',                    app:'attendance',def:'true'},
   {key:'canApplyLeave',           label:'Can apply for leave',              app:'attendance',def:'true'},
@@ -944,13 +952,22 @@ const PM_SEED = [
   {key:'canEditRecords',          label:'Can edit attendance records',      app:'attendance',def:'false'},
   {key:'canAddObsNotes',          label:'Can add observation notes',        app:'attendance',def:'false'},
   {key:'canSeeAllFiles',          label:'Can see file log in check-in',     app:'attendance',def:'false'},
-  {key:'canEditFiles',            label:'Can edit file details',            app:'broker',    def:'true'},
-  {key:'canAddFiles',             label:'Can add new files',                app:'broker',    def:'false'},
-  {key:'canArchiveFiles',         label:'Can archive / withdraw files',     app:'broker',    def:'false'},
-  {key:'canAddFeedback',          label:'Can add broker feedback',          app:'broker',    def:'true'},
-  {key:'canManageTasks',          label:'Can create and manage tasks',      app:'broker',    def:'true'},
-  {key:'canSeeAllTeamFiles',      label:'Can see all team files',           app:'broker',    def:'false'},
-  {key:'canExportFiles',          label:'Can export file data',             app:'broker',    def:'false'},
+  // ── Broker: Screens ───────────────────────────────────────────────────
+  {key:'tab_myfiles',     label:'My Files',          app:'broker', def:'false'},
+  {key:'tab_files',       label:'All Files',         app:'broker', def:'false'},
+  {key:'tab_myteam',      label:'My Team',           app:'broker', def:'false'},
+  {key:'tab_performance', label:'Performance',       app:'broker', def:'false'},
+  {key:'tab_othertasks',  label:'Other Tasks',       app:'broker', def:'false'},
+  {key:'tab_feedback',    label:'Feedback',          app:'broker', def:'false'},
+  {key:'tab_profile',     label:'Profile',           app:'broker', def:'true'},
+  // ── Broker: Features ──────────────────────────────────────────────────
+  {key:'canEditFiles',        label:'Can edit file details',        app:'broker', def:'true'},
+  {key:'canAddFiles',         label:'Can add new files',            app:'broker', def:'false'},
+  {key:'canArchiveFiles',     label:'Can archive / withdraw files', app:'broker', def:'false'},
+  {key:'canAddFeedback',      label:'Can add broker feedback',      app:'broker', def:'true'},
+  {key:'canManageTasks',      label:'Can create and manage tasks',  app:'broker', def:'true'},
+  {key:'canSeeAllTeamFiles',  label:'Can see all team files',       app:'broker', def:'false'},
+  {key:'canExportFiles',      label:'Can export file data',         app:'broker', def:'false'},
 ];
 
 // Portals definition (mirrors ALL_APPS but used for access control)
@@ -1011,9 +1028,15 @@ async function _pmLoadValues() {
 function _pmGetVal(app, role, key) {
   const spKey = app+'_'+role;
   const saved = _pmValues[spKey];
-  if (saved?.data?.features && key in saved.data.features) return saved.data.features[key];
+  const isTab = key.startsWith('tab_');
+  const tabKey = isTab ? key.slice(4) : key;
+  if (isTab) {
+    if (saved?.data?.tabs && tabKey in saved.data.tabs) return saved.data.tabs[tabKey];
+  } else {
+    if (saved?.data?.features && key in saved.data.features) return saved.data.features[key];
+  }
   const seed = PM_SEED.find(s=>s.key===key&&s.app===app);
-  return seed ? seed.def : false;
+  return seed ? seed.def==='true' : false;
 }
 
 function switchPermApp(app) {
@@ -1037,30 +1060,38 @@ function renderPermContent() {
   if (!defs.length) { el.innerHTML='<div style="padding:30px;text-align:center;color:#9ca3af;font-size:13px">No permissions defined yet.</div>'; return; }
 
   const cols = PM_ROLES;
+  const tabDefs  = defs.filter(d=>d.key.startsWith('tab_'));
+  const featDefs = defs.filter(d=>!d.key.startsWith('tab_'));
+
+  const tableHead = `<thead><tr style="background:#f9fafb;border-bottom:2px solid #e5e7eb">
+    <th style="padding:8px 12px;text-align:left;font-size:11px;color:#6b7280;font-weight:600;min-width:180px;position:sticky;left:0;background:#f9fafb;z-index:1">Permission</th>
+    ${cols.map(r=>`<th style="padding:8px 8px;text-align:center;font-size:11px;color:#6b7280;font-weight:600;white-space:nowrap">${PM_ROLE_LABEL[r]||r}</th>`).join('')}
+  </tr></thead>`;
+
+  const renderRows = (rows, offset=0) => rows.map((def,i)=>`
+    <tr style="border-bottom:1px solid #f3f4f6;background:${(i+offset)%2?'#fafafa':'#fff'}">
+      <td style="padding:8px 12px;font-size:12px;color:#111827;font-weight:500;position:sticky;left:0;background:${(i+offset)%2?'#fafafa':'#fff'};z-index:1">${def.label}</td>
+      ${cols.map(role=>`<td style="padding:8px;text-align:center">
+        <input type="checkbox" class="pm-cb" data-app="${_pmApp}" data-role="${role}" data-key="${def.key}"
+          ${_pmGetVal(_pmApp,role,def.key)?'checked':''}
+          style="width:15px;height:15px;cursor:pointer;accent-color:#0F2A5E"/>
+      </td>`).join('')}
+    </tr>`).join('');
+
   el.innerHTML = `
     <div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
-      <table style="border-collapse:collapse;font-size:12px;min-width:600px;width:100%">
-        <thead>
-          <tr style="background:#f9fafb;border-bottom:2px solid #e5e7eb">
-            <th style="padding:8px 12px;text-align:left;font-size:11px;color:#6b7280;font-weight:600;min-width:180px;position:sticky;left:0;background:#f9fafb;z-index:1">Permission</th>
-            ${cols.map(r=>`<th style="padding:8px 8px;text-align:center;font-size:11px;color:#6b7280;font-weight:600;white-space:nowrap">${PM_ROLE_LABEL[r]||r}</th>`).join('')}
-          </tr>
-        </thead>
-        <tbody>
-          ${defs.map((def,i)=>`
-            <tr style="border-bottom:1px solid #f3f4f6;background:${i%2?'#fafafa':'#fff'}">
-              <td style="padding:8px 12px;font-size:12px;color:#111827;font-weight:500;position:sticky;left:0;background:${i%2?'#fafafa':'#fff'};z-index:1">${def.label}</td>
-              ${cols.map(role=>`
-                <td style="padding:8px;text-align:center">
-                  <input type="checkbox" class="pm-cb" data-app="${_pmApp}" data-role="${role}" data-key="${def.key}"
-                    ${_pmGetVal(_pmApp,role,def.key)?'checked':''}
-                    style="width:15px;height:15px;cursor:pointer;accent-color:#0F2A5E"/>
-                </td>`).join('')}
-            </tr>`).join('')}
-        </tbody>
-      </table>
+      ${tabDefs.length ? `
+      <div style="font-size:11px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.5px;padding:10px 12px 4px;background:#f9fafb;border-radius:6px 6px 0 0;border:1px solid #e5e7eb;border-bottom:none;margin-top:4px">🖥 Screens</div>
+      <table style="border-collapse:collapse;font-size:12px;min-width:600px;width:100%;margin-bottom:12px;border:1px solid #e5e7eb">
+        ${tableHead}<tbody>${renderRows(tabDefs)}</tbody>
+      </table>` : ''}
+      ${featDefs.length ? `
+      <div style="font-size:11px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.5px;padding:10px 12px 4px;background:#f9fafb;border-radius:6px 6px 0 0;border:1px solid #e5e7eb;border-bottom:none">⚙ Features</div>
+      <table style="border-collapse:collapse;font-size:12px;min-width:600px;width:100%;border:1px solid #e5e7eb">
+        ${tableHead}<tbody>${renderRows(featDefs)}</tbody>
+      </table>` : ''}
     </div>
-    <div style="margin-top:10px;font-size:11px;color:#9ca3af">✔ = role has this permission · Changes apply after the role holder next refreshes</div>`;
+    <div style="margin-top:10px;font-size:11px;color:#9ca3af">✔ = role has access · Changes apply after the role holder next refreshes their session</div>`;
 }
 
 function renderPortalTab(el) {
@@ -1159,7 +1190,8 @@ function initiatePermSave() {
       const current = _pmGetVal(_pmApp, cb.dataset.role, cb.dataset.key);
       if (cb.checked !== current) {
         const def = _pmDefs.find(d=>d.key===cb.dataset.key&&d.app===_pmApp);
-        changes.push(`${PM_ROLE_LABEL[cb.dataset.role]||cb.dataset.role} · ${def?.label||cb.dataset.key}: ${cb.checked?'ON ✓':'OFF ✗'}`);
+        const section = cb.dataset.key.startsWith('tab_') ? '🖥' : '⚙';
+        changes.push(`${section} ${PM_ROLE_LABEL[cb.dataset.role]||cb.dataset.role} · ${def?.label||cb.dataset.key}: ${cb.checked?'ON ✓':'OFF ✗'}`);
       }
     });
   }
@@ -1219,18 +1251,26 @@ async function _doSave() {
     return;
   }
 
-  // Feature permissions save
+  // Feature + Tab permissions save
   const newByRole = {};
   document.querySelectorAll(`.pm-cb[data-app="${_pmApp}"]`).forEach(cb => {
-    if (!newByRole[cb.dataset.role]) newByRole[cb.dataset.role] = {};
-    newByRole[cb.dataset.role][cb.dataset.key] = cb.checked;
+    if (!newByRole[cb.dataset.role]) newByRole[cb.dataset.role] = { tabs:{}, features:{} };
+    const key = cb.dataset.key;
+    if (key.startsWith('tab_')) {
+      newByRole[cb.dataset.role].tabs[key.slice(4)] = cb.checked;
+    } else {
+      newByRole[cb.dataset.role].features[key] = cb.checked;
+    }
   });
 
   let saved=0, errors=0;
   for (const role of Object.keys(newByRole)) {
     const spKey = _pmApp+'_'+role;
     const existing = _pmValues[spKey];
-    const merged = { tabs: existing?.data?.tabs||{}, features: {...(existing?.data?.features||{}), ...newByRole[role]} };
+    const merged = {
+      tabs:     { ...(existing?.data?.tabs||{}),     ...newByRole[role].tabs },
+      features: { ...(existing?.data?.features||{}), ...newByRole[role].features }
+    };
     const payload = { Permissions: JSON.stringify(merged) };
     if (existing?.id) {
       const ok = await _pmPatch("('RolePermissions')", existing.id, payload);
