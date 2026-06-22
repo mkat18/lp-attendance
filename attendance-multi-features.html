@@ -1022,7 +1022,6 @@ tr.flagged-row:hover td { background: #FFEAEA; }
           <label>Role</label>
           <select id="newManagerOnlyRole" style="font-size:14px">
             <option value="hrmanager">HR Manager</option>
-            <option value="superadmin">Super Admin</option>
           </select>
         </div>
       </div>
@@ -1868,7 +1867,7 @@ function getDefaultRoles() {
 function buildRoleOptions(currentRole, includeSuperAdmin) {
   const roles = getRoles();
   let opts = '';
-  if (includeSuperAdmin) opts += '<option value="superadmin"' + (currentRole==='superadmin'?' selected':'') + '>Super Admin</option>';
+  // Super Admin is hardcoded (Mayur & Divit only) — never assignable via UI
   for (const r of roles) {
     opts += '<option value="' + r.title + '"' + (currentRole===r.title?' selected':'') + '>' + r.label + '</option>';
   }
@@ -5767,6 +5766,7 @@ async function writeAuditLog(action, targetName, detail) {
 
 function changeRole(i, newRole) {
   if (!canChangeRole()) { showToast('Only Super Admins can change roles.','err'); return; }
+  if (newRole === 'superadmin') { showToast('Super Admin cannot be assigned through the UI.','err'); return; }
   const staff=getStaff();
   const name=staff[i].name;
   const oldRole=staff[i].role;
