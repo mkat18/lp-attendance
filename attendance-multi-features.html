@@ -107,11 +107,7 @@ main { max-width: 1280px; margin: 0 auto; padding: 1.75rem 2rem 4rem; }
   }
 }
 
-/* Wider metrics grid on desktop */
-@media (min-width: 700px) {
-  .metrics { grid-template-columns: repeat(4, 1fr); }
-  #screen-dashboard .filter-row { flex-wrap: nowrap; }
-}
+/* Wider metrics grid on desktop — now default above */
 .screen { display: none; }
 .screen.active { display: block; }
 
@@ -282,7 +278,11 @@ input:focus, select:focus {
 .err-msg { font-size: 13px; color: var(--danger); text-align: center; margin: -4px 0 10px; min-height: 18px; font-weight: 500; }
 
 /* ─── METRICS GRID ───────────────────────────────────────────────────────── */
-.metrics { display: grid; grid-template-columns: repeat(2,1fr); gap: 6px; margin-bottom: 1rem; }
+.metrics { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; margin-bottom: 1rem; }
+@media (max-width: 640px) {
+  .metrics { grid-template-columns: repeat(2,1fr); gap: 6px; }
+  #weeklyWidgets > div { grid-template-columns: 1fr 1fr !important; }
+}
 .met {
   background: var(--surface); border: 1.5px solid var(--border);
   border-radius: var(--radius); padding: 10px 14px;
@@ -787,45 +787,51 @@ tr.flagged-row:hover td { background: #FFEAEA; }
 
     <div class="dashboard-grid">
 
-    <!-- Cards — single day or range -->
-    <div class="dashboard-snapshot" style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:.75rem 1rem;box-shadow:var(--shadow-sm)">
-      <div class="snapshot-header" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px">
-        <span style="font-family:var(--font-ui);font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.6px">Snapshot</span>
-        <div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap">
-          <button class="quick-date-btn active" id="qbtn-today" onclick="setCardRange('today',this)">Today</button>
-          <button class="quick-date-btn" id="qbtn-yesterday" onclick="setCardRange('yesterday',this)">Yesterday</button>
-          <button class="quick-date-btn" id="qbtn-week" onclick="setCardRange('week',this)">This week</button>
-          <button class="quick-date-btn" id="qbtn-month" onclick="setCardRange('month',this)">This month</button>
-        </div>
-        <div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap">
-          <input type="date" id="selectedDate" style="min-width:110px;padding:5px 8px;font-size:12px"/>
-          <span style="font-size:12px;color:var(--text-3)">to</span>
-          <input type="date" id="selectedDateTo" style="min-width:110px;padding:5px 8px;font-size:12px"/>
-          <button class="icon-btn" onclick="renderMetrics();renderEODCardIfNeeded();" style="padding:5px 10px;font-size:12px">↻</button>
-        </div>
+    <!-- ── Unified date bar ─────────────────────────────────────────── -->
+    <div class="dashboard-snapshot" style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:.75rem 1rem;box-shadow:var(--shadow-sm);margin-bottom:1rem">
+      <div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
+        <button id="db_today"     class="quick-date-btn active" onclick="setDashRange('today')">Today</button>
+        <button id="db_yesterday" class="quick-date-btn"        onclick="setDashRange('yesterday')">Yesterday</button>
+        <button id="db_week"      class="quick-date-btn"        onclick="setDashRange('week')">This week</button>
+        <button id="db_month"     class="quick-date-btn"        onclick="setDashRange('month')">This month</button>
+        <button id="db_custom"    class="quick-date-btn"        onclick="setDashRange('custom')">📅 Custom date range</button>
+        <input  type="date" id="selectedDate"   onchange="onDashCustomDate()" style="display:none;padding:4px 7px;font-size:12px;border:1.5px solid var(--border);border-radius:var(--radius-sm)"/>
+        <span   id="dashDateSep" style="display:none;font-size:12px;color:var(--text-3)">to</span>
+        <input  type="date" id="selectedDateTo" onchange="onDashCustomDate()" style="display:none;padding:4px 7px;font-size:12px;border:1.5px solid var(--border);border-radius:var(--radius-sm)"/>
+        <!-- Hidden inputs kept for legacy references -->
+        <input type="date" id="fromDate" style="display:none"/>
+        <input type="date" id="toDate"   style="display:none"/>
+        <input type="text" id="filterName" placeholder="Filter by name…" oninput="loadTabs()" style="font-size:12px;padding:4px 8px;border:1.5px solid var(--border);border-radius:var(--radius-sm);min-width:130px;margin-left:auto"/>
       </div>
-<div id="publicHolidayBanner" style="display:none;background:#FEF3C7;border:1.5px solid #FDE68A;border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:10px;font-size:13px;font-weight:600;color:#92400E;text-align:center"></div>
-      <div id="needsAttentionBanner" style="display:none"></div>
-      <div class="metrics" id="metrics" style="margin-bottom:0"></div>
     </div>
 
-    <!-- Tabs — date range -->
+    <!-- ── Public holiday banner ────────────────────────────────────── -->
+    <div id="publicHolidayBanner" style="display:none;background:#FEF3C7;border:1.5px solid #FDE68A;border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:10px;font-size:13px;font-weight:600;color:#92400E;text-align:center"></div>
+    <div id="needsAttentionBanner" style="display:none"></div>
+
+    <!-- ── Metric cards ─────────────────────────────────────────────── -->
+    <div class="metrics" id="metrics" style="margin-bottom:0"></div>
+
+    <!-- ── Widgets: birthdays · anniversaries · on leave ────────────── -->
+    <div id="weeklyWidgets" style="margin-top:12px;margin-bottom:1rem">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+        <div style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:1rem">
+          <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:10px">🎂 Birthdays today</div>
+          <div id="widgetBirthdays"><div style="font-size:12px;color:var(--text-3)">No birthdays today</div></div>
+        </div>
+        <div style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:1rem">
+          <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:10px">🎉 Work anniversaries</div>
+          <div id="widgetAnniversaries"><div style="font-size:12px;color:var(--text-3)">No anniversaries this week</div></div>
+        </div>
+        <div style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:1rem">
+          <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:10px">🏖 On leave this week</div>
+          <div id="widgetLeaves" style="display:flex;flex-wrap:wrap;gap:6px 20px"><div style="font-size:12px;color:var(--text-3)">No leave this week</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Tabs ─────────────────────────────────────────────────────── -->
     <div class="dashboard-tabs" style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:1rem 1.1rem;box-shadow:var(--shadow-sm)">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
-        <span style="font-family:var(--font-ui);font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.6px;white-space:nowrap">Date range</span>
-        <input type="date" id="fromDate" style="flex:1;min-width:110px;padding:5px 8px;font-size:12px"/>
-        <span style="font-size:12px;color:var(--text-3)">to</span>
-        <input type="date" id="toDate" style="flex:1;min-width:110px;padding:5px 8px;font-size:12px"/>
-        <button class="icon-btn" onclick="loadTabs()" style="padding:5px 10px;font-size:12px">↻</button>
-      </div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
-        <button class="quick-date-btn" id="rbtn-today" onclick="setTabRange('today',this)">Today</button>
-        <button class="quick-date-btn" id="rbtn-week" onclick="setTabRange('week',this)">This week</button>
-        <button class="quick-date-btn active" id="rbtn-month" onclick="setTabRange('month',this)">This month</button>
-      </div>
-      <div style="margin-bottom:10px">
-        <input type="text" id="filterName" placeholder="Filter by name…" oninput="loadTabs()" style="font-size:13px"/>
-      </div>
       <div class="tab-bar" style="margin-bottom:.75rem">
         <button class="tab active" onclick="switchDashTab('records',this)">Records</button>
         <button class="tab" onclick="switchDashTab('people',this)">By person</button>
@@ -864,24 +870,6 @@ tr.flagged-row:hover td { background: #FFEAEA; }
     </div>
 
     </div><!-- end dashboard-grid -->
-
-    <!-- Weekly widgets: birthdays, anniversaries, leaves -->
-    <div id="weeklyWidgets" style="margin-top:12px">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
-        <div style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:1rem">
-          <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:10px">🎂 Birthdays today</div>
-          <div id="widgetBirthdays"><div style="font-size:12px;color:var(--text-3)">No birthdays today</div></div>
-        </div>
-        <div style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:1rem">
-          <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:10px">🎉 Work anniversaries</div>
-          <div id="widgetAnniversaries"><div style="font-size:12px;color:var(--text-3)">No anniversaries this week</div></div>
-        </div>
-      </div>
-      <div style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:1rem">
-        <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:10px">🏖 On leave this week</div>
-        <div id="widgetLeaves" style="display:flex;flex-wrap:wrap;gap:6px 20px"><div style="font-size:12px;color:var(--text-3)">No leave this week</div></div>
-      </div>
-    </div>
     <button class="btn-primary export-btn" style="margin-top:.75rem" onclick="exportCSV()">⬇ Download CSV</button>
   </div>
 
@@ -3202,34 +3190,59 @@ document.getElementById('selectedDateTo').addEventListener('change',()=>{
   renderMetrics(); renderEODCardIfNeeded();
 });
 
-function setCardRange(range, btn) {
-  document.querySelectorAll('[id^=qbtn]').forEach(b=>b.classList.remove('active'));
-  btn.classList.add('active');
-  const d = new Date();
+// ── Unified date range (controls both metric cards AND tabs) ─────────────
+let _dashPreset = 'today';
+
+function setDashRange(preset) {
+  _dashPreset = preset;
+  const d   = new Date();
   const fmt = d2 => d2.toISOString().split('T')[0];
-  if (range==='today') {
-    document.getElementById('selectedDate').value = today;
-    document.getElementById('selectedDateTo').value = today;
-  } else if (range==='yesterday') {
-    const yest = fmt(new Date(Date.now()-86400000));
-    document.getElementById('selectedDate').value = yest;
-    document.getElementById('selectedDateTo').value = yest;
-  } else if (range==='week') {
-    const day = d.getDay()||7;
-    const mon = new Date(d); mon.setDate(d.getDate()-day+1);
-    document.getElementById('selectedDate').value = fmt(mon);
-    document.getElementById('selectedDateTo').value = today;
-  } else if (range==='month') {
-    document.getElementById('selectedDate').value = fmt(new Date(d.getFullYear(),d.getMonth(),1));
-    document.getElementById('selectedDateTo').value = today;
+  let from  = today, to = today;
+
+  if      (preset==='today')     { from=to=today; }
+  else if (preset==='yesterday') { const y=new Date(d); y.setDate(d.getDate()-1); from=to=fmt(y); }
+  else if (preset==='week')      { const day=d.getDay()||7; const m=new Date(d); m.setDate(d.getDate()-day+1); from=fmt(m); to=today; }
+  else if (preset==='month')     { from=fmt(new Date(d.getFullYear(),d.getMonth(),1)); to=today; }
+
+  // Show/hide custom date inputs in same row
+  const isCustom = preset==='custom';
+  ['selectedDate','selectedDateTo','dashDateSep'].forEach(id => {
+    const el=document.getElementById(id);
+    if(el) el.style.display = isCustom ? '' : 'none';
+  });
+
+  // Update all date inputs (not for custom — user picks the dates)
+  if (!isCustom) {
+    document.getElementById('selectedDate').value   = from;
+    document.getElementById('selectedDateTo').value = to;
+    document.getElementById('fromDate').value       = from;
+    document.getElementById('toDate').value         = to;
   }
-  renderMetrics(); renderEODCardIfNeeded();
+
+  // One highlight only — clear all, set active
+  ['today','yesterday','week','month','custom'].forEach(k => {
+    const btn = document.getElementById('db_'+k);
+    if (btn) btn.classList.toggle('active', k===preset);
+  });
+
+  if (!isCustom) { renderMetrics(); renderEODCardIfNeeded(); loadTabs(); }
 }
 
-// Keep setDay as alias for backward compat
-function setDay(range,btn){ setCardRange(range,btn); }
+function onDashCustomDate() {
+  const from = document.getElementById('selectedDate').value;
+  const to   = document.getElementById('selectedDateTo').value;
+  if (!from || !to) return;
+  document.getElementById('fromDate').value = from;
+  document.getElementById('toDate').value   = to;
+  renderMetrics(); renderEODCardIfNeeded(); loadTabs();
+}
 
-function getSelectedDate(){ return document.getElementById('selectedDate').value||today; }
+// Legacy aliases so any existing calls still work
+function setCardRange(range){ setDashRange(range); }
+function setDay(range){ setDashRange(range); }
+function setTabRange(range){ setDashRange(range); }
+
+function getSelectedDate()  { return document.getElementById('selectedDate').value||today; }
 function getSelectedDateTo(){ return document.getElementById('selectedDateTo').value||getSelectedDate(); }
 function isMultiDay(){ return getSelectedDate() !== getSelectedDateTo(); }
 
@@ -3668,29 +3681,18 @@ function confirmOnBehalf() {
   showToast('✓ Submitted for '+name.split(' ')[0]+'.','ok');
   renderMetrics(); loadTabs();
 }
-(function initTabDates(){
-  const first=new Date(new Date().getFullYear(),new Date().getMonth(),1).toISOString().split('T')[0];
-  document.getElementById('fromDate').value=first;
-  document.getElementById('toDate').value=today;
-  document.getElementById('rbtn-month').classList.add('active');
+(function initDashDates(){
+  // Initialise unified date to today
+  const t = today;
+  ['selectedDate','selectedDateTo','fromDate','toDate'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = t;
+  });
 })();
 
-document.getElementById('fromDate').addEventListener('change',()=>{ document.querySelectorAll('[id^=rbtn]').forEach(b=>b.classList.remove('active')); loadTabs(); });
-document.getElementById('toDate').addEventListener('change',()=>{ document.querySelectorAll('[id^=rbtn]').forEach(b=>b.classList.remove('active')); loadTabs(); });
-
-function setTabRange(range, btn) {
-  document.querySelectorAll('[id^=rbtn]').forEach(b=>b.classList.remove('active'));
-  btn.classList.add('active');
-  const d=new Date();
-  if(range==='today'){ document.getElementById('fromDate').value=today; document.getElementById('toDate').value=today; }
-  else if(range==='week'){ const day=d.getDay()||7; const mon=new Date(d); mon.setDate(d.getDate()-day+1); document.getElementById('fromDate').value=mon.toISOString().split('T')[0]; document.getElementById('toDate').value=today; }
-  else if(range==='month'){ document.getElementById('fromDate').value=new Date(d.getFullYear(),d.getMonth(),1).toISOString().split('T')[0]; document.getElementById('toDate').value=today; }
-  loadTabs();
-}
-
 function loadTabs() {
-  const from=document.getElementById('fromDate').value;
-  const to=document.getElementById('toDate').value;
+  const from=document.getElementById('fromDate').value||today;
+  const to=document.getElementById('toDate').value||today;
   const fn=document.getElementById('filterName').value.trim().toLowerCase();
   tabData=getRecords().filter(r=>r.date>=from&&r.date<=to&&(!fn||r.name.toLowerCase().includes(fn)));
   const active=document.querySelector('.panel.active');
