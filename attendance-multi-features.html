@@ -5776,10 +5776,15 @@ function changeRole(i, newRole) {
   staff[i].roleChangedAt=new Date().toLocaleString('en-AU');
   staff[i].roleChangedFrom=oldRole;
   saveStaff(staff);
-  spSaveStaffMember(staff[i]);
-  writeAuditLog('Role Change', name, `Changed from ${ROLE_LABEL[oldRole]} to ${ROLE_LABEL[newRole]}`);
+  // Lightweight patch — only update Role field to avoid 400 from column mismatches
+  if (staff[i].id) {
+    spPatch(SP_API + "('AttendanceStaff')/items(" + staff[i].id + ")", { Role: newRole })
+      .then(ok => { if (!ok) showToast('Role saved locally but SP sync failed — try again.','err'); })
+      .catch(() => showToast('SP sync failed — role saved locally.','err'));
+  }
+  writeAuditLog('Role Change', name, `Changed from ${ROLE_LABEL[oldRole]||oldRole} to ${ROLE_LABEL[newRole]||newRole}`);
   renderAdmin();
-  showToast(`${name.split(' ')[0]} is now ${ROLE_LABEL[newRole]}.`,'ok');
+  showToast(`${name.split(' ')[0]} is now ${ROLE_LABEL[newRole]||newRole}.`,'ok');
 }
 
 
@@ -6807,7 +6812,7 @@ async function spSavePinOnly(s) {
 }
 
 async function spSaveStaffMember(s) {
-  // Build payload — only include fields that exist in SP
+  // Build payload — only include fields confirmed to exist in SP AttendanceStaff
   const payload = {
     Title: String(s.name||''),
     Role: String(s.role||'staff'),
@@ -6818,9 +6823,9 @@ async function spSaveStaffMember(s) {
     Office: String(s.office||''),
     Team: String(s.team||''),
     JoinDate: String(s.joinDate||''),
-    DOB: String(s.dob||''),
     Phone: String(s.phone||''),
     Email: String(s.email||''),
+    DOB: String(s.dob||''),
     EmergencyContact1Name: String(s.ec1Name||''),
     EmergencyContact1Phone: String(s.ec1Phone||''),
     EmergencyContact1Relation: String(s.ec1Relation||''),
