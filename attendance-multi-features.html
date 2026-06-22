@@ -291,6 +291,16 @@ input:focus, select:focus {
 }
 .met.clickable { cursor: pointer; }
 .met.clickable:hover { border-color: var(--brand); }
+.met.met-active { border-color: var(--brand) !important; background: var(--brand-light) !important; }
+.met-row-expand {
+  grid-column: 1 / -1;
+  background: var(--surface);
+  border: 1.5px solid var(--brand);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  animation: expandIn .15s ease-out;
+}
+@keyframes expandIn { from { opacity:0; transform:translateY(-4px); } to { opacity:1; transform:translateY(0); } }
 .met-lbl { font-size: 10px; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; font-family: var(--font-ui); }
 .met-val { font-family: var(--font-ui); font-size: 26px; font-weight: 700; letter-spacing: -0.5px; line-height: 1; }
 .met-sub { font-size: 11px; color: var(--text-3); margin-top: 4px; }
@@ -798,19 +808,8 @@ tr.flagged-row:hover td { background: #FFEAEA; }
         </div>
       </div>
 <div id="publicHolidayBanner" style="display:none;background:#FEF3C7;border:1.5px solid #FDE68A;border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:10px;font-size:13px;font-weight:600;color:#92400E;text-align:center"></div>
-      <div id="needsAttentionBanner" style="display:none;background:#FEF2F2;border:1.5px solid #FECACA;border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:10px;cursor:pointer;display:flex;align-items:center;justify-content:space-between" onclick="goTab('admin',document.querySelector('.nav-tab[data-tab=admin]'))">
-        <div style="font-size:13px;font-weight:600;color:var(--danger)">⚠ <span id="needsAttentionCount">0</span> issue<span id="needsAttentionPlural">s</span> need attention</div>
-        <div style="font-size:12px;color:var(--danger);opacity:0.7">View in Staff tab →</div>
-      </div>
+      <div id="needsAttentionBanner" style="display:none"></div>
       <div class="metrics" id="metrics" style="margin-bottom:0"></div>
-      <!-- Inline expand panel — shows when a metric card is clicked -->
-      <div id="metricsExpand" style="display:none;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);margin-top:10px;overflow:hidden;box-shadow:var(--shadow-sm)">
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--surface-2);border-bottom:1px solid var(--border)">
-          <div style="font-size:13px;font-weight:700;color:var(--text)" id="metricsExpandTitle"></div>
-          <button onclick="closeMetricsExpand()" style="background:transparent;border:none;color:var(--text-3);font-size:18px;cursor:pointer;line-height:1;padding:0 2px">✕</button>
-        </div>
-        <div id="metricsExpandBody" style="padding:10px 14px"></div>
-      </div>
     </div>
 
     <!-- Tabs — date range -->
@@ -3247,6 +3246,169 @@ function getDateRange() {
   return dates;
 }
 
+// ── Metric card helpers ───────────────────────────────────────────────────
+let _activeMetricCard = null;
+let _activeMetricRow  = null;
+
+function metCard(key, row, label, val, color, sub, alertBorder, navToAdmin) {
+  const isActive = _activeMetricCard === key;
+  const border = isActive ? '' : (alertBorder || '');
+  return `<div class="met clickable${isActive?' met-active':''}" style="${border}"
+    onclick="${navToAdmin
+      ? `goTab('admin',document.querySelector('.nav-tab[data-tab=admin]'))`
+      : `tapCard('${key}',${row})`}">
+    <div class="met-lbl">${label}</div>
+    <div class="met-val" style="color:${color}">${val}</div>
+    <div class="met-sub">${sub}</div>
+  </div>`;
+}
+
+function rowExpandHTML(row) {
+  return `<div id="dashExp_${row}" class="met-row-expand" style="display:none">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 14px;background:var(--brand-light);border-bottom:1px solid var(--brand)">
+      <div style="font-size:13px;font-weight:700;color:var(--brand)" id="dashExpTitle_${row}"></div>
+      <button onclick="closeDashExp(${row})" style="background:transparent;border:none;color:var(--brand);font-size:16px;cursor:pointer;padding:0 4px;line-height:1">✕</button>
+    </div>
+    <div id="dashExpBody_${row}" style="padding:10px 14px;max-height:260px;overflow-y:auto"></div>
+  </div>`;
+}
+
+function closeDashExp(row) {
+  document.getElementById('dashExp_'+row).style.display = 'none';
+  _activeMetricCard = null;
+  _activeMetricRow  = null;
+  // Re-render cards to remove active highlight
+  renderMetrics();
+}
+
+function tapCard(key, row) {
+  // Toggle same card closed
+  if (_activeMetricCard === key) { closeDashExp(row); return; }
+
+  // Close previous expand if different row
+  if (_activeMetricRow !== null && _activeMetricRow !== row) {
+    const prev = document.getElementById('dashExp_'+_activeMetricRow);
+    if (prev) prev.style.display = 'none';
+  }
+
+  _activeMetricCard = key;
+  _activeMetricRow  = row;
+  renderMetrics(); // re-render to show active state
+
+  // Build expand content
+  const date     = getSelectedDate();
+  const dateTo   = getSelectedDateTo();
+  const allRecs  = getRecords().filter(r => r.date >= date && r.date <= dateTo);
+  const allStaff = getStaff().filter(s => s.role !== 'superadmin');
+  const allBreaks= getBreaks();
+
+  const personRow = (name, detail, color) =>
+    `<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border)">
+      <div style="font-size:13px;font-weight:600;flex:1">${esc(name)}</div>
+      <div style="font-size:12px;color:${color||'var(--text-3)'}">${esc(detail)}</div>
+    </div>`;
+
+  let title = '', rows = [], emptyMsg = '';
+
+  if (key === 'missing') {
+    const sub = new Set(allRecs.map(r => r.name));
+    rows = allStaff.filter(s => !sub.has(s.name)).map(s => personRow(s.name, 'Not submitted', 'var(--danger)'));
+    title = 'Not submitted'; emptyMsg = 'All staff have submitted ✓';
+  } else if (key === 'office') {
+    rows = allRecs.filter(r => r.status==='office').map(r => personRow(r.name, r.clockIn?'In '+fmtTime(r.clockIn)+(r.clockOut?' · Out '+fmtTime(r.clockOut):''):'—', 'var(--brand)'));
+    title = 'In office'; emptyMsg = 'Nobody in office';
+  } else if (key === 'wfh') {
+    rows = allRecs.filter(r => r.status==='wfh').map(r => personRow(r.name, r.clockIn?'In '+fmtTime(r.clockIn):'—', 'var(--success)'));
+    title = 'WFH'; emptyMsg = 'Nobody WFH today';
+  } else if (key === 'leave') {
+    rows = allRecs.filter(r => r.status==='leave').map(r => personRow(r.name, r.reason||'On leave', 'var(--warn)'));
+    title = 'On leave'; emptyMsg = 'Nobody on leave today';
+  } else if (key === 'halfday') {
+    rows = allRecs.filter(r => r.status==='halfday').map(r => personRow(r.name, r.reason||'Half day', '#7C3AED'));
+    title = 'Half day'; emptyMsg = 'Nobody on half day today';
+  } else if (key === 'onbreak') {
+    const on = allBreaks.filter(b => b.date===today && b.isOpen===true);
+    rows = on.map(b => personRow(b.name, b.start?'Since '+fmtTime(b.start):'On break', 'var(--warn)'));
+    title = 'On break now'; emptyMsg = 'Nobody on break right now';
+  } else if (key === 'available') {
+    const onBrk = new Set(allBreaks.filter(b => b.date===today && b.isOpen).map(b => b.name));
+    rows = allRecs.filter(r => r.date===today && (r.status==='office'||r.status==='wfh') && !onBrk.has(r.name))
+      .map(r => personRow(r.name, r.status==='office'?'In office':'WFH', 'var(--success)'));
+    title = 'Available now'; emptyMsg = 'Nobody available right now';
+  } else if (key === 'late') {
+    rows = allStaff.filter(s => s.startTime && allRecs.some(r => {
+      if (r.name!==s.name||!r.clockIn) return false;
+      return r.clockIn > new Date(r.date+'T'+s.startTime+':00').getTime()+15*60*1000;
+    })).map(s => personRow(s.name, 'Late clock in', 'var(--danger)'));
+    title = 'Late clock in'; emptyMsg = 'No late arrivals ✓';
+  } else if (key === 'early') {
+    rows = allStaff.filter(s => s.endTime && allRecs.some(r => {
+      if (r.name!==s.name||!r.clockOut) return false;
+      return r.clockOut < new Date(r.date+'T'+s.endTime+':00').getTime()-15*60*1000;
+    })).map(s => personRow(s.name, 'Early clock out', 'var(--danger)'));
+    title = 'Early out'; emptyMsg = 'No early departures ✓';
+  } else if (key === 'location') {
+    rows = allRecs.filter(r => {
+      if (r.status!=='office'&&r.status!=='halfday') return false;
+      const flag = r.geo && geoFlagForRecord(r);
+      return flag && !flag.ok;
+    }).map(r => personRow(r.name, '⚠ Location mismatch', 'var(--danger)'));
+    title = 'Location issues'; emptyMsg = 'No location issues ✓';
+  } else if (key === 'noselfie') {
+    rows = allRecs.filter(r => r.status!=='leave'&&!r.hasPhoto).map(r => personRow(r.name, 'No selfie', 'var(--danger)'));
+    title = 'No selfie'; emptyMsg = 'All selfies captured ✓';
+  } else if (key === 'eod') {
+    const eodRpts = getEODReports().filter(r => r.date === date);
+    const submitted = new Set(eodRpts.map(r => r.name));
+    const eligible = allStaff.filter(s => ['analyst','trainee','teamlead'].includes(s.role));
+    rows = eligible.map(s => personRow(s.name, submitted.has(s.name)?'✓ Submitted':'Not yet', submitted.has(s.name)?'var(--success)':'var(--danger)'));
+    title = 'EOD reports'; emptyMsg = 'No eligible staff';
+  } else if (key === 'absence') {
+    const patterns = detectAbsencePatterns();
+    rows = patterns.map(p => personRow(p.name||p.label, p.detail||p.label, '#B45309'));
+    title = 'Absence patterns'; emptyMsg = 'No recurring patterns ✓';
+  } else if (key === 'coverage') {
+    const dayRecs = allRecs.filter(r => r.date===date);
+    const cov = getCoverage();
+    rows = dayRecs.filter(r => r.status==='leave').map(r => {
+      const assigned = cov[date+'_'+r.name];
+      return personRow(r.name, assigned?'Cover: '+assigned:'⚠ Unassigned', assigned?'var(--success)':'var(--danger)');
+    });
+    title = 'Coverage'; emptyMsg = 'No leave today ✓';
+  } else if (key === 'suspicious') {
+    rows = allRecs.filter(r => {
+      if (!r.msAccount) return false;
+      const msFirst = r.msAccount.split('@')[0].toLowerCase().replace(/[._]/g,' ').split(' ')[0];
+      const staffFirst = r.name.toLowerCase().split(' ')[0];
+      return msFirst !== staffFirst && !r.name.toLowerCase().includes(msFirst) && !r.msAccount.toLowerCase().includes(staffFirst);
+    }).map(r => personRow(r.name, 'via '+r.msAccount, '#B45309'));
+    title = 'Suspicious activity'; emptyMsg = 'No anomalies detected ✓';
+  } else if (key === 'needs') {
+    rows = (_attentionIssues||[]).map(i => personRow(i.name, i.detail + ' · ' + fmtDate(i.date), 'var(--danger)'));
+    title = 'Needs attention'; emptyMsg = 'No issues ✓';
+  }
+
+  // Deduplicate
+  const seen = new Set();
+  rows = rows.filter((r,i) => {
+    const name = r.match(/font-weight:600[^>]*>([^<]+)/)?.[1];
+    if (!name || seen.has(name)) return false;
+    seen.add(name); return true;
+  });
+
+  const expTitle = document.getElementById('dashExpTitle_'+row);
+  const expBody  = document.getElementById('dashExpBody_'+row);
+  const expDiv   = document.getElementById('dashExp_'+row);
+  if (!expTitle || !expBody || !expDiv) return;
+
+  expTitle.textContent = title + (rows.length ? ' ('+rows.length+')' : '');
+  expBody.innerHTML = rows.length
+    ? rows.join('').replace(/border-bottom:[^;]+;([^<]*<\/div>\s*)$/, '$1')
+    : `<div style="font-size:13px;color:var(--text-3);text-align:center;padding:10px 0">${emptyMsg}</div>`;
+  expDiv.style.display = 'block';
+  setTimeout(() => expDiv.scrollIntoView({ behavior:'smooth', block:'nearest' }), 50);
+}
+
 function renderMetrics() {
   const fromDate = getSelectedDate();
   const toDate   = getSelectedDateTo();
@@ -3348,91 +3510,120 @@ function renderMetrics() {
 
   const rangeLabel = multi ? ` <span style="font-size:10px;color:var(--text-3);font-weight:400">${fromDate} – ${toDate}</span>` : '';
 
-  document.getElementById('metrics').innerHTML=`
-    <div class="met clickable" style="grid-column:1/-1;${missing.length>0?'border-color:#FECACA':''}" onclick="cardTap('missing')">
-      <div class="met-lbl">Not submitted${rangeLabel}</div>
-      <div class="met-val" style="color:${missing.length>0?'var(--danger)':'var(--success)'}">${missing.length}</div>
-      <div class="met-sub">${missingLabel}</div>
-    </div>
-    <div class="met clickable" onclick="cardTap('office')">
-      <div class="met-lbl">In office</div>
-      <div class="met-val" style="color:var(--brand)">${office}</div>
-      <div class="met-sub">${office>0?'tap to see':'&nbsp;'}</div>
-    </div>
-    <div class="met clickable" onclick="cardTap('wfh')">
-      <div class="met-lbl">WFH</div>
-      <div class="met-val" style="color:var(--success)">${wfh}</div>
-      <div class="met-sub">${wfh>0?'tap to see':'&nbsp;'}</div>
-    </div>
-    <div class="met clickable" onclick="cardTap('leave')">
-      <div class="met-lbl">On leave</div>
-      <div class="met-val" style="color:var(--warn)">${leave}</div>
-      <div class="met-sub">${leave>0?'tap to see':'&nbsp;'}</div>
-    </div>
-    <div class="met clickable" onclick="cardTap('halfday')">
-      <div class="met-lbl">Half day</div>
-      <div class="met-val" style="color:var(--halfday)">${halfday}</div>
-      <div class="met-sub">${halfday>0?'tap to see':'&nbsp;'}</div>
-    </div>
-    ${isToday?`
-    <div class="met clickable" style="${onBreakNames.length>0?'border-color:#E8A040':''}" onclick="cardTap('onbreak')">
-      <div class="met-lbl">On break now</div>
-      <div class="met-val" style="color:${onBreakNames.length>0?'var(--warn)':'var(--text-3)'}">${onBreakNames.length}</div>
-      <div class="met-sub">${onBreakNames.length>0?onBreakNames.slice(0,2).map(n=>n.split(' ')[0]).join(', ')+(onBreakNames.length>2?' +more':''):'nobody on break'}</div>
-    </div>
-    <div class="met clickable" onclick="cardTap('available')">
-      <div class="met-lbl">Available</div>
-      <div class="met-val" style="color:var(--success)">${availableNames.length}</div>
-      <div class="met-sub">${availableNames.length>0?availableNames.slice(0,2).map(n=>n.split(' ')[0]).join(', ')+(availableNames.length>2?' +more':''):'&nbsp;'}</div>
-    </div>`:''}
-    <div class="met clickable" style="${lateStaff.length>0?'border-color:#FECACA':''}" onclick="cardTap('late')">
-      <div class="met-lbl">Late clock in</div>
-      <div class="met-val" style="color:${lateStaff.length>0?'var(--danger)':'var(--success)'}">${lateStaff.length}</div>
-      <div class="met-sub">${lateStaff.length>0?lateStaff.slice(0,2).map(n=>n.name.split(' ')[0]).join(', ')+(lateStaff.length>2?' +more':''):'all on time ✓'}</div>
-    </div>
-    <div class="met clickable" style="${earlyStaff.length>0?'border-color:#FECACA':''}" onclick="cardTap('early')">
-      <div class="met-lbl">Early clock out</div>
-      <div class="met-val" style="color:${earlyStaff.length>0?'var(--danger)':'var(--success)'}">${earlyStaff.length}</div>
-      <div class="met-sub">${earlyStaff.length>0?earlyStaff.slice(0,2).map(n=>n.name.split(' ')[0]).join(', ')+(earlyStaff.length>2?' +more':''):'all good ✓'}</div>
-    </div>
-    <div class="met clickable" style="grid-column:1/-1;${locationFlagged.length>0?'border-color:#FECACA':''}" onclick="cardTap('location')">
-      <div class="met-lbl">📍 Location issues</div>
-      <div class="met-val" style="color:${locationFlagged.length>0?'var(--danger)':'var(--success)'}">${locationFlagged.length}</div>
-      <div class="met-sub">${locationFlagged.length>0?locationFlagged.slice(0,3).map(r=>r.name.split(' ')[0]).join(', ')+(locationFlagged.length>3?' +more':''):'all locations verified ✓'}</div>
-    </div>
-    ${isSuperAdmin()?`
-    <div class="met" style="grid-column:1/-1;${suspicious.length>0?'border-color:#F59E0B;background:#FFFBEB':''}">
-      <div class="met-lbl">🔍 Suspicious activity</div>
-      <div class="met-val" style="color:${suspicious.length>0?'#B45309':'var(--success)'}">${suspicious.length}</div>
-      <div class="met-sub" style="white-space:normal">${suspicious.length>0?suspicious.map(r=>esc(r.name.split(' ')[0])+' via <b>'+esc(r.msAccount)+'</b>').join(' · '):'no anomalies detected ✓'}</div>
-    </div>`:''}
-    ${isManager()?`
-    <div class="met" style="grid-column:1/-1;${noPhoto.length>0?'border-color:#FECACA':''}">
-      <div class="met-lbl">📷 No selfie</div>
-      <div class="met-val" style="color:${noPhoto.length>0?'var(--danger)':'var(--success)'}">${noPhoto.length}</div>
-      <div class="met-sub">${noPhoto.length>0?noPhoto.slice(0,3).map(r=>r.name.split(' ')[0]).join(', ')+(noPhoto.length>3?' +more':''):'all selfies captured ✓'}</div>
-    </div>`:''}
-    ${isManager()?renderAbsencePatternCard():''}
-    ${isManager()?renderCoverageCard(date):''}
-    ${(()=>{
-      const role = currentUser && currentUser.role;
-      if (!['analyst','teamlead'].includes(role)) return '';
-      const myFiles = getFileEntries().filter(f => 
-        role === 'superadmin' || role === 'hrmanager' ? true :
-        role === 'teamlead' ? (getTeamForTL(currentUser.name).includes(f.owner) || f.owner === currentUser.name) :
-        f.owner === currentUser.name
-      );
-      const atOrPastReady3 = ['Ready to Submit', ...STAGES_AFTER_READY];
-      const pending = myFiles.filter(f => !f.checklistSubmitted && atOrPastReady3.includes(f.status));
-      if (!pending.length) return '';
-      const names = pending.slice(0,3).map(f=>esc(f.client||'Unnamed')).join(', ') + (pending.length>3?' +more':'');
-      return '<div class="met clickable" style="grid-column:1/-1;border-color:#FDE68A;background:#FFFBEB">' +
-        '<div class="met-lbl">⚠ Checklist not submitted</div>' +
-        '<div class="met-val" style="color:#92400E">' + pending.length + '</div>' +
-        '<div class="met-sub" style="white-space:normal">' + names + '</div>' +
-        '</div>';
-    })()}
-  `;
+  // ── Compute data needed for Row 3 ──────────────────────────────────────
+  const patterns     = isManager()||isSuperAdmin() ? detectAbsencePatterns() : [];
+  const eodRpts      = isManager()||isSuperAdmin() ? getEODReports().filter(r=>r.date===date) : [];
+  const eodEligible  = allStaff.filter(s=>['analyst','trainee','teamlead'].includes(s.role));
+  const eodCount     = eodRpts.length;
+  const eodTotal     = eodEligible.length;
+  const eodMissing   = eodTotal - eodCount;
+  const coverage     = typeof getCoverage==='function' ? getCoverage() : {};
+  const onLeaveRecs  = allRecs.filter(r=>r.date===date&&r.status==='leave');
+  const unassignedCover = onLeaveRecs.filter(r=>!coverage[date+'_'+r.name]).length;
+
+  const _restoreKey = _activeMetricCard;
+  const _restoreRow = _activeMetricRow;
+
+  // Row 0: Alerts
+  let r0 = '';
+  r0 += metCard('needs',   0, '⚠ Needs attention', _attentionIssues.length,
+    _attentionIssues.length?'var(--danger)':'var(--success)',
+    _attentionIssues.length?_attentionIssues.length+' issue'+(_attentionIssues.length!==1?'s':''):'all clear ✓',
+    _attentionIssues.length?'border-color:#FECACA;':'', true);
+  r0 += metCard('missing', 0, 'Not submitted', missing.length,
+    missing.length?'var(--danger)':'var(--success)', missingLabel,
+    missing.length?'border-color:#FECACA;':'');
+  r0 += metCard('office',  0, 'In office',  office, 'var(--brand)',    office>0?'tap to see':'&nbsp;');
+  r0 += metCard('wfh',     0, 'WFH',        wfh,    'var(--success)',  wfh>0?'tap to see':'&nbsp;');
+  r0 += rowExpandHTML(0);
+
+  // Row 1: Status
+  let r1 = '';
+  r1 += metCard('leave',    1, 'On leave',  leave,   'var(--warn)',    leave>0?'tap to see':'&nbsp;');
+  r1 += metCard('halfday',  1, 'Half day',  halfday, 'var(--halfday)', halfday>0?'tap to see':'&nbsp;');
+  r1 += metCard('onbreak',  1, 'On break',
+    isToday?onBreakNames.length:'—',
+    isToday&&onBreakNames.length?'var(--warn)':'var(--text-3)',
+    isToday?(onBreakNames.length>0?onBreakNames.slice(0,2).map(n=>n.split(' ')[0]).join(', ')+(onBreakNames.length>2?' +more':''):'nobody on break'):'today only',
+    isToday&&onBreakNames.length?'border-color:#E8A040;':'');
+  r1 += metCard('available', 1, 'Available',
+    isToday?availableNames.length:'—',
+    isToday&&availableNames.length?'var(--success)':'var(--text-3)',
+    isToday?(availableNames.length>0?availableNames.slice(0,2).map(n=>n.split(' ')[0]).join(', ')+(availableNames.length>2?' +more':''):'&nbsp;'):'today only');
+  r1 += rowExpandHTML(1);
+
+  // Row 2: Flags
+  let r2 = '';
+  r2 += metCard('late',     2, '⏰ Late clock in',  lateStaff.length,
+    lateStaff.length?'var(--danger)':'var(--success)',
+    lateStaff.length>0?lateStaff.slice(0,2).map(n=>n.name.split(' ')[0]).join(', ')+(lateStaff.length>2?' +more':''):'all on time ✓',
+    lateStaff.length?'border-color:#FECACA;':'');
+  r2 += metCard('early',    2, '🏃 Early out',       earlyStaff.length,
+    earlyStaff.length?'var(--danger)':'var(--success)',
+    earlyStaff.length>0?earlyStaff.slice(0,2).map(n=>n.name.split(' ')[0]).join(', ')+(earlyStaff.length>2?' +more':''):'all good ✓',
+    earlyStaff.length?'border-color:#FECACA;':'');
+  r2 += metCard('location', 2, '📍 Location',        locationFlagged.length,
+    locationFlagged.length?'var(--danger)':'var(--success)',
+    locationFlagged.length>0?locationFlagged.slice(0,3).map(r=>r.name.split(' ')[0]).join(', ')+(locationFlagged.length>3?' +more':''):'all verified ✓',
+    locationFlagged.length?'border-color:#FECACA;':'');
+  r2 += isManager()
+    ? metCard('noselfie', 2, '📷 No selfie', noPhoto.length,
+        noPhoto.length?'var(--danger)':'var(--success)',
+        noPhoto.length>0?noPhoto.slice(0,3).map(r=>r.name.split(' ')[0]).join(', ')+(noPhoto.length>3?' +more':''):'all captured ✓',
+        noPhoto.length?'border-color:#FECACA;':'')
+    : '';
+  r2 += rowExpandHTML(2);
+
+  // Row 3: Insights (manager/SA)
+  let r3 = '';
+  if (isManager()||isSuperAdmin()) {
+    r3 += metCard('eod', 3, '📋 EOD reports',
+      eodCount+'/'+eodTotal,
+      eodCount>=eodTotal?'var(--success)':'var(--warn)',
+      eodMissing>0?eodMissing+' not yet':'all submitted ✓',
+      eodMissing?'border-color:#FDE68A;':'');
+    r3 += metCard('absence', 3, '📊 Absence patterns', patterns.length,
+      patterns.length?'#B45309':'var(--success)',
+      patterns.length?patterns.slice(0,2).map(p=>p.label).join(', ')+(patterns.length>2?' +more':''):'no patterns ✓',
+      patterns.length?'border-color:#F59E0B;background:#FFFBEB;':'');
+    r3 += metCard('coverage', 3, '🔄 Coverage', unassignedCover+' unassigned',
+      unassignedCover?'var(--danger)':'var(--success)',
+      unassignedCover?'tap to manage':'all assigned ✓',
+      unassignedCover?'border-color:#FECACA;':'');
+    r3 += isSuperAdmin()
+      ? metCard('suspicious', 3, '🔍 Suspicious', suspicious.length,
+          suspicious.length?'#B45309':'var(--success)',
+          suspicious.length>0?suspicious.slice(0,1).map(r=>r.name.split(' ')[0]).join('')+(suspicious.length>1?' +'+(suspicious.length-1)+' more':''):'no anomalies ✓',
+          suspicious.length?'border-color:#F59E0B;background:#FFFBEB;':'')
+      : '';
+    r3 += rowExpandHTML(3);
+  }
+
+  // Checklist card
+  const checklistCard = (()=>{
+    const role = currentUser && currentUser.role;
+    if (!['analyst','teamlead'].includes(role)) return '';
+    const myFiles = getFileEntries().filter(f =>
+      role==='superadmin'||role==='hrmanager' ? true :
+      role==='teamlead' ? (getTeamForTL(currentUser.name).includes(f.owner)||f.owner===currentUser.name) :
+      f.owner===currentUser.name
+    );
+    const atOrPastReady3 = ['Ready to Submit',...STAGES_AFTER_READY];
+    const pending = myFiles.filter(f=>!f.checklistSubmitted&&atOrPastReady3.includes(f.status));
+    if (!pending.length) return '';
+    return '<div class="met clickable" style="grid-column:1/-1;border-color:#FDE68A;background:#FFFBEB">' +
+      '<div class="met-lbl">⚠ Checklist not submitted</div>' +
+      '<div class="met-val" style="color:#92400E">' + pending.length + '</div>' +
+      '<div class="met-sub" style="white-space:normal">' + pending.slice(0,3).map(f=>esc(f.client||'Unnamed')).join(', ')+(pending.length>3?' +more':'') + '</div>' +
+      '</div>';
+  })();
+
+  document.getElementById('metrics').innerHTML = r0 + r1 + r2 + r3 + checklistCard;
+
+  if (_restoreKey && _restoreRow !== null) {
+    const expDiv = document.getElementById('dashExp_'+_restoreRow);
+    if (expDiv) expDiv.style.display = 'block';
+  }
 }
 
 function renderEODCardIfNeeded() {
@@ -3448,119 +3639,6 @@ function renderEODCardIfNeeded() {
       // the patch will re-append it on next renderMetrics call — already handled
     }
   }
-}
-
-let _activeMetricCard = null;
-
-function closeMetricsExpand() {
-  _activeMetricCard = null;
-  document.getElementById('metricsExpand').style.display = 'none';
-  // Clear active highlight on all cards
-  document.querySelectorAll('.met.clickable').forEach(m => m.style.borderColor = '');
-}
-
-function cardTap(status) {
-  // Toggle — click same card again to close
-  if (_activeMetricCard === status) { closeMetricsExpand(); return; }
-  _activeMetricCard = status;
-
-  const date   = getSelectedDate();
-  const dateTo = getSelectedDateTo();
-  const allRecs = getRecords().filter(r => r.date >= date && r.date <= dateTo);
-  const allStaff= getStaff().filter(s => s.role !== 'superadmin');
-  const allBreaks = getBreaks();
-
-  // Build the list of people for this status
-  let people = [], title = '', emptyMsg = '';
-
-  if (status === 'missing') {
-    const submitted = new Set(allRecs.map(r => r.name));
-    people = allStaff.filter(s => !submitted.has(s.name)).map(s => ({
-      name: s.name, detail: 'Not submitted', color: 'var(--danger)'
-    }));
-    title = 'Not submitted'; emptyMsg = 'All staff have submitted ✓';
-  } else if (status === 'office') {
-    people = allRecs.filter(r => r.status === 'office').map(r => ({
-      name: r.name, detail: r.clockIn ? 'In ' + fmtTime(r.clockIn) + (r.clockOut ? ' · Out ' + fmtTime(r.clockOut) : '') : '', color: 'var(--brand)'
-    }));
-    title = 'In office'; emptyMsg = 'Nobody in office today';
-  } else if (status === 'wfh') {
-    people = allRecs.filter(r => r.status === 'wfh').map(r => ({
-      name: r.name, detail: r.clockIn ? 'In ' + fmtTime(r.clockIn) : '', color: 'var(--success)'
-    }));
-    title = 'WFH'; emptyMsg = 'Nobody working from home today';
-  } else if (status === 'leave') {
-    people = allRecs.filter(r => r.status === 'leave').map(r => ({
-      name: r.name, detail: r.reason || 'On leave', color: 'var(--warn)'
-    }));
-    title = 'On leave'; emptyMsg = 'Nobody on leave today';
-  } else if (status === 'halfday') {
-    people = allRecs.filter(r => r.status === 'halfday').map(r => ({
-      name: r.name, detail: r.reason || 'Half day', color: '#7C3AED'
-    }));
-    title = 'Half day'; emptyMsg = 'Nobody on half day today';
-  } else if (status === 'onbreak') {
-    const onBreak = allBreaks.filter(b => b.date === today && b.isOpen === true);
-    people = onBreak.map(b => ({
-      name: b.name, detail: b.start ? 'Since ' + fmtTime(b.start) : 'On break', color: 'var(--warn)'
-    }));
-    title = 'On break now'; emptyMsg = 'Nobody on break right now';
-  } else if (status === 'available') {
-    const onBreakNames = new Set(allBreaks.filter(b => b.date === today && b.isOpen).map(b => b.name));
-    const working = allRecs.filter(r => r.date === today && (r.status === 'office' || r.status === 'wfh'));
-    people = working.filter(r => !onBreakNames.has(r.name)).map(r => ({
-      name: r.name, detail: r.status === 'office' ? 'In office' : 'WFH', color: 'var(--success)'
-    }));
-    title = 'Available now'; emptyMsg = 'Nobody available right now';
-  } else if (status === 'late') {
-    const lateList = allStaff.filter(s => {
-      if (!s.startTime) return false;
-      return allRecs.some(r => {
-        if (r.name !== s.name || !r.clockIn) return false;
-        const scheduledMs = new Date(r.date + 'T' + s.startTime + ':00').getTime();
-        return r.clockIn > scheduledMs + 15 * 60 * 1000;
-      });
-    });
-    people = lateList.map(s => ({ name: s.name, detail: 'Late clock in', color: 'var(--danger)' }));
-    title = 'Late clock in'; emptyMsg = 'No late arrivals ✓';
-  } else if (status === 'early') {
-    const earlyList = allStaff.filter(s => {
-      if (!s.endTime) return false;
-      return allRecs.some(r => {
-        if (r.name !== s.name || !r.clockOut) return false;
-        const scheduledEndMs = new Date(r.date + 'T' + s.endTime + ':00').getTime();
-        return r.clockOut < scheduledEndMs - 15 * 60 * 1000;
-      });
-    });
-    people = earlyList.map(s => ({ name: s.name, detail: 'Early clock out', color: 'var(--danger)' }));
-    title = 'Early clock out'; emptyMsg = 'No early departures ✓';
-  } else if (status === 'location') {
-    const flagged = allRecs.filter(r => {
-      if (r.status !== 'office' && r.status !== 'halfday') return false;
-      if (!r.geo) return false;
-      const flag = geoFlagForRecord(r);
-      return flag && !flag.ok;
-    });
-    people = flagged.map(r => ({ name: r.name, detail: '⚠ Location mismatch', color: 'var(--danger)' }));
-    title = 'Location issues'; emptyMsg = 'No location issues ✓';
-  }
-
-  // Deduplicate by name
-  const seen = new Set();
-  people = people.filter(p => { if (seen.has(p.name)) return false; seen.add(p.name); return true; });
-
-  // Render expand panel
-  document.getElementById('metricsExpandTitle').textContent = title + (people.length ? ' (' + people.length + ')' : '');
-  document.getElementById('metricsExpandBody').innerHTML = people.length === 0
-    ? `<div style="font-size:13px;color:var(--text-3);padding:8px 0;text-align:center">${emptyMsg}</div>`
-    : people.map(p => `
-        <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
-          <div style="font-size:13px;font-weight:600;flex:1">${esc(p.name)}</div>
-          <div style="font-size:12px;color:${p.color}">${esc(p.detail)}</div>
-        </div>`).join('').replace(/border-bottom[^;]+;([^<]*<\/div>\s*$)/, '$1');
-
-  document.getElementById('metricsExpand').style.display = 'block';
-  setTimeout(() => document.getElementById('metricsExpand').scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 50);
 }
 
 // ── Submit on behalf ──────────────────────────────────────────────────────
