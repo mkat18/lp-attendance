@@ -4012,7 +4012,7 @@ async function renderNeedsAttention() {
   }
 
   // Admin panel — show full list with default filter (yesterday)
-  filterAttention('yesterday');
+  filterAttention(window._scrollToAttention ? 'all' : 'yesterday');
 }
 
 let _currentAttFilter = 'yesterday';
@@ -4054,6 +4054,13 @@ function filterAttention(period) {
 
   if (!filtered.length) {
     list.innerHTML = '<div style="font-size:13px;color:var(--text-3);padding:8px 0">No issues in this period ✓</div>';
+    // Still scroll if requested from dashboard
+    if (window._scrollToAttention) {
+      window._scrollToAttention = false;
+      const body = document.getElementById('attentionCardBody');
+      if (body) body.style.display = 'block';
+      setTimeout(() => card.scrollIntoView({ behavior:'smooth', block:'start' }), 50);
+    }
     return;
   }
 
