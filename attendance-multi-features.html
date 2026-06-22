@@ -789,19 +789,18 @@ tr.flagged-row:hover td { background: #FFEAEA; }
 
     <!-- ── Unified date bar ─────────────────────────────────────────── -->
     <div class="dashboard-snapshot" style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:.75rem 1rem;box-shadow:var(--shadow-sm);margin-bottom:1rem">
-      <div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
-        <button id="db_today"     class="quick-date-btn active" onclick="setDashRange('today')">Today</button>
-        <button id="db_yesterday" class="quick-date-btn"        onclick="setDashRange('yesterday')">Yesterday</button>
-        <button id="db_week"      class="quick-date-btn"        onclick="setDashRange('week')">This week</button>
-        <button id="db_month"     class="quick-date-btn"        onclick="setDashRange('month')">This month</button>
-        <button id="db_custom"    class="quick-date-btn"        onclick="setDashRange('custom')">📅 Custom date range</button>
+      <div style="display:flex;gap:5px;align-items:center;flex-wrap:nowrap;margin-bottom:8px;overflow-x:auto">
+        <button id="db_today"     class="quick-date-btn active" onclick="setDashRange('today')" style="white-space:nowrap">Today</button>
+        <button id="db_yesterday" class="quick-date-btn"        onclick="setDashRange('yesterday')" style="white-space:nowrap">Yesterday</button>
+        <button id="db_week"      class="quick-date-btn"        onclick="setDashRange('week')" style="white-space:nowrap">This week</button>
+        <button id="db_month"     class="quick-date-btn"        onclick="setDashRange('month')" style="white-space:nowrap">This month</button>
+        <button id="db_custom"    class="quick-date-btn"        onclick="setDashRange('custom')" style="white-space:nowrap">📅 Custom date range</button>
         <input  type="date" id="selectedDate"   onchange="onDashCustomDate()" style="display:none;padding:4px 7px;font-size:12px;border:1.5px solid var(--border);border-radius:var(--radius-sm)"/>
-        <span   id="dashDateSep" style="display:none;font-size:12px;color:var(--text-3)">to</span>
+        <span   id="dashDateSep" style="display:none;font-size:12px;color:var(--text-3);white-space:nowrap">to</span>
         <input  type="date" id="selectedDateTo" onchange="onDashCustomDate()" style="display:none;padding:4px 7px;font-size:12px;border:1.5px solid var(--border);border-radius:var(--radius-sm)"/>
-        <!-- Hidden inputs kept for legacy references -->
+        <!-- Hidden inputs for tabs system -->
         <input type="date" id="fromDate" style="display:none"/>
         <input type="date" id="toDate"   style="display:none"/>
-        <input type="text" id="filterName" placeholder="Filter by name…" oninput="loadTabs()" style="font-size:12px;padding:4px 8px;border:1.5px solid var(--border);border-radius:var(--radius-sm);min-width:130px;margin-left:auto"/>
       </div>
     </div>
 
@@ -832,6 +831,9 @@ tr.flagged-row:hover td { background: #FFEAEA; }
 
     <!-- ── Tabs ─────────────────────────────────────────────────────── -->
     <div class="dashboard-tabs" style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:1rem 1.1rem;box-shadow:var(--shadow-sm)">
+      <div style="margin-bottom:10px">
+        <input type="text" id="filterName" placeholder="🔍 Filter by name…" oninput="loadTabs()" style="font-size:13px;width:100%;padding:6px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)"/>
+      </div>
       <div class="tab-bar" style="margin-bottom:.75rem">
         <button class="tab active" onclick="switchDashTab('records',this)">Records</button>
         <button class="tab" onclick="switchDashTab('people',this)">By person</button>
@@ -3382,7 +3384,11 @@ function tapCard(key, row) {
     const cov = getCoverage();
     rows = dayRecs.filter(r => r.status==='leave').map(r => {
       const assigned = cov[date+'_'+r.name];
-      return personRow(r.name, assigned?'Cover: '+assigned:'⚠ Unassigned', assigned?'var(--success)':'var(--danger)');
+      return `<div style="display:flex;align-items:center;gap:6px;padding:7px 0;border-bottom:1px solid var(--border)">
+        <div style="font-size:13px;font-weight:600;flex:1">${esc(r.name)}</div>
+        <div style="font-size:12px;color:${assigned?'var(--success)':'var(--danger)'}">${assigned?'Cover: '+esc(assigned):'Unassigned'}</div>
+        <button onclick="assignCover('${r.name.replace(/'/g,"\\'")}','${date}')" style="font-size:11px;padding:2px 8px;border-radius:4px;border:1px solid var(--border);background:var(--surface-2);cursor:pointer">${assigned?'Change':'Assign'}</button>
+      </div>`;
     });
     title = 'Coverage'; emptyMsg = 'No leave today ✓';
   } else if (key === 'suspicious') {
@@ -3394,8 +3400,19 @@ function tapCard(key, row) {
     }).map(r => personRow(r.name, 'via '+r.msAccount, '#B45309'));
     title = 'Suspicious activity'; emptyMsg = 'No anomalies detected ✓';
   } else if (key === 'needs') {
-    rows = (_attentionIssues||[]).map(i => personRow(i.name, i.detail + ' · ' + fmtDate(i.date), 'var(--danger)'));
-    title = 'Needs attention'; emptyMsg = 'No issues ✓';
+    // Navigate to admin tab and scroll to needs attention section
+    const adminTab = document.querySelector('.nav-tab[data-tab=admin]');
+    if (adminTab) goTab('admin', adminTab);
+    setTimeout(() => {
+      const card = document.getElementById('needsAttentionAdminCard');
+      if (card) {
+        card.style.display = 'block';
+        const body = document.getElementById('attentionCardBody');
+        if (body) body.style.display = 'block';
+        card.scrollIntoView({ behavior:'smooth', block:'start' });
+      }
+    }, 300);
+    return;
   }
 
   // Deduplicate
@@ -3596,7 +3613,7 @@ function renderMetrics() {
       patterns.length?'#B45309':'var(--success)',
       patterns.length?patterns.slice(0,2).map(p=>p.label).join(', ')+(patterns.length>2?' +more':''):'no patterns ✓',
       patterns.length?'border-color:#F59E0B;background:#FFFBEB;':'');
-    r3 += metCard('coverage', 3, '🔄 Coverage', unassignedCover+' unassigned',
+    r3 += metCard('coverage', 3, '🔄 Coverage', unassignedCover,
       unassignedCover?'var(--danger)':'var(--success)',
       unassignedCover?'tap to manage':'all assigned ✓',
       unassignedCover?'border-color:#FECACA;':'');
@@ -10579,36 +10596,6 @@ window.renderMyTeam = function() {
     myteamEl.appendChild(eodDiv);
   }
   renderEODSummary(eodDiv, myTeamNames, today);
-};
-
-// ── Patch manager dashboard to show EOD summary card ─────────────────────
-const _origRenderMetricsEOD = window.renderMetrics;
-window.renderMetrics = function() {
-  if (_origRenderMetricsEOD) _origRenderMetricsEOD.apply(this, arguments);
-  if (!isManager()) return;
-  const metricsEl = document.getElementById('metrics');
-  if (!metricsEl) return;
-  // Use dashboard selected date so EOD card respects the date picker
-  const selFrom = getSelectedDate();
-  const selTo   = getSelectedDateTo();
-  const selRecs = getRecords().filter(r => r.date >= selFrom && r.date <= selTo && r.status !== 'leave' && r.status !== 'absent');
-  const selNames = [...new Set(selRecs.map(r => r.name))];
-  const allAnalysts = getStaff().filter(s => EOD_ROLES.includes(s.role) && selNames.includes(s.name)).map(s => s.name);
-  if (allAnalysts.length === 0) return;
-  const todayReports = getEODReports().filter(r => r.date >= selFrom && r.date <= selTo && allAnalysts.includes(r.name));
-  const lowConf = todayReports.filter(r => r.confidence <= 2).length;
-  const brokerFlags = todayReports.filter(r => r.brokerConcern === 'yes').length;
-  const notSubmitted = allAnalysts.length - todayReports.length;
-
-  const eodCard = document.createElement('div');
-  eodCard.className = 'met';
-  eodCard.style.cssText = `grid-column:1/-1;cursor:pointer;${(lowConf>0||brokerFlags>0)?'border-color:#F59E0B;background:#FFFBEB':''}`;
-  eodCard.onclick = () => { /* could expand to full EOD view */ };
-  eodCard.innerHTML = `
-    <div class="met-lbl">📋 EOD Reports</div>
-    <div class="met-val" style="color:${notSubmitted>0?'var(--danger)':'var(--success)'}">${todayReports.length}/${allAnalysts.length}</div>
-    <div class="met-sub">${notSubmitted>0?notSubmitted+' not submitted · ':''}${lowConf>0?'⚠️ '+lowConf+' low confidence · ':''}${brokerFlags>0?'📣 '+brokerFlags+' broker concern':''}${notSubmitted===0&&lowConf===0&&brokerFlags===0?'all clear ✓':''}</div>`;
-  metricsEl.appendChild(eodCard);
 };
 
 // ── Patch lockCheckin / initCheckin to show EOD prompt card ──────────────
