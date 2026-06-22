@@ -803,6 +803,14 @@ tr.flagged-row:hover td { background: #FFEAEA; }
         <div style="font-size:12px;color:var(--danger);opacity:0.7">View in Staff tab →</div>
       </div>
       <div class="metrics" id="metrics" style="margin-bottom:0"></div>
+      <!-- Inline expand panel — shows when a metric card is clicked -->
+      <div id="metricsExpand" style="display:none;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);margin-top:10px;overflow:hidden;box-shadow:var(--shadow-sm)">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--surface-2);border-bottom:1px solid var(--border)">
+          <div style="font-size:13px;font-weight:700;color:var(--text)" id="metricsExpandTitle"></div>
+          <button onclick="closeMetricsExpand()" style="background:transparent;border:none;color:var(--text-3);font-size:18px;cursor:pointer;line-height:1;padding:0 2px">✕</button>
+        </div>
+        <div id="metricsExpandBody" style="padding:10px 14px"></div>
+      </div>
     </div>
 
     <!-- Tabs — date range -->
@@ -829,7 +837,6 @@ tr.flagged-row:hover td { background: #FFEAEA; }
         <button class="tab" onclick="switchDashTab('breaks',this)">Breaks</button>
         <button class="tab" onclick="switchDashTab('late',this)">⏰ Late</button>
         <button class="tab" onclick="switchDashTab('early',this)">🏃 Early out</button>
-        <button class="tab" onclick="switchDashTab('suspicious',this)">🔍 Suspicious</button>
         <button class="tab" onclick="switchDashTab('chart',this)">Chart</button>
       </div>
       <div id="dpanel-records" class="panel active">
@@ -3443,57 +3450,117 @@ function renderEODCardIfNeeded() {
   }
 }
 
+let _activeMetricCard = null;
+
+function closeMetricsExpand() {
+  _activeMetricCard = null;
+  document.getElementById('metricsExpand').style.display = 'none';
+  // Clear active highlight on all cards
+  document.querySelectorAll('.met.clickable').forEach(m => m.style.borderColor = '');
+}
+
 function cardTap(status) {
-  const date=getSelectedDate();
-  const dateTo=getSelectedDateTo();
-  document.getElementById('fromDate').value=date;
-  document.getElementById('toDate').value=dateTo;
-  document.querySelectorAll('[id^=rbtn]').forEach(b=>b.classList.remove('active'));
-  loadTabs();
-  if(status==='onbreak'||status==='available'){
-    const btn=Array.from(document.querySelectorAll('.tab')).find(t=>t.textContent.trim()==='Breaks');
-    if(btn) switchDashTab('breaks',btn);
-    return;
+  // Toggle — click same card again to close
+  if (_activeMetricCard === status) { closeMetricsExpand(); return; }
+  _activeMetricCard = status;
+
+  const date   = getSelectedDate();
+  const dateTo = getSelectedDateTo();
+  const allRecs = getRecords().filter(r => r.date >= date && r.date <= dateTo);
+  const allStaff= getStaff().filter(s => s.role !== 'superadmin');
+  const allBreaks = getBreaks();
+
+  // Build the list of people for this status
+  let people = [], title = '', emptyMsg = '';
+
+  if (status === 'missing') {
+    const submitted = new Set(allRecs.map(r => r.name));
+    people = allStaff.filter(s => !submitted.has(s.name)).map(s => ({
+      name: s.name, detail: 'Not submitted', color: 'var(--danger)'
+    }));
+    title = 'Not submitted'; emptyMsg = 'All staff have submitted ✓';
+  } else if (status === 'office') {
+    people = allRecs.filter(r => r.status === 'office').map(r => ({
+      name: r.name, detail: r.clockIn ? 'In ' + fmtTime(r.clockIn) + (r.clockOut ? ' · Out ' + fmtTime(r.clockOut) : '') : '', color: 'var(--brand)'
+    }));
+    title = 'In office'; emptyMsg = 'Nobody in office today';
+  } else if (status === 'wfh') {
+    people = allRecs.filter(r => r.status === 'wfh').map(r => ({
+      name: r.name, detail: r.clockIn ? 'In ' + fmtTime(r.clockIn) : '', color: 'var(--success)'
+    }));
+    title = 'WFH'; emptyMsg = 'Nobody working from home today';
+  } else if (status === 'leave') {
+    people = allRecs.filter(r => r.status === 'leave').map(r => ({
+      name: r.name, detail: r.reason || 'On leave', color: 'var(--warn)'
+    }));
+    title = 'On leave'; emptyMsg = 'Nobody on leave today';
+  } else if (status === 'halfday') {
+    people = allRecs.filter(r => r.status === 'halfday').map(r => ({
+      name: r.name, detail: r.reason || 'Half day', color: '#7C3AED'
+    }));
+    title = 'Half day'; emptyMsg = 'Nobody on half day today';
+  } else if (status === 'onbreak') {
+    const onBreak = allBreaks.filter(b => b.date === today && b.isOpen === true);
+    people = onBreak.map(b => ({
+      name: b.name, detail: b.start ? 'Since ' + fmtTime(b.start) : 'On break', color: 'var(--warn)'
+    }));
+    title = 'On break now'; emptyMsg = 'Nobody on break right now';
+  } else if (status === 'available') {
+    const onBreakNames = new Set(allBreaks.filter(b => b.date === today && b.isOpen).map(b => b.name));
+    const working = allRecs.filter(r => r.date === today && (r.status === 'office' || r.status === 'wfh'));
+    people = working.filter(r => !onBreakNames.has(r.name)).map(r => ({
+      name: r.name, detail: r.status === 'office' ? 'In office' : 'WFH', color: 'var(--success)'
+    }));
+    title = 'Available now'; emptyMsg = 'Nobody available right now';
+  } else if (status === 'late') {
+    const lateList = allStaff.filter(s => {
+      if (!s.startTime) return false;
+      return allRecs.some(r => {
+        if (r.name !== s.name || !r.clockIn) return false;
+        const scheduledMs = new Date(r.date + 'T' + s.startTime + ':00').getTime();
+        return r.clockIn > scheduledMs + 15 * 60 * 1000;
+      });
+    });
+    people = lateList.map(s => ({ name: s.name, detail: 'Late clock in', color: 'var(--danger)' }));
+    title = 'Late clock in'; emptyMsg = 'No late arrivals ✓';
+  } else if (status === 'early') {
+    const earlyList = allStaff.filter(s => {
+      if (!s.endTime) return false;
+      return allRecs.some(r => {
+        if (r.name !== s.name || !r.clockOut) return false;
+        const scheduledEndMs = new Date(r.date + 'T' + s.endTime + ':00').getTime();
+        return r.clockOut < scheduledEndMs - 15 * 60 * 1000;
+      });
+    });
+    people = earlyList.map(s => ({ name: s.name, detail: 'Early clock out', color: 'var(--danger)' }));
+    title = 'Early clock out'; emptyMsg = 'No early departures ✓';
+  } else if (status === 'location') {
+    const flagged = allRecs.filter(r => {
+      if (r.status !== 'office' && r.status !== 'halfday') return false;
+      if (!r.geo) return false;
+      const flag = geoFlagForRecord(r);
+      return flag && !flag.ok;
+    });
+    people = flagged.map(r => ({ name: r.name, detail: '⚠ Location mismatch', color: 'var(--danger)' }));
+    title = 'Location issues'; emptyMsg = 'No location issues ✓';
   }
-  if(status==='missing'){
-    const btn=Array.from(document.querySelectorAll('.tab')).find(t=>t.textContent.trim()==='Not submitted');
-    if(btn) switchDashTab('missing',btn);
-    window._missingFilter=status;
-    renderMissing();
-    const tabSection=document.querySelector('.tab-bar');
-    if(tabSection) tabSection.scrollIntoView({behavior:'smooth',block:'start'});
-    return;
-  }
-  if(status==='late'){
-    const btn=Array.from(document.querySelectorAll('.tab')).find(t=>t.textContent.trim()==='⏰ Late');
-    if(btn) switchDashTab('late',btn);
-    const tabSection=document.querySelector('.tab-bar');
-    if(tabSection) tabSection.scrollIntoView({behavior:'smooth',block:'start'});
-    return;
-  }
-  if(status==='early'){
-    const btn=Array.from(document.querySelectorAll('.tab')).find(t=>t.textContent.trim()==='🏃 Early out');
-    if(btn) switchDashTab('early',btn);
-    const tabSection=document.querySelector('.tab-bar');
-    if(tabSection) tabSection.scrollIntoView({behavior:'smooth',block:'start'});
-    return;
-  }
-  if(status==='location'){
-    const btn=Array.from(document.querySelectorAll('.tab')).find(t=>t.textContent.trim()==='Records');
-    if(btn) switchDashTab('records',btn);
-    window._locationFilter=true;
-    renderRecords();
-    const tabSection=document.querySelector('.tab-bar');
-    if(tabSection) tabSection.scrollIntoView({behavior:'smooth',block:'start'});
-    return;
-  }
-  // office, wfh, leave, halfday — go to By person filtered
-  const btn=Array.from(document.querySelectorAll('.tab')).find(t=>t.textContent.trim()==='By person');
-  if(btn) switchDashTab('people',btn);
-  window._cardTapStatus=status;
-  renderPeople();
-  const tabSection=document.querySelector('.tab-bar');
-  if(tabSection) tabSection.scrollIntoView({behavior:'smooth',block:'start'});
+
+  // Deduplicate by name
+  const seen = new Set();
+  people = people.filter(p => { if (seen.has(p.name)) return false; seen.add(p.name); return true; });
+
+  // Render expand panel
+  document.getElementById('metricsExpandTitle').textContent = title + (people.length ? ' (' + people.length + ')' : '');
+  document.getElementById('metricsExpandBody').innerHTML = people.length === 0
+    ? `<div style="font-size:13px;color:var(--text-3);padding:8px 0;text-align:center">${emptyMsg}</div>`
+    : people.map(p => `
+        <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
+          <div style="font-size:13px;font-weight:600;flex:1">${esc(p.name)}</div>
+          <div style="font-size:12px;color:${p.color}">${esc(p.detail)}</div>
+        </div>`).join('').replace(/border-bottom[^;]+;([^<]*<\/div>\s*$)/, '$1');
+
+  document.getElementById('metricsExpand').style.display = 'block';
+  setTimeout(() => document.getElementById('metricsExpand').scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 50);
 }
 
 // ── Submit on behalf ──────────────────────────────────────────────────────
@@ -5223,19 +5290,22 @@ function renderPeople() {
     const allPeople=getStaff().filter(s=>s.role!=='superadmin').map(s=>s.name).filter(n=>!fn||n.toLowerCase().includes(fn)).sort();
     const submittedMap={};
     for(const r of tabData) submittedMap[r.name]=r;
-    const filterStatus=window._cardTapStatus||null;
-    window._cardTapStatus=null;
-    if(!allPeople.length){document.getElementById('peopleTable').innerHTML='<tr><td><div class="empty-state">No staff found.</div></td></tr>';return;}
-    let html='<thead><tr><th>Name</th><th>Status</th><th>Clock in</th><th>Clock out</th><th>Worked</th><th>Reason</th></tr></thead><tbody>';
-    for(const name of allPeople){
-      const rec=submittedMap[name];
-      const s=rec?.status;
-      const isMissing=!s;
-      const matches=!filterStatus||(filterStatus==='missing'?isMissing:s===filterStatus);
-      const rowStyle=matches&&filterStatus?'background:var(--brand-light)':'';
-      const workedMins=rec?calcWorkedMins(rec):null;
-      const isLeave=s==='leave';
-      html+=`<tr style="${rowStyle}">
+    const filterStatus = window._cardTapStatus || null;
+    window._cardTapStatus = null;
+    const STATUS_LABEL = {office:'In office', wfh:'WFH', leave:'On leave', halfday:'Half day', missing:'Not submitted'};
+    if (!allPeople.length) { document.getElementById('peopleTable').innerHTML='<tr><td><div class="empty-state">No staff found.</div></td></tr>'; return; }
+    let html = '<thead><tr><th>Name</th><th>Status</th><th>Clock in</th><th>Clock out</th><th>Worked</th><th>Reason</th></tr></thead><tbody>';
+    let shownCount = 0;
+    for (const name of allPeople) {
+      const rec = submittedMap[name];
+      const s = rec?.status;
+      const isMissing = !s;
+      const matches = !filterStatus || (filterStatus === 'missing' ? isMissing : s === filterStatus);
+      if (filterStatus && !matches) continue;
+      shownCount++;
+      const workedMins = rec ? calcWorkedMins(rec) : null;
+      const isLeave = s === 'leave';
+      html+=`<tr>
         <td style="font-weight:600">${esc(name)}</td>
         <td>${s?tag(s):'<span class="tag tag-missing">Not submitted</span>'}</td>
         <td style="font-size:12px;color:var(--text-2)">${isLeave?'—':rec?.clockIn?fmtTime(rec.clockIn):'—'}</td>
@@ -5244,7 +5314,12 @@ function renderPeople() {
         <td style="color:var(--text-2);font-size:12px">${rec?.reason?esc(rec.reason):'—'}</td>
       </tr>`;
     }
-    document.getElementById('peopleTable').innerHTML=html+'</tbody>';
+    if (filterStatus && shownCount === 0) html += '<tr><td colspan="6"><div class="empty-state">Nobody is ' + (STATUS_LABEL[filterStatus]||filterStatus).toLowerCase() + ' today.</div></td></tr>';
+    const filterBanner = filterStatus ? `<div style="background:var(--brand-light);border-radius:var(--radius-sm);padding:7px 12px;margin-bottom:8px;font-size:12px;color:var(--brand);font-weight:600;display:flex;align-items:center;justify-content:space-between">
+      <span>Showing: ${STATUS_LABEL[filterStatus]||filterStatus} (${shownCount})</span>
+      <button onclick="window._cardTapStatus=null;renderPeople()" style="background:transparent;border:1px solid var(--brand);border-radius:99px;padding:2px 10px;font-size:11px;color:var(--brand);cursor:pointer">Show all</button>
+    </div>` : '';
+    document.getElementById('peopleTable').innerHTML = filterBanner + html + '</tbody>';
   } else {
     // Date range — totals per person including total hours
     const map={};
