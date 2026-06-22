@@ -1916,7 +1916,7 @@ function isAssistant()     { return currentUser&&currentUser.role==='assistant';
 function isTeamLead()      { return currentUser&&currentUser.role==='teamlead'; }
 function isAnalyst()       { return currentUser&&currentUser.role==='analyst'; }
 function isTrainee()       { return currentUser&&currentUser.role==='trainee'; }
-function canSeeFiles()     { return currentUser&&(ANALYST_ROLES.includes(currentUser.role)||isSuperAdmin()); }
+function canSeeFiles()     { return isSuperAdmin() || canDo('canSeeAllFiles'); }
 function canSeeDashboard() { return currentUser&&(DASHBOARD_ROLES.includes(currentUser.role)||isSuperAdmin()); }
 function canSeeAdmin()     { return currentUser&&ADMIN_ROLES.includes(currentUser.role); }
 function hasDashboard() { return currentUser&&['superadmin','hrmanager','assistant'].includes(currentUser.role); }
@@ -1972,11 +1972,11 @@ const DEFAULT_PERMISSIONS = {
   },
   teamlead: {
     tabs: { checkin:true, leave:true, dashboard:true, admin:false, files:false, myfiles:false, myteam:false, eod:true, performance:false, othertasks:false, feedback:false, profile:true },
-    features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canSeeLeaveBalance:false, canApproveLeave:true, canSeeTeamLeaveBalances:false, canSeeAllFiles:false, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:true }
+    features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canSeeLeaveBalance:false, canApproveLeave:true, canSeeTeamLeaveBalances:true, canSeeAllFiles:true, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:true }
   },
   analyst: {
     tabs: { checkin:true, leave:true, dashboard:false, admin:false, files:false, myfiles:false, myteam:false, eod:true, performance:false, othertasks:false, feedback:false, profile:true },
-    features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canSeeLeaveBalance:false, canApproveLeave:false, canSeeTeamLeaveBalances:false, canSeeAllFiles:false, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:false }
+    features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canSeeLeaveBalance:false, canApproveLeave:false, canSeeTeamLeaveBalances:false, canSeeAllFiles:true, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:false }
   },
   trainee: {
     tabs: { checkin:true, leave:true, dashboard:false, admin:false, files:false, myfiles:false, myteam:false, eod:false, performance:false, othertasks:false, feedback:false, profile:true },
@@ -4203,6 +4203,10 @@ function getLeaveBalance(name) {
 
 // ── Submit leave request ───────────────────────────────────────────────────
 async function submitLeaveRequest() {
+  if (!isSuperAdmin() && !canDo('canApplyLeave')) {
+    showToast('You do not have permission to submit leave.', 'err');
+    return;
+  }
   const leaveType = document.getElementById('leaveTypeSelect').value;
   const startDate = document.getElementById('leaveStartDate').value;
   const endDate = document.getElementById('leaveEndDate').value || startDate;
@@ -4300,6 +4304,10 @@ function requireNoteAndProcess(id, action) {
 }
 
 async function processLeaveRequest(id, action, notes) {
+  if (!isSuperAdmin() && !canDo('canApproveLeave')) {
+    showToast('You do not have permission to approve or reject leave.', 'err');
+    return;
+  }
   const req = _leaveRequests.find(r => r.Id == id);
   if (!req) return;
 
@@ -4445,7 +4453,7 @@ async function renderLeaveScreen() {
           <div style="font-size:11px;color:var(--text-3)">Unpaid: ${bal.unpaidUsed} · Broker: ${bal.brokerCount}</div>
         </div>
       </div>
-      ${!onProb ? `
+      ${(!onProb && (isSuperAdmin() || canDo('canApplyLeave'))) ? `
       <div class="section-label" style="margin-bottom:10px">Apply for leave</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
         <div class="field" style="margin:0">
@@ -4507,7 +4515,7 @@ async function renderLeaveScreen() {
   }
 
   // ── Approval section for TL / Manager / Superadmin ─────────────────────────
-  const canApprove = (isSuperAdmin() && !_previewRole) || isMgr || isTL;
+  const canApprove = (isSuperAdmin() && !_previewRole) || ((isMgr || isTL) && (canDo('canApproveLeave') !== false));
   if (canApprove) {
     let pendingReqs = _leaveRequests.filter(r => r.Status === 'Pending');
     if (isTL && !isMgr && !isSuperAdmin()) {
@@ -4579,7 +4587,7 @@ async function renderLeaveScreen() {
   }
 
   // ── Team leave balances for manager/TL ────────────────────────────────────
-  if (canApprove) {
+  if (canApprove && (isSuperAdmin() || canDo('canSeeTeamLeaveBalances') !== false)) {
     const curYear = getCurrentLeaveYear();
     const prevYear = (() => { const [s,e] = curYear.split('-'); return `${parseInt(s)-1}-${parseInt(e)-1}`; })();
     html += `<div class="card">
@@ -7780,8 +7788,7 @@ function populateObsNoteDropdown() {
 function updateObsNoteUI() {
   const card = document.getElementById('workloadNoteCard');
   if (!card) return;
-  const displayRole = currentUser.role; // use current role (preview-aware)
-  const canNote = ['hrmanager','superadmin','teamlead'].includes(displayRole);
+  const canNote = isSuperAdmin() || canDo('canAddObsNotes');
   card.style.display = canNote ? 'block' : 'none';
   if (canNote) populateObsNoteDropdown();
 }
