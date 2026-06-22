@@ -780,252 +780,348 @@ async function init() {
 init();
 </script>
 <!-- ── Permissions Manager Panel ───────────────────────────────────────── -->
-<div id="permPanel" style="display:none;position:fixed;inset:0;z-index:400;background:rgba(15,23,42,.7);backdrop-filter:blur(4px);overflow-y:auto;padding:1rem">
-  <div style="max-width:900px;margin:0 auto;background:var(--surface,#fff);border-radius:16px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.3)">
-    <div style="background:#0F2A5E;padding:20px 24px;display:flex;align-items:center;justify-content:space-between">
-      <div>
-        <div style="font-size:18px;font-weight:700;color:#fff">⚙ Permissions Manager</div>
-        <div style="font-size:12px;color:rgba(255,255,255,.6);margin-top:2px">Manage feature permissions per role across all apps</div>
-      </div>
-      <button onclick="closePermManager()" style="background:rgba(255,255,255,.15);border:none;color:#fff;width:32px;height:32px;border-radius:50%;font-size:18px;cursor:pointer;line-height:1">×</button>
-    </div>
+<div id="permPanel" style="display:none;position:fixed;inset:0;z-index:9000;background:rgba(15,23,42,.75);backdrop-filter:blur(4px);overflow-y:auto;-webkit-overflow-scrolling:touch">
+  <div style="min-height:100%;display:flex;align-items:flex-start;justify-content:center;padding:1rem">
+    <div style="width:100%;max-width:860px;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.35);margin:auto">
 
-    <!-- App tabs -->
-    <div style="display:flex;border-bottom:1.5px solid #e5e7eb;padding:0 24px;background:#f9fafb">
-      <button id="permTab_attendance" onclick="switchPermApp('attendance')" style="padding:12px 20px;border:none;background:transparent;font-size:14px;font-weight:600;color:#0F2A5E;border-bottom:2px solid #0F2A5E;cursor:pointer;margin-bottom:-1.5px">Attendance</button>
-      <button id="permTab_broker" onclick="switchPermApp('broker')" style="padding:12px 20px;border:none;background:transparent;font-size:14px;color:#6b7280;border-bottom:2px solid transparent;cursor:pointer;margin-bottom:-1.5px">Broker</button>
-    </div>
+      <!-- Header -->
+      <div style="background:#0F2A5E;padding:18px 20px;display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <div style="font-size:17px;font-weight:700;color:#fff">⚙ Permissions Manager</div>
+          <div style="font-size:12px;color:rgba(255,255,255,.55);margin-top:2px">Control feature access and portal visibility per role</div>
+        </div>
+        <button onclick="closePermManager()" style="background:rgba(255,255,255,.15);border:none;color:#fff;width:32px;height:32px;border-radius:50%;font-size:20px;line-height:1;cursor:pointer">×</button>
+      </div>
 
-    <div style="padding:20px 24px">
-      <div id="permContent" style="min-height:200px">
-        <div style="text-align:center;padding:40px;color:#6b7280;font-size:14px">Loading permissions…</div>
+      <!-- Tabs -->
+      <div style="display:flex;background:#f9fafb;border-bottom:1.5px solid #e5e7eb;overflow-x:auto;-webkit-overflow-scrolling:touch">
+        <button id="permTab_attendance" onclick="switchPermApp('attendance')" style="padding:11px 18px;border:none;border-bottom:2.5px solid #0F2A5E;background:transparent;font-size:13px;font-weight:700;color:#0F2A5E;cursor:pointer;white-space:nowrap;margin-bottom:-1.5px">Attendance</button>
+        <button id="permTab_broker"     onclick="switchPermApp('broker')"     style="padding:11px 18px;border:none;border-bottom:2.5px solid transparent;background:transparent;font-size:13px;font-weight:400;color:#6b7280;cursor:pointer;white-space:nowrap;margin-bottom:-1.5px">Broker</button>
+        <button id="permTab_portals"    onclick="switchPermApp('portals')"    style="padding:11px 18px;border:none;border-bottom:2.5px solid transparent;background:transparent;font-size:13px;font-weight:400;color:#6b7280;cursor:pointer;white-space:nowrap;margin-bottom:-1.5px">Portal Access</button>
       </div>
-      <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end">
-        <button onclick="closePermManager()" style="padding:9px 20px;border-radius:8px;border:1.5px solid #e5e7eb;background:#fff;font-size:14px;cursor:pointer;color:#374151">Cancel</button>
-        <button onclick="savePermissions()" style="padding:9px 20px;border-radius:8px;border:none;background:#C9A84C;color:#0F1E35;font-size:14px;font-weight:700;cursor:pointer">Save permissions</button>
+
+      <!-- Content -->
+      <div style="padding:20px">
+        <div id="permContent" style="min-height:160px;overflow-x:auto">
+          <div style="text-align:center;padding:40px;color:#9ca3af;font-size:14px">Loading…</div>
+        </div>
+
+        <!-- Confirm flow (hidden until Save clicked) -->
+        <div id="permConfirmBox" style="display:none;margin-top:16px;background:#FEF3C7;border:1.5px solid #F59E0B;border-radius:10px;padding:14px 16px">
+          <div style="font-size:13px;font-weight:600;color:#92400E;margin-bottom:8px">⚠ Review changes before saving</div>
+          <div id="permChangeSummary" style="font-size:12px;color:#78350F;margin-bottom:12px;max-height:160px;overflow-y:auto"></div>
+          <div style="font-size:12px;color:#92400E;margin-bottom:8px">Type <strong id="permConfirmWord" style="font-family:monospace;background:#FDE68A;padding:1px 6px;border-radius:4px"></strong> to confirm:</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <input id="permConfirmInput" type="text" placeholder="Type here…" style="flex:1;min-width:140px;padding:7px 10px;border-radius:8px;border:1.5px solid #F59E0B;font-size:13px;font-family:monospace;text-transform:uppercase"/>
+            <button onclick="confirmAndSave()" style="padding:7px 16px;border-radius:8px;border:none;background:#0F2A5E;color:#fff;font-size:13px;font-weight:700;cursor:pointer">Confirm & Save</button>
+            <button onclick="cancelConfirm()" style="padding:7px 14px;border-radius:8px;border:1.5px solid #e5e7eb;background:#fff;font-size:13px;cursor:pointer;color:#374151">Cancel</button>
+          </div>
+        </div>
+
+        <!-- Save button row -->
+        <div id="permSaveRow" style="display:flex;align-items:center;justify-content:space-between;margin-top:16px;flex-wrap:wrap;gap:8px">
+          <div id="permSaveStatus" style="font-size:12px;color:#6b7280"></div>
+          <button onclick="initiatePermSave()" style="padding:9px 22px;border-radius:8px;border:none;background:#C9A84C;color:#0F1E35;font-size:14px;font-weight:700;cursor:pointer">Save changes</button>
+        </div>
       </div>
-      <div id="permSaveStatus" style="text-align:right;margin-top:8px;font-size:12px;color:#6b7280"></div>
     </div>
   </div>
 </div>
 
 <script>
 // ── Permission Manager ─────────────────────────────────────────────────────
-const PERM_APPS = ['attendance', 'broker'];
-let _permDefs    = [];   // [{key, label, appName, defaultValue}]
-let _permValues  = {};   // { 'attendance_hrmanager': {features:{...}} }
-let _permRoles   = [];   // ['hrmanager','teamlead','analyst',...]
-let _activePermApp = 'attendance';
+const PM_APPS  = ['attendance','broker'];
+const PM_ROLES = ['hrmanager','teamlead','analyst','trainee','assistant','sales','customerservice','socialmedia','accountant'];
+const PM_ROLE_LABEL = {hrmanager:'HR Mgr',teamlead:'Team Lead',analyst:'Analyst',trainee:'Trainee',assistant:'Asst',sales:'Sales',customerservice:'CS',socialmedia:'Social',accountant:'Acct'};
 
-// Seed data — used to auto-populate PermissionKeys SP list on first run
-const PERM_SEED = [
-  // Attendance permissions
-  { key:'canBreak',               label:'Can take breaks',                   app:'attendance', def:'true'  },
-  { key:'canClockOut',            label:'Can clock out',                     app:'attendance', def:'true'  },
-  { key:'canApplyLeave',          label:'Can apply for leave',               app:'attendance', def:'true'  },
-  { key:'canApproveLeave',        label:'Can approve / reject leave',        app:'attendance', def:'false' },
-  { key:'canSeeLeaveBalance',     label:'Can see full leave balances',       app:'attendance', def:'false' },
-  { key:'canSeeTeamLeaveBalances',label:'Can see team leave balances',       app:'attendance', def:'false' },
-  { key:'canExportData',          label:'Can export data as CSV',            app:'attendance', def:'false' },
-  { key:'canAddStaff',            label:'Can add new staff',                 app:'attendance', def:'false' },
-  { key:'canDeleteStaff',         label:'Can delete staff',                  app:'attendance', def:'false' },
-  { key:'canResetPins',           label:'Can reset staff PINs',              app:'attendance', def:'false' },
-  { key:'canEditRecords',         label:'Can edit attendance records',       app:'attendance', def:'false' },
-  { key:'canAddObsNotes',         label:'Can add observation notes',         app:'attendance', def:'false' },
-  { key:'canSeeAllFiles',         label:'Can see file log in check-in',      app:'attendance', def:'false' },
-  // Broker permissions
-  { key:'canEditFiles',           label:'Can edit file details',             app:'broker',     def:'true'  },
-  { key:'canAddFiles',            label:'Can add new files',                 app:'broker',     def:'false' },
-  { key:'canArchiveFiles',        label:'Can archive / withdraw files',      app:'broker',     def:'false' },
-  { key:'canAddFeedback',         label:'Can add broker feedback',           app:'broker',     def:'true'  },
-  { key:'canManageTasks',         label:'Can create and manage tasks',       app:'broker',     def:'true'  },
-  { key:'canSeeAllTeamFiles',     label:'Can see all team files',            app:'broker',     def:'false' },
-  { key:'canExportFiles',         label:'Can export file data',              app:'broker',     def:'false' },
+let _pmDefs    = [];
+let _pmValues  = {};
+let _pmPortalAccess = {};
+let _pmApp     = 'attendance';
+let _pmPending = null; // changes pending confirmation
+
+const PM_SEED = [
+  {key:'canBreak',                label:'Can take breaks',                  app:'attendance',def:'true'},
+  {key:'canClockOut',             label:'Can clock out',                    app:'attendance',def:'true'},
+  {key:'canApplyLeave',           label:'Can apply for leave',              app:'attendance',def:'true'},
+  {key:'canApproveLeave',         label:'Can approve / reject leave',       app:'attendance',def:'false'},
+  {key:'canSeeLeaveBalance',      label:'Can see full leave balances',      app:'attendance',def:'false'},
+  {key:'canSeeTeamLeaveBalances', label:'Can see team leave balances',      app:'attendance',def:'false'},
+  {key:'canExportData',           label:'Can export data as CSV',           app:'attendance',def:'false'},
+  {key:'canAddStaff',             label:'Can add new staff',                app:'attendance',def:'false'},
+  {key:'canDeleteStaff',          label:'Can delete staff',                 app:'attendance',def:'false'},
+  {key:'canResetPins',            label:'Can reset staff PINs',             app:'attendance',def:'false'},
+  {key:'canEditRecords',          label:'Can edit attendance records',      app:'attendance',def:'false'},
+  {key:'canAddObsNotes',          label:'Can add observation notes',        app:'attendance',def:'false'},
+  {key:'canSeeAllFiles',          label:'Can see file log in check-in',     app:'attendance',def:'false'},
+  {key:'canEditFiles',            label:'Can edit file details',            app:'broker',    def:'true'},
+  {key:'canAddFiles',             label:'Can add new files',                app:'broker',    def:'false'},
+  {key:'canArchiveFiles',         label:'Can archive / withdraw files',     app:'broker',    def:'false'},
+  {key:'canAddFeedback',          label:'Can add broker feedback',          app:'broker',    def:'true'},
+  {key:'canManageTasks',          label:'Can create and manage tasks',      app:'broker',    def:'true'},
+  {key:'canSeeAllTeamFiles',      label:'Can see all team files',           app:'broker',    def:'false'},
+  {key:'canExportFiles',          label:'Can export file data',             app:'broker',    def:'false'},
 ];
 
-const PERM_ROLES = ['hrmanager','teamlead','analyst','trainee','assistant','sales','customerservice','socialmedia','accountant'];
-const ROLE_LABELS = { hrmanager:'HR Manager', teamlead:'Team Lead', analyst:'Analyst', trainee:'Trainee', assistant:'Assistant', sales:'Sales', customerservice:'CS', socialmedia:'Social', accountant:'Accountant' };
+// Portals definition (mirrors ALL_APPS but used for access control)
+const PM_PORTALS = [
+  {key:'attendance', label:'Attendance Portal'},
+  {key:'broker',     label:'Broker Portal'},
+  {key:'lms',        label:'Learning Hub'},
+  {key:'hr',         label:'HR Suite'},
+];
 
-async function spPermGet(path) {
-  const token = _portalToken || await getToken();
-  const res = await fetch(SP_API + path, { headers: { 'Authorization':'Bearer '+token, 'Accept':'application/json;odata=nometadata' } });
-  if (!res.ok) return null;
-  return res.json();
-}
-async function spPermPost(path, body) {
-  const token = _portalToken || await getToken();
-  const res = await fetch(SP_API + path, {
-    method:'POST',
-    headers: { 'Authorization':'Bearer '+token, 'Accept':'application/json;odata=nometadata', 'Content-Type':'application/json;odata=nometadata' },
-    body: JSON.stringify(body)
-  });
-  return res.ok ? res.json() : null;
-}
-async function spPermPatch(path, body, id) {
-  const token = _portalToken || await getToken();
-  const res = await fetch(SP_API + path + '/items(' + id + ')', {
-    method:'PATCH',
-    headers: { 'Authorization':'Bearer '+token, 'Accept':'application/json;odata=nometadata', 'Content-Type':'application/json;odata=nometadata', 'IF-MATCH':'*' },
-    body: JSON.stringify(body)
-  });
-  return res.ok;
-}
+const PM_PORTAL_DEFAULTS = {
+  attendance: ['hrmanager','teamlead','analyst','trainee','assistant','sales','customerservice','socialmedia','accountant'],
+  broker:     ['teamlead','analyst'],
+  lms:        ['hrmanager','teamlead','analyst','trainee'],
+  hr:         ['hrmanager'],
+};
 
-async function loadPermissionDefs() {
-  const data = await spPermGet("('PermissionKeys')/items?$select=Id,Title,Label,AppName,DefaultValue&$top=200");
-  if (!data || !data.value) return false;
-  if (data.value.length === 0) {
-    // Auto-seed the list
-    await seedPermissionKeys();
-    return loadPermissionDefs();
+async function _pmFetch(path, opts={}) {
+  const token = _portalToken || await getToken();
+  const headers = {'Authorization':'Bearer '+token,'Accept':'application/json;odata=nometadata',...(opts.headers||{})};
+  const res = await fetch(SP_API + path, {...opts, headers});
+  return res.ok ? (opts.method && opts.method!=='GET' ? res : res.json()) : null;
+}
+const _pmGet  = p => _pmFetch(p);
+const _pmPost = (p,b) => _pmFetch(p,{method:'POST',headers:{'Content-Type':'application/json;odata=nometadata'},body:JSON.stringify(b)});
+const _pmPatch= (p,id,b) => _pmFetch(p+'/items('+id+')',{method:'PATCH',headers:{'Content-Type':'application/json;odata=nometadata','IF-MATCH':'*'},body:JSON.stringify(b)});
+
+async function _pmLoadDefs() {
+  const d = await _pmGet("('PermissionKeys')/items?$select=Id,Title,Label,AppName,DefaultValue&$top=200");
+  if (!d) return false;
+  if (!d.value.length) {
+    document.getElementById('permSaveStatus').textContent = 'Setting up SP definitions…';
+    for (const s of PM_SEED) await _pmPost("('PermissionKeys')/items",{Title:s.key,Label:s.label,AppName:s.app,DefaultValue:s.def});
+    document.getElementById('permSaveStatus').textContent = '';
+    return _pmLoadDefs();
   }
-  _permDefs = data.value.map(i => ({ id:i.Id, key:i.Title, label:i.Label||i.Title, app:i.AppName||'attendance', def:i.DefaultValue||'false' }));
+  _pmDefs = d.value.map(i=>({id:i.Id,key:i.Title,label:i.Label||i.Title,app:(i.AppName||'attendance').toLowerCase(),def:i.DefaultValue==='true'}));
   return true;
 }
 
-async function seedPermissionKeys() {
-  document.getElementById('permSaveStatus').textContent = 'Setting up permission definitions in SharePoint…';
-  for (const p of PERM_SEED) {
-    await spPermPost("('PermissionKeys')/items", { Title:p.key, Label:p.label, AppName:p.app, DefaultValue:p.def });
-  }
-  document.getElementById('permSaveStatus').textContent = 'Definitions created ✓';
-}
-
-async function loadSavedPermissions() {
-  const data = await spPermGet("('RolePermissions')/items?$select=Id,Title,Permissions&$top=200");
-  _permValues = {};
-  if (!data || !data.value) return;
-  for (const item of data.value) {
+async function _pmLoadValues() {
+  const d = await _pmGet("('RolePermissions')/items?$select=Id,Title,Permissions&$top=200");
+  _pmValues = {};
+  _pmPortalAccess = JSON.parse(JSON.stringify(PM_PORTAL_DEFAULTS));
+  if (!d) return;
+  for (const item of d.value) {
     const key = (item.Title||'').toLowerCase();
-    if (!key) continue;
-    try { _permValues[key] = { id: item.Id, data: JSON.parse(item.Permissions||'{}') }; }
-    catch(e) { _permValues[key] = { id: item.Id, data: {} }; }
+    if (key === 'portal_access') {
+      try { _pmPortalAccess = {...PM_PORTAL_DEFAULTS,...JSON.parse(item.Permissions||'{}')}; _pmValues['__portal__'] = {id:item.Id}; }
+      catch(e){}
+    } else {
+      try { _pmValues[key] = {id:item.Id,data:JSON.parse(item.Permissions||'{}')}; }
+      catch(e){ _pmValues[key] = {id:item.Id,data:{}}; }
+    }
   }
 }
 
-function getPermValue(app, role, permKey) {
-  const spKey = app + '_' + role;
-  const saved = _permValues[spKey];
-  if (saved && saved.data.features && permKey in saved.data.features) {
-    return saved.data.features[permKey];
-  }
-  // Fall back to seed default
-  const seed = PERM_SEED.find(s => s.key === permKey && s.app === app);
-  return seed ? seed.def === 'true' : false;
+function _pmGetVal(app, role, key) {
+  const spKey = app+'_'+role;
+  const saved = _pmValues[spKey];
+  if (saved?.data?.features && key in saved.data.features) return saved.data.features[key];
+  const seed = PM_SEED.find(s=>s.key===key&&s.app===app);
+  return seed ? seed.def : false;
 }
 
 function switchPermApp(app) {
-  _activePermApp = app;
-  PERM_APPS.forEach(a => {
-    const btn = document.getElementById('permTab_' + a);
+  _pmApp = app;
+  ['attendance','broker','portals'].forEach(a => {
+    const btn = document.getElementById('permTab_'+a);
     if (!btn) return;
-    btn.style.color = a === app ? '#0F2A5E' : '#6b7280';
-    btn.style.fontWeight = a === app ? '600' : '400';
-    btn.style.borderBottomColor = a === app ? '#0F2A5E' : 'transparent';
+    const active = a===app;
+    btn.style.color = active ? '#0F2A5E' : '#6b7280';
+    btn.style.fontWeight = active ? '700' : '400';
+    btn.style.borderBottomColor = active ? '#0F2A5E' : 'transparent';
   });
-  renderPermTable();
+  cancelConfirm();
+  renderPermContent();
 }
 
-function renderPermTable() {
+function renderPermContent() {
   const el = document.getElementById('permContent');
-  const appDefs = _permDefs.filter(d => d.app === _activePermApp);
-  if (!appDefs.length) {
-    el.innerHTML = '<div style="text-align:center;padding:40px;color:#6b7280">No permissions defined for this app yet.</div>';
-    return;
-  }
+  if (_pmApp === 'portals') { renderPortalTab(el); return; }
+  const defs = _pmDefs.filter(d=>d.app===_pmApp);
+  if (!defs.length) { el.innerHTML='<div style="padding:30px;text-align:center;color:#9ca3af;font-size:13px">No permissions defined yet.</div>'; return; }
 
-  const roleCols = PERM_ROLES;
-  const roleHeaders = roleCols.map(r => `<th style="padding:8px 12px;font-size:11px;font-weight:600;color:#6b7280;text-align:center;white-space:nowrap">${ROLE_LABELS[r]||r}</th>`).join('');
-
-  const rows = appDefs.map(def => {
-    const cells = roleCols.map(role => {
-      const val = getPermValue(_activePermApp, role, def.key);
-      return `<td style="padding:8px 12px;text-align:center">
-        <input type="checkbox" data-app="${_activePermApp}" data-role="${role}" data-key="${def.key}"
-          ${val ? 'checked' : ''}
-          style="width:16px;height:16px;cursor:pointer;accent-color:#0F2A5E"/>
-      </td>`;
-    }).join('');
-    return `<tr style="border-bottom:1px solid #f3f4f6">
-      <td style="padding:8px 12px;font-size:13px;color:#111827;min-width:200px">${def.label}</td>
-      ${cells}
-    </tr>`;
-  }).join('');
-
+  const cols = PM_ROLES;
   el.innerHTML = `
-    <div style="overflow-x:auto">
-      <table style="width:100%;border-collapse:collapse;font-size:13px">
+    <div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
+      <table style="border-collapse:collapse;font-size:12px;min-width:600px;width:100%">
         <thead>
-          <tr style="border-bottom:2px solid #e5e7eb">
-            <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;color:#6b7280">Permission</th>
-            ${roleHeaders}
+          <tr style="background:#f9fafb;border-bottom:2px solid #e5e7eb">
+            <th style="padding:8px 12px;text-align:left;font-size:11px;color:#6b7280;font-weight:600;min-width:180px;position:sticky;left:0;background:#f9fafb;z-index:1">Permission</th>
+            ${cols.map(r=>`<th style="padding:8px 8px;text-align:center;font-size:11px;color:#6b7280;font-weight:600;white-space:nowrap">${PM_ROLE_LABEL[r]||r}</th>`).join('')}
           </tr>
         </thead>
-        <tbody>${rows}</tbody>
+        <tbody>
+          ${defs.map((def,i)=>`
+            <tr style="border-bottom:1px solid #f3f4f6;background:${i%2?'#fafafa':'#fff'}">
+              <td style="padding:8px 12px;font-size:12px;color:#111827;font-weight:500;position:sticky;left:0;background:${i%2?'#fafafa':'#fff'};z-index:1">${def.label}</td>
+              ${cols.map(role=>`
+                <td style="padding:8px;text-align:center">
+                  <input type="checkbox" class="pm-cb" data-app="${_pmApp}" data-role="${role}" data-key="${def.key}"
+                    ${_pmGetVal(_pmApp,role,def.key)?'checked':''}
+                    style="width:15px;height:15px;cursor:pointer;accent-color:#0F2A5E"/>
+                </td>`).join('')}
+            </tr>`).join('')}
+        </tbody>
       </table>
     </div>
-    <div style="margin-top:12px;font-size:11px;color:#9ca3af">Tick = role has this permission. Changes take effect after the role holder next refreshes their session.</div>`;
+    <div style="margin-top:10px;font-size:11px;color:#9ca3af">✔ = role has this permission · Changes apply after the role holder next refreshes</div>`;
+}
+
+function renderPortalTab(el) {
+  const cols = PM_ROLES;
+  el.innerHTML = `
+    <div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
+      <table style="border-collapse:collapse;font-size:12px;min-width:600px;width:100%">
+        <thead>
+          <tr style="background:#f9fafb;border-bottom:2px solid #e5e7eb">
+            <th style="padding:8px 12px;text-align:left;font-size:11px;color:#6b7280;font-weight:600;min-width:160px;position:sticky;left:0;background:#f9fafb;z-index:1">Portal</th>
+            ${cols.map(r=>`<th style="padding:8px 8px;text-align:center;font-size:11px;color:#6b7280;font-weight:600;white-space:nowrap">${PM_ROLE_LABEL[r]||r}</th>`).join('')}
+          </tr>
+        </thead>
+        <tbody>
+          ${PM_PORTALS.map((portal,i)=>`
+            <tr style="border-bottom:1px solid #f3f4f6;background:${i%2?'#fafafa':'#fff'}">
+              <td style="padding:8px 12px;font-size:12px;color:#111827;font-weight:500;position:sticky;left:0;background:${i%2?'#fafafa':'#fff'};z-index:1">${portal.label}</td>
+              ${cols.map(role=>`
+                <td style="padding:8px;text-align:center">
+                  <input type="checkbox" class="pm-cb" data-app="portals" data-portal="${portal.key}" data-role="${role}"
+                    ${(_pmPortalAccess[portal.key]||[]).includes(role)?'checked':''}
+                    style="width:15px;height:15px;cursor:pointer;accent-color:#0F2A5E"/>
+                </td>`).join('')}
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+    <div style="margin-top:10px;font-size:11px;color:#9ca3af">✔ = role can see and access this portal · Superadmin always has full access</div>`;
 }
 
 async function openPermManager() {
   document.getElementById('permPanel').style.display = 'block';
-  document.getElementById('permContent').innerHTML = '<div style="text-align:center;padding:40px;color:#6b7280;font-size:14px">Loading…</div>';
+  document.body.style.overflow = 'hidden';
+  document.getElementById('permContent').innerHTML = '<div style="text-align:center;padding:40px;color:#9ca3af;font-size:14px">Loading…</div>';
   document.getElementById('permSaveStatus').textContent = '';
-  const ok = await loadPermissionDefs();
+  cancelConfirm();
+  const ok = await _pmLoadDefs();
   if (!ok) {
-    document.getElementById('permContent').innerHTML = '<div style="text-align:center;padding:40px;color:#b91c1c">Could not load permission definitions from SharePoint.<br>Make sure the PermissionKeys list exists.</div>';
+    document.getElementById('permContent').innerHTML = '<div style="padding:30px;text-align:center;color:#b91c1c;font-size:13px">Could not connect to SharePoint.<br>Check that the PermissionKeys list exists.</div>';
     return;
   }
-  await loadSavedPermissions();
-  renderPermTable();
+  await _pmLoadValues();
+  renderPermContent();
 }
 
 function closePermManager() {
   document.getElementById('permPanel').style.display = 'none';
+  document.body.style.overflow = '';
+  cancelConfirm();
 }
 
-async function savePermissions() {
+// ── Confirmation flow ──────────────────────────────────────────────────────
+function initiatePermSave() {
+  // Collect pending changes
+  const changes = [];
+
+  if (_pmApp === 'portals') {
+    document.querySelectorAll('.pm-cb[data-app="portals"]').forEach(cb => {
+      const portal = cb.dataset.portal;
+      const role = cb.dataset.role;
+      const current = (_pmPortalAccess[portal]||[]).includes(role);
+      if (cb.checked !== current) changes.push(`${PM_PORTALS.find(p=>p.key===portal)?.label||portal} → ${PM_ROLE_LABEL[role]||role}: ${cb.checked?'Grant access':'Remove access'}`);
+    });
+  } else {
+    document.querySelectorAll(`.pm-cb[data-app="${_pmApp}"]`).forEach(cb => {
+      const current = _pmGetVal(_pmApp, cb.dataset.role, cb.dataset.key);
+      if (cb.checked !== current) {
+        const def = _pmDefs.find(d=>d.key===cb.dataset.key&&d.app===_pmApp);
+        changes.push(`${PM_ROLE_LABEL[cb.dataset.role]||cb.dataset.role} · ${def?.label||cb.dataset.key}: ${cb.checked?'ON ✓':'OFF ✗'}`);
+      }
+    });
+  }
+
+  if (!changes.length) { document.getElementById('permSaveStatus').textContent = 'No changes detected.'; return; }
+
+  _pmPending = changes;
+  const word = _pmApp.toUpperCase();
+  document.getElementById('permConfirmWord').textContent = word;
+  document.getElementById('permChangeSummary').innerHTML = changes.map(c=>`<div style="padding:3px 0;border-bottom:1px solid rgba(0,0,0,.06)">${c}</div>`).join('');
+  document.getElementById('permConfirmInput').value = '';
+  document.getElementById('permConfirmBox').style.display = 'block';
+  document.getElementById('permConfirmInput').focus();
+}
+
+function cancelConfirm() {
+  document.getElementById('permConfirmBox').style.display = 'none';
+  document.getElementById('permConfirmInput').value = '';
+  _pmPending = null;
+}
+
+async function confirmAndSave() {
+  const word = (_pmApp).toUpperCase();
+  const typed = (document.getElementById('permConfirmInput').value||'').trim().toUpperCase();
+  if (typed !== word && typed !== 'CONFIRM') {
+    document.getElementById('permConfirmInput').style.borderColor = '#ef4444';
+    setTimeout(()=>{ document.getElementById('permConfirmInput').style.borderColor = '#F59E0B'; }, 1000);
+    return;
+  }
+  cancelConfirm();
+  await _doSave();
+}
+
+async function _doSave() {
   const statusEl = document.getElementById('permSaveStatus');
   statusEl.textContent = 'Saving…';
   statusEl.style.color = '#6b7280';
 
-  // Collect all checkbox values for active app
-  const checkboxes = document.querySelectorAll(`input[type=checkbox][data-app="${_activePermApp}"]`);
-  const newValues = {}; // { role: { key: bool } }
-  checkboxes.forEach(cb => {
-    const role = cb.dataset.role;
-    const key  = cb.dataset.key;
-    if (!newValues[role]) newValues[role] = {};
-    newValues[role][key] = cb.checked;
+  if (_pmApp === 'portals') {
+    // Build new portal access object
+    const newAccess = JSON.parse(JSON.stringify(_pmPortalAccess));
+    document.querySelectorAll('.pm-cb[data-app="portals"]').forEach(cb => {
+      const portal = cb.dataset.portal;
+      const role = cb.dataset.role;
+      if (!newAccess[portal]) newAccess[portal] = [];
+      if (cb.checked && !newAccess[portal].includes(role)) newAccess[portal].push(role);
+      if (!cb.checked) newAccess[portal] = newAccess[portal].filter(r=>r!==role);
+    });
+    const payload = { Permissions: JSON.stringify(newAccess) };
+    const existing = _pmValues['__portal__'];
+    let ok;
+    if (existing?.id) ok = await _pmPatch("('RolePermissions')", existing.id, payload);
+    else { const res = await _pmPost("('RolePermissions')/items",{Title:'portal_access',...payload}); ok=!!res; if(res) _pmValues['__portal__']={id:res.Id}; }
+    _pmPortalAccess = newAccess;
+    statusEl.textContent = ok ? '✓ Portal access saved' : '⚠ Save failed';
+    statusEl.style.color = ok ? '#16a34a' : '#b91c1c';
+    return;
+  }
+
+  // Feature permissions save
+  const newByRole = {};
+  document.querySelectorAll(`.pm-cb[data-app="${_pmApp}"]`).forEach(cb => {
+    if (!newByRole[cb.dataset.role]) newByRole[cb.dataset.role] = {};
+    newByRole[cb.dataset.role][cb.dataset.key] = cb.checked;
   });
 
-  let saved = 0, errors = 0;
-  for (const role of Object.keys(newValues)) {
-    const spKey = _activePermApp + '_' + role;
-    const existing = _permValues[spKey];
-    const existingFeatures = existing?.data?.features || {};
-    const existingTabs = existing?.data?.tabs || {};
-    const updatedFeatures = { ...existingFeatures, ...newValues[role] };
-    const payload = { Permissions: JSON.stringify({ tabs: existingTabs, features: updatedFeatures }) };
-
+  let saved=0, errors=0;
+  for (const role of Object.keys(newByRole)) {
+    const spKey = _pmApp+'_'+role;
+    const existing = _pmValues[spKey];
+    const merged = { tabs: existing?.data?.tabs||{}, features: {...(existing?.data?.features||{}), ...newByRole[role]} };
+    const payload = { Permissions: JSON.stringify(merged) };
     if (existing?.id) {
-      const ok = await spPermPatch("('RolePermissions')", payload, existing.id);
-      ok ? saved++ : errors++;
+      const ok = await _pmPatch("('RolePermissions')", existing.id, payload);
+      if (ok) { _pmValues[spKey].data = merged; saved++; } else errors++;
     } else {
-      const res = await spPermPost("('RolePermissions')/items", { Title: spKey, ...payload });
-      if (res) { _permValues[spKey] = { id: res.Id, data: { tabs: existingTabs, features: updatedFeatures } }; saved++; }
-      else errors++;
+      const res = await _pmPost("('RolePermissions')/items",{Title:spKey,...payload});
+      if (res) { _pmValues[spKey]={id:res.Id,data:merged}; saved++; } else errors++;
     }
   }
-
-  if (errors === 0) {
-    statusEl.textContent = `✓ Saved ${_activePermApp} permissions for ${saved} roles`;
-    statusEl.style.color = '#16a34a';
-    await loadSavedPermissions(); // refresh
-  } else {
-    statusEl.textContent = `⚠ ${errors} role(s) failed to save`;
-    statusEl.style.color = '#b91c1c';
-  }
+  statusEl.textContent = errors ? `⚠ ${errors} role(s) failed` : `✓ ${_pmApp} permissions saved for ${saved} roles`;
+  statusEl.style.color = errors ? '#b91c1c' : '#16a34a';
 }
 </script>
 </body>
