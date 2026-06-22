@@ -255,7 +255,7 @@
   .portal-nav {
     background: var(--navy);
     padding: 0 2rem;
-    height: 56px;
+    height: 68px;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -273,7 +273,7 @@
   .portal-nav-logo img { height: 32px; }
 
   .portal-nav-logo span {
-    font-size: 15px;
+    font-size: 17px;
     font-weight: 600;
     color: #fff;
   }
@@ -285,7 +285,7 @@
   }
 
   .portal-user {
-    font-size: 13px;
+    font-size: 14px;
     color: rgba(255,255,255,0.7);
   }
 
@@ -310,7 +310,7 @@
   .portal-body {
     max-width: 1100px;
     margin: 0 auto;
-    padding: 3rem 2rem;
+    padding: 3.5rem 2.5rem;
   }
 
   .portal-greeting {
@@ -318,14 +318,14 @@
   }
 
   .portal-greeting h2 {
-    font-size: 26px;
+    font-size: 32px;
     font-weight: 600;
     color: var(--navy);
     margin-bottom: 4px;
   }
 
   .portal-greeting p {
-    font-size: 14px;
+    font-size: 15px;
     color: var(--text-3);
   }
 
@@ -340,8 +340,8 @@
 
   .app-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-    gap: 16px;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 20px;
     margin-bottom: 2.5rem;
   }
 
@@ -349,7 +349,7 @@
     background: var(--surface);
     border: 1.5px solid var(--border);
     border-radius: var(--radius);
-    padding: 1.5rem;
+    padding: 1.75rem;
     cursor: pointer;
     text-decoration: none;
     color: inherit;
@@ -377,24 +377,24 @@
   }
 
   .app-icon {
-    width: 48px;
-    height: 48px;
+    width: 56px;
+    height: 56px;
     border-radius: 12px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 24px;
+    font-size: 28px;
     background: var(--icon-bg, #EFF2F7);
   }
 
   .app-name {
-    font-size: 15px;
+    font-size: 17px;
     font-weight: 600;
     color: var(--navy);
   }
 
   .app-desc {
-    font-size: 12px;
+    font-size: 13px;
     color: var(--text-3);
     line-height: 1.5;
   }
@@ -432,7 +432,7 @@
     justify-content: center;
     background: var(--navy);
     flex-direction: column;
-    gap: 16px;
+    gap: 20px;
   }
 
   .spinner {
@@ -449,6 +449,69 @@
   .loading-text {
     font-size: 13px;
     color: rgba(255,255,255,0.5);
+  }
+
+  /* ── Hamburger menu (mobile) ─────────────────────────────── */
+  .portal-hamburger {
+    display: none;
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 8px;
+    color: #fff;
+    width: 40px;
+    height: 40px;
+    font-size: 20px;
+    cursor: pointer;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .portal-hamburger-menu {
+    display: none;
+    position: absolute;
+    top: 68px;
+    right: 1rem;
+    background: #1B2B4B;
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0,0,0,.4);
+    padding: 8px;
+    min-width: 200px;
+    z-index: 200;
+  }
+  .portal-hamburger-menu.open { display: block; }
+  .portal-hamburger-menu a,
+  .portal-hamburger-menu button {
+    display: block;
+    width: 100%;
+    padding: 10px 14px;
+    text-align: left;
+    background: transparent;
+    border: none;
+    color: rgba(255,255,255,0.85);
+    font-size: 14px;
+    cursor: pointer;
+    border-radius: 8px;
+    text-decoration: none;
+  }
+  .portal-hamburger-menu a:hover,
+  .portal-hamburger-menu button:hover { background: rgba(255,255,255,0.1); }
+  .portal-hamburger-divider {
+    height: 1px;
+    background: rgba(255,255,255,0.1);
+    margin: 4px 8px;
+  }
+  @media (max-width: 640px) {
+    .portal-nav-right > .portal-user,
+    .portal-nav-right > #permBtn,
+    .portal-nav-right > .portal-signout { display: none !important; }
+    .portal-hamburger { display: flex; }
+    .portal-nav { padding: 0 1rem; position: relative; }
+    .portal-body { padding: 2rem 1rem; }
+    .app-grid { grid-template-columns: 1fr 1fr; gap: 12px; }
+    .portal-greeting h2 { font-size: 24px; }
+  }
+  @media (max-width: 400px) {
+    .app-grid { grid-template-columns: 1fr; }
   }
 
   .portal-footer {
@@ -521,8 +584,17 @@
     </div>
     <div class="portal-nav-right">
       <span class="portal-user">Signed in as <strong id="portalUserName"></strong></span>
-      <button id="permBtn" onclick="openPermManager()" style="display:none;margin-right:8px;padding:6px 14px;border-radius:50px;border:1.5px solid rgba(255,255,255,0.3);background:transparent;color:#fff;font-size:13px;cursor:pointer">⚙ Permissions</button>
+      <button id="permBtn" onclick="openPermManager()" style="display:none;padding:7px 16px;border-radius:50px;border:1.5px solid rgba(255,255,255,0.3);background:transparent;color:#fff;font-size:13px;cursor:pointer">⚙ Permissions</button>
       <button class="portal-signout" onclick="signOut()">Sign out</button>
+      <!-- Hamburger (mobile only) -->
+      <button class="portal-hamburger" onclick="toggleHamburger(event)" aria-label="Menu">☰</button>
+    </div>
+    <!-- Mobile dropdown -->
+    <div id="portalHamburgerMenu" class="portal-hamburger-menu">
+      <div id="hmUserLine" style="padding:10px 14px;font-size:13px;color:rgba(255,255,255,.5)"></div>
+      <div class="portal-hamburger-divider"></div>
+      <button id="hmPermBtn" onclick="closeHamburger();openPermManager()" style="display:none">⚙ Permissions</button>
+      <button onclick="closeHamburger();signOut()">Sign out</button>
     </div>
   </nav>
 
@@ -692,6 +764,11 @@ function renderPortal(userName, role) {
   // Show permissions button for superadmin only
   const permBtn = document.getElementById('permBtn');
   if (permBtn) permBtn.style.display = role === 'superadmin' ? 'inline-block' : 'none';
+  // Hamburger menu user line + perms button
+  const hmUser = document.getElementById('hmUserLine');
+  if (hmUser) hmUser.textContent = 'Signed in as ' + userName;
+  const hmPerm = document.getElementById('hmPermBtn');
+  if (hmPerm) hmPerm.style.display = role === 'superadmin' ? 'block' : 'none';
 
   const grid = document.getElementById('appGrid');
   const visibleApps = ALL_APPS.filter(app => app.roles.includes(role));
@@ -793,11 +870,11 @@ init();
         <button onclick="closePermManager()" style="background:rgba(255,255,255,.15);border:none;color:#fff;width:32px;height:32px;border-radius:50%;font-size:20px;line-height:1;cursor:pointer">×</button>
       </div>
 
-      <!-- Tabs -->
+      <!-- Tabs — Portal Access first -->
       <div style="display:flex;background:#f9fafb;border-bottom:1.5px solid #e5e7eb;overflow-x:auto;-webkit-overflow-scrolling:touch">
-        <button id="permTab_attendance" onclick="switchPermApp('attendance')" style="padding:11px 18px;border:none;border-bottom:2.5px solid #0F2A5E;background:transparent;font-size:13px;font-weight:700;color:#0F2A5E;cursor:pointer;white-space:nowrap;margin-bottom:-1.5px">Attendance</button>
+        <button id="permTab_portals"    onclick="switchPermApp('portals')"    style="padding:11px 18px;border:none;border-bottom:2.5px solid #0F2A5E;background:transparent;font-size:13px;font-weight:700;color:#0F2A5E;cursor:pointer;white-space:nowrap;margin-bottom:-1.5px">Portal Access</button>
+        <button id="permTab_attendance" onclick="switchPermApp('attendance')" style="padding:11px 18px;border:none;border-bottom:2.5px solid transparent;background:transparent;font-size:13px;font-weight:400;color:#6b7280;cursor:pointer;white-space:nowrap;margin-bottom:-1.5px">Attendance</button>
         <button id="permTab_broker"     onclick="switchPermApp('broker')"     style="padding:11px 18px;border:none;border-bottom:2.5px solid transparent;background:transparent;font-size:13px;font-weight:400;color:#6b7280;cursor:pointer;white-space:nowrap;margin-bottom:-1.5px">Broker</button>
-        <button id="permTab_portals"    onclick="switchPermApp('portals')"    style="padding:11px 18px;border:none;border-bottom:2.5px solid transparent;background:transparent;font-size:13px;font-weight:400;color:#6b7280;cursor:pointer;white-space:nowrap;margin-bottom:-1.5px">Portal Access</button>
       </div>
 
       <!-- Content -->
@@ -1001,12 +1078,34 @@ function renderPortalTab(el) {
     <div style="margin-top:10px;font-size:11px;color:#9ca3af">✔ = role can see and access this portal · Superadmin always has full access</div>`;
 }
 
+function toggleHamburger(e) {
+  e && e.stopPropagation();
+  const m = document.getElementById('portalHamburgerMenu');
+  m.classList.toggle('open');
+}
+function closeHamburger() {
+  document.getElementById('portalHamburgerMenu')?.classList.remove('open');
+}
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.portal-hamburger') && !e.target.closest('.portal-hamburger-menu')) closeHamburger();
+});
+
 async function openPermManager() {
+  _pmApp = 'portals';
   document.getElementById('permPanel').style.display = 'block';
   document.body.style.overflow = 'hidden';
   document.getElementById('permContent').innerHTML = '<div style="text-align:center;padding:40px;color:#9ca3af;font-size:14px">Loading…</div>';
   document.getElementById('permSaveStatus').textContent = '';
   cancelConfirm();
+  // Reset tab highlights — portals active first
+  ['portals','attendance','broker'].forEach(a => {
+    const btn = document.getElementById('permTab_'+a);
+    if (!btn) return;
+    const active = a === 'portals';
+    btn.style.color = active ? '#0F2A5E' : '#6b7280';
+    btn.style.fontWeight = active ? '700' : '400';
+    btn.style.borderBottomColor = active ? '#0F2A5E' : 'transparent';
+  });
   const ok = await _pmLoadDefs();
   if (!ok) {
     document.getElementById('permContent').innerHTML = '<div style="padding:30px;text-align:center;color:#b91c1c;font-size:13px">Could not connect to SharePoint.<br>Check that the PermissionKeys list exists.</div>';
