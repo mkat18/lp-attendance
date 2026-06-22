@@ -1086,15 +1086,27 @@ function renderPermContent() {
   el.innerHTML = `
     <div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
       ${tabDefs.length ? `
-      <div style="font-size:11px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.5px;padding:10px 12px 4px;background:#f9fafb;border-radius:6px 6px 0 0;border:1px solid #e5e7eb;border-bottom:none;margin-top:4px">🖥 Screens</div>
-      <table style="border-collapse:collapse;font-size:12px;min-width:600px;width:100%;margin-bottom:12px;border:1px solid #e5e7eb">
-        ${tableHead}<tbody>${renderRows(tabDefs)}</tbody>
-      </table>` : ''}
+      <div onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'':'none';this.querySelector('.pm-chevron').textContent=this.nextElementSibling.style.display==='none'?'▶':'▼'"
+        style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;margin-bottom:4px;cursor:pointer;user-select:none">
+        <span style="font-size:12px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.5px">🖥 Screens</span>
+        <span class="pm-chevron" style="font-size:12px;color:#6b7280">▼</span>
+      </div>
+      <div style="overflow-x:auto;margin-bottom:12px">
+        <table style="border-collapse:collapse;font-size:12px;min-width:600px;width:100%;border:1px solid #e5e7eb;border-radius:0 0 8px 8px">
+          ${tableHead}<tbody>${renderRows(tabDefs)}</tbody>
+        </table>
+      </div>` : ''}
       ${featDefs.length ? `
-      <div style="font-size:11px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.5px;padding:10px 12px 4px;background:#f9fafb;border-radius:6px 6px 0 0;border:1px solid #e5e7eb;border-bottom:none">⚙ Features</div>
-      <table style="border-collapse:collapse;font-size:12px;min-width:600px;width:100%;border:1px solid #e5e7eb">
-        ${tableHead}<tbody>${renderRows(featDefs)}</tbody>
-      </table>` : ''}
+      <div onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'':'none';this.querySelector('.pm-chevron').textContent=this.nextElementSibling.style.display==='none'?'▶':'▼'"
+        style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;margin-bottom:4px;cursor:pointer;user-select:none">
+        <span style="font-size:12px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.5px">⚙ Features</span>
+        <span class="pm-chevron" style="font-size:12px;color:#6b7280">▼</span>
+      </div>
+      <div style="overflow-x:auto">
+        <table style="border-collapse:collapse;font-size:12px;min-width:600px;width:100%;border:1px solid #e5e7eb;border-radius:0 0 8px 8px">
+          ${tableHead}<tbody>${renderRows(featDefs)}</tbody>
+        </table>
+      </div>` : ''}
     </div>
     <div style="margin-top:10px;font-size:11px;color:#9ca3af">✔ = role has access · Changes apply after the role holder next refreshes their session</div>`;
 }
