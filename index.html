@@ -521,6 +521,7 @@
     </div>
     <div class="portal-nav-right">
       <span class="portal-user">Signed in as <strong id="portalUserName"></strong></span>
+      <button id="permBtn" onclick="openPermManager()" style="display:none;margin-right:8px;padding:6px 14px;border-radius:50px;border:1.5px solid rgba(255,255,255,0.3);background:transparent;color:#fff;font-size:13px;cursor:pointer">⚙ Permissions</button>
       <button class="portal-signout" onclick="signOut()">Sign out</button>
     </div>
   </nav>
@@ -688,6 +689,10 @@ function renderPortal(userName, role) {
     weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
   });
 
+  // Show permissions button for superadmin only
+  const permBtn = document.getElementById('permBtn');
+  if (permBtn) permBtn.style.display = role === 'superadmin' ? 'inline-block' : 'none';
+
   const grid = document.getElementById('appGrid');
   const visibleApps = ALL_APPS.filter(app => app.roles.includes(role));
 
@@ -773,6 +778,255 @@ async function init() {
 }
 
 init();
+</script>
+<!-- ── Permissions Manager Panel ───────────────────────────────────────── -->
+<div id="permPanel" style="display:none;position:fixed;inset:0;z-index:400;background:rgba(15,23,42,.7);backdrop-filter:blur(4px);overflow-y:auto;padding:1rem">
+  <div style="max-width:900px;margin:0 auto;background:var(--surface,#fff);border-radius:16px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+    <div style="background:#0F2A5E;padding:20px 24px;display:flex;align-items:center;justify-content:space-between">
+      <div>
+        <div style="font-size:18px;font-weight:700;color:#fff">⚙ Permissions Manager</div>
+        <div style="font-size:12px;color:rgba(255,255,255,.6);margin-top:2px">Manage feature permissions per role across all apps</div>
+      </div>
+      <button onclick="closePermManager()" style="background:rgba(255,255,255,.15);border:none;color:#fff;width:32px;height:32px;border-radius:50%;font-size:18px;cursor:pointer;line-height:1">×</button>
+    </div>
+
+    <!-- App tabs -->
+    <div style="display:flex;border-bottom:1.5px solid #e5e7eb;padding:0 24px;background:#f9fafb">
+      <button id="permTab_attendance" onclick="switchPermApp('attendance')" style="padding:12px 20px;border:none;background:transparent;font-size:14px;font-weight:600;color:#0F2A5E;border-bottom:2px solid #0F2A5E;cursor:pointer;margin-bottom:-1.5px">Attendance</button>
+      <button id="permTab_broker" onclick="switchPermApp('broker')" style="padding:12px 20px;border:none;background:transparent;font-size:14px;color:#6b7280;border-bottom:2px solid transparent;cursor:pointer;margin-bottom:-1.5px">Broker</button>
+    </div>
+
+    <div style="padding:20px 24px">
+      <div id="permContent" style="min-height:200px">
+        <div style="text-align:center;padding:40px;color:#6b7280;font-size:14px">Loading permissions…</div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end">
+        <button onclick="closePermManager()" style="padding:9px 20px;border-radius:8px;border:1.5px solid #e5e7eb;background:#fff;font-size:14px;cursor:pointer;color:#374151">Cancel</button>
+        <button onclick="savePermissions()" style="padding:9px 20px;border-radius:8px;border:none;background:#C9A84C;color:#0F1E35;font-size:14px;font-weight:700;cursor:pointer">Save permissions</button>
+      </div>
+      <div id="permSaveStatus" style="text-align:right;margin-top:8px;font-size:12px;color:#6b7280"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Permission Manager ─────────────────────────────────────────────────────
+const PERM_APPS = ['attendance', 'broker'];
+let _permDefs    = [];   // [{key, label, appName, defaultValue}]
+let _permValues  = {};   // { 'attendance_hrmanager': {features:{...}} }
+let _permRoles   = [];   // ['hrmanager','teamlead','analyst',...]
+let _activePermApp = 'attendance';
+
+// Seed data — used to auto-populate PermissionKeys SP list on first run
+const PERM_SEED = [
+  // Attendance permissions
+  { key:'canBreak',               label:'Can take breaks',                   app:'attendance', def:'true'  },
+  { key:'canClockOut',            label:'Can clock out',                     app:'attendance', def:'true'  },
+  { key:'canApplyLeave',          label:'Can apply for leave',               app:'attendance', def:'true'  },
+  { key:'canApproveLeave',        label:'Can approve / reject leave',        app:'attendance', def:'false' },
+  { key:'canSeeLeaveBalance',     label:'Can see full leave balances',       app:'attendance', def:'false' },
+  { key:'canSeeTeamLeaveBalances',label:'Can see team leave balances',       app:'attendance', def:'false' },
+  { key:'canExportData',          label:'Can export data as CSV',            app:'attendance', def:'false' },
+  { key:'canAddStaff',            label:'Can add new staff',                 app:'attendance', def:'false' },
+  { key:'canDeleteStaff',         label:'Can delete staff',                  app:'attendance', def:'false' },
+  { key:'canResetPins',           label:'Can reset staff PINs',              app:'attendance', def:'false' },
+  { key:'canEditRecords',         label:'Can edit attendance records',       app:'attendance', def:'false' },
+  { key:'canAddObsNotes',         label:'Can add observation notes',         app:'attendance', def:'false' },
+  { key:'canSeeAllFiles',         label:'Can see file log in check-in',      app:'attendance', def:'false' },
+  // Broker permissions
+  { key:'canEditFiles',           label:'Can edit file details',             app:'broker',     def:'true'  },
+  { key:'canAddFiles',            label:'Can add new files',                 app:'broker',     def:'false' },
+  { key:'canArchiveFiles',        label:'Can archive / withdraw files',      app:'broker',     def:'false' },
+  { key:'canAddFeedback',         label:'Can add broker feedback',           app:'broker',     def:'true'  },
+  { key:'canManageTasks',         label:'Can create and manage tasks',       app:'broker',     def:'true'  },
+  { key:'canSeeAllTeamFiles',     label:'Can see all team files',            app:'broker',     def:'false' },
+  { key:'canExportFiles',         label:'Can export file data',              app:'broker',     def:'false' },
+];
+
+const PERM_ROLES = ['hrmanager','teamlead','analyst','trainee','assistant','sales','customerservice','socialmedia','accountant'];
+const ROLE_LABELS = { hrmanager:'HR Manager', teamlead:'Team Lead', analyst:'Analyst', trainee:'Trainee', assistant:'Assistant', sales:'Sales', customerservice:'CS', socialmedia:'Social', accountant:'Accountant' };
+
+async function spPermGet(path) {
+  const token = _portalToken || await getToken();
+  const res = await fetch(SP_API + path, { headers: { 'Authorization':'Bearer '+token, 'Accept':'application/json;odata=nometadata' } });
+  if (!res.ok) return null;
+  return res.json();
+}
+async function spPermPost(path, body) {
+  const token = _portalToken || await getToken();
+  const res = await fetch(SP_API + path, {
+    method:'POST',
+    headers: { 'Authorization':'Bearer '+token, 'Accept':'application/json;odata=nometadata', 'Content-Type':'application/json;odata=nometadata' },
+    body: JSON.stringify(body)
+  });
+  return res.ok ? res.json() : null;
+}
+async function spPermPatch(path, body, id) {
+  const token = _portalToken || await getToken();
+  const res = await fetch(SP_API + path + '/items(' + id + ')', {
+    method:'PATCH',
+    headers: { 'Authorization':'Bearer '+token, 'Accept':'application/json;odata=nometadata', 'Content-Type':'application/json;odata=nometadata', 'IF-MATCH':'*' },
+    body: JSON.stringify(body)
+  });
+  return res.ok;
+}
+
+async function loadPermissionDefs() {
+  const data = await spPermGet("('PermissionKeys')/items?$select=Id,Title,Label,AppName,DefaultValue&$top=200");
+  if (!data || !data.value) return false;
+  if (data.value.length === 0) {
+    // Auto-seed the list
+    await seedPermissionKeys();
+    return loadPermissionDefs();
+  }
+  _permDefs = data.value.map(i => ({ id:i.Id, key:i.Title, label:i.Label||i.Title, app:i.AppName||'attendance', def:i.DefaultValue||'false' }));
+  return true;
+}
+
+async function seedPermissionKeys() {
+  document.getElementById('permSaveStatus').textContent = 'Setting up permission definitions in SharePoint…';
+  for (const p of PERM_SEED) {
+    await spPermPost("('PermissionKeys')/items", { Title:p.key, Label:p.label, AppName:p.app, DefaultValue:p.def });
+  }
+  document.getElementById('permSaveStatus').textContent = 'Definitions created ✓';
+}
+
+async function loadSavedPermissions() {
+  const data = await spPermGet("('RolePermissions')/items?$select=Id,Title,Permissions&$top=200");
+  _permValues = {};
+  if (!data || !data.value) return;
+  for (const item of data.value) {
+    const key = (item.Title||'').toLowerCase();
+    if (!key) continue;
+    try { _permValues[key] = { id: item.Id, data: JSON.parse(item.Permissions||'{}') }; }
+    catch(e) { _permValues[key] = { id: item.Id, data: {} }; }
+  }
+}
+
+function getPermValue(app, role, permKey) {
+  const spKey = app + '_' + role;
+  const saved = _permValues[spKey];
+  if (saved && saved.data.features && permKey in saved.data.features) {
+    return saved.data.features[permKey];
+  }
+  // Fall back to seed default
+  const seed = PERM_SEED.find(s => s.key === permKey && s.app === app);
+  return seed ? seed.def === 'true' : false;
+}
+
+function switchPermApp(app) {
+  _activePermApp = app;
+  PERM_APPS.forEach(a => {
+    const btn = document.getElementById('permTab_' + a);
+    if (!btn) return;
+    btn.style.color = a === app ? '#0F2A5E' : '#6b7280';
+    btn.style.fontWeight = a === app ? '600' : '400';
+    btn.style.borderBottomColor = a === app ? '#0F2A5E' : 'transparent';
+  });
+  renderPermTable();
+}
+
+function renderPermTable() {
+  const el = document.getElementById('permContent');
+  const appDefs = _permDefs.filter(d => d.app === _activePermApp);
+  if (!appDefs.length) {
+    el.innerHTML = '<div style="text-align:center;padding:40px;color:#6b7280">No permissions defined for this app yet.</div>';
+    return;
+  }
+
+  const roleCols = PERM_ROLES;
+  const roleHeaders = roleCols.map(r => `<th style="padding:8px 12px;font-size:11px;font-weight:600;color:#6b7280;text-align:center;white-space:nowrap">${ROLE_LABELS[r]||r}</th>`).join('');
+
+  const rows = appDefs.map(def => {
+    const cells = roleCols.map(role => {
+      const val = getPermValue(_activePermApp, role, def.key);
+      return `<td style="padding:8px 12px;text-align:center">
+        <input type="checkbox" data-app="${_activePermApp}" data-role="${role}" data-key="${def.key}"
+          ${val ? 'checked' : ''}
+          style="width:16px;height:16px;cursor:pointer;accent-color:#0F2A5E"/>
+      </td>`;
+    }).join('');
+    return `<tr style="border-bottom:1px solid #f3f4f6">
+      <td style="padding:8px 12px;font-size:13px;color:#111827;min-width:200px">${def.label}</td>
+      ${cells}
+    </tr>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div style="overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead>
+          <tr style="border-bottom:2px solid #e5e7eb">
+            <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;color:#6b7280">Permission</th>
+            ${roleHeaders}
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+    <div style="margin-top:12px;font-size:11px;color:#9ca3af">Tick = role has this permission. Changes take effect after the role holder next refreshes their session.</div>`;
+}
+
+async function openPermManager() {
+  document.getElementById('permPanel').style.display = 'block';
+  document.getElementById('permContent').innerHTML = '<div style="text-align:center;padding:40px;color:#6b7280;font-size:14px">Loading…</div>';
+  document.getElementById('permSaveStatus').textContent = '';
+  const ok = await loadPermissionDefs();
+  if (!ok) {
+    document.getElementById('permContent').innerHTML = '<div style="text-align:center;padding:40px;color:#b91c1c">Could not load permission definitions from SharePoint.<br>Make sure the PermissionKeys list exists.</div>';
+    return;
+  }
+  await loadSavedPermissions();
+  renderPermTable();
+}
+
+function closePermManager() {
+  document.getElementById('permPanel').style.display = 'none';
+}
+
+async function savePermissions() {
+  const statusEl = document.getElementById('permSaveStatus');
+  statusEl.textContent = 'Saving…';
+  statusEl.style.color = '#6b7280';
+
+  // Collect all checkbox values for active app
+  const checkboxes = document.querySelectorAll(`input[type=checkbox][data-app="${_activePermApp}"]`);
+  const newValues = {}; // { role: { key: bool } }
+  checkboxes.forEach(cb => {
+    const role = cb.dataset.role;
+    const key  = cb.dataset.key;
+    if (!newValues[role]) newValues[role] = {};
+    newValues[role][key] = cb.checked;
+  });
+
+  let saved = 0, errors = 0;
+  for (const role of Object.keys(newValues)) {
+    const spKey = _activePermApp + '_' + role;
+    const existing = _permValues[spKey];
+    const existingFeatures = existing?.data?.features || {};
+    const existingTabs = existing?.data?.tabs || {};
+    const updatedFeatures = { ...existingFeatures, ...newValues[role] };
+    const payload = { Permissions: JSON.stringify({ tabs: existingTabs, features: updatedFeatures }) };
+
+    if (existing?.id) {
+      const ok = await spPermPatch("('RolePermissions')", payload, existing.id);
+      ok ? saved++ : errors++;
+    } else {
+      const res = await spPermPost("('RolePermissions')/items", { Title: spKey, ...payload });
+      if (res) { _permValues[spKey] = { id: res.Id, data: { tabs: existingTabs, features: updatedFeatures } }; saved++; }
+      else errors++;
+    }
+  }
+
+  if (errors === 0) {
+    statusEl.textContent = `✓ Saved ${_activePermApp} permissions for ${saved} roles`;
+    statusEl.style.color = '#16a34a';
+    await loadSavedPermissions(); // refresh
+  } else {
+    statusEl.textContent = `⚠ ${errors} role(s) failed to save`;
+    statusEl.style.color = '#b91c1c';
+  }
+}
 </script>
 </body>
 </html>
