@@ -861,7 +861,7 @@ init();
 <!-- ── Permissions Manager Panel ───────────────────────────────────────── -->
 <div id="permPanel" style="display:none;position:fixed;inset:0;z-index:9000;background:rgba(15,23,42,.75);backdrop-filter:blur(4px);overflow-y:auto;-webkit-overflow-scrolling:touch">
   <div style="min-height:100%;display:flex;align-items:flex-start;justify-content:center;padding:1rem">
-    <div style="width:100%;max-width:860px;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.35);margin:auto">
+    <div style="width:100%;max-width:860px;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.35);margin:auto;zoom:1.25">
 
       <!-- Header -->
       <div style="background:#0F2A5E;padding:18px 20px;display:flex;align-items:center;justify-content:space-between">
@@ -998,12 +998,17 @@ const _pmPatch= (p,id,b) => _pmFetch(p+'/items('+id+')',{method:'PATCH',headers:
 async function _pmLoadDefs() {
   const d = await _pmGet("('PermissionKeys')/items?$select=Id,Title,Label,AppName,DefaultValue&$top=200");
   if (!d) return false;
-  if (!d.value.length) {
-    document.getElementById('permSaveStatus').textContent = 'Setting up SP definitions…';
-    for (const s of PM_SEED) await _pmPost("('PermissionKeys')/items",{Title:s.key,Label:s.label,AppName:s.app,DefaultValue:s.def});
+
+  // Find keys in seed that are missing from SP and add them
+  const existingKeys = new Set(d.value.map(i => i.Title));
+  const missing = PM_SEED.filter(s => !existingKeys.has(s.key));
+  if (missing.length) {
+    document.getElementById('permSaveStatus').textContent = `Adding ${missing.length} new permission definition${missing.length!==1?'s':''}…`;
+    for (const s of missing) await _pmPost("('PermissionKeys')/items",{Title:s.key,Label:s.label,AppName:s.app,DefaultValue:s.def});
     document.getElementById('permSaveStatus').textContent = '';
-    return _pmLoadDefs();
+    return _pmLoadDefs(); // reload with new keys
   }
+
   _pmDefs = d.value.map(i=>({id:i.Id,key:i.Title,label:i.Label||i.Title,app:(i.AppName||'attendance').toLowerCase(),def:i.DefaultValue==='true'}));
   return true;
 }
