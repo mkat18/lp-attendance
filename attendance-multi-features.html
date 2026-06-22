@@ -879,7 +879,7 @@ tr.flagged-row:hover td { background: #FFEAEA; }
         <div id="widgetLeaves" style="display:flex;flex-wrap:wrap;gap:6px 20px"><div style="font-size:12px;color:var(--text-3)">No leave this week</div></div>
       </div>
     </div>
-    <button class="btn-primary" style="margin-top:.75rem" onclick="exportCSV()">⬇ Download CSV</button>
+    <button class="btn-primary export-btn" style="margin-top:.75rem" onclick="exportCSV()">⬇ Download CSV</button>
   </div>
 
   <!-- ── LEAVE ─────────────────────────────────────────────────────────── -->
@@ -1033,7 +1033,7 @@ tr.flagged-row:hover td { background: #FFEAEA; }
     <div class="card">
       <div class="section-label">Export data</div>
       <p style="font-size:13px;color:var(--text-2);margin-bottom:12px">Download all records as a CSV file you can open in Excel.</p>
-      <button class="btn-primary" onclick="exportCSV()">⬇ Download CSV</button>
+      <button class="btn-primary export-btn" onclick="exportCSV()">⬇ Download CSV</button>
     </div>
 
     <div class="card" id="publicHolidaysCard" style="display:none">
@@ -1807,6 +1807,20 @@ async function saveProfileDetails() {
   writeAuditLog('Profile Updated', currentUser.name, 'Staff updated their own profile details');
 }
 
+function applyPermissionVisibility() {
+  // Show/hide export buttons based on canExportData permission
+  const canExport = isSuperAdmin() || canDo('canExportData');
+  document.querySelectorAll('.export-btn').forEach(btn => {
+    btn.style.display = canExport ? '' : 'none';
+  });
+  // Show/hide obs note card
+  const obsCard = document.getElementById('workloadNoteCard');
+  if (obsCard) {
+    const show = isSuperAdmin() || isMgr() || isTL() || canDo('canAddObsNotes');
+    // Only hide the trigger button, not the card itself
+  }
+}
+
 function showScreen(name) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById('screen-'+name).classList.add('active');
@@ -1907,10 +1921,12 @@ function canSeeDashboard() { return currentUser&&(DASHBOARD_ROLES.includes(curre
 function canSeeAdmin()     { return currentUser&&ADMIN_ROLES.includes(currentUser.role); }
 function hasDashboard() { return currentUser&&['superadmin','hrmanager','assistant'].includes(currentUser.role); }
 function canEdit()      { return currentUser&&['superadmin','hrmanager'].includes(currentUser.role); }
-function canAddStaff()  { return currentUser&&['superadmin','hrmanager'].includes(currentUser.role); }
-function canDeleteStaff(){ return isSuperAdmin(); }
+function canAddStaff()  { return isSuperAdmin() || canDo('canAddStaff'); }
+function canDeleteStaff(){ return isSuperAdmin() || canDo('canDeleteStaff'); }
 function canChangeRole(){ return isSuperAdmin(); }
-function canEditRecords(){ return isSuperAdmin(); }
+function canResetPins()  { return isSuperAdmin() || canDo('canResetPins'); }
+function canAddObs()     { return isSuperAdmin() || isMgr() || isTL() || canDo('canAddObsNotes'); }
+function canEditRecords(){ return isSuperAdmin() || canDo('canEditRecords'); }
 
 
 // ── Role preview for superadmin ───────────────────────────────────────────
@@ -2024,6 +2040,7 @@ async function loadPermissions() {
         }
       }
       LS.set('ci_permissions', _permissions);
+    setTimeout(applyPermissionVisibility, 100);
     }
   } catch(e) {
     const cached = LS.get('ci_permissions');
@@ -5670,7 +5687,7 @@ function renderAllStaffCards(staff) {
         }[s.role]||'';
 
         // What buttons can current user see for this person
-        const canResetThis = sa || (mgr && s.role!=='superadmin');
+        const canResetThis = sa || ((mgr || canResetPins()) && s.role!=='superadmin');
         const canDeleteThis = sa && s.name!==currentUser.name; // can't delete yourself
         const canChangeRoleThis = (sa || mgr) && s.name!==currentUser.name && !(mgr && s.role==='superadmin');
         const canEditScheduleThis = sa || (mgr && s.role!=='superadmin') || (s.name===currentUser.name);
@@ -6988,6 +7005,10 @@ async function initMsal() {
 
 // ── Export CSV ────────────────────────────────────────────────────────────
 function exportCSV() {
+  if (!canDo('canExportData') && !isSuperAdmin()) {
+    showToast('You do not have permission to export data.', 'err');
+    return;
+  }
   const from = document.getElementById('fromDate').value;
   const to   = document.getElementById('toDate').value;
 
