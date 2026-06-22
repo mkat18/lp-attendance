@@ -571,14 +571,11 @@ tr.flagged-row:hover td { background: #FFEAEA; }
 /* ── Desktop dashboard layout ─────────────────────────────────────────── */
 @media (min-width: 768px) {
   .dashboard-grid {
-    display: grid;
-    grid-template-columns: 380px 1fr;
-    gap: 1.5rem;
-    align-items: start;
+    display: block;
     min-width: 0;
   }
-  .dashboard-snapshot { grid-column: 1; min-width: 0; }
-  .dashboard-tabs { grid-column: 2; min-width: 0; overflow: hidden; }
+  .dashboard-snapshot { min-width: 0; margin-bottom: 1rem; }
+  .dashboard-tabs { min-width: 0; overflow: hidden; }
   .snapshot-header { flex-wrap: wrap !important; gap: 6px; }
   .snapshot-header > div { flex-wrap: wrap; gap: 4px; }
 }
