@@ -809,6 +809,7 @@ tr.flagged-row:hover td { background: #FFEAEA; }
     <div id="needsAttentionBanner" style="display:none"></div>
 
     <!-- ── Metric cards ─────────────────────────────────────────────── -->
+    <div id="_dbgDates" style="font-size:11px;color:red;padding:2px 0;margin-bottom:4px"></div>
     <div class="metrics" id="metrics" style="margin-bottom:0"></div>
 
     <!-- ── Widgets: birthdays · anniversaries · on leave ────────────── -->
@@ -3427,6 +3428,9 @@ function tapCard(key, row) {
 function renderMetrics() {
   const fromDate = getSelectedDate();
   const toDate   = getSelectedDateTo();
+  // TEMP DEBUG — remove after testing
+  const dbg = document.getElementById('_dbgDates');
+  if (dbg) dbg.textContent = 'renderMetrics using: ' + fromDate + ' → ' + toDate;
   const multi    = isMultiDay();
   const dates    = getDateRange();
   const allStaff = getStaff().filter(s=>s.role!=='superadmin');
