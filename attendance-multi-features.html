@@ -1092,8 +1092,8 @@ tr.flagged-row:hover td { background: #FFEAEA; }
 
     <div class="card" id="permissionsEditorCard" style="display:none">
       <div class="section-label">🔐 Role permissions</div>
-      <p style="font-size:13px;color:var(--text-2);margin-bottom:12px">Control what each role can see and do. Superadmin permissions are fixed and cannot be changed.</p>
-      <div id="permissionsEditorContent"></div>
+      <p style="font-size:13px;color:var(--text-2);margin-bottom:12px">Permissions are now managed centrally from the <strong>LP Portal</strong> — click ⚙ Permissions in the top nav after logging in to the portal.</p>
+      <a href="index.html" style="display:inline-block;font-size:13px;padding:8px 16px;background:var(--brand);color:#fff;border-radius:var(--radius-sm);text-decoration:none">Go to Portal →</a>
     </div>
 
     <div class="card" id="obsNotesStatsCard" style="display:none">
@@ -3227,7 +3227,7 @@ function setDashRange(preset) {
     if (btn) btn.classList.toggle('active', k===preset);
   });
 
-  if (!isCustom) { renderMetrics(); renderEODCardIfNeeded(); loadTabs(); }
+  if (!isCustom) { renderMetrics(); renderEODCardIfNeeded(); renderNeedsAttention(); loadTabs(); }
 }
 
 function onDashCustomDate() {
@@ -3236,7 +3236,7 @@ function onDashCustomDate() {
   if (!from || !to) return;
   document.getElementById('fromDate').value = from;
   document.getElementById('toDate').value   = to;
-  renderMetrics(); renderEODCardIfNeeded(); loadTabs();
+  renderMetrics(); renderEODCardIfNeeded(); renderNeedsAttention(); loadTabs();
 }
 
 // Legacy aliases so any existing calls still work
@@ -3400,9 +3400,16 @@ function tapCard(key, row) {
     }).map(r => personRow(r.name, 'via '+r.msAccount, '#B45309'));
     title = 'Suspicious activity'; emptyMsg = 'No anomalies detected ✓';
   } else if (key === 'needs') {
-    window._scrollToAttention = true;
     const adminTab = document.querySelector('.nav-tab[data-tab=admin]');
     if (adminTab) goTab('admin', adminTab);
+    setTimeout(() => {
+      const card = document.getElementById('needsAttentionAdminCard');
+      if (!card) return;
+      card.style.display = 'block';
+      const body = document.getElementById('attentionCardBody');
+      if (body) body.style.display = 'block';
+      card.scrollIntoView({ behavior:'smooth', block:'start' });
+    }, 500);
     return;
   }
 
@@ -3544,10 +3551,11 @@ function renderMetrics() {
 
   // Row 0: Alerts
   let r0 = '';
-  r0 += metCard('needs',   0, '⚠ Needs attention', _attentionIssues.length,
-    _attentionIssues.length?'var(--danger)':'var(--success)',
-    _attentionIssues.length?_attentionIssues.length+' issue'+(_attentionIssues.length!==1?'s':''):'all clear ✓',
-    _attentionIssues.length?'border-color:#FECACA;':'', true);
+  const filteredAttention = _attentionIssues.filter(i => i.date >= date && i.date <= dateTo);
+  r0 += metCard('needs',   0, '⚠ Needs attention', filteredAttention.length,
+    filteredAttention.length?'var(--danger)':'var(--success)',
+    filteredAttention.length?filteredAttention.length+' issue'+(filteredAttention.length!==1?'s':''):'all clear ✓',
+    filteredAttention.length?'border-color:#FECACA;':'', true);
   r0 += metCard('missing', 0, 'Not submitted', missing.length,
     missing.length?'var(--danger)':'var(--success)', missingLabel,
     missing.length?'border-color:#FECACA;':'');
@@ -4012,7 +4020,7 @@ async function renderNeedsAttention() {
   }
 
   // Admin panel — show full list with default filter (yesterday)
-  filterAttention(window._scrollToAttention ? 'all' : 'yesterday');
+  filterAttention('yesterday');
 }
 
 let _currentAttFilter = 'yesterday';
@@ -4022,6 +4030,9 @@ function filterAttention(period) {
   const card = document.getElementById('needsAttentionAdminCard');
   const list = document.getElementById('needsAttentionList');
   if (!card || !list) return;
+
+  // Show the card (it starts display:none)
+  card.style.display = 'block';
 
   // Update filter button styles
   document.querySelectorAll('.att-filter').forEach(b => {
@@ -4054,13 +4065,6 @@ function filterAttention(period) {
 
   if (!filtered.length) {
     list.innerHTML = '<div style="font-size:13px;color:var(--text-3);padding:8px 0">No issues in this period ✓</div>';
-    // Still scroll if requested from dashboard
-    if (window._scrollToAttention) {
-      window._scrollToAttention = false;
-      const body = document.getElementById('attentionCardBody');
-      if (body) body.style.display = 'block';
-      setTimeout(() => card.scrollIntoView({ behavior:'smooth', block:'start' }), 50);
-    }
     return;
   }
 
@@ -4074,13 +4078,6 @@ function filterAttention(period) {
       }
     </div>`).join('');
 
-  // Scroll to attention card if requested from dashboard
-  if (window._scrollToAttention) {
-    window._scrollToAttention = false;
-    const body = document.getElementById('attentionCardBody');
-    if (body) body.style.display = 'block';
-    setTimeout(() => card.scrollIntoView({ behavior:'smooth', block:'start' }), 50);
-  }
 }
 
 async function managerClockOut(recId, name, date, timeInputId) {
