@@ -3184,6 +3184,9 @@ function handleCp() {
 let _dashPreset = 'today';
 
 function setDashRange(preset) {
+  // TEMP DEBUG
+  const dbg = document.getElementById('_dbgDates');
+  if (dbg) dbg.textContent = 'setDashRange called: ' + preset + ' at ' + new Date().toLocaleTimeString();
   _dashPreset = preset;
   const d   = new Date();
   const fmt = d2 => d2.toISOString().split('T')[0];
