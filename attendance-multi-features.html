@@ -809,7 +809,6 @@ tr.flagged-row:hover td { background: #FFEAEA; }
     <div id="needsAttentionBanner" style="display:none"></div>
 
     <!-- ── Metric cards ─────────────────────────────────────────────── -->
-    <div id="_dbgDates" style="font-size:11px;color:red;padding:2px 0;margin-bottom:4px"></div>
     <div class="metrics" id="metrics" style="margin-bottom:0"></div>
 
     <!-- ── Widgets: birthdays · anniversaries · on leave ────────────── -->
@@ -1810,7 +1809,7 @@ function applyPermissionVisibility() {
   // Show/hide obs note card
   const obsCard = document.getElementById('workloadNoteCard');
   if (obsCard) {
-    const show = isSuperAdmin() || isMgr() || isTL() || canDo('canAddObsNotes');
+    const show = isSuperAdmin() || isManager() || isTeamLead() || canDo('canAddObsNotes');
     // Only hide the trigger button, not the card itself
   }
 }
@@ -3184,9 +3183,6 @@ function handleCp() {
 let _dashPreset = 'today';
 
 function setDashRange(preset) {
-  // TEMP DEBUG
-  const dbg = document.getElementById('_dbgDates');
-  if (dbg) dbg.textContent = 'setDashRange called: ' + preset + ' at ' + new Date().toLocaleTimeString();
   _dashPreset = preset;
   const d   = new Date();
   const fmt = d2 => d2.toISOString().split('T')[0];
@@ -3431,9 +3427,7 @@ function tapCard(key, row) {
 function renderMetrics() {
   const fromDate = getSelectedDate();
   const toDate   = getSelectedDateTo();
-  // TEMP DEBUG — remove after testing
-  const dbg = document.getElementById('_dbgDates');
-  if (dbg) dbg.textContent = 'renderMetrics using: ' + fromDate + ' → ' + toDate;
+
   const multi    = isMultiDay();
   const dates    = getDateRange();
   const allStaff = getStaff().filter(s=>s.role!=='superadmin');
@@ -3548,7 +3542,7 @@ function renderMetrics() {
 
   // Row 0: Alerts
   let r0 = '';
-  const filteredAttention = _attentionIssues.filter(i => i.date >= date && i.date <= dateTo);
+  const filteredAttention = _attentionIssues.filter(i => i.date >= date && i.date <= toDate);
   r0 += metCard('needs',   0, '⚠ Needs attention', filteredAttention.length,
     filteredAttention.length?'var(--danger)':'var(--success)',
     filteredAttention.length?filteredAttention.length+' issue'+(filteredAttention.length!==1?'s':''):'all clear ✓',
