@@ -3177,20 +3177,7 @@ function handleCp() {
   setTimeout(()=>{ const tabs=document.querySelectorAll('.nav-tab'); if(tabs[0]) goTab('checkin',tabs[0]); },600);
 }
 
-// ── Dashboard — cards (single day or range) ─────────────────────────────
-document.getElementById('selectedDate').value=today;
-document.getElementById('selectedDateTo').value=today;
-document.getElementById('selectedDate').addEventListener('change',()=>{
-  document.querySelectorAll('[id^=qbtn]').forEach(b=>b.classList.remove('active'));
-  // If from > to, snap to-date to match
-  if(document.getElementById('selectedDate').value > document.getElementById('selectedDateTo').value)
-    document.getElementById('selectedDateTo').value = document.getElementById('selectedDate').value;
-  renderMetrics(); renderEODCardIfNeeded();
-});
-document.getElementById('selectedDateTo').addEventListener('change',()=>{
-  document.querySelectorAll('[id^=qbtn]').forEach(b=>b.classList.remove('active'));
-  renderMetrics(); renderEODCardIfNeeded();
-});
+// ── Unified date range init ─────────────────────────────────────────────
 
 // ── Unified date range (controls both metric cards AND tabs) ─────────────
 let _dashPreset = 'today';
@@ -3227,7 +3214,7 @@ function setDashRange(preset) {
     if (btn) btn.classList.toggle('active', k===preset);
   });
 
-  if (!isCustom) { renderMetrics(); renderEODCardIfNeeded(); renderNeedsAttention(); loadTabs(); }
+  if (!isCustom) { renderNeedsAttention(); renderMetrics(); renderEODCardIfNeeded(); loadTabs(); }
 }
 
 function onDashCustomDate() {
@@ -3236,7 +3223,7 @@ function onDashCustomDate() {
   if (!from || !to) return;
   document.getElementById('fromDate').value = from;
   document.getElementById('toDate').value   = to;
-  renderMetrics(); renderEODCardIfNeeded(); renderNeedsAttention(); loadTabs();
+  renderNeedsAttention(); renderMetrics(); renderEODCardIfNeeded(); loadTabs();
 }
 
 // Legacy aliases so any existing calls still work
@@ -3409,7 +3396,10 @@ function tapCard(key, row) {
       const body = document.getElementById('attentionCardBody');
       if (body) body.style.display = 'block';
       card.scrollIntoView({ behavior:'smooth', block:'start' });
-    }, 500);
+      // Brief highlight so user knows where to look
+      card.style.outline = '2.5px solid var(--danger)';
+      setTimeout(() => { card.style.outline = ''; }, 1500);
+    }, 600);
     return;
   }
 
@@ -5325,7 +5315,7 @@ function loadDashboard() {
     spGet(SP_API + "('AttendanceRecords')/items?$top=5000").then(r => { if (r&&r.value) { _records=r.value.map(spToRecord); LS.set('ci_records',_records); } }),
     spGet(SP_API + "('AttendanceBreaks')/items?$top=5000").then(r => { if (r&&r.value) { _breaks=r.value.map(spToBreak); LS.set('ci_breaks',_breaks); } }),
   ]).catch(()=>{}).finally(() => {
-    renderMetrics(); loadTabs(); renderNeedsAttention(); renderWeeklyWidgets();
+    renderNeedsAttention(); renderMetrics(); loadTabs(); renderWeeklyWidgets();
   });
 }
 
