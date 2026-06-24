@@ -3029,8 +3029,7 @@ function clockOut() {
   if (idx<0) return;
   if (recs[idx].clockOut) { showToast('Already clocked out.','err'); return; }
   // Gate behind EOD for analyst/trainee/teamlead
-  const EOD_ROLES = ['analyst','trainee','teamlead'];
-  if (EOD_ROLES.includes(currentUser.role)) {
+  if (roleHasEOD(currentUser?.role)) {
     const eodDone = getTodayEOD(currentUser.name);
     if (!eodDone) {
       showToast('Please complete your EOD report before clocking out.','err');
@@ -3534,7 +3533,7 @@ function renderMetrics() {
   // ── Compute data needed for Row 3 ──────────────────────────────────────
   const patterns     = isManager()||isSuperAdmin() ? detectAbsencePatterns() : [];
   const eodRpts      = isManager()||isSuperAdmin() ? getEODReports().filter(r=>r.date===date) : [];
-  const eodEligible  = allStaff.filter(s=>['analyst','trainee','teamlead'].includes(s.role));
+  const eodEligible  = allStaff.filter(s=>roleHasEOD(s.role));
   const eodCount     = eodRpts.length;
   const eodTotal     = eodEligible.length;
   const eodMissing   = eodTotal - eodCount;
@@ -4731,7 +4730,16 @@ async function renderLeaveScreen() {
           <option value="Unpaid Leave">Unpaid</option>
           <option value="Broker Holiday">Broker</option>
         </select>
-        <input type="text" id="leaveFilterName" placeholder="Name…" oninput="filterLeaveRequests()" style="font-size:12px;padding:4px 6px;border-radius:var(--radius-sm);border:1.5px solid var(--border);width:80px"/>
+        <select id="leaveFilterName" onchange="filterLeaveRequests()" style="font-size:12px;padding:4px 6px;border-radius:var(--radius-sm);border:1.5px solid var(--border)">
+          <option value="">All staff</option>
+          ${(()=>{
+            const isTL = isTeamLead() && !isManager() && !isSuperAdmin();
+            const names = isTL
+              ? getStaff().filter(s=>getTeamForTL(currentUser.name).includes(s.name)).map(s=>s.name)
+              : getStaff().filter(s=>s.role!=='superadmin').map(s=>s.name);
+            return names.sort().map(n=>`<option value="${n}">${n}</option>`).join('');
+          })()}
+        </select>
         ${['Today','Yesterday','This week','This month'].map(p=>`<button id="lfBtn_${p.replace(/ /g,'_')}" onclick="setLeavePreset('${p}',this)" style="font-size:12px;padding:4px 9px;border-radius:50px;border:1.5px solid var(--border);background:var(--surface-2);color:var(--text-2);cursor:pointer">${p}</button>`).join('')}
         <button id="lfBtn_custom" onclick="toggleLeaveCustomRange(this)" style="font-size:12px;padding:4px 9px;border-radius:50px;border:1.5px solid var(--border);background:var(--surface-2);color:var(--text-2);cursor:pointer">📅 Custom</button>
         <button onclick="clearLeaveFilters()" style="font-size:12px;padding:4px 9px;border-radius:50px;border:1.5px solid var(--border);background:transparent;cursor:pointer;color:var(--text-3)">Clear</button>
@@ -4756,6 +4764,16 @@ async function renderLeaveScreen() {
         <select id="leaveBalYearSel" onchange="filterTeamLeaveBalances();clearLeaveBalPresetBtns()" style="font-size:12px;padding:4px 6px;border-radius:var(--radius-sm);border:1.5px solid var(--border)">
           <option value="${curYear}">${curYear} (current)</option>
           <option value="${prevYear}">${prevYear}</option>
+        </select>
+        <select id="leaveBalNameFilter" onchange="filterTeamLeaveBalances()" style="font-size:12px;padding:4px 6px;border-radius:var(--radius-sm);border:1.5px solid var(--border)">
+          <option value="">All staff</option>
+          ${(()=>{
+            const isTLv = isTeamLead()&&!isManager()&&!isSuperAdmin();
+            const names = isTLv
+              ? getStaff().filter(s=>getTeamForTL(currentUser.name).includes(s.name)).map(s=>s.name)
+              : getStaff().filter(s=>s.role!=='superadmin').map(s=>s.name);
+            return names.sort().map(n=>`<option value="${n}">${n}</option>`).join('');
+          })()}
         </select>
         ${['Today','Yesterday','This week','This month'].map(p=>`<button id="lbBtn_${p.replace(/ /g,'_')}" onclick="setLeaveBalPreset('${p}',this)" style="font-size:12px;padding:4px 9px;border-radius:50px;border:1.5px solid var(--border);background:var(--surface-2);color:var(--text-2);cursor:pointer">${p}</button>`).join('')}
         <button id="lbBtn_custom" onclick="toggleLeaveBalCustomRange(this)" style="font-size:12px;padding:4px 9px;border-radius:50px;border:1.5px solid var(--border);background:var(--surface-2);color:var(--text-2);cursor:pointer">📅 Custom</button>
@@ -4800,27 +4818,133 @@ function toggleHalfDaySession() {
   if (sel) sel.style.display = cb && cb.checked ? 'inline-block' : 'none';
 }
 
+function clearLeavePresetBtns() {
+  ['Today','Yesterday','This_week','This_month'].forEach(k => {
+    const b=document.getElementById('lfBtn_'+k);
+    if(b){b.style.background='var(--surface-2)';b.style.borderColor='var(--border)';b.style.color='var(--text-2)';b.style.fontWeight='400';}
+  });
+}
+function clearLeaveBalPresetBtns() {
+  ['Today','Yesterday','This_week','This_month'].forEach(k => {
+    const b=document.getElementById('lbBtn_'+k);
+    if(b){b.style.background='var(--surface-2)';b.style.borderColor='var(--border)';b.style.color='var(--text-2)';b.style.fontWeight='400';}
+  });
+}
+function clearLeaveFilters() {
+  ['leaveFilterStatus','leaveFilterType','leaveFilterName'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  _leaveDateFrom=''; _leaveDateTo='';
+  const f=document.getElementById('leaveFilterFrom'); if(f) f.value='';
+  const t=document.getElementById('leaveFilterTo');   if(t) t.value='';
+  clearLeavePresetBtns();
+  const customDiv=document.getElementById('leaveCustomRange'); if(customDiv) customDiv.style.display='none';
+  filterLeaveRequests();
+}
+function toggleLeaveBalCustomRange(btn) {
+  const div=document.getElementById('leaveBalCustomRange');
+  if(!div) return;
+  const open=div.style.display!=='none';
+  div.style.display=open?'none':'flex';
+  clearLeaveBalPresetBtns();
+  if(btn){btn.style.background=open?'var(--surface-2)':'var(--brand-light)';btn.style.borderColor=open?'var(--border)':'var(--brand)';btn.style.color=open?'var(--text-2)':'var(--brand)';btn.style.fontWeight=open?'400':'700';}
+  if(!open){_leaveBalDateFrom='';_leaveBalDateTo='';}
+}
+function toggleLeaveCustomRange(btn) {
+  const div = document.getElementById('leaveCustomRange');
+  if (!div) return;
+  const open = div.style.display !== 'none';
+  div.style.display = open ? 'none' : 'flex';
+  const active = !open;
+  // Clear all preset buttons first, then highlight custom if opening
+  clearLeavePresetBtns();
+  if (btn) {
+    btn.style.background  = active ? 'var(--brand-light)' : 'var(--surface-2)';
+    btn.style.borderColor = active ? 'var(--brand)' : 'var(--border)';
+    btn.style.color       = active ? 'var(--brand)' : 'var(--text-2)';
+    btn.style.fontWeight  = active ? '700' : '400';
+  }
+}
+
+// ── Leave date preset state (persists across re-renders) ─────────────────
+let _leaveDateFrom = '', _leaveDateTo = '';
+let _leaveBalDateFrom = '', _leaveBalDateTo = '';
+
+function setLeavePreset(preset, btn) {
+  const d = new Date();
+  const fmt = d2 => d2.toISOString().split('T')[0];
+  _leaveDateFrom = today; _leaveDateTo = today;
+  if (preset==='Yesterday')  { const y=new Date(d); y.setDate(d.getDate()-1); _leaveDateFrom=_leaveDateTo=fmt(y); }
+  else if (preset==='This week')  { const day=d.getDay()||7; const m=new Date(d); m.setDate(d.getDate()-day+1); _leaveDateFrom=fmt(m); _leaveDateTo=today; }
+  else if (preset==='This month') { _leaveDateFrom=fmt(new Date(d.getFullYear(),d.getMonth(),1)); _leaveDateTo=today; }
+  const fromEl=document.getElementById('leaveFilterFrom');
+  const toEl=document.getElementById('leaveFilterTo');
+  if(fromEl) fromEl.value=_leaveDateFrom;
+  if(toEl) toEl.value=_leaveDateTo;
+  clearLeavePresetBtns();
+  const customDiv=document.getElementById('leaveCustomRange');
+  if(customDiv) customDiv.style.display='none';
+  if(btn){ btn.style.background='var(--brand-light)'; btn.style.borderColor='var(--brand)'; btn.style.color='var(--brand)'; btn.style.fontWeight='700'; }
+  filterLeaveRequests();
+}
+
+function setLeaveBalPreset(preset, btn) {
+  const d = new Date();
+  const fmt = d2 => d2.toISOString().split('T')[0];
+  _leaveBalDateFrom = today; _leaveBalDateTo = today;
+  if (preset==='Yesterday')  { const y=new Date(d); y.setDate(d.getDate()-1); _leaveBalDateFrom=_leaveBalDateTo=fmt(y); }
+  else if (preset==='This week')  { const day=d.getDay()||7; const m=new Date(d); m.setDate(d.getDate()-day+1); _leaveBalDateFrom=fmt(m); _leaveBalDateTo=today; }
+  else if (preset==='This month') { _leaveBalDateFrom=fmt(new Date(d.getFullYear(),d.getMonth(),1)); _leaveBalDateTo=today; }
+  const fromEl=document.getElementById('leaveBalFrom');
+  const toEl=document.getElementById('leaveBalTo');
+  if(fromEl) fromEl.value=_leaveBalDateFrom;
+  if(toEl) toEl.value=_leaveBalDateTo;
+  clearLeaveBalPresetBtns();
+  const customDiv=document.getElementById('leaveBalCustomRange');
+  if(customDiv) customDiv.style.display='none';
+  if(btn){ btn.style.background='var(--brand-light)'; btn.style.borderColor='var(--brand)'; btn.style.color='var(--brand)'; btn.style.fontWeight='700'; }
+  filterTeamLeaveBalances();
+}
+
+// ── Undo leave — reverts back to Pending ─────────────────────────────────
+async function undoLeave(id) {
+  if (!confirm('Revert this leave request back to Pending?\n\nThe leave balance will be restored automatically.')) return;
+  const r = _leaveRequests.find(x => x.Id===id);
+  if (!r) return;
+  const isTLonly = isTeamLead() && !isManager() && !isSuperAdmin();
+  if (isTLonly && !getTeamForTL(currentUser.name).includes(r.Title)) {
+    showToast('You can only undo leave for your own team.', 'error'); return;
+  }
+  const ok = await spPatch(`LeaveRequests(${id})`, { Status:'Pending', ApprovedBy:'', ApprovalNote:'' });
+  if (ok !== false) {
+    showToast('Leave reverted to Pending ✓', 'ok');
+    await loadLeaveRequestsFromSP();
+    renderLeaveScreen();
+  } else {
+    showToast('Failed to revert — please try again.', 'error');
+  }
+}
+
 function filterTeamLeaveBalances() {
   const el = document.getElementById('teamLeaveBalTable');
   if (!el) return;
   const yearSel = document.getElementById('leaveBalYearSel')?.value || getCurrentLeaveYear();
-  const from = document.getElementById('leaveBalFrom')?.value || '';
-  const to = document.getElementById('leaveBalTo')?.value || '';
+  const from = _leaveBalDateFrom || document.getElementById('leaveBalFrom')?.value || '';
+  const to   = _leaveBalDateTo   || document.getElementById('leaveBalTo')?.value   || '';
+  const nameFilter = document.getElementById('leaveBalNameFilter')?.value || '';
   const useDateRange = from || to;
   const isMgr = isManager() || isSuperAdmin();
-  const isTL = isTeamLead();
+  const isTL2 = isTeamLead();
   const isHRV = (isSuperAdmin() && !_previewRole) || canDo('canSeeLeaveBalance');
 
-  let teamStaff = isTL && !isMgr && !isSuperAdmin()
+  let teamStaff = isTL2 && !isMgr && !isSuperAdmin()
     ? getStaff().filter(s => getTeamForTL(currentUser.name).includes(s.name))
     : getStaff().filter(s => s.role !== 'superadmin');
+  if (nameFilter) teamStaff = teamStaff.filter(s => s.name === nameFilter);
 
   const rows = teamStaff.map(s => {
     const onProb = isOnProbation(s);
     let annualUsed, sickUsed, unpaid, broker, total, annualRem, sickRem;
 
     if (useDateRange) {
-      // Filter actual leave requests by date range
       const reqs = _leaveRequests.filter(r =>
         r.Title === s.name && r.Status === 'Approved' &&
         (!from || r.StartDate >= from) && (!to || r.StartDate <= to)
@@ -4849,7 +4973,7 @@ function filterTeamLeaveBalances() {
       <td style="padding:8px 0;text-align:center">${unpaid}</td>
       <td style="padding:8px 0;text-align:center">${broker}</td>
       <td style="padding:8px 0;text-align:center;font-weight:600">${total}</td>
-      ${isMgr&&!useDateRange?`<td style="padding:8px 0;text-align:center">${encashed>0&&!encashCleared?`<button onclick="markEncashed('${esc(s.name)}','${yearSel}')" style="font-size:11px;padding:3px 8px;background:var(--success);color:#fff;border:none;border-radius:4px;cursor:pointer">Mark encashed (${encashed}d)</button>`:'—'}</td>`:''}
+      ${isMgr&&!useDateRange?`<td style="padding:8px 0;text-align:center">${encashed>0&&!encashCleared?`<button onclick="markEncashed('${esc(s.name)}','${yearSel}')" style="font-size:11px;padding:3px 8px;background:var(--success);color:#fff;border:none;border-radius:4px;cursor:pointer">Mark encashed (${encashed}d)</button>`:'—'}</td>`:''} 
     </tr>`;
   }).join('');
 
@@ -4870,119 +4994,27 @@ function filterTeamLeaveBalances() {
     </tr></thead><tbody>${rows}</tbody></table>`;
 }
 
-function toggleLeaveCustomRange(btn) {
-  const div = document.getElementById('leaveCustomRange');
-  if (!div) return;
-  const open = div.style.display !== 'none';
-  div.style.display = open ? 'none' : 'flex';
-  const active = !open;
-  // Clear all preset buttons first, then highlight custom if opening
-  clearLeavePresetBtns();
-  if (btn) {
-    btn.style.background  = active ? 'var(--brand-light)' : 'var(--surface-2)';
-    btn.style.borderColor = active ? 'var(--brand)' : 'var(--border)';
-    btn.style.color       = active ? 'var(--brand)' : 'var(--text-2)';
-    btn.style.fontWeight  = active ? '700' : '400';
-  }
-}
-
-function setLeavePreset(preset, btn) {
-  const d = new Date();
-  const fmt = d2 => d2.toISOString().split('T')[0];
-  let from = today, to = today;
-  if (preset === 'Yesterday')  { const y=new Date(d); y.setDate(d.getDate()-1); from=to=fmt(y); }
-  else if (preset === 'This week')  { const day=d.getDay()||7; const mon=new Date(d); mon.setDate(d.getDate()-day+1); from=fmt(mon); to=today; }
-  else if (preset === 'This month') { from=fmt(new Date(d.getFullYear(),d.getMonth(),1)); to=today; }
-  const fromEl=document.getElementById('leaveFilterFrom');
-  const toEl=document.getElementById('leaveFilterTo');
-  if(fromEl) fromEl.value=from;
-  if(toEl) toEl.value=to;
-  // Highlight button
-  clearLeavePresetBtns();
-  // Hide custom range and reset its button
-  const customDiv = document.getElementById('leaveCustomRange');
-  if (customDiv) customDiv.style.display = 'none';
-  const customBtn = document.getElementById('lfBtn_custom');
-  if (customBtn) { customBtn.style.background='var(--surface-2)'; customBtn.style.borderColor='var(--border)'; customBtn.style.color='var(--text-2)'; customBtn.style.fontWeight='400'; }
-  if(btn) { btn.style.background='var(--brand-light)'; btn.style.borderColor='var(--brand)'; btn.style.color='var(--brand)'; btn.style.fontWeight='700'; }
-  filterLeaveRequests();
-}
-function clearLeavePresetBtns() {
-  ['Today','Yesterday','This_week','This_month'].forEach(k => {
-    const b=document.getElementById('lfBtn_'+k);
-    if(b) { b.style.background='var(--surface-2)'; b.style.borderColor='var(--border)'; b.style.color='var(--text-2)'; b.style.fontWeight='400'; }
-  });
-}
-function toggleLeaveBalCustomRange(btn) {
-  const div = document.getElementById('leaveBalCustomRange');
-  if (!div) return;
-  const open = div.style.display !== 'none';
-  div.style.display = open ? 'none' : 'flex';
-  const active = !open;
-  clearLeaveBalPresetBtns();
-  if (btn) {
-    btn.style.background  = active ? 'var(--brand-light)' : 'var(--surface-2)';
-    btn.style.borderColor = active ? 'var(--brand)' : 'var(--border)';
-    btn.style.color       = active ? 'var(--brand)' : 'var(--text-2)';
-    btn.style.fontWeight  = active ? '700' : '400';
-  }
-}
-
-function setLeaveBalPreset(preset, btn) {
-  const d = new Date();
-  const fmt = d2 => d2.toISOString().split('T')[0];
-  let from = today, to = today;
-  if (preset === 'Yesterday')  { const y=new Date(d); y.setDate(d.getDate()-1); from=to=fmt(y); }
-  else if (preset === 'This week')  { const day=d.getDay()||7; const mon=new Date(d); mon.setDate(d.getDate()-day+1); from=fmt(mon); to=today; }
-  else if (preset === 'This month') { from=fmt(new Date(d.getFullYear(),d.getMonth(),1)); to=today; }
-  const fromEl=document.getElementById('leaveBalFrom');
-  const toEl=document.getElementById('leaveBalTo');
-  if(fromEl) fromEl.value=from;
-  if(toEl) toEl.value=to;
-  clearLeaveBalPresetBtns();
-  // Hide custom range and reset its button
-  const customDiv = document.getElementById('leaveBalCustomRange');
-  if (customDiv) customDiv.style.display = 'none';
-  const customBtn = document.getElementById('lbBtn_custom');
-  if (customBtn) { customBtn.style.background='var(--surface-2)'; customBtn.style.borderColor='var(--border)'; customBtn.style.color='var(--text-2)'; customBtn.style.fontWeight='400'; }
-  if(btn) { btn.style.background='var(--brand-light)'; btn.style.borderColor='var(--brand)'; btn.style.color='var(--brand)'; btn.style.fontWeight='700'; }
-  filterTeamLeaveBalances();
-}
-function clearLeaveBalPresetBtns() {
-  ['Today','Yesterday','This_week','This_month'].forEach(k => {
-    const b=document.getElementById('lbBtn_'+k);
-    if(b) { b.style.background='var(--surface-2)'; b.style.borderColor='var(--border)'; b.style.color='var(--text-2)'; b.style.fontWeight='400'; }
-  });
-}
-
-function clearLeaveFilters() {
-  ['leaveFilterStatus','leaveFilterType','leaveFilterName','leaveFilterFrom','leaveFilterTo'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.value = '';
-  });
-  clearLeavePresetBtns();
-  const customBtn = document.getElementById('lfBtn_custom');
-  if (customBtn) { customBtn.style.background='var(--surface-2)'; customBtn.style.borderColor='var(--border)'; customBtn.style.color='var(--text-2)'; customBtn.style.fontWeight='400'; }
-  const customDiv = document.getElementById('leaveCustomRange');
-  if (customDiv) customDiv.style.display = 'none';
-  filterLeaveRequests();
-}
-
-function filterLeaveRequests() {
-  const status = document.getElementById('leaveFilterStatus')?.value||'';
-  const type = document.getElementById('leaveFilterType')?.value||'';
-  const name = (document.getElementById('leaveFilterName')?.value||'').toLowerCase();
-  const from = document.getElementById('leaveFilterFrom')?.value||'';
-  const to = document.getElementById('leaveFilterTo')?.value||'';
-  const el = document.getElementById('leaveRequestsList');
+function filterLeaveRequests() {  const status = document.getElementById('leaveFilterStatus')?.value||'';
+  const type   = document.getElementById('leaveFilterType')?.value||'';
+  const name   = document.getElementById('leaveFilterName')?.value||'';
+  const filterFrom = document.getElementById('leaveFilterFrom')?.value||'';
+  const filterTo   = document.getElementById('leaveFilterTo')?.value||'';
+  const el     = document.getElementById('leaveRequestsList');
   if (!el) return;
 
+  // Role-based access: TL sees her team only, manager/SA see all
+  const isTLonly = isTeamLead() && !isManager() && !isSuperAdmin();
+  const allowedNames = isTLonly
+    ? new Set([...getTeamForTL(currentUser.name), currentUser.name])
+    : null;
+
   let reqs = [..._leaveRequests];
+  if (allowedNames) reqs = reqs.filter(r => allowedNames.has(r.Title));
   if (status) reqs = reqs.filter(r => r.Status === status);
-  if (type) reqs = reqs.filter(r => r.LeaveType === type);
-  if (name) reqs = reqs.filter(r => (r.Title||'').toLowerCase().includes(name));
-  if (from) reqs = reqs.filter(r => r.StartDate >= from);
-  if (to) reqs = reqs.filter(r => r.StartDate <= to);
+  if (type)   reqs = reqs.filter(r => r.LeaveType === type);
+  if (name)   reqs = reqs.filter(r => r.Title === name);
+  if (filterFrom) reqs = reqs.filter(r => r.StartDate >= filterFrom);
+  if (filterTo)   reqs = reqs.filter(r => r.StartDate <= filterTo);
   reqs = reqs.slice(0, 100);
 
   if (!reqs.length) { el.innerHTML = '<div style="font-size:13px;color:var(--text-3)">No requests found.</div>'; return; }
@@ -4995,9 +5027,15 @@ function filterLeaveRequests() {
       <th style="padding:6px 0;text-align:left;font-size:11px;color:var(--text-3);font-weight:600">Days</th>
       <th style="padding:6px 0;text-align:left;font-size:11px;color:var(--text-3);font-weight:600">Status</th>
       <th style="padding:6px 0;text-align:left;font-size:11px;color:var(--text-3);font-weight:600">By</th>
+      <th></th>
     </tr></thead><tbody>
     ${reqs.map(r => {
       const sc = r.Status==='Approved'?'var(--success)':r.Status==='Rejected'?'var(--danger)':r.Status==='Forced'?'var(--warn)':'var(--text-3)';
+      const canUndo = (isSuperAdmin()||isManager()) ||
+        (isTeamLead() && getTeamForTL(currentUser.name).includes(r.Title));
+      const undoBtn = canUndo && r.Status && r.Status!=='Pending'
+        ? `<button onclick="undoLeave(${r.Id})" style="font-size:11px;padding:2px 8px;border-radius:4px;border:1px solid var(--border);background:var(--surface-2);cursor:pointer;color:var(--text-2)">↩ Undo</button>`
+        : '';
       return `<tr style="border-bottom:0.5px solid var(--border)">
         <td style="padding:7px 0;font-weight:500">${esc(r.Title||'')}</td>
         <td style="padding:7px 0;color:var(--text-2)">${esc(r.LeaveType||'')}</td>
@@ -5005,6 +5043,7 @@ function filterLeaveRequests() {
         <td style="padding:7px 0">${r.DaysRequested||'?'}</td>
         <td style="padding:7px 0;color:${sc};font-weight:600">${r.Status||'Pending'}</td>
         <td style="padding:7px 0;font-size:12px;color:var(--text-3)">${esc(r.ApprovedBy||'—')}</td>
+        <td style="padding:7px 0">${undoBtn}</td>
       </tr>`;
     }).join('')}
   </tbody></table>`;
@@ -10159,7 +10198,18 @@ window.initCheckin = function() {
 // ── EOD REPORT SYSTEM ─────────────────────────────────────────────────────
 // ══════════════════════════════════════════════════════════════════════════
 
-const EOD_ROLES = ['analyst','trainee','teamlead'];
+const EOD_ROLES = ['analyst','trainee','teamlead']; // legacy fallback only
+
+// Dynamic EOD eligibility — reads from permissions, not a hardcoded list
+// Add EOD tab to any role in the portal → they automatically get EOD
+function roleHasEOD(role) {
+  if (!role || role === 'superadmin') return false;
+  const sp  = typeof _permissions !== 'undefined' ? _permissions[role] : null;
+  const def = typeof DEFAULT_PERMISSIONS !== 'undefined'
+    ? (DEFAULT_PERMISSIONS[role] || DEFAULT_PERMISSIONS.staff) : null;
+  const tabs = { ...(def?.tabs||{}), ...(sp?.tabs||{}) };
+  return tabs.eod === true;
+}
 
 // ── Storage ────────────────────────────────────────────────────────────────
 
@@ -10182,7 +10232,7 @@ function goToEOD() {
 function updateEODPromptCard() {
   const card = document.getElementById('eodPromptCard');
   if (!card) return;
-  if (!EOD_ROLES.includes(currentUser?.role)) { card.style.display = 'none'; return; }
+  if (!roleHasEOD(currentUser?.role)) { card.style.display = 'none'; return; }
   const rec = getRecords().find(r => r.date === today && r.name === currentUser.name);
   if (!rec || rec.status === 'leave') { card.style.display = 'none'; return; }
   card.style.display = 'block';
@@ -10518,7 +10568,7 @@ function renderEODSummary(el, teamNames, date) {
   const reports = getEODReports().filter(r => r.date === date && teamNames.includes(r.name));
   // Only count staff who actually checked in on this date (not on leave/absent)
   const checkedInNames = new Set(getRecords().filter(r => r.date === date && r.status !== 'leave' && r.status !== 'absent').map(r => r.name));
-  const staff = getStaff().filter(s => EOD_ROLES.includes(s.role) && teamNames.includes(s.name) && checkedInNames.has(s.name));
+  const staff = getStaff().filter(s => roleHasEOD(s.role) && teamNames.includes(s.name) && checkedInNames.has(s.name));
   const submitted = new Set(reports.map(r => r.name));
   const missing = staff.filter(s => !submitted.has(s.name));
 
@@ -10601,12 +10651,12 @@ window.renderMyTeam = function() {
 const _origLockCheckinEOD = window.lockCheckin;
 window.lockCheckin = function() {
   if (_origLockCheckinEOD) _origLockCheckinEOD.apply(this, arguments);
-  if (EOD_ROLES.includes(currentUser?.role)) setTimeout(updateEODPromptCard, 100);
+  if (roleHasEOD(currentUser?.role)) setTimeout(updateEODPromptCard, 100);
 };
 const _origInitCheckinEOD = window.initCheckin;
 window.initCheckin = function() {
   if (_origInitCheckinEOD) _origInitCheckinEOD.apply(this, arguments);
-  if (EOD_ROLES.includes(currentUser?.role)) setTimeout(updateEODPromptCard, 300);
+  if (roleHasEOD(currentUser?.role)) setTimeout(updateEODPromptCard, 300);
 };
 
 
@@ -11042,7 +11092,7 @@ const _origRenderEODSummary = window.renderEODSummary;
 window.renderEODSummary = function(el, teamNames, date) {
   date = date||today;
   const reports = getEODReports().filter(r=>r.date===date&&teamNames.includes(r.name));
-  const staff = getStaff().filter(s=>EOD_ROLES.includes(s.role)&&teamNames.includes(s.name));
+  const staff = getStaff().filter(s=>roleHasEOD(s.role)&&teamNames.includes(s.name));
   const submitted = new Set(reports.map(r=>r.name));
   const missing = staff.filter(s=>!submitted.has(s.name));
   const lowConf = reports.filter(r=>r.confidence<=2);
