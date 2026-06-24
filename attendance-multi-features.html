@@ -4996,39 +4996,80 @@ let _leaveDateFrom = '', _leaveDateTo = '';
 let _leaveBalDateFrom = '', _leaveBalDateTo = '';
 
 function setLeavePreset(preset, btn) {
+  const localDate = d => {
+    const pad = n => String(n).padStart(2,'0');
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  };
   const d = new Date();
-  const fmt = d2 => d2.toISOString().split('T')[0];
-  _leaveDateFrom = today; _leaveDateTo = today;
-  if (preset==='Yesterday')  { const y=new Date(d); y.setDate(d.getDate()-1); _leaveDateFrom=_leaveDateTo=fmt(y); }
-  else if (preset==='This week')  { const day=d.getDay()||7; const m=new Date(d); m.setDate(d.getDate()-day+1); _leaveDateFrom=fmt(m); _leaveDateTo=today; }
-  else if (preset==='This month') { _leaveDateFrom=fmt(new Date(d.getFullYear(),d.getMonth(),1)); _leaveDateTo=today; }
-  const fromEl=document.getElementById('leaveFilterFrom');
-  const toEl=document.getElementById('leaveFilterTo');
-  if(fromEl) fromEl.value=_leaveDateFrom;
-  if(toEl) toEl.value=_leaveDateTo;
+  const todayLocal = localDate(d);
+
+  if (preset === 'Today') {
+    _leaveDateFrom = todayLocal; _leaveDateTo = todayLocal;
+  } else if (preset === 'Yesterday') {
+    const y = new Date(d); y.setDate(d.getDate()-1);
+    _leaveDateFrom = localDate(y); _leaveDateTo = localDate(y);
+  } else if (preset === 'This week') {
+    const day = d.getDay() || 7;
+    const mon = new Date(d); mon.setDate(d.getDate() - day + 1);
+    _leaveDateFrom = localDate(mon); _leaveDateTo = todayLocal;
+  } else if (preset === 'This month') {
+    _leaveDateFrom = localDate(new Date(d.getFullYear(), d.getMonth(), 1));
+    _leaveDateTo = todayLocal;
+  }
+
+  const fromEl = document.getElementById('leaveFilterFrom');
+  const toEl   = document.getElementById('leaveFilterTo');
+  if (fromEl) fromEl.value = _leaveDateFrom;
+  if (toEl)   toEl.value   = _leaveDateTo;
   clearLeavePresetBtns();
-  const customDiv=document.getElementById('leaveCustomRange');
-  if(customDiv) customDiv.style.display='none';
-  if(btn){ btn.style.background='var(--brand-light)'; btn.style.borderColor='var(--brand)'; btn.style.color='var(--brand)'; btn.style.fontWeight='700'; }
+  const customDiv = document.getElementById('leaveCustomRange');
+  if (customDiv) customDiv.style.display = 'none';
+  if (btn) {
+    btn.style.background  = 'var(--brand-light)';
+    btn.style.borderColor = 'var(--brand)';
+    btn.style.color       = 'var(--brand)';
+    btn.style.fontWeight  = '700';
+  }
   filterLeaveRequests();
 }
 
 function setLeaveBalPreset(preset, btn) {
+  // Use LOCAL date (not UTC) to avoid timezone issues
+  const localDate = d => {
+    const pad = n => String(n).padStart(2,'0');
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  };
   const d = new Date();
-  const fmt = d2 => d2.toISOString().split('T')[0];
-  _leaveBalDateFrom = today; _leaveBalDateTo = today;
-  if      (preset==='Yesterday')  { const y=new Date(d); y.setDate(d.getDate()-1); _leaveBalDateFrom=_leaveBalDateTo=fmt(y); }
-  else if (preset==='This week')  { const day=d.getDay()||7; const m=new Date(d); m.setDate(d.getDate()-day+1); _leaveBalDateFrom=fmt(m); _leaveBalDateTo=today; }
-  else if (preset==='This month') { _leaveBalDateFrom=fmt(new Date(d.getFullYear(),d.getMonth(),1)); _leaveBalDateTo=today; }
-  // 'Today' uses the defaults already set above
-  const fromEl=document.getElementById('leaveBalFrom');
-  const toEl=document.getElementById('leaveBalTo');
-  if(fromEl) fromEl.value=_leaveBalDateFrom;
-  if(toEl)   toEl.value=_leaveBalDateTo;
+  const todayLocal = localDate(d);
+
+  if (preset === 'Today') {
+    _leaveBalDateFrom = todayLocal; _leaveBalDateTo = todayLocal;
+  } else if (preset === 'Yesterday') {
+    const y = new Date(d); y.setDate(d.getDate()-1);
+    _leaveBalDateFrom = localDate(y); _leaveBalDateTo = localDate(y);
+  } else if (preset === 'This week') {
+    const day = d.getDay() || 7;
+    const mon = new Date(d); mon.setDate(d.getDate() - day + 1);
+    _leaveBalDateFrom = localDate(mon); _leaveBalDateTo = todayLocal;
+  } else if (preset === 'This month') {
+    _leaveBalDateFrom = localDate(new Date(d.getFullYear(), d.getMonth(), 1));
+    _leaveBalDateTo = todayLocal;
+  }
+
+  const fromEl = document.getElementById('leaveBalFrom');
+  const toEl   = document.getElementById('leaveBalTo');
+  if (fromEl) fromEl.value = _leaveBalDateFrom;
+  if (toEl)   toEl.value   = _leaveBalDateTo;
+
   clearLeaveBalPresetBtns();
-  const customDiv=document.getElementById('leaveBalCustomRange');
-  if(customDiv) customDiv.style.display='none';
-  if(btn){ btn.style.background='var(--brand-light)'; btn.style.borderColor='var(--brand)'; btn.style.color='var(--brand)'; btn.style.fontWeight='700'; }
+  const customDiv = document.getElementById('leaveBalCustomRange');
+  if (customDiv) customDiv.style.display = 'none';
+  if (btn) {
+    btn.style.background  = 'var(--brand-light)';
+    btn.style.borderColor = 'var(--brand)';
+    btn.style.color       = 'var(--brand)';
+    btn.style.fontWeight  = '700';
+  }
   filterTeamLeaveBalances();
 }
 
@@ -5092,14 +5133,18 @@ async function submitUndoLeave() {
 function filterTeamLeaveBalances() {
   const el = document.getElementById('teamLeaveBalTable');
   if (!el) return;
-  const yearSel = document.getElementById('leaveBalYearSel')?.value || getCurrentLeaveYear();
+
+  const yearSel     = document.getElementById('leaveBalYearSel')?.value || getCurrentLeaveYear();
+  const nameFilter  = document.getElementById('leaveBalNameFilter')?.value || '';
+
+  // Read date range — state vars take priority over inputs
   const from = _leaveBalDateFrom || document.getElementById('leaveBalFrom')?.value || '';
   const to   = _leaveBalDateTo   || document.getElementById('leaveBalTo')?.value   || '';
-  const nameFilter = document.getElementById('leaveBalNameFilter')?.value || '';
-  const useDateRange = from || to;
-  const isMgr = isManager() || isSuperAdmin();
-  const isTL2 = isTeamLead();
-  const isHRV = (isSuperAdmin() && !_previewRole) || canDo('canSeeLeaveBalance');
+  const useDateRange = !!(from || to);
+
+  const isMgr  = isManager() || isSuperAdmin();
+  const isTL2  = isTeamLead();
+  const isHRV  = (isSuperAdmin() && !_previewRole) || canDo('canSeeLeaveBalance');
 
   let teamStaff = isTL2 && !isMgr && !isSuperAdmin()
     ? getStaff().filter(s => getTeamForTL(currentUser.name).includes(s.name))
@@ -5112,21 +5157,24 @@ function filterTeamLeaveBalances() {
 
     if (useDateRange) {
       const reqs = _leaveRequests.filter(r => {
-        const sd = (r.StartDate||'').substring(0,10); // strip time component
-        return r.Title === s.name && r.Status === 'Approved' &&
-          (!from || sd >= from) && (!to || sd <= to);
+        // Strip time component from SP date (handles both '2026-06-25' and '2026-06-25T00:00:00Z')
+        const sd = (r.StartDate || '').substring(0, 10);
+        return r.Title === s.name &&
+          (r.Status || '').toLowerCase() === 'approved' &&
+          (!from || sd >= from) &&
+          (!to   || sd <= to);
       });
-      annualUsed = reqs.filter(r=>r.LeaveType==='Annual Leave'||r.LeaveType==='Forced Leave').reduce((a,r)=>a+parseFloat(r.DaysRequested||0),0);
-      sickUsed = reqs.filter(r=>r.LeaveType==='Sick Leave').reduce((a,r)=>a+parseFloat(r.DaysRequested||0),0);
-      unpaid = reqs.filter(r=>r.LeaveType==='Unpaid Leave').reduce((a,r)=>a+parseFloat(r.DaysRequested||0),0);
-      broker = reqs.filter(r=>r.LeaveType==='Broker Holiday').reduce((a,r)=>a+parseFloat(r.DaysRequested||0),0);
-      total = reqs.reduce((a,r)=>a+parseFloat(r.DaysRequested||0),0);
-      annualRem = '—'; sickRem = '—';
+      annualUsed = reqs.filter(r => ['annual leave','forced leave'].includes((r.LeaveType||'').toLowerCase())).reduce((a,r)=>a+parseFloat(r.DaysRequested||0),0);
+      sickUsed   = reqs.filter(r => (r.LeaveType||'').toLowerCase() === 'sick leave').reduce((a,r)=>a+parseFloat(r.DaysRequested||0),0);
+      unpaid     = reqs.filter(r => (r.LeaveType||'').toLowerCase() === 'unpaid leave').reduce((a,r)=>a+parseFloat(r.DaysRequested||0),0);
+      broker     = reqs.filter(r => (r.LeaveType||'').toLowerCase() === 'broker holiday').reduce((a,r)=>a+parseFloat(r.DaysRequested||0),0);
+      total      = reqs.reduce((a,r)=>a+parseFloat(r.DaysRequested||0),0);
+      annualRem  = '—'; sickRem = '—';
     } else {
-      const bal = getLeaveBalance(s.name, yearSel !== getCurrentLeaveYear() ? yearSel : undefined);
+      const bal  = getLeaveBalance(s.name, yearSel !== getCurrentLeaveYear() ? yearSel : undefined);
       annualUsed = bal.annualUsed; sickUsed = bal.sickUsed;
-      unpaid = bal.unpaidUsed; broker = bal.brokerCount; total = bal.totalUsed;
-      annualRem = bal.annualRemaining; sickRem = bal.sickRemaining;
+      unpaid     = bal.unpaidUsed; broker   = bal.brokerCount; total = bal.totalUsed;
+      annualRem  = bal.annualRemaining; sickRem = bal.sickRemaining;
     }
 
     const ent = getLeaveEntitlement(s.name, yearSel);
@@ -8153,14 +8201,19 @@ async function loadCoverageFromSP() {
 }
 
 function getCoverageForDate(date) {
-  // Returns {absenteeName: coverName} for a given date (also check localStorage for NCR)
-  const result = {};
-  _coverageSP.filter(r=>r.date===date).forEach(r=>{ result[r.absenteeName]=r.coverName; });
-  // Merge with localStorage NCR entries
+  // Start with localStorage (always available as fallback)
   const lsCov = getCoverage();
-  Object.entries(lsCov).forEach(([key,val])=>{
-    const [d,...nameParts] = key.split('_'); const name=nameParts.join('_');
-    if (d===date && val==='_ncr') result[name]='_ncr';
+  const result = {};
+  // Add all localStorage entries for this date
+  Object.entries(lsCov).forEach(([key, val]) => {
+    const parts = key.split('_');
+    const d = parts[0];
+    const name = parts.slice(1).join('_');
+    if (d === date) result[name] = val;
+  });
+  // SP entries override localStorage (SP is source of truth when available)
+  _coverageSP.filter(r => r.date === date).forEach(r => {
+    result[r.absenteeName] = r.coverName;
   });
   return result;
 }
@@ -8238,9 +8291,9 @@ function confirmBulkTransfer() {
 
 function assignCover(absenteeName, date) {
   const staff = getStaff().filter(s => s.role !== 'superadmin' && s.name !== absenteeName);
-  const coverage = getCoverage();
-  const key = date + '_' + absenteeName;
-  const current = coverage[key] && coverage[key] !== '_ncr' ? coverage[key] : '';
+  // Read current assignment from SP cache (merged with localStorage)
+  const covForDate = getCoverageForDate(date);
+  const current = covForDate[absenteeName] && covForDate[absenteeName] !== '_ncr' ? covForDate[absenteeName] : '';
 
   const options = staff.map(s =>
     `<option value="${esc(s.name)}" ${current===s.name?'selected':''}>${esc(s.name)}</option>`
@@ -8264,29 +8317,27 @@ function assignCover(absenteeName, date) {
 }
 
 function setNocover(absenteeName, date) {
+  // Save NCR to localStorage immediately
   const coverage = getCoverage();
   coverage[date+'_'+absenteeName] = '_ncr';
   saveCoverage(coverage);
+  // Try SP too
+  saveCoverageSP(absenteeName, date, '_ncr').catch(()=>{});
   showToast('Marked as no cover required for ' + absenteeName.split(' ')[0] + '.', 'ok');
-  // Re-open the coverage expand to refresh
   tapCard('coverage', 3);
 }
 
 function saveCoverAssign(absenteeName, date, coverName, btn) {
   if (!coverName) { showToast('Select a person first.','err'); return; }
-  saveCoverageSP(absenteeName, date, coverName).then(() => {
-    showToast(coverName.split(' ')[0]+' assigned as cover for '+absenteeName.split(' ')[0]+' ✓','ok');
-    btn.closest('div[style*="fixed"]').remove();
-    renderMetrics();
-  }).catch(() => {
-    // Fallback to localStorage
-    const coverage = getCoverage();
-    coverage[date+'_'+absenteeName] = coverName;
-    saveCoverage(coverage);
-    showToast(coverName.split(' ')[0]+' assigned ✓','ok');
-    btn.closest('div[style*="fixed"]').remove();
-    renderMetrics();
-  });
+  // Always save to localStorage immediately so UI updates even if SP fails
+  const coverage = getCoverage();
+  coverage[date+'_'+absenteeName] = coverName;
+  saveCoverage(coverage);
+  // Try SP in background
+  saveCoverageSP(absenteeName, date, coverName).catch(()=>{});
+  showToast(coverName.split(' ')[0]+' assigned as cover for '+absenteeName.split(' ')[0]+' ✓','ok');
+  btn.closest('div[style*="fixed"]').remove();
+  renderMetrics();
 }
 
 function renderCoverageCard(date) {
@@ -10758,10 +10809,11 @@ function renderEODScreen() {
   const hasCheckedIn = rec && rec.status !== 'leave';
 
   if (!hasCheckedIn) {
+    const isOnLeave = rec && rec.status === 'leave';
     el.innerHTML = `<div class="card" style="text-align:center;padding:2rem">
-      <div style="font-size:2rem;margin-bottom:10px">⏳</div>
-      <div style="font-size:15px;font-weight:600;color:var(--text)">Check in first</div>
-      <div style="font-size:13px;color:var(--text-3);margin-top:4px">Complete your attendance check-in before filling in the EOD report.</div>
+      <div style="font-size:2rem;margin-bottom:10px">${isOnLeave ? '🌴' : '⏳'}</div>
+      <div style="font-size:15px;font-weight:600;color:var(--text)">${isOnLeave ? 'You\'re on leave today' : 'Check in first'}</div>
+      <div style="font-size:13px;color:var(--text-3);margin-top:4px">${isOnLeave ? 'No EOD report needed on leave days.' : 'Complete your attendance check-in before filling in the EOD report.'}</div>
     </div>`;
     return;
   }
