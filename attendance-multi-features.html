@@ -1879,12 +1879,25 @@ const SUPERADMIN_ROLE = { title: 'superadmin', label: 'Super Admin' };
 
 async function loadRolesFromSP() {
   try {
-    const res = await spGet(SP_API + "('Roles')/items?$select=Title,Label&$top=100&$orderby=Title");
-    if (res && res.value && res.value.length) {
-      _roles = res.value.map(r => ({ title: (r.Title||'').toLowerCase(), label: r.Label || r.Title }));
-      LS.set('ci_roles', _roles);
-      updateRoleLabel();
-      return;
+    const res = await spGet(SP_API + "('Roles')/items?$select=Id,Title,Label&$top=100&$orderby=Title");
+    if (res && res.value) {
+      // Auto-seed any missing default roles
+      const existingTitles = new Set(res.value.map(r => (r.Title||'').toLowerCase()));
+      const defaults = getDefaultRoles();
+      const missing = defaults.filter(d => !existingTitles.has(d.title));
+      if (missing.length) {
+        for (const r of missing) {
+          await spPost(SP_API + "('Roles')/items", { Title: r.title, Label: r.label });
+        }
+        // Reload after seeding
+        return loadRolesFromSP();
+      }
+      if (res.value.length) {
+        _roles = res.value.map(r => ({ title: (r.Title||'').toLowerCase(), label: r.Label || r.Title }));
+        LS.set('ci_roles', _roles);
+        updateRoleLabel();
+        return;
+      }
     }
   } catch(e) { console.warn('loadRolesFromSP failed:', e); }
   // Fallback to cache
