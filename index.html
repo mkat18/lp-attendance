@@ -635,7 +635,7 @@ const ALL_APPS = [
     accent: '#4F46E5',
     url: BASE_URL + 'attendance-multi-features.html',
     badge: 'Live',
-    roles: ['superadmin','hrmanager','manager','teamlead','analyst','trainee','staff','hr','assistant','sales','customerservice','socialmedia'],
+    roles: ['superadmin','hrmanager','manager','teamlead','analyst','trainee','staff','hr','assistant','sales','customerservice','socialmedia','opsmanager'],
   },
   {
     id: 'lms',
@@ -657,7 +657,7 @@ const ALL_APPS = [
     accent: '#16A34A',
     url: BASE_URL + 'broker.html',
     badge: 'Live',
-    roles: ['superadmin','teamlead','analyst'],
+    roles: ['superadmin','teamlead','analyst','opsmanager'],
   },
   {
     id: 'hr',
@@ -921,8 +921,8 @@ init();
 <script>
 // ── Permission Manager ─────────────────────────────────────────────────────
 const PM_APPS  = ['attendance','broker'];
-const PM_ROLES = ['hrmanager','teamlead','analyst','trainee','assistant','sales','customerservice','socialmedia','accountant'];
-const PM_ROLE_LABEL = {hrmanager:'HR Mgr',teamlead:'Team Lead',analyst:'Analyst',trainee:'Trainee',assistant:'Asst',sales:'Sales',customerservice:'CS',socialmedia:'Social',accountant:'Acct'};
+const PM_ROLES = ['hrmanager','opsmanager','teamlead','analyst','trainee','assistant','sales','customerservice','socialmedia','accountant'];
+const PM_ROLE_LABEL = {hrmanager:'HR Mgr',opsmanager:'Ops Mgr',teamlead:'Team Lead',analyst:'Analyst',trainee:'Trainee',assistant:'Asst',sales:'Sales',customerservice:'CS',socialmedia:'Social',accountant:'Acct'};
 
 let _pmDefs    = [];
 let _pmValues  = {};
@@ -979,8 +979,8 @@ const PM_PORTALS = [
 ];
 
 const PM_PORTAL_DEFAULTS = {
-  attendance: ['hrmanager','teamlead','analyst','trainee','assistant','sales','customerservice','socialmedia','accountant'],
-  broker:     ['teamlead','analyst'],
+  attendance: ['hrmanager','teamlead','analyst','trainee','assistant','sales','customerservice','socialmedia','accountant','opsmanager'],
+  broker:     ['teamlead','analyst','opsmanager'],
   lms:        ['hrmanager','teamlead','analyst','trainee'],
   hr:         ['hrmanager'],
 };
