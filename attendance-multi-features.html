@@ -10793,15 +10793,44 @@ function renderEODScreen() {
     <!-- ── BROKER INTERACTION ─────────────────────── -->
     <div class="card" style="margin-bottom:1rem">
       <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Broker interaction today</div>
-      <div style="font-size:13px;font-weight:500;color:var(--text-2);margin-bottom:8px">Select all that apply</div>
-      <div style="display:flex;flex-wrap:wrap;gap:8px" id="eodInteractionChips">
-        ${BROKER_OPTIONS.map(b => {
+      <div style="font-size:13px;font-weight:500;color:var(--text-2);margin-bottom:6px">Select all that apply</div>
+
+      <div style="font-size:11px;font-weight:600;color:var(--success);text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px">Positive</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px" id="eodInteractionChips">
+        ${['Clear instructions','Responsive','Supportive','Good feedback','Easy to work with'].map(b => {
           const sel = Array.isArray(existingBrokerInteraction) && existingBrokerInteraction.includes(b);
           return `<button type="button" onclick="toggleEODChip(this)"
-            data-val="${esc(b)}" data-selected="${sel}"
-            style="padding:8px 14px;border-radius:50px;border:1.5px solid ${sel?'var(--brand)':'var(--border)'};
-            background:${sel?'var(--brand-light)':'var(--surface-2)'};color:${sel?'var(--brand)':'var(--text-2)'};
-            font-size:13px;font-weight:${sel?'700':'400'};cursor:pointer">
+            data-val="${esc(b)}" data-selected="${sel}" data-group="positive"
+            style="padding:6px 12px;border-radius:50px;border:1.5px solid ${sel?'var(--success)':'var(--border)'};
+            background:${sel?'var(--success-light)':'var(--surface-2)'};color:${sel?'var(--success)':'var(--text-2)'};
+            font-size:12px;font-weight:${sel?'700':'400'};cursor:pointer">
+            ${sel?'✓ ':''}${esc(b)}
+          </button>`;
+        }).join('')}
+      </div>
+
+      <div style="font-size:11px;font-weight:600;color:var(--danger);text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px">Negative</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px" id="eodInteractionChipsNeg">
+        ${['Raised complaint','Unclear brief','Unreasonable expectation','Slow to respond','Changed requirements','Rude or dismissive'].map(b => {
+          const sel = Array.isArray(existingBrokerInteraction) && existingBrokerInteraction.includes(b);
+          return `<button type="button" onclick="toggleEODChip(this)"
+            data-val="${esc(b)}" data-selected="${sel}" data-group="negative"
+            style="padding:6px 12px;border-radius:50px;border:1.5px solid ${sel?'var(--danger)':'var(--border)'};
+            background:${sel?'var(--danger-light)':'var(--surface-2)'};color:${sel?'var(--danger)':'var(--text-2)'};
+            font-size:12px;font-weight:${sel?'700':'400'};cursor:pointer">
+            ${sel?'✓ ':''}${esc(b)}
+          </button>`;
+        }).join('')}
+      </div>
+
+      <div style="display:flex;flex-wrap:wrap;gap:6px">
+        ${['No broker interaction today'].map(b => {
+          const sel = Array.isArray(existingBrokerInteraction) && existingBrokerInteraction.includes(b);
+          return `<button type="button" onclick="toggleEODChip(this)"
+            data-val="${esc(b)}" data-selected="${sel}" data-group="neutral"
+            style="padding:6px 12px;border-radius:50px;border:1.5px solid ${sel?'var(--text-2)':'var(--border)'};
+            background:${sel?'var(--surface-2)':'var(--surface-2)'};color:${sel?'var(--text)':'var(--text-3)'};
+            font-size:12px;font-weight:${sel?'700':'400'};cursor:pointer">
             ${sel?'✓ ':''}${esc(b)}
           </button>`;
         }).join('')}
@@ -11015,20 +11044,27 @@ function renderEODTaskList() {
     </div>`).join('');
 }
 
-// ── Chip toggle (fixed) ───────────────────────────────────────────────────
+// ── Chip toggle ───────────────────────────────────────────────────────────
 function toggleEODChip(btn) {
   const selected = btn.dataset.selected === 'true';
+  const group = btn.dataset.group || 'positive';
+  const colors = {
+    positive: { border:'var(--success)', bg:'var(--success-light)', text:'var(--success)' },
+    negative: { border:'var(--danger)',  bg:'var(--danger-light)',  text:'var(--danger)'  },
+    neutral:  { border:'var(--text-2)', bg:'var(--surface-2)',     text:'var(--text)'    },
+  };
+  const c = colors[group] || colors.positive;
   btn.dataset.selected = (!selected).toString();
   if (!selected) {
-    btn.style.border = '1.5px solid var(--brand)';
-    btn.style.background = 'var(--brand-light)';
-    btn.style.color = 'var(--brand)';
+    btn.style.border = '1.5px solid ' + c.border;
+    btn.style.background = c.bg;
+    btn.style.color = c.text;
     btn.style.fontWeight = '700';
     btn.textContent = '✓ ' + btn.dataset.val;
   } else {
     btn.style.border = '1.5px solid var(--border)';
     btn.style.background = 'var(--surface-2)';
-    btn.style.color = 'var(--text-2)';
+    btn.style.color = group === 'neutral' ? 'var(--text-3)' : 'var(--text-2)';
     btn.style.fontWeight = '400';
     btn.textContent = btn.dataset.val;
   }
@@ -11070,9 +11106,9 @@ function submitEOD(e) {
   e.preventDefault();
   const errEl = document.getElementById('eodSubmitErr');
 
-  // Collect broker interaction chips
+  // Collect broker interaction chips (positive + negative + neutral)
   const brokerInteraction = Array.from(
-    document.querySelectorAll('#eodInteractionChips button[data-selected="true"]')
+    document.querySelectorAll('#eodInteractionChips button[data-selected="true"], #eodInteractionChipsNeg button[data-selected="true"], .card button[data-group="neutral"][data-selected="true"]')
   ).map(b => b.dataset.val);
 
   const challenges   = document.getElementById('eod_challenges')?.value||'';
