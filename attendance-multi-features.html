@@ -1880,29 +1880,27 @@ const SUPERADMIN_ROLE = { title: 'superadmin', label: 'Super Admin' };
 async function loadRolesFromSP() {
   try {
     const res = await spGet(SP_API + "('Roles')/items?$select=Id,Title,Label&$top=100&$orderby=Title");
-    if (res && res.value) {
-      // Auto-seed any missing default roles
-      const existingTitles = new Set(res.value.map(r => (r.Title||'').toLowerCase()));
-      const defaults = getDefaultRoles();
-      const missing = defaults.filter(d => !existingTitles.has(d.title));
-      if (missing.length) {
-        for (const r of missing) {
-          await spPost(SP_API + "('Roles')/items", { Title: r.title, Label: r.label });
-        }
-        // Reload after seeding
-        return loadRolesFromSP();
-      }
-      if (res.value.length) {
-        _roles = res.value.map(r => ({ title: (r.Title||'').toLowerCase(), label: r.Label || r.Title }));
-        LS.set('ci_roles', _roles);
-        updateRoleLabel();
-        return;
-      }
+    if (res && res.value && res.value.length) {
+      const spRoles = res.value.map(r => ({ title: (r.Title||'').toLowerCase(), label: r.Label || r.Title }));
+      // Always merge SP roles with any defaults not yet in SP
+      const spTitles = new Set(spRoles.map(r => r.title));
+      const missingDefaults = getDefaultRoles().filter(d => !spTitles.has(d.title));
+      _roles = [...spRoles, ...missingDefaults];
+      LS.set('ci_roles', _roles);
+      updateRoleLabel();
+      // Seed missing roles to SP silently in background
+      missingDefaults.forEach(r =>
+        spPost(SP_API + "('Roles')/items", { Title: r.title, Label: r.label }).catch(()=>{})
+      );
+      return;
     }
   } catch(e) { console.warn('loadRolesFromSP failed:', e); }
-  // Fallback to cache
-  const cached = LS.get('ci_roles');
-  if (cached && cached.length) { _roles = cached; updateRoleLabel(); }
+  // Fallback — merge cache with defaults
+  const cached = LS.get('ci_roles') || [];
+  const cachedTitles = new Set(cached.map(r => r.title));
+  const missingFromCache = getDefaultRoles().filter(d => !cachedTitles.has(d.title));
+  _roles = [...cached, ...missingFromCache];
+  if (_roles.length) updateRoleLabel();
 }
 
 function updateRoleLabel() {
@@ -5931,7 +5929,18 @@ function renderObsStats() {
   el.innerHTML = html;
 }
 
+function _refreshStaffRoleDropdowns() {
+  // Refresh all role change dropdowns in the staff list with latest roles
+  document.querySelectorAll('select[onchange*="changeRoleByName"]').forEach(sel => {
+    const current = sel.value;
+    sel.innerHTML = '<option value="">— role —</option>' +
+      getRoles().map(r => `<option value="${r.title}" ${r.title===current?'selected':''}>${r.label}</option>`).join('');
+  });
+}
+
 function renderAdmin() {
+  // Reload roles first to ensure latest (including any new defaults)
+  loadRolesFromSP().then(() => _refreshStaffRoleDropdowns()).catch(()=>{});
   const staff=getStaff();
   const sa=isSuperAdmin();
   const mgr=currentUser.role==='hrmanager';
