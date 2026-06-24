@@ -1908,12 +1908,13 @@ function buildViewAsOptions() {
   return opts;
 }
 
-const ROLE_LABEL = { superadmin:'Super Admin', hrmanager:'HR Manager', hr:'HR', teamlead:'Team Lead', analyst:'Analyst', trainee:'Trainee', assistant:'Assistant', sales:'Sales', customerservice:'Customer Service', socialmedia:'Social Media' };
+const ROLE_LABEL = { superadmin:'Super Admin', hrmanager:'HR Manager', hr:'HR', teamlead:'Team Lead', analyst:'Analyst', trainee:'Trainee', assistant:'Assistant', sales:'Sales', customerservice:'Customer Service', socialmedia:'Social Media', opsmanager:'Ops Manager' };
 const ANALYST_ROLES = ['analyst','teamlead']; // roles that get Files tab
 const CHECKIN_ROLES = ['manager','hr','teamlead','analyst','trainee','assistant','sales','customerservice','socialmedia']; // all check in except superadmin
 const DASHBOARD_ROLES = ['manager','hr','teamlead','assistant']; // see dashboard
 const ADMIN_ROLES = ['manager','superadmin']; // see admin panel
 
+function isOpsManager()    { return currentUser&&(_realRole||currentUser.role)==='opsmanager'; }
 function isSuperAdmin()    { 
   if (_previewRole) return false; // during preview, act as preview role only
   return currentUser&&(_realRole||currentUser.role)==='superadmin'; 
@@ -2019,6 +2020,10 @@ const DEFAULT_PERMISSIONS = {
   },
   accountant: {
     tabs: { checkin:true, leave:true, dashboard:false, admin:false, files:false, myfiles:false, myteam:false, eod:false, performance:false, othertasks:false, feedback:false, profile:true },
+    features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canApproveLeave:false, canSeeLeaveBalance:false, canSeeTeamLeaveBalances:false, canSeeAllFiles:false, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:false }
+  },
+  opsmanager: {
+    tabs: { checkin:true, leave:true, eod:true, dashboard:false, admin:false, files:false, myfiles:false, myteam:false, performance:false, othertasks:false, feedback:false, profile:true },
     features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canApproveLeave:false, canSeeLeaveBalance:false, canSeeTeamLeaveBalances:false, canSeeAllFiles:false, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:false }
   },
 };
@@ -3393,10 +3398,14 @@ function tapCard(key, row) {
     const cov = getCoverage();
     rows = dayRecs.filter(r => r.status==='leave').map(r => {
       const assigned = cov[date+'_'+r.name];
+      const isNCR = assigned === '_ncr';
+      const statusText = isNCR ? 'No cover required' : (assigned ? 'Cover: '+esc(assigned) : 'Unassigned');
+      const statusColor = isNCR ? 'var(--text-3)' : (assigned ? 'var(--success)' : 'var(--danger)');
       return `<div style="display:flex;align-items:center;gap:6px;padding:7px 0;border-bottom:1px solid var(--border)">
         <div style="font-size:13px;font-weight:600;flex:1">${esc(r.name)}</div>
-        <div style="font-size:12px;color:${assigned?'var(--success)':'var(--danger)'}">${assigned?'Cover: '+esc(assigned):'Unassigned'}</div>
+        <div style="font-size:12px;color:${statusColor}">${statusText}</div>
         <button onclick="assignCover('${r.name.replace(/'/g,"\\'")}','${date}')" style="font-size:11px;padding:2px 8px;border-radius:4px;border:1px solid var(--border);background:var(--surface-2);cursor:pointer">${assigned?'Change':'Assign'}</button>
+        ${!isNCR?`<button onclick="setNocover('${r.name.replace(/'/g,"\\'")}','${date}')" style="font-size:11px;padding:2px 8px;border-radius:4px;border:1px solid var(--border);background:var(--surface-2);cursor:pointer;color:var(--text-3)">No cover</button>`:''}
       </div>`;
     });
     title = 'Coverage'; emptyMsg = 'No leave today ✓';
@@ -3557,7 +3566,8 @@ function renderMetrics() {
   const eodMissing   = eodTotal - eodCount;
   const coverage     = typeof getCoverage==='function' ? getCoverage() : {};
   const onLeaveRecs  = allRecs.filter(r=>r.date===date&&r.status==='leave');
-  const unassignedCover = onLeaveRecs.filter(r=>!coverage[date+'_'+r.name]).length;
+  const unassignedCover = onLeaveRecs.filter(r=>{const v=coverage[date+'_'+r.name]; return !v || v==='';}).length;
+  const ncrCover = onLeaveRecs.filter(r=>coverage[date+'_'+r.name]==='_ncr').length;
 
   const _restoreKey = _activeMetricCard;
   const _restoreRow = _activeMetricRow;
@@ -3627,7 +3637,7 @@ function renderMetrics() {
       patterns.length?'border-color:#F59E0B;background:#FFFBEB;':'');
     r3 += metCard('coverage', 3, '🔄 Coverage', unassignedCover,
       unassignedCover?'var(--danger)':'var(--success)',
-      unassignedCover?'tap to manage':'all assigned ✓',
+      unassignedCover?(unassignedCover+' unresolved'):(ncrCover?'all resolved ✓':'all assigned ✓'),
       unassignedCover?'border-color:#FECACA;':'');
     r3 += isSuperAdmin()
       ? metCard('suspicious', 3, '🔍 Suspicious', suspicious.length,
@@ -7818,10 +7828,10 @@ function getCoverage() { return LS.get('ci_coverage') || {}; }
 function saveCoverage(c) { LS.set('ci_coverage', c); }
 
 function assignCover(absenteeName, date) {
-  const staff = getStaff().filter(s => s.role === 'staff' && s.name !== absenteeName);
+  const staff = getStaff().filter(s => s.role !== 'superadmin' && s.name !== absenteeName);
   const coverage = getCoverage();
   const key = date + '_' + absenteeName;
-  const current = coverage[key] || '';
+  const current = coverage[key] && coverage[key] !== '_ncr' ? coverage[key] : '';
 
   const options = staff.map(s =>
     `<option value="${esc(s.name)}" ${current===s.name?'selected':''}>${esc(s.name)}</option>`
@@ -7842,6 +7852,15 @@ function assignCover(absenteeName, date) {
     </div>
   </div>`;
   document.body.appendChild(div);
+}
+
+function setNocover(absenteeName, date) {
+  const coverage = getCoverage();
+  coverage[date+'_'+absenteeName] = '_ncr';
+  saveCoverage(coverage);
+  showToast('Marked as no cover required for ' + absenteeName.split(' ')[0] + '.', 'ok');
+  // Re-open the coverage expand to refresh
+  tapCard('coverage', 3);
 }
 
 function saveCoverAssign(absenteeName, date, coverName, btn) {

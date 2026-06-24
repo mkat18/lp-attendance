@@ -1589,7 +1589,7 @@ function buildViewAsOptions() {
   return opts;
 }
 
-const ROLE_LABEL = { superadmin:'Super Admin', hrmanager:'HR Manager', hr:'HR', teamlead:'Team Lead', analyst:'Analyst', trainee:'Trainee', assistant:'Assistant', sales:'Sales', customerservice:'Customer Service', socialmedia:'Social Media' };
+const ROLE_LABEL = { superadmin:'Super Admin', hrmanager:'HR Manager', hr:'HR', teamlead:'Team Lead', analyst:'Analyst', trainee:'Trainee', assistant:'Assistant', sales:'Sales', customerservice:'Customer Service', socialmedia:'Social Media', opsmanager:'Ops Manager' };
 const ANALYST_ROLES = ['analyst','teamlead']; // roles that get Files tab
 const CHECKIN_ROLES = ['manager','hr','teamlead','analyst','trainee','assistant','sales','customerservice','socialmedia']; // all check in except superadmin
 const DASHBOARD_ROLES = ['manager','hr','teamlead','assistant']; // see dashboard
@@ -1606,6 +1606,7 @@ function isManager()       {
 function isHR()            { return currentUser&&currentUser.role==='hr'; }
 function isAssistant()     { return currentUser&&currentUser.role==='assistant'; }
 function isTeamLead()      { return currentUser&&currentUser.role==='teamlead'; }
+function isOpsManager()    { return currentUser&&currentUser.role==='opsmanager'; }
 function isAnalyst()       { return currentUser&&currentUser.role==='analyst'; }
 function isTrainee()       { return currentUser&&currentUser.role==='trainee'; }
 function canSeeFiles()     { return currentUser&&(ANALYST_ROLES.includes(currentUser.role)||isSuperAdmin()); }
@@ -1699,6 +1700,10 @@ const DEFAULT_PERMISSIONS = {
   accountant: {
     tabs: { checkin:true, leave:true, dashboard:false, admin:false, files:false, myfiles:false, myteam:false, eod:false, performance:false, othertasks:false, feedback:false, profile:true },
     features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canApproveLeave:false, canSeeLeaveBalance:false, canSeeTeamLeaveBalances:false, canSeeAllFiles:false, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:false }
+  },
+  opsmanager: {
+    tabs: { checkin:false, leave:false, dashboard:false, admin:false, files:false, myfiles:false, myteam:false, eod:false, performance:true, othertasks:false, feedback:false, profile:true },
+    features: { canBreak:false, canClockOut:false, requiresSelfie:false, requiresLocation:false, canApplyLeave:false, canApproveLeave:false, canSeeLeaveBalance:false, canSeeTeamLeaveBalances:false, canSeeAllFiles:false, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:false }
   },
 };
 
@@ -10913,9 +10918,13 @@ let _perfDays = 7;
 let _myTeamNames = []; // shared for My Team filter functions
 
 function renderPerformanceScreen() {
-  if (!isTeamLead()) return;
   const el = document.getElementById('perfContent');
   if (!el) return;
+
+  // Ops Manager sees all analysts + by team toggle
+  if (isOpsManager()) { renderOpsPerformance(el); return; }
+
+  if (!isTeamLead()) return;
 
   const myTeam = getTeamForTL(currentUser.name);
   if (myTeam.length === 0) {
@@ -11042,6 +11051,118 @@ function renderPerformanceScreen() {
     </div>`;
 }
 
+// ── Ops Manager performance view ──────────────────────────────────────────
+let _opsPerfView = 'analyst'; // 'analyst' | 'team'
+
+function renderOpsPerformance(el) {
+  const allStaff = getStaff();
+  const analysts = allStaff.filter(s => s.role === 'analyst' || s.role === 'trainee');
+  const teamLeads = allStaff.filter(s => s.role === 'teamlead');
+  const fmt$ = v => '$' + Math.round(v).toLocaleString('en-AU');
+
+  const toggleBtns = `<div style="display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap">
+    <button onclick="setOpsPerfView('analyst',this)"
+      style="padding:7px 16px;border-radius:50px;border:1.5px solid ${_opsPerfView==='analyst'?'var(--brand)':'var(--border)'};
+      background:${_opsPerfView==='analyst'?'var(--brand-light)':'var(--surface-2)'};
+      color:${_opsPerfView==='analyst'?'var(--brand)':'var(--text-2)'};font-size:13px;font-weight:${_opsPerfView==='analyst'?'700':'400'};cursor:pointer">
+      👤 By analyst
+    </button>
+    <button onclick="setOpsPerfView('team',this)"
+      style="padding:7px 16px;border-radius:50px;border:1.5px solid ${_opsPerfView==='team'?'var(--brand)':'var(--border)'};
+      background:${_opsPerfView==='team'?'var(--brand-light)':'var(--surface-2)'};
+      color:${_opsPerfView==='team'?'var(--brand)':'var(--text-2)'};font-size:13px;font-weight:${_opsPerfView==='team'?'700':'400'};cursor:pointer">
+      👥 By team
+    </button>
+    <div style="margin-left:auto;display:flex;gap:6px">
+      ${[7,14,30,60,90,180].map(d=>`<button onclick="setPerfDays(${d},this)"
+        style="padding:6px 12px;border-radius:50px;border:1.5px solid ${_perfDays===d?'var(--brand)':'var(--border)'};
+        background:${_perfDays===d?'var(--brand-light)':'var(--surface-2)'};
+        color:${_perfDays===d?'var(--brand)':'var(--text-2)'};font-size:12px;cursor:pointer">
+        ${d}d
+      </button>`).join('')}
+    </div>
+  </div>`;
+
+  if (_opsPerfView === 'analyst') {
+    const perfData = analysts
+      .map(a => calcPersonPerformance(a.name, _perfDays))
+      .sort((a,b) => {const o={red:0,amber:1,green:2}; return o[a.pulse]-o[b.pulse];});
+
+    const rows = perfData.map(p => `
+      <tr style="border-bottom:1px solid var(--border)">
+        <td style="padding:8px 0;font-weight:600;font-size:13px">
+          <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${p.pulse==='green'?'var(--success)':p.pulse==='amber'?'var(--warn)':'var(--danger)'};margin-right:6px"></span>
+          ${esc(p.name)}
+        </td>
+        <td style="padding:8px;text-align:center;font-size:13px">${p.settled}</td>
+        <td style="padding:8px;text-align:center;font-size:13px">${p.inProgress}</td>
+        <td style="padding:8px;text-align:center;font-size:13px">${fmt$(p.settledVal)}</td>
+        <td style="padding:8px;text-align:center;font-size:13px;color:${p.pulse==='red'?'var(--danger)':p.pulse==='amber'?'var(--warn)':'inherit'}">${p.alerts.length?p.alerts[0].msg:'—'}</td>
+      </tr>`).join('');
+
+    el.innerHTML = toggleBtns + `
+      <div class="card">
+        <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">All analysts — last ${_perfDays} days</div>
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+          <thead><tr style="border-bottom:2px solid var(--border)">
+            <th style="padding:6px 0;text-align:left;font-size:11px;color:var(--text-3);font-weight:600">Analyst</th>
+            <th style="padding:6px 8px;text-align:center;font-size:11px;color:var(--text-3);font-weight:600">Settled</th>
+            <th style="padding:6px 8px;text-align:center;font-size:11px;color:var(--text-3);font-weight:600">In progress</th>
+            <th style="padding:6px 8px;text-align:center;font-size:11px;color:var(--text-3);font-weight:600">Value settled</th>
+            <th style="padding:6px 8px;text-align:center;font-size:11px;color:var(--text-3);font-weight:600">Top alert</th>
+          </tr></thead>
+          <tbody>${rows || '<tr><td colspan="5" style="padding:16px;text-align:center;color:var(--text-3)">No analyst data yet</td></tr>'}</tbody>
+        </table>
+      </div>`;
+  } else {
+    // By team
+    const teamRows = teamLeads.map(tl => {
+      const teamNames = getTeamForTL(tl.name);
+      const teamAnalysts = analysts.filter(a => teamNames.includes(a.name));
+      const teamPerf = teamAnalysts.map(a => calcPersonPerformance(a.name, _perfDays));
+      const totalSettled   = teamPerf.reduce((s,p)=>s+p.settled,0);
+      const totalProgress  = teamPerf.reduce((s,p)=>s+p.inProgress,0);
+      const totalVal       = teamPerf.reduce((s,p)=>s+p.settledVal,0);
+      const reds   = teamPerf.filter(p=>p.pulse==='red').length;
+      const ambers = teamPerf.filter(p=>p.pulse==='amber').length;
+      const pulse  = reds>0?'red':ambers>0?'amber':'green';
+      return `<tr style="border-bottom:1px solid var(--border)">
+        <td style="padding:8px 0;font-weight:600;font-size:13px">
+          <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${pulse==='green'?'var(--success)':pulse==='amber'?'var(--warn)':'var(--danger)'};margin-right:6px"></span>
+          ${esc(tl.name)}
+        </td>
+        <td style="padding:8px;text-align:center;font-size:12px;color:var(--text-3)">${teamAnalysts.length} analyst${teamAnalysts.length!==1?'s':''}</td>
+        <td style="padding:8px;text-align:center;font-size:13px">${totalSettled}</td>
+        <td style="padding:8px;text-align:center;font-size:13px">${totalProgress}</td>
+        <td style="padding:8px;text-align:center;font-size:13px">${fmt$(totalVal)}</td>
+        <td style="padding:8px;text-align:center;font-size:12px">${reds>0?`<span style="color:var(--danger)">${reds} 🔴</span>`:''}${ambers>0?` <span style="color:var(--warn)">${ambers} ⚠️</span>`:''}</td>
+      </tr>`;
+    }).join('');
+
+    el.innerHTML = toggleBtns + `
+      <div class="card">
+        <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">All teams — last ${_perfDays} days</div>
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+          <thead><tr style="border-bottom:2px solid var(--border)">
+            <th style="padding:6px 0;text-align:left;font-size:11px;color:var(--text-3);font-weight:600">Team Lead</th>
+            <th style="padding:6px 8px;text-align:center;font-size:11px;color:var(--text-3);font-weight:600">Team size</th>
+            <th style="padding:6px 8px;text-align:center;font-size:11px;color:var(--text-3);font-weight:600">Settled</th>
+            <th style="padding:6px 8px;text-align:center;font-size:11px;color:var(--text-3);font-weight:600">In progress</th>
+            <th style="padding:6px 8px;text-align:center;font-size:11px;color:var(--text-3);font-weight:600">Value settled</th>
+            <th style="padding:6px 8px;text-align:center;font-size:11px;color:var(--text-3);font-weight:600">Alerts</th>
+          </tr></thead>
+          <tbody>${teamRows || '<tr><td colspan="6" style="padding:16px;text-align:center;color:var(--text-3)">No teams set up yet</td></tr>'}</tbody>
+        </table>
+      </div>`;
+  }
+}
+
+function setOpsPerfView(view) {
+  _opsPerfView = view;
+  const el = document.getElementById('perfContent');
+  if (el) renderOpsPerformance(el);
+}
+
 function setPerfDays(days, btn) {
   _perfDays = days;
   renderPerformanceScreen();
@@ -11056,7 +11177,31 @@ window.renderMyTeam = function() {
   if (!myteamEl) return;
   const myTeamNames = getTeamForTL(currentUser.name);
   if (myTeamNames.length === 0) return;
+
+  // ── Coverage section (informational, read-only for TL) ────────────────
   renderPerformancePulse(myteamEl, myTeamNames);
+
+  const coverage = typeof getCoverage === 'function' ? getCoverage() : {};
+  const dayRecs  = typeof getRecords === 'function' ? getRecords().filter(r => r.date === today) : [];
+  const onLeave  = dayRecs.filter(r => myTeamNames.includes(r.name) && r.status === 'leave');
+  if (!onLeave.length) return;
+
+  const coverDiv = document.createElement('div');
+  coverDiv.className = 'card';
+  coverDiv.style.marginTop = '12px';
+  coverDiv.innerHTML = `
+    <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">🔄 Today's coverage</div>
+    ${onLeave.map(r => {
+      const v = coverage[today+'_'+r.name];
+      const isNCR = v === '_ncr';
+      const label = isNCR ? 'No cover required' : (v ? `Covered by <strong>${esc(v)}</strong>` : '⚠ Unassigned — contact your manager');
+      const color = isNCR ? 'var(--text-3)' : (v ? 'var(--success)' : 'var(--danger)');
+      return `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)">
+        <span style="font-size:13px;font-weight:600;flex:1">${esc(r.name)} <span style="font-size:11px;color:var(--text-3);font-weight:400">on leave</span></span>
+        <span style="font-size:12px;color:${color}">${label}</span>
+      </div>`;
+    }).join('')}`;
+  myteamEl.appendChild(coverDiv);
 };
 
 </script>
