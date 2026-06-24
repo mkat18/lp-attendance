@@ -4666,10 +4666,11 @@ function filterMyLeaveHistory() {
   const el = document.getElementById('myLeaveHistoryTable');
   if (!el) return;
   const reqs = _leaveRequests.filter(r => {
-    const sd = (r.StartDate||'').substring(0,10);
+    const start = (r.StartDate||'').substring(0,10);
+    const end   = (r.EndDate||r.StartDate||'').substring(0,10) || start;
     return r.Title === currentUser.name &&
-      (!from || sd >= from) &&
-      (!to || sd <= to);
+      (!from || end   >= from) &&
+      (!to   || start <= to);
   });
   if (!reqs.length) { el.innerHTML = '<div style="font-size:13px;color:var(--text-3)">No leave in this period.</div>'; return; }
   el.innerHTML = `<table style="width:100%;font-size:13px;border-collapse:collapse">
@@ -5157,12 +5158,13 @@ function filterTeamLeaveBalances() {
 
     if (useDateRange) {
       const reqs = _leaveRequests.filter(r => {
-        // Strip time component from SP date (handles both '2026-06-25' and '2026-06-25T00:00:00Z')
-        const sd = (r.StartDate || '').substring(0, 10);
+        const start = (r.StartDate||'').substring(0,10);
+        const end   = (r.EndDate||r.StartDate||'').substring(0,10) || start;
+        // Overlap check: leave overlaps range if it starts before range end AND ends after range start
         return r.Title === s.name &&
-          (r.Status || '').toLowerCase() === 'approved' &&
-          (!from || sd >= from) &&
-          (!to   || sd <= to);
+          (r.Status||'').toLowerCase() === 'approved' &&
+          (!to   || start <= to) &&
+          (!from || end   >= from);
       });
       annualUsed = reqs.filter(r => ['annual leave','forced leave'].includes((r.LeaveType||'').toLowerCase())).reduce((a,r)=>a+parseFloat(r.DaysRequested||0),0);
       sickUsed   = reqs.filter(r => (r.LeaveType||'').toLowerCase() === 'sick leave').reduce((a,r)=>a+parseFloat(r.DaysRequested||0),0);
@@ -5228,7 +5230,7 @@ function filterLeaveRequests() {  const status = document.getElementById('leaveF
   if (status) reqs = reqs.filter(r => r.Status === status);
   if (type)   reqs = reqs.filter(r => r.LeaveType === type);
   if (name)   reqs = reqs.filter(r => r.Title === name);
-  if (filterFrom) reqs = reqs.filter(r => (r.StartDate||'').substring(0,10) >= filterFrom);
+  if (filterFrom) reqs = reqs.filter(r => (r.EndDate||r.StartDate||'').substring(0,10) >= filterFrom);
   if (filterTo)   reqs = reqs.filter(r => (r.StartDate||'').substring(0,10) <= filterTo);
   reqs = reqs.slice(0, 100);
 
