@@ -2056,9 +2056,14 @@ function getPerms() {
   // Use SP permissions if fully loaded, otherwise defaults
   const spPerms = _permissions[role];
   const defaults = DEFAULT_PERMISSIONS[role] || DEFAULT_PERMISSIONS.staff;
-  if (spPerms && spPerms.tabs && spPerms.features &&
-      Object.keys(spPerms.tabs).length >= 10 &&
-      Object.keys(spPerms.features).length >= 10) return spPerms;
+  // Use SP permissions if they have any tabs or features saved
+  if (spPerms && (spPerms.tabs || spPerms.features)) {
+    // Merge SP over defaults so missing keys fall back gracefully
+    return {
+      tabs:     { ...(defaults.tabs||{}),     ...(spPerms.tabs||{}) },
+      features: { ...(defaults.features||{}), ...(spPerms.features||{}) }
+    };
+  }
   return defaults;
 }
 
