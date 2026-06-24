@@ -1209,6 +1209,24 @@ tr.flagged-row:hover td { background: #FFEAEA; }
     <button class="modal-cancel" onclick="closeTempPinModal()">Done — I've noted the PIN</button>
   </div>
 </div>
+<div id="undoLeaveModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:200;align-items:center;justify-content:center;backdrop-filter:blur(2px)">
+  <div class="modal-box">
+    <div class="modal-title">↩ Undo leave</div>
+    <div class="modal-sub" id="undoLeaveDesc"></div>
+    <div style="margin:12px 0">
+      <label style="font-size:12px;font-weight:600;color:var(--text-2);display:block;margin-bottom:4px">Reason for reverting <span style="color:var(--danger)">*</span></label>
+      <textarea id="undoLeaveReason" rows="3" placeholder="e.g. Staff did not end up taking leave" style="width:100%;font-size:13px;padding:8px;border:1.5px solid var(--border);border-radius:var(--radius-sm);resize:vertical"></textarea>
+    </div>
+    <div style="margin-bottom:16px">
+      <label style="font-size:12px;font-weight:600;color:var(--text-2);display:block;margin-bottom:4px">Type <strong>UNDO</strong> to confirm <span style="color:var(--danger)">*</span></label>
+      <input id="undoLeaveConfirmWord" type="text" placeholder="UNDO" oninput="checkUndoReady()" style="width:100%;font-size:13px;padding:8px;border:1.5px solid var(--border);border-radius:var(--radius-sm);text-transform:uppercase"/>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button id="undoLeaveSubmitBtn" onclick="submitUndoLeave()" disabled style="flex:1;padding:10px;border:none;border-radius:var(--radius-sm);background:var(--danger);color:#fff;font-size:13px;font-weight:700;cursor:pointer;opacity:.4">Revert to Pending</button>
+      <button class="modal-cancel" onclick="closeUndoLeaveModal()">Cancel</button>
+    </div>
+  </div>
+</div>
 <div id="onBehalfModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:200;align-items:center;justify-content:center;backdrop-filter:blur(2px)">
   <div class="modal-box">
     <div class="modal-title">Submit leave on behalf</div>
@@ -4777,7 +4795,7 @@ async function renderLeaveScreen() {
         </select>
         ${['Today','Yesterday','This week','This month'].map(p=>`<button id="lbBtn_${p.replace(/ /g,'_')}" onclick="setLeaveBalPreset('${p}',this)" style="font-size:12px;padding:4px 9px;border-radius:50px;border:1.5px solid var(--border);background:var(--surface-2);color:var(--text-2);cursor:pointer">${p}</button>`).join('')}
         <button id="lbBtn_custom" onclick="toggleLeaveBalCustomRange(this)" style="font-size:12px;padding:4px 9px;border-radius:50px;border:1.5px solid var(--border);background:var(--surface-2);color:var(--text-2);cursor:pointer">📅 Custom</button>
-        <button onclick="document.getElementById('leaveBalFrom').value='';document.getElementById('leaveBalTo').value='';clearLeaveBalPresetBtns();filterTeamLeaveBalances()" style="font-size:12px;padding:4px 9px;border-radius:50px;border:1.5px solid var(--border);background:transparent;cursor:pointer;color:var(--text-3)">Clear</button>
+        <button onclick="_leaveBalDateFrom='';_leaveBalDateTo='';document.getElementById('leaveBalFrom').value='';document.getElementById('leaveBalTo').value='';clearLeaveBalPresetBtns();filterTeamLeaveBalances()" style="font-size:12px;padding:4px 9px;border-radius:50px;border:1.5px solid var(--border);background:transparent;cursor:pointer;color:var(--text-3)">Clear</button>
       </div>
       <div id="leaveBalCustomRange" style="display:none;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
         <span style="font-size:12px;color:var(--text-3)">From</span>
@@ -4819,14 +4837,14 @@ function toggleHalfDaySession() {
 }
 
 function clearLeavePresetBtns() {
-  ['Today','Yesterday','This_week','This_month'].forEach(k => {
-    const b=document.getElementById('lfBtn_'+k);
+  ['lfBtn_Today','lfBtn_Yesterday','lfBtn_This_week','lfBtn_This_month','lfBtn_custom'].forEach(id => {
+    const b=document.getElementById(id);
     if(b){b.style.background='var(--surface-2)';b.style.borderColor='var(--border)';b.style.color='var(--text-2)';b.style.fontWeight='400';}
   });
 }
 function clearLeaveBalPresetBtns() {
-  ['Today','Yesterday','This_week','This_month'].forEach(k => {
-    const b=document.getElementById('lbBtn_'+k);
+  ['lbBtn_Today','lbBtn_Yesterday','lbBtn_This_week','lbBtn_This_month','lbBtn_custom'].forEach(id => {
+    const b=document.getElementById(id);
     if(b){b.style.background='var(--surface-2)';b.style.borderColor='var(--border)';b.style.color='var(--text-2)';b.style.fontWeight='400';}
   });
 }
@@ -4890,13 +4908,14 @@ function setLeaveBalPreset(preset, btn) {
   const d = new Date();
   const fmt = d2 => d2.toISOString().split('T')[0];
   _leaveBalDateFrom = today; _leaveBalDateTo = today;
-  if (preset==='Yesterday')  { const y=new Date(d); y.setDate(d.getDate()-1); _leaveBalDateFrom=_leaveBalDateTo=fmt(y); }
+  if      (preset==='Yesterday')  { const y=new Date(d); y.setDate(d.getDate()-1); _leaveBalDateFrom=_leaveBalDateTo=fmt(y); }
   else if (preset==='This week')  { const day=d.getDay()||7; const m=new Date(d); m.setDate(d.getDate()-day+1); _leaveBalDateFrom=fmt(m); _leaveBalDateTo=today; }
   else if (preset==='This month') { _leaveBalDateFrom=fmt(new Date(d.getFullYear(),d.getMonth(),1)); _leaveBalDateTo=today; }
+  // 'Today' uses the defaults already set above
   const fromEl=document.getElementById('leaveBalFrom');
   const toEl=document.getElementById('leaveBalTo');
   if(fromEl) fromEl.value=_leaveBalDateFrom;
-  if(toEl) toEl.value=_leaveBalDateTo;
+  if(toEl)   toEl.value=_leaveBalDateTo;
   clearLeaveBalPresetBtns();
   const customDiv=document.getElementById('leaveBalCustomRange');
   if(customDiv) customDiv.style.display='none';
@@ -4904,16 +4923,54 @@ function setLeaveBalPreset(preset, btn) {
   filterTeamLeaveBalances();
 }
 
-// ── Undo leave — reverts back to Pending ─────────────────────────────────
-async function undoLeave(id) {
-  if (!confirm('Revert this leave request back to Pending?\n\nThe leave balance will be restored automatically.')) return;
-  const r = _leaveRequests.find(x => x.Id===id);
+// ── Undo leave modal ──────────────────────────────────────────────────────
+let _undoLeaveId = null;
+
+function undoLeave(id) {
+  const r = _leaveRequests.find(x => x.Id === id);
+  if (!r) return;
+  _undoLeaveId = id;
+  document.getElementById('undoLeaveDesc').innerHTML =
+    `Reverting <strong>${esc(r.Title)}</strong>'s <strong>${esc(r.LeaveType)}</strong>
+     (${fmtDate(r.StartDate)}${r.EndDate&&r.EndDate!==r.StartDate?' → '+fmtDate(r.EndDate):''}, ${r.DaysRequested||'?'} day${r.DaysRequested!==1?'s':''})
+     back to <span style="color:var(--warn);font-weight:600">Pending</span>.`;
+  document.getElementById('undoLeaveReason').value = '';
+  document.getElementById('undoLeaveConfirmWord').value = '';
+  document.getElementById('undoLeaveSubmitBtn').disabled = true;
+  document.getElementById('undoLeaveSubmitBtn').style.opacity = '.4';
+  const modal = document.getElementById('undoLeaveModal');
+  modal.style.display = 'flex';
+  setTimeout(() => document.getElementById('undoLeaveReason').focus(), 100);
+}
+
+function checkUndoReady() {
+  const word   = (document.getElementById('undoLeaveConfirmWord')?.value||'').trim().toUpperCase();
+  const reason = (document.getElementById('undoLeaveReason')?.value||'').trim();
+  const ready  = word === 'UNDO' && reason.length >= 3;
+  const btn    = document.getElementById('undoLeaveSubmitBtn');
+  if (btn) { btn.disabled = !ready; btn.style.opacity = ready ? '1' : '.4'; }
+}
+
+function closeUndoLeaveModal() {
+  document.getElementById('undoLeaveModal').style.display = 'none';
+  _undoLeaveId = null;
+}
+
+async function submitUndoLeave() {
+  if (!_undoLeaveId) return;
+  const reason = (document.getElementById('undoLeaveReason')?.value||'').trim();
+  const r = _leaveRequests.find(x => x.Id === _undoLeaveId);
   if (!r) return;
   const isTLonly = isTeamLead() && !isManager() && !isSuperAdmin();
   if (isTLonly && !getTeamForTL(currentUser.name).includes(r.Title)) {
     showToast('You can only undo leave for your own team.', 'error'); return;
   }
-  const ok = await spPatch(`LeaveRequests(${id})`, { Status:'Pending', ApprovedBy:'', ApprovalNote:'' });
+  const btn = document.getElementById('undoLeaveSubmitBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Reverting…'; }
+  const ok = await spPatch(`LeaveRequests(${_undoLeaveId})`, {
+    Status: 'Pending', ApprovedBy: '', ApprovalNote: reason
+  });
+  closeUndoLeaveModal();
   if (ok !== false) {
     showToast('Leave reverted to Pending ✓', 'ok');
     await loadLeaveRequestsFromSP();
