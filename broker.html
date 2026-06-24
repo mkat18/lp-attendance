@@ -8901,11 +8901,71 @@ function renderFilesArchive(el, allFiles) {
     return;
   }
 
+  const canRestoreAny = isTeamLead() || isSuperAdmin();
   el.innerHTML = `
     <div style="font-size:13px;color:var(--text-3);margin-bottom:10px">${archived.length} settled / closed file${archived.length!==1?'s':''}</div>
     <div class="card" style="padding:0;overflow:hidden">
-      ${archived.map(f => fileCard(f, false)).join('<div style="height:1px;background:var(--border)"></div>')}
+      ${archived.map(f => {
+        const sc = FILE_STATUS_COLORS[f.status] || {bg:'#F3F4F6',color:'#374151'};
+        const daysAgo = Math.floor((Date.now()-(f.updatedTs||0))/86400000);
+        const ageLabel = daysAgo===0?'today':daysAgo===1?'yesterday':daysAgo+'d ago';
+        const canRestoreThis = canRestoreAny || f.owner===currentUser.name;
+        return `<div style="padding:12px 14px;border-bottom:1px solid var(--border)">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:6px">
+            <div style="flex:1;min-width:0">
+              <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:2px">${esc(f.client)}</div>
+              <div style="font-size:11px;color:var(--text-3)">📋 ${esc(f.appType||'')}${f.lender?' · 🏦 '+esc(f.lender):''} · 👤 ${esc(f.owner)} · ${ageLabel}</div>
+            </div>
+            <span style="background:${sc.bg};color:${sc.color};border-radius:50px;padding:3px 9px;font-size:11px;font-weight:600;white-space:nowrap;flex-shrink:0">${esc(f.status)}</span>
+          </div>
+          ${canRestoreThis?`<button onclick="openRestoreModal('${f.id}')" style="font-size:12px;padding:4px 12px;border-radius:var(--radius-sm);border:1.5px solid var(--brand);background:var(--brand-light);color:var(--brand);cursor:pointer;font-weight:600">↩ Restore to active</button>`:''}
+        </div>`;
+      }).join('')}
     </div>`;
+}
+
+function openRestoreModal(fileId) {
+  const files = getFileEntries();
+  const f = files.find(x => x.id === fileId);
+  if (!f) return;
+  const activeStages = FILE_STATUSES.filter(s => !['Settlement','Withdrawn','Declined'].includes(s));
+  const existing = document.getElementById('_restoreModal');
+  if (existing) existing.remove();
+  const div = document.createElement('div');
+  div.id = '_restoreModal';
+  div.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.6);z-index:300;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)';
+  div.innerHTML = `<div style="background:var(--surface);border-radius:20px;padding:1.5rem;width:calc(100% - 2rem);max-width:380px;box-shadow:0 20px 60px rgba(0,0,0,.25)">
+    <div style="font-size:17px;font-weight:700;color:var(--text);margin-bottom:4px">↩ Restore file</div>
+    <div style="font-size:13px;color:var(--text-3);margin-bottom:1rem">${esc(f.client)} — select a stage to restore it to</div>
+    <select id="_restoreStage" style="width:100%;font-size:14px;padding:10px;border-radius:var(--radius-sm);border:1.5px solid var(--border);margin-bottom:1rem">
+      <option value="">— select stage —</option>
+      ${activeStages.map(s=>`<option value="${esc(s)}">${esc(s)}</option>`).join('')}
+    </select>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <button onclick="document.getElementById('_restoreModal').remove()" style="padding:12px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:transparent;color:var(--text-2);font-size:14px;cursor:pointer">Cancel</button>
+      <button onclick="confirmRestore('${fileId}')" style="padding:12px;border-radius:var(--radius-sm);border:none;background:var(--brand);color:#fff;font-size:14px;font-weight:700;cursor:pointer">Restore</button>
+    </div>
+  </div>`;
+  document.body.appendChild(div);
+}
+
+function confirmRestore(fileId) {
+  const stage = document.getElementById('_restoreStage')?.value;
+  if (!stage) { showToast('Please select a stage first.', 'err'); return; }
+  const files = getFileEntries();
+  const idx = files.findIndex(f => f.id === fileId);
+  if (idx < 0) return;
+  files[idx].active = true;
+  files[idx].status = stage;
+  files[idx].closedAt = null;
+  files[idx].settledAt = null;
+  files[idx].updatedTs = Date.now();
+  files[idx].updatedAt = today;
+  saveFileEntries(files);
+  document.getElementById('_restoreModal')?.remove();
+  showToast(files[idx].client + ' restored to ' + stage + ' ✓', 'ok');
+  if (document.getElementById('screen-files')?.classList.contains('active')) renderFilesScreen();
+  if (document.getElementById('screen-myfiles')?.classList.contains('active')) renderMyFilesScreen();
 }
 
 // ── 6. PATCH fileCard — add stale flag, priority badge, quick-status, lender ──
@@ -11178,6 +11238,28 @@ window.renderMyTeam = function() {
   const myTeamNames = getTeamForTL(currentUser.name);
   if (myTeamNames.length === 0) return;
 
+  // ── First priority from yesterday's EOD ────────────────────────────────
+  const yest = new Date(); yest.setDate(yest.getDate()-1);
+  const yesterdayStr = yest.toISOString().split('T')[0];
+  const allEODs = typeof getEODReports === 'function' ? getEODReports() : [];
+  const teamPriorities = myTeamNames
+    .map(name => ({ name, eod: allEODs.find(r => r.name === name && r.date === yesterdayStr) }))
+    .filter(x => x.eod?.firstPriority);
+
+  if (teamPriorities.length > 0) {
+    const priorityDiv = document.createElement('div');
+    priorityDiv.className = 'card';
+    priorityDiv.style.marginTop = '12px';
+    priorityDiv.innerHTML = `
+      <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">📌 Today's priorities (from yesterday's EOD)</div>
+      ${teamPriorities.map(x => `
+        <div style="display:flex;align-items:flex-start;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)">
+          <div style="font-size:13px;font-weight:600;min-width:120px;flex-shrink:0">${esc(x.name.split(' ')[0])}</div>
+          <div style="font-size:13px;color:var(--text-2)">${esc(x.eod.firstPriority)}</div>
+        </div>`).join('')}`;
+    myteamEl.appendChild(priorityDiv);
+  }
+
   // ── Coverage section (informational, read-only for TL) ────────────────
   renderPerformancePulse(myteamEl, myTeamNames);
 
@@ -11202,6 +11284,41 @@ window.renderMyTeam = function() {
       </div>`;
     }).join('')}`;
   myteamEl.appendChild(coverDiv);
+
+  // ── Checklist summary ─────────────────────────────────────────────────
+  const allFiles = typeof getFileEntries === 'function' ? getFileEntries() : [];
+  const atOrPastReady = ['Ready to Submit', ...(typeof STAGES_AFTER_READY !== 'undefined' ? STAGES_AFTER_READY : [])];
+  const teamFiles = allFiles.filter(f => myTeamNames.includes(f.owner) && atOrPastReady.includes(f.status));
+
+  if (teamFiles.length > 0) {
+    const clDiv = document.createElement('div');
+    clDiv.className = 'card';
+    clDiv.style.marginTop = '12px';
+
+    // Group by person
+    const byPerson = {};
+    teamFiles.forEach(f => {
+      if (!byPerson[f.owner]) byPerson[f.owner] = {submitted:[], pending:[]};
+      if (f.checklistSubmitted) byPerson[f.owner].submitted.push(f);
+      else byPerson[f.owner].pending.push(f);
+    });
+
+    clDiv.innerHTML = `
+      <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">✅ Submission checklist status</div>
+      ${Object.entries(byPerson).map(([name, {submitted, pending}]) => `
+        <div style="padding:8px 0;border-bottom:1px solid var(--border)">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+            <span style="font-size:13px;font-weight:600">${esc(name.split(' ')[0])}</span>
+            <span style="font-size:12px;color:${pending.length?'var(--danger)':'var(--success)'};font-weight:600">
+              ${submitted.length} done${pending.length?' · '+pending.length+' pending':''}
+            </span>
+          </div>
+          ${pending.length?`<div style="font-size:12px;color:var(--danger)">
+            Pending: ${pending.map(f=>esc(f.client)).join(', ')}
+          </div>`:''}
+        </div>`).join('')}`;
+    myteamEl.appendChild(clDiv);
+  }
 };
 
 </script>
