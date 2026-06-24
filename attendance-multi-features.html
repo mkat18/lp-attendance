@@ -10993,31 +10993,25 @@ function renderEODTaskList() {
     return;
   }
   el.innerHTML = _eodTasks.map((t, i) => `
-    <div style="background:var(--surface-2);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:12px;margin-bottom:8px">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+    <div style="background:var(--surface-2);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:8px">
+      <div style="display:grid;grid-template-columns:1fr auto auto auto;gap:8px;align-items:center;margin-bottom:8px">
         <select onchange="updateEODTask(${i},'type',this.value)"
-          style="flex:1;font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface)">
+          style="font-size:13px;padding:6px 8px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface)">
           <option value="">— task type —</option>
           ${EOD_TASK_TYPES.map(ty=>`<option value="${esc(ty)}" ${t.type===ty?'selected':''}>${esc(ty)}</option>`).join('')}
         </select>
+        <input type="time" value="${t.startTime||''}" onchange="updateEODTask(${i},'startTime',this.value)"
+          title="Start time"
+          style="font-size:13px;padding:6px 8px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);width:110px"/>
+        <input type="time" value="${t.endTime||''}" onchange="updateEODTask(${i},'endTime',this.value)"
+          title="End time"
+          style="font-size:13px;padding:6px 8px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);width:110px"/>
         <button type="button" onclick="removeEODTask(${i})"
           style="background:transparent;border:none;color:var(--text-3);font-size:18px;cursor:pointer;padding:0 4px;line-height:1;flex-shrink:0">✕</button>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
-        <div>
-          <div style="font-size:11px;font-weight:600;color:var(--text-3);margin-bottom:4px">Start time</div>
-          <input type="time" value="${t.startTime||''}" onchange="updateEODTask(${i},'startTime',this.value)"
-            style="width:100%;font-size:14px;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text)"/>
-        </div>
-        <div>
-          <div style="font-size:11px;font-weight:600;color:var(--text-3);margin-bottom:4px">End time</div>
-          <input type="time" value="${t.endTime||''}" onchange="updateEODTask(${i},'endTime',this.value)"
-            style="width:100%;font-size:14px;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text)"/>
-        </div>
-      </div>
       <textarea rows="2" onchange="updateEODTask(${i},'notes',this.value)"
         placeholder="Notes (optional)"
-        style="width:100%;font-size:13px;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);resize:none;background:var(--surface);color:var(--text)">${esc(t.notes||'')}</textarea>
+        style="width:100%;font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);resize:none;background:var(--surface);color:var(--text)">${esc(t.notes||'')}</textarea>
     </div>`).join('');
 }
 
