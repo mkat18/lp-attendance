@@ -968,11 +968,13 @@ tr.flagged-row:hover td { background: #FFEAEA; }
       <input type="text" id="fm_client" placeholder="e.g. Johnson Family"/>
     </div>
     <div class="field">
-      <label>Broker name <span style="color:var(--danger)">*</span></label>
-      <input type="text" id="fm_broker" placeholder="e.g. Sarah Mitchell"/>
+      <label>Broker <span style="color:var(--danger)">*</span></label>
+      <select id="fm_broker" style="font-size:14px">
+        <option value="">— select broker —</option>
+      </select>
     </div>
     <div class="field">
-      <label>Application type</label>
+      <label>Application type <span style="color:var(--danger)">*</span></label>
       <select id="fm_type" style="font-size:14px">
         <option value="Home Loan">Home Loan</option>
         <option value="Refinance">Refinance</option>
@@ -1011,12 +1013,12 @@ tr.flagged-row:hover td { background: #FFEAEA; }
         </select>
       </div>
       <div class="field" style="margin-bottom:0">
-        <label>Lender <span style="font-size:11px;color:var(--text-3)">(optional)</span></label>
+        <label>Lender <span style="color:var(--danger)">*</span></label>
         <input type="text" id="fm_lender" placeholder="e.g. ANZ, CBA…"/>
       </div>
     </div>
-    <div class="field" id="fm_settleDateField" style="display:none">
-      <label>Settlement date</label>
+    <div class="field" id="fm_settleDateField">
+      <label>Settlement date <span style="color:var(--danger)">*</span></label>
       <input type="date" id="fm_settleDate"/>
     </div>
     <div class="field">
@@ -1040,8 +1042,8 @@ tr.flagged-row:hover td { background: #FFEAEA; }
       <textarea id="fm_pending" placeholder="e.g. Waiting on bank statements, need to call client re: rates…" style="width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:14px;color:var(--text);background:var(--surface-2);outline:none;resize:none;min-height:72px;line-height:1.5"></textarea>
       <div id="fm_pending_history" style="display:none;margin-top:6px"></div>
     </div>
-    <div class="field" id="fm_loanAmountField" style="display:none">
-      <label>Loan amount ($) <span style="font-size:11px;color:var(--text-3)">— enter when at Settlement or Unconditionally Approved</span></label>
+    <div class="field" id="fm_loanAmountField">
+      <label>Loan amount ($) <span style="color:var(--danger)">*</span></label>
       <input type="number" id="fm_loanAmount" placeholder="e.g. 650000" min="0" style="font-size:14px"/>
     </div>
     <div class="field" id="fm_ownerField" style="display:none">
@@ -6137,6 +6139,10 @@ async function loadFromSharePoint() {
       loadBrokerFeedbackFromSP(),
       loadOtherTasksFromSP(),
       loadTeamsFromSP(),
+      loadBrokerListFromSP(),
+      loadBrokerAssignmentsFromSP(),
+      loadCRMDataFromSP(),
+      loadCoverageAssignmentsFromSP(),
     ]).catch(e => console.warn('Some SP loads failed:', e));
     // Update EDITABLE_ROLES from loaded roles
     if (_roles.length) EDITABLE_ROLES = _roles.map(r => r.title);
@@ -7801,7 +7807,7 @@ function openFileModal(fileId) {
     if (!entry) return;
     document.getElementById('fileModalTitle').textContent = 'Edit file';
     document.getElementById('fm_client').value = entry.client || '';
-    document.getElementById('fm_broker').value = entry.broker || '';
+    populateBrokerDropdown(entry.broker || '');
     document.getElementById('fm_type').value = entry.appType || 'Home Loan';
     document.getElementById('fm_status').value = entry.status || 'Data Collection';
     document.getElementById('fm_done').value = getNoteLatest(entry.done);
@@ -7828,7 +7834,7 @@ function openFileModal(fileId) {
     // Add mode
     document.getElementById('fileModalTitle').textContent = 'Add client file';
     document.getElementById('fm_client').value = '';
-    document.getElementById('fm_broker').value = '';
+    populateBrokerDropdown('');
     document.getElementById('fm_type').value = 'Home Loan';
     document.getElementById('fm_status').value = 'Data Collection';
     document.getElementById('fm_done').value = '';
@@ -7878,8 +7884,17 @@ function renderExistingAttachments(entry) {
 async function saveFileEntry() {
   const client = document.getElementById('fm_client').value.trim();
   const broker = document.getElementById('fm_broker').value.trim();
-  if (!client) { showToast('Client name is required.','err'); return; }
-  if (!broker) { showToast('Broker name is required.','err'); return; }
+  const lender = document.getElementById('fm_lender')?.value.trim()||'';
+  const settleDate = document.getElementById('fm_settleDate')?.value||'';
+  const loanAmtRaw = document.getElementById('fm_loanAmount')?.value||'';
+  const loanAmount = loanAmtRaw ? parseFloat(loanAmtRaw) : null;
+
+  // All required fields
+  if (!client)     { showToast('Client name is required.','err'); return; }
+  if (!broker)     { showToast('Broker is required.','err'); return; }
+  if (!lender)     { showToast('Lender is required.','err'); return; }
+  if (!settleDate) { showToast('Settlement date is required.','err'); return; }
+  if (!loanAmount) { showToast('Loan amount is required.','err'); return; }
 
   const isTL = isTeamLead();
   const owner = isTL
@@ -7913,9 +7928,6 @@ async function saveFileEntry() {
       return;
     }
   }
-  const loanAmtRaw = document.getElementById('fm_loanAmount') ? document.getElementById('fm_loanAmount').value : '';
-  const loanAmount = loanAmtRaw ? parseFloat(loanAmtRaw) : (existing ? existing.loanAmount : null);
-
   // Build stage history — append if status changed
   let stageHistory = existing ? (existing.stageHistory || []) : [];
   const prevStatus = existing ? existing.status : null;
@@ -11134,6 +11146,12 @@ function renderOpsPerformance(el) {
       color:${_opsPerfView==='team'?'var(--brand)':'var(--text-2)'};font-size:13px;font-weight:${_opsPerfView==='team'?'700':'400'};cursor:pointer">
       👥 By team
     </button>
+    <button onclick="setOpsPerfView('spare',this)"
+      style="padding:7px 16px;border-radius:50px;border:1.5px solid ${_opsPerfView==='spare'?'var(--success)':'var(--border)'};
+      background:${_opsPerfView==='spare'?'var(--success-light)':'var(--surface-2)'};
+      color:${_opsPerfView==='spare'?'var(--success)':'var(--text-2)'};font-size:13px;font-weight:${_opsPerfView==='spare'?'700':'400'};cursor:pointer">
+      ✓ Spare staff
+    </button>
     <div style="margin-left:auto;display:flex;gap:6px">
       ${[7,14,30,60,90,180].map(d=>`<button onclick="setPerfDays(${d},this)"
         style="padding:6px 12px;border-radius:50px;border:1.5px solid ${_perfDays===d?'var(--brand)':'var(--border)'};
@@ -11143,6 +11161,12 @@ function renderOpsPerformance(el) {
       </button>`).join('')}
     </div>
   </div>`;
+
+  if (_opsPerfView === 'spare') {
+    el.innerHTML = toggleBtns;
+    renderOpsSpareStaff(el);
+    return;
+  }
 
   if (_opsPerfView === 'analyst') {
     const perfData = analysts
@@ -11224,6 +11248,110 @@ function setOpsPerfView(view) {
   if (el) renderOpsPerformance(el);
 }
 
+// ── Broker + CRM + Coverage SP (broker portal) ────────────────────────────
+let _brokerListBP = [];
+let _brokerAssignsBP = [];
+let _crmOptionsBP = [];
+let _staffCRMsBP = {};
+let _coverageAssignsBP = [];
+
+async function loadBrokerListFromSP() {
+  try {
+    const res = await spGet(SP_API + "('Brokers')/items?$select=Id,Title&$top=200&$orderby=Title");
+    if (res?.value) { _brokerListBP = res.value.map(b=>({id:b.Id,name:b.Title})); return; }
+  } catch(e){}
+  _brokerListBP = LS.get('ci_brokers') || [];
+}
+
+async function loadBrokerAssignmentsFromSP() {
+  try {
+    const res = await spGet(SP_API + "('BrokerAssignments')/items?$select=Id,Title,BrokerName&$top=500");
+    if (res?.value) { _brokerAssignsBP = res.value.map(r=>({id:r.Id,staffName:r.Title,brokerName:r.BrokerName})); return; }
+  } catch(e){}
+  _brokerAssignsBP = LS.get('ci_broker_assignments') || [];
+}
+
+function getBrokersForUserBP(name) {
+  return _brokerAssignsBP.filter(a=>a.staffName===name).map(a=>a.brokerName);
+}
+
+async function loadCRMDataFromSP() {
+  try {
+    const [crmRes, staffRes] = await Promise.all([
+      spGet(SP_API + "('CRMOptions')/items?$select=Id,Title&$top=100&$orderby=Title"),
+      spGet(SP_API + "('StaffCRMs')/items?$select=Id,Title,CRMList&$top=200"),
+    ]);
+    if (crmRes?.value)  _crmOptionsBP = crmRes.value.map(r=>({id:r.Id,name:r.Title}));
+    if (staffRes?.value) { _staffCRMsBP={}; staffRes.value.forEach(r=>{_staffCRMsBP[r.Title]=(r.CRMList||'').split(',').filter(Boolean);}); }
+  } catch(e){}
+}
+
+function getCRMsForUserBP(name) { return _staffCRMsBP[name] || []; }
+
+async function loadCoverageAssignmentsFromSP() {
+  try {
+    const res = await spGet(SP_API + "('CoverageAssignments')/items?$select=Id,Title,CoverDate,CoverName,AssignedBy,AssignedAt&$top=500");
+    if (res?.value) { _coverageAssignsBP = res.value.map(r=>({id:r.Id,absenteeName:r.Title,date:r.CoverDate,coverName:r.CoverName})); return; }
+  } catch(e){}
+  _coverageAssignsBP = LS.get('ci_coverage_sp') || [];
+}
+
+function getCoverageBP(date) {
+  const result = {};
+  _coverageAssignsBP.filter(r=>r.date===date).forEach(r=>{ result[r.absenteeName]=r.coverName; });
+  return result;
+}
+
+// Populate broker dropdown when file modal opens
+function populateBrokerDropdown(currentBroker) {
+  const sel = document.getElementById('fm_broker');
+  if (!sel) return;
+  const myBrokers = getBrokersForUserBP(currentUser.name);
+  sel.innerHTML = '<option value="">— select broker —</option>' +
+    myBrokers.map(b=>`<option value="${esc(b)}" ${b===currentBroker?'selected':''}>${esc(b)}</option>`).join('');
+  // If no brokers assigned, show all (fallback)
+  if (!myBrokers.length) {
+    sel.innerHTML = '<option value="">— no brokers assigned (contact SA) —</option>' +
+      _brokerListBP.map(b=>`<option value="${esc(b.name)}" ${b.name===currentBroker?'selected':''}>${esc(b.name)}</option>`).join('');
+  }
+}
+
+// ── Ops Manager spare staff (analysts with no broker assigned) ─────────────
+function renderOpsSpareStaff(el) {
+  const allStaff = getStaff();
+  const analysts = allStaff.filter(s => s.role==='analyst' || s.role==='trainee');
+  const spare = analysts.filter(a => getBrokersForUserBP(a.name).length === 0);
+  const active = analysts.filter(a => getBrokersForUserBP(a.name).length > 0);
+
+  el.innerHTML += `
+    <div class="card" style="margin-top:1rem">
+      <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">📋 Staff availability</div>
+      ${spare.length ? `
+      <div style="font-size:12px;font-weight:600;color:var(--success);margin-bottom:6px">✓ ${spare.length} available (no broker assigned)</div>
+      ${spare.map(s => {
+        const crms = getCRMsForUserBP(s.name);
+        return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)">
+          <div style="font-size:13px;font-weight:600;flex:1">${esc(s.name)}</div>
+          <div style="display:flex;gap:4px;flex-wrap:wrap">
+            ${crms.length ? crms.map(c=>`<span style="font-size:11px;background:var(--brand-light);color:var(--brand);border-radius:4px;padding:1px 6px">${esc(c)}</span>`).join('') : '<span style="font-size:11px;color:var(--text-3)">No CRM assigned</span>'}
+          </div>
+        </div>`;
+      }).join('')}` : '<div style="font-size:13px;color:var(--text-3)">No spare staff — all analysts have a broker assigned.</div>'}
+      ${active.length ? `
+      <div style="font-size:12px;font-weight:600;color:var(--text-3);margin-top:12px;margin-bottom:6px">Assigned (${active.length})</div>
+      ${active.map(s => {
+        const brokers = getBrokersForUserBP(s.name);
+        const crms = getCRMsForUserBP(s.name);
+        return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);opacity:.7">
+          <div style="font-size:13px;font-weight:600;flex:1">${esc(s.name)} <span style="font-size:11px;color:var(--text-3);font-weight:400">${brokers.map(b=>esc(b)).join(', ')}</span></div>
+          <div style="display:flex;gap:4px;flex-wrap:wrap">
+            ${crms.map(c=>`<span style="font-size:11px;background:var(--surface-2);color:var(--text-3);border-radius:4px;padding:1px 6px">${esc(c)}</span>`).join('')}
+          </div>
+        </div>`;
+      }).join('')}` : ''}
+    </div>`;
+}
+
 function setPerfDays(days, btn) {
   _perfDays = days;
   renderPerformanceScreen();
@@ -11264,9 +11392,38 @@ window.renderMyTeam = function() {
   // ── Coverage section (informational, read-only for TL) ────────────────
   renderPerformancePulse(myteamEl, myTeamNames);
 
-  const coverage = typeof getCoverage === 'function' ? getCoverage() : {};
+  const coverage = getCoverageBP(today);
   const dayRecs  = typeof getRecords === 'function' ? getRecords().filter(r => r.date === today) : [];
   const onLeave  = dayRecs.filter(r => myTeamNames.includes(r.name) && r.status === 'leave');
+
+  // Coverage revert prompt — team members who were on leave yesterday but are back today
+  const yest2 = new Date(); yest2.setDate(yest2.getDate()-1);
+  const yesterdayStr2 = yest2.toISOString().split('T')[0];
+  const yesterdayCoverage = getCoverageBP(yesterdayStr2);
+  const yesterdayRecs = typeof getRecords === 'function' ? getRecords().filter(r => r.date === yesterdayStr2) : [];
+  const backToday = myTeamNames.filter(name => {
+    const wasOnLeave = yesterdayRecs.find(r=>r.name===name&&r.status==='leave');
+    const isBackNow = dayRecs.find(r=>r.name===name&&r.status!=='leave');
+    const hadCover = yesterdayCoverage[name] && yesterdayCoverage[name]!=='_ncr';
+    return wasOnLeave && isBackNow && hadCover;
+  });
+
+  if (backToday.length) {
+    const revertDiv = document.createElement('div');
+    revertDiv.className = 'card';
+    revertDiv.style.cssText = 'margin-bottom:12px;border-color:#FDE68A;background:#FFFBEB';
+    revertDiv.innerHTML = `
+      <div style="font-size:13px;font-weight:700;color:#92400E;margin-bottom:8px">↩ Staff returned from leave</div>
+      ${backToday.map(name => {
+        const coverName = yesterdayCoverage[name];
+        return `<div style="padding:6px 0;border-bottom:1px solid #FDE68A;font-size:13px">
+          <strong>${esc(name.split(' ')[0])}</strong> is back today — covered by ${esc(coverName)} yesterday.
+          <div style="font-size:12px;color:#92400E;margin-top:2px">Reassign any of ${esc(coverName.split(' ')[0])}'s files back to ${esc(name.split(' ')[0])} via the Files tab.</div>
+        </div>`;
+      }).join('')}`;
+    myteamEl.insertBefore(revertDiv, myteamEl.firstChild);
+  }
+
   if (!onLeave.length) return;
 
   const coverDiv = document.createElement('div');
@@ -11275,9 +11432,9 @@ window.renderMyTeam = function() {
   coverDiv.innerHTML = `
     <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">🔄 Today's coverage</div>
     ${onLeave.map(r => {
-      const v = coverage[today+'_'+r.name];
+      const v = coverage[r.name];
       const isNCR = v === '_ncr';
-      const label = isNCR ? 'No cover required' : (v ? `Covered by <strong>${esc(v)}</strong>` : '⚠ Unassigned — contact your manager');
+      const label = isNCR ? 'No cover required' : (v ? `Covered by <strong>${esc(v)}</strong>` : '⚠ Unassigned — contact Ops Manager');
       const color = isNCR ? 'var(--text-3)' : (v ? 'var(--success)' : 'var(--danger)');
       return `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)">
         <span style="font-size:13px;font-weight:600;flex:1">${esc(r.name)} <span style="font-size:11px;color:var(--text-3);font-weight:400">on leave</span></span>

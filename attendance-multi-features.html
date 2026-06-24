@@ -1038,6 +1038,12 @@ tr.flagged-row:hover td { background: #FFEAEA; }
       <button class="btn-primary export-btn" onclick="exportCSV()">⬇ Download CSV</button>
     </div>
 
+    <div class="card" id="bulkTransferCard" style="display:none">
+      <div class="section-label">↔ Bulk file transfer</div>
+      <p style="font-size:13px;color:var(--text-2);margin-bottom:12px">Move all files from one analyst to another. Use for permanent staff replacements.</p>
+      <button class="btn-primary" onclick="openBulkTransferModal()">Transfer files…</button>
+    </div>
+
     <div class="card" id="publicHolidaysCard" style="display:none">
       <div class="section-label">📅 Public Holidays</div>
       <p style="font-size:13px;color:var(--text-2);margin-bottom:12px">Manage Australian national public holidays + 15 August. These are excluded from leave day counts.</p>
@@ -1103,6 +1109,44 @@ tr.flagged-row:hover td { background: #FFEAEA; }
       <div class="section-label">🔐 Role permissions</div>
       <p style="font-size:13px;color:var(--text-2);margin-bottom:12px">Permissions are now managed centrally from the <strong>LP Portal</strong> — click ⚙ Permissions in the top nav after logging in to the portal.</p>
       <a href="index.html" style="display:inline-block;font-size:13px;padding:8px 16px;background:var(--brand);color:#fff;border-radius:var(--radius-sm);text-decoration:none">Go to Portal →</a>
+    </div>
+
+    <!-- ── Broker Management (superadmin only) ─────────────────────────── -->
+    <div class="card" id="brokerMgmtCard" style="display:none">
+      <div class="section-label">🏦 Broker List</div>
+      <p style="font-size:13px;color:var(--text-2);margin-bottom:12px">Manage brokers. Only superadmin can see or edit this list.</p>
+      <div style="display:flex;gap:8px;margin-bottom:12px">
+        <input type="text" id="newBrokerName" placeholder="Broker name…" style="flex:1;font-size:13px;padding:6px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)"/>
+        <button onclick="addBroker()" class="btn-sm" style="background:var(--brand);color:#fff;border-color:var(--brand)">+ Add</button>
+      </div>
+      <div id="brokerList"><div style="font-size:13px;color:var(--text-3)">Loading…</div></div>
+    </div>
+
+    <div class="card" id="brokerAssignCard" style="display:none">
+      <div class="section-label">👤 Broker Assignments</div>
+      <p style="font-size:13px;color:var(--text-2);margin-bottom:12px">Assign brokers to analysts and team leads.</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+        <select id="baStaffSel" style="flex:1;font-size:13px;padding:6px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)">
+          <option value="">— select staff —</option>
+        </select>
+        <select id="baBrokerSel" style="flex:1;font-size:13px;padding:6px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)">
+          <option value="">— select broker —</option>
+        </select>
+        <button onclick="assignBrokerToStaff()" class="btn-sm" style="background:var(--brand);color:#fff;border-color:var(--brand)">Assign</button>
+      </div>
+      <div id="brokerAssignList"><div style="font-size:13px;color:var(--text-3)">Loading…</div></div>
+    </div>
+
+    <div class="card" id="crmMgmtCard" style="display:none">
+      <div class="section-label">💻 CRM Options &amp; Assignments</div>
+      <p style="font-size:13px;color:var(--text-2);margin-bottom:12px">Manage CRM software options and assign to staff.</p>
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <input type="text" id="newCRMName" placeholder="CRM name (e.g. Infynity)…" style="flex:1;font-size:13px;padding:6px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)"/>
+        <button onclick="addCRMOption()" class="btn-sm" style="background:var(--brand);color:#fff;border-color:var(--brand)">+ Add</button>
+      </div>
+      <div id="crmOptionList" style="margin-bottom:14px"></div>
+      <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">CRM per analyst / TL</div>
+      <div id="staffCRMList"></div>
     </div>
 
     <div class="card" id="obsNotesStatsCard" style="display:none">
@@ -3449,9 +3493,9 @@ function tapCard(key, row) {
     title = 'Absence patterns'; emptyMsg = 'No recurring patterns ✓';
   } else if (key === 'coverage') {
     const dayRecs = allRecs.filter(r => r.date===date);
-    const cov = getCoverage();
+    const covForDate = getCoverageForDate(date);
     rows = dayRecs.filter(r => r.status==='leave').map(r => {
-      const assigned = cov[date+'_'+r.name];
+      const assigned = covForDate[r.name];
       const isNCR = assigned === '_ncr';
       const statusText = isNCR ? 'No cover required' : (assigned ? 'Cover: '+esc(assigned) : 'Unassigned');
       const statusColor = isNCR ? 'var(--text-3)' : (assigned ? 'var(--success)' : 'var(--danger)');
@@ -3618,10 +3662,10 @@ function renderMetrics() {
   const eodCount     = eodRpts.length;
   const eodTotal     = eodEligible.length;
   const eodMissing   = eodTotal - eodCount;
-  const coverage     = typeof getCoverage==='function' ? getCoverage() : {};
+  const coverage     = typeof getCoverageForDate==='function' ? getCoverageForDate(date) : {};
   const onLeaveRecs  = allRecs.filter(r=>r.date===date&&r.status==='leave');
-  const unassignedCover = onLeaveRecs.filter(r=>{const v=coverage[date+'_'+r.name]; return !v || v==='';}).length;
-  const ncrCover = onLeaveRecs.filter(r=>coverage[date+'_'+r.name]==='_ncr').length;
+  const unassignedCover = onLeaveRecs.filter(r=>{const v=coverage[r.name]; return !v || v==='';}).length;
+  const ncrCover = onLeaveRecs.filter(r=>coverage[r.name]==='_ncr').length;
 
   const _restoreKey = _activeMetricCard;
   const _restoreRow = _activeMetricRow;
@@ -5480,6 +5524,8 @@ function loadDashboard() {
   Promise.all([
     spGet(SP_API + "('AttendanceRecords')/items?$top=5000").then(r => { if (r&&r.value) { _records=r.value.map(spToRecord); LS.set('ci_records',_records); } }),
     spGet(SP_API + "('AttendanceBreaks')/items?$top=5000").then(r => { if (r&&r.value) { _breaks=r.value.map(spToBreak); LS.set('ci_breaks',_breaks); } }),
+    loadCoverageFromSP(),
+    loadBrokerAssignments(),
   ]).catch(()=>{}).finally(() => {
     renderNeedsAttention(); renderMetrics(); loadTabs(); renderWeeklyWidgets();
   });
@@ -5966,6 +6012,18 @@ function renderAdmin() {
     permCard.style.display=sa?'block':'none';
     if(sa) renderPermissionsEditor();
   }
+  // Broker + CRM management (superadmin only)
+  ['brokerMgmtCard','brokerAssignCard','crmMgmtCard'].forEach(id => {
+    const c = document.getElementById(id);
+    if(c) c.style.display = sa ? 'block' : 'none';
+  });
+  if(sa) {
+    loadBrokers().then(renderBrokerList);
+    loadBrokerAssignments().then(renderBrokerAssignList);
+    loadCRMOptions().then(() => loadStaffCRMs().then(renderCRMSection));
+  }
+  const btCard = document.getElementById('bulkTransferCard');
+  if(btCard) btCard.style.display = (sa || isTeamLead()) ? 'block' : 'none';
   const phCard=document.getElementById('publicHolidaysCard');
   if(phCard) {
     phCard.style.display=sa?'block':'none';
@@ -7892,6 +7950,290 @@ function renderAbsencePatternCard() {
 function getCoverage() { return LS.get('ci_coverage') || {}; }
 function saveCoverage(c) { LS.set('ci_coverage', c); }
 
+// ── Broker list ───────────────────────────────────────────────────────────
+let _brokers = [];
+let _brokerAssignments = [];
+
+async function loadBrokers() {
+  try {
+    const res = await spGet(SP_API + "('Brokers')/items?$select=Id,Title&$top=200&$orderby=Title");
+    if (res?.value) { _brokers = res.value.map(b=>({id:b.Id,name:b.Title})); LS.set('ci_brokers',_brokers); return; }
+  } catch(e){}
+  _brokers = LS.get('ci_brokers') || [];
+}
+
+async function addBroker() {
+  const name = document.getElementById('newBrokerName')?.value.trim();
+  if (!name) return;
+  const res = await spPost(SP_API + "('Brokers')/items", {Title:name});
+  if (res) {
+    document.getElementById('newBrokerName').value = '';
+    await loadBrokers(); renderBrokerList();
+    showToast('Broker added ✓','ok');
+  }
+}
+
+async function deleteBroker(id) {
+  if (!confirm('Remove this broker? This will NOT remove existing assignments.')) return;
+  await spDelete(SP_API + `('Brokers')/items(${id})`);
+  await loadBrokers(); renderBrokerList(); showToast('Broker removed','ok');
+}
+
+function renderBrokerList() {
+  const el = document.getElementById('brokerList');
+  if (!el) return;
+  if (!_brokers.length) { el.innerHTML='<div style="font-size:13px;color:var(--text-3)">No brokers added yet.</div>'; return; }
+  el.innerHTML = _brokers.map(b=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)">
+    <span style="font-size:13px;font-weight:500">${esc(b.name)}</span>
+    <button onclick="deleteBroker(${b.id})" style="font-size:11px;padding:2px 8px;border-radius:4px;border:1px solid var(--danger);color:var(--danger);background:transparent;cursor:pointer">Remove</button>
+  </div>`).join('');
+}
+
+// ── Broker assignments ────────────────────────────────────────────────────
+async function loadBrokerAssignments() {
+  try {
+    const res = await spGet(SP_API + "('BrokerAssignments')/items?$select=Id,Title,BrokerName&$top=500");
+    if (res?.value) { _brokerAssignments=res.value.map(r=>({id:r.Id,staffName:r.Title,brokerName:r.BrokerName})); LS.set('ci_broker_assignments',_brokerAssignments); return; }
+  } catch(e){}
+  _brokerAssignments = LS.get('ci_broker_assignments') || [];
+}
+
+function getBrokersForStaff(name) {
+  return _brokerAssignments.filter(a=>a.staffName===name).map(a=>a.brokerName);
+}
+
+async function assignBrokerToStaff() {
+  const staffName = document.getElementById('baStaffSel')?.value;
+  const brokerName = document.getElementById('baBrokerSel')?.value;
+  if (!staffName || !brokerName) { showToast('Select both staff and broker','err'); return; }
+  if (_brokerAssignments.some(a=>a.staffName===staffName&&a.brokerName===brokerName)) { showToast('Already assigned','err'); return; }
+  const res = await spPost(SP_API + "('BrokerAssignments')/items", {Title:staffName, BrokerName:brokerName});
+  if (res) { await loadBrokerAssignments(); renderBrokerAssignList(); showToast('Broker assigned ✓','ok'); }
+}
+
+async function removeBrokerAssignment(id) {
+  await spDelete(SP_API + `('BrokerAssignments')/items(${id})`);
+  await loadBrokerAssignments(); renderBrokerAssignList(); showToast('Assignment removed','ok');
+}
+
+function renderBrokerAssignList() {
+  const el = document.getElementById('brokerAssignList');
+  if (!el) return;
+  // Populate staff + broker selects
+  const staffSel = document.getElementById('baStaffSel');
+  const brokerSel = document.getElementById('baBrokerSel');
+  if (staffSel) {
+    const analysts = getStaff().filter(s=>['analyst','teamlead'].includes(s.role));
+    staffSel.innerHTML = '<option value="">— select staff —</option>' + analysts.map(s=>`<option value="${esc(s.name)}">${esc(s.name)}</option>`).join('');
+  }
+  if (brokerSel) {
+    brokerSel.innerHTML = '<option value="">— select broker —</option>' + _brokers.map(b=>`<option value="${esc(b.name)}">${esc(b.name)}</option>`).join('');
+  }
+  if (!_brokerAssignments.length) { el.innerHTML='<div style="font-size:13px;color:var(--text-3)">No assignments yet.</div>'; return; }
+  // Group by staff
+  const byStaff = {};
+  _brokerAssignments.forEach(a=>{ if(!byStaff[a.staffName]) byStaff[a.staffName]=[]; byStaff[a.staffName].push(a); });
+  el.innerHTML = Object.entries(byStaff).map(([name,assignments])=>`
+    <div style="margin-bottom:10px">
+      <div style="font-size:13px;font-weight:600;margin-bottom:4px">${esc(name)}</div>
+      ${assignments.map(a=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:4px 8px;background:var(--surface-2);border-radius:4px;margin-bottom:3px">
+        <span style="font-size:12px">${esc(a.brokerName)}</span>
+        <button onclick="removeBrokerAssignment(${a.id})" style="font-size:11px;padding:1px 6px;border-radius:4px;border:1px solid var(--danger);color:var(--danger);background:transparent;cursor:pointer">✕</button>
+      </div>`).join('')}
+    </div>`).join('');
+}
+
+// ── CRM options ───────────────────────────────────────────────────────────
+let _crmOptions = [];
+let _staffCRMs  = {};
+const DEFAULT_CRMS = ['Infynity','ApplyOnline','NextGen','MyCRM','Loan App','Symmetry'];
+
+async function loadCRMOptions() {
+  try {
+    const res = await spGet(SP_API + "('CRMOptions')/items?$select=Id,Title&$top=100&$orderby=Title");
+    if (res?.value) {
+      if (!res.value.length) {
+        for (const n of DEFAULT_CRMS) await spPost(SP_API + "('CRMOptions')/items",{Title:n}).catch(()=>{});
+        return loadCRMOptions();
+      }
+      _crmOptions = res.value.map(r=>({id:r.Id,name:r.Title})); return;
+    }
+  } catch(e){}
+  _crmOptions = DEFAULT_CRMS.map((n,i)=>({id:i,name:n}));
+}
+
+async function addCRMOption() {
+  const name = document.getElementById('newCRMName')?.value.trim();
+  if (!name) return;
+  const res = await spPost(SP_API + "('CRMOptions')/items",{Title:name});
+  if (res) { document.getElementById('newCRMName').value=''; await loadCRMOptions(); renderCRMSection(); showToast('CRM added ✓','ok'); }
+}
+
+async function deleteCRMOption(id) {
+  await spDelete(SP_API + `('CRMOptions')/items(${id})`);
+  await loadCRMOptions(); renderCRMSection(); showToast('CRM removed','ok');
+}
+
+async function loadStaffCRMs() {
+  try {
+    const res = await spGet(SP_API + "('StaffCRMs')/items?$select=Id,Title,CRMList&$top=200");
+    if (res?.value) { _staffCRMs={}; res.value.forEach(r=>{_staffCRMs[r.Title]={id:r.Id,crms:(r.CRMList||'').split(',').filter(Boolean)};}); return; }
+  } catch(e){}
+  _staffCRMs = LS.get('ci_staff_crms') || {};
+}
+
+function getCRMsForStaff(name) { return (_staffCRMs[name]?.crms || _staffCRMs[name] || []); }
+
+async function saveStaffCRMSP(staffName, crms) {
+  const crmStr = crms.join(',');
+  const existing = _staffCRMs[staffName];
+  if (existing?.id) {
+    await spPatch(SP_API + `('StaffCRMs')/items(${existing.id})`, {CRMList:crmStr});
+  } else {
+    const res = await spPost(SP_API + "('StaffCRMs')/items", {Title:staffName, CRMList:crmStr});
+    if (res) _staffCRMs[staffName] = {id:res.d?.Id||res.ID, crms};
+  }
+  if (_staffCRMs[staffName]) _staffCRMs[staffName].crms = crms;
+  else _staffCRMs[staffName] = {crms};
+  LS.set('ci_staff_crms', _staffCRMs);
+}
+
+function renderCRMSection() {
+  const optEl = document.getElementById('crmOptionList');
+  const staffEl = document.getElementById('staffCRMList');
+  if (optEl) {
+    optEl.innerHTML = !_crmOptions.length
+      ? '<div style="font-size:13px;color:var(--text-3)">No CRMs yet.</div>'
+      : '<div style="display:flex;flex-wrap:wrap;gap:6px">' +
+        _crmOptions.map(c=>`<div style="display:flex;align-items:center;gap:4px;background:var(--surface-2);border:1px solid var(--border);border-radius:4px;padding:3px 8px">
+          <span style="font-size:12px">${esc(c.name)}</span>
+          <button onclick="deleteCRMOption(${c.id})" style="background:transparent;border:none;color:var(--text-3);cursor:pointer;font-size:13px;line-height:1;padding:0 2px">✕</button>
+        </div>`).join('') + '</div>';
+  }
+  if (staffEl) {
+    const analysts = getStaff().filter(s=>['analyst','teamlead'].includes(s.role));
+    staffEl.innerHTML = analysts.map(s => {
+      const staffCRMs = getCRMsForStaff(s.name);
+      return `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);flex-wrap:wrap">
+        <span style="font-size:13px;font-weight:600;min-width:130px">${esc(s.name)}</span>
+        <div style="display:flex;flex-wrap:wrap;gap:4px;flex:1">
+          ${_crmOptions.map(c=>{
+            const sel = staffCRMs.includes(c.name);
+            return `<button type="button" onclick="toggleStaffCRM('${s.name.replace(/'/g,"\\'")}','${esc(c.name)}')"
+              style="font-size:11px;padding:3px 8px;border-radius:4px;border:1.5px solid ${sel?'var(--brand)':'var(--border)'};background:${sel?'var(--brand-light)':'transparent'};color:${sel?'var(--brand)':'var(--text-3)'};cursor:pointer;font-weight:${sel?'700':'400'}">${sel?'✓ ':''}${esc(c.name)}</button>`;
+          }).join('')}
+        </div>
+      </div>`;
+    }).join('');
+  }
+}
+
+async function toggleStaffCRM(staffName, crmName) {
+  const current = getCRMsForStaff(staffName);
+  const newList = current.includes(crmName) ? current.filter(c=>c!==crmName) : [...current, crmName];
+  await saveStaffCRMSP(staffName, newList);
+  renderCRMSection();
+  showToast(staffName.split(' ')[0]+' CRMs updated ✓','ok');
+}
+
+// ── Coverage SP ───────────────────────────────────────────────────────────
+let _coverageSP = []; // [{id, date, absenteeName, coverName, assignedBy, assignedAt}]
+
+async function loadCoverageFromSP() {
+  try {
+    const res = await spGet(SP_API + "('CoverageAssignments')/items?$select=Id,Title,CoverDate,CoverName,AssignedBy,AssignedAt&$top=500");
+    if (res?.value) {
+      _coverageSP = res.value.map(r=>({id:r.Id,absenteeName:r.Title,date:r.CoverDate,coverName:r.CoverName,assignedBy:r.AssignedBy,assignedAt:r.AssignedAt}));
+      LS.set('ci_coverage_sp',_coverageSP); return;
+    }
+  } catch(e){}
+  _coverageSP = LS.get('ci_coverage_sp') || [];
+}
+
+function getCoverageForDate(date) {
+  // Returns {absenteeName: coverName} for a given date (also check localStorage for NCR)
+  const result = {};
+  _coverageSP.filter(r=>r.date===date).forEach(r=>{ result[r.absenteeName]=r.coverName; });
+  // Merge with localStorage NCR entries
+  const lsCov = getCoverage();
+  Object.entries(lsCov).forEach(([key,val])=>{
+    const [d,...nameParts] = key.split('_'); const name=nameParts.join('_');
+    if (d===date && val==='_ncr') result[name]='_ncr';
+  });
+  return result;
+}
+
+async function saveCoverageSP(absenteeName, date, coverName) {
+  if (coverName === '_ncr') { // No cover required — only localStorage
+    const lsCov = getCoverage();
+    lsCov[date+'_'+absenteeName] = '_ncr';
+    saveCoverage(lsCov); return;
+  }
+  const existing = _coverageSP.find(r=>r.absenteeName===absenteeName&&r.date===date);
+  const payload = {Title:absenteeName, CoverDate:date, CoverName:coverName, AssignedBy:currentUser?.name||'', AssignedAt:new Date().toISOString()};
+  if (existing) {
+    await spPatch(SP_API+`('CoverageAssignments')/items(${existing.id})`, payload);
+    Object.assign(existing, {coverName, assignedBy:payload.AssignedBy, assignedAt:payload.AssignedAt});
+  } else {
+    const res = await spPost(SP_API+"('CoverageAssignments')/items", payload);
+    if (res) _coverageSP.push({id:res.d?.Id||res.ID, absenteeName, date, coverName, assignedBy:payload.AssignedBy, assignedAt:payload.AssignedAt});
+  }
+  LS.set('ci_coverage_sp', _coverageSP);
+}
+
+// ── Bulk file transfer ─────────────────────────────────────────────────────
+function openBulkTransferModal() {
+  const staff = getStaff().filter(s => s.role !== 'superadmin');
+  const isTL = isTeamLead() && !isSuperAdmin();
+  const fromPool = isTL ? getStaff().filter(s => getTeamForTL(currentUser.name).includes(s.name)) : staff;
+  const toPool   = staff;
+
+  const existing = document.getElementById('_bulkTransferModal');
+  if (existing) existing.remove();
+  const div = document.createElement('div');
+  div.id = '_bulkTransferModal';
+  div.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.6);z-index:300;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)';
+  div.innerHTML = `<div style="background:var(--surface);border-radius:20px;padding:1.5rem;width:calc(100%-2rem);max-width:420px;box-shadow:0 20px 60px rgba(0,0,0,.25)">
+    <div style="font-size:17px;font-weight:700;color:var(--text);margin-bottom:4px">↔ Transfer files</div>
+    <div style="font-size:13px;color:var(--text-3);margin-bottom:14px">Move all files from one person to another permanently.</div>
+    <div style="margin-bottom:10px">
+      <div style="font-size:11px;font-weight:600;color:var(--text-3);margin-bottom:4px">Transfer FROM</div>
+      <select id="_btFrom" style="width:100%;font-size:13px;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)">
+        <option value="">— select person —</option>
+        ${fromPool.map(s=>`<option value="${esc(s.name)}">${esc(s.name)} (${esc(ROLE_LABEL[s.role]||s.role)})</option>`).join('')}
+      </select>
+    </div>
+    <div style="margin-bottom:14px">
+      <div style="font-size:11px;font-weight:600;color:var(--text-3);margin-bottom:4px">Transfer TO</div>
+      <select id="_btTo" style="width:100%;font-size:13px;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)">
+        <option value="">— select person —</option>
+        ${toPool.map(s=>`<option value="${esc(s.name)}">${esc(s.name)} (${esc(ROLE_LABEL[s.role]||s.role)})</option>`).join('')}
+      </select>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <button onclick="document.getElementById('_bulkTransferModal').remove()" style="padding:12px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:transparent;color:var(--text-2);font-size:14px;cursor:pointer">Cancel</button>
+      <button onclick="confirmBulkTransfer()" style="padding:12px;border-radius:var(--radius-sm);border:none;background:var(--brand);color:#fff;font-size:14px;font-weight:700;cursor:pointer">Transfer</button>
+    </div>
+  </div>`;
+  document.body.appendChild(div);
+}
+
+function confirmBulkTransfer() {
+  const from = document.getElementById('_btFrom')?.value;
+  const to   = document.getElementById('_btTo')?.value;
+  if (!from || !to) { showToast('Select both people','err'); return; }
+  if (from === to) { showToast('Cannot transfer to the same person','err'); return; }
+  if (!confirm(`Transfer ALL files from ${from} to ${to}? This cannot be undone.`)) return;
+  const allFiles = getFileEntries ? getFileEntries() : (window.getFileEntries ? window.getFileEntries() : []);
+  // Transfer via postMessage to broker if on different origin, otherwise direct
+  const transferred = allFiles.filter(f => f.owner === from);
+  if (!transferred.length) { showToast('No files found for '+from,'err'); return; }
+  transferred.forEach(f => f.owner = to);
+  if (window.saveFileEntries) saveFileEntries(allFiles);
+  document.getElementById('_bulkTransferModal')?.remove();
+  showToast(transferred.length+' file'+(transferred.length!==1?'s':'')+' transferred to '+to+' ✓','ok');
+}
+
 function assignCover(absenteeName, date) {
   const staff = getStaff().filter(s => s.role !== 'superadmin' && s.name !== absenteeName);
   const coverage = getCoverage();
@@ -7930,13 +8272,19 @@ function setNocover(absenteeName, date) {
 
 function saveCoverAssign(absenteeName, date, coverName, btn) {
   if (!coverName) { showToast('Select a person first.','err'); return; }
-  const coverage = getCoverage();
-  const key = date + '_' + absenteeName;
-  coverage[key] = coverName;
-  saveCoverage(coverage);
-  showToast(coverName.split(' ')[0] + ' assigned as cover for ' + absenteeName.split(' ')[0] + '.', 'ok');
-  btn.closest('div[style*="fixed"]').remove();
-  renderMetrics();
+  saveCoverageSP(absenteeName, date, coverName).then(() => {
+    showToast(coverName.split(' ')[0]+' assigned as cover for '+absenteeName.split(' ')[0]+' ✓','ok');
+    btn.closest('div[style*="fixed"]').remove();
+    renderMetrics();
+  }).catch(() => {
+    // Fallback to localStorage
+    const coverage = getCoverage();
+    coverage[date+'_'+absenteeName] = coverName;
+    saveCoverage(coverage);
+    showToast(coverName.split(' ')[0]+' assigned ✓','ok');
+    btn.closest('div[style*="fixed"]').remove();
+    renderMetrics();
+  });
 }
 
 function renderCoverageCard(date) {
