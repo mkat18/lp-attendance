@@ -3911,6 +3911,21 @@ async function _obSubmit(name) {
     }
   } catch(e) { console.warn('Leave request SP save failed:', e); }
 
+  // Update leave entitlement balance (same as normal approval)
+  const ent = _leaveEntitlements.find(e => e.Title === name && e.LeaveYear === ly);
+  if (ent) {
+    if (leaveType === 'Annual Leave') {
+      const used = parseFloat(ent.AnnualUsed||0) + days;
+      await updateLeaveEntitlement(name, ly, { AnnualUsed: String(used) });
+    } else if (leaveType === 'Sick Leave') {
+      const used = parseFloat(ent.SickUsed||0) + days;
+      await updateLeaveEntitlement(name, ly, { SickUsed: String(used) });
+    } else if (leaveType === 'Unpaid Leave') {
+      const used = parseFloat(ent.UnpaidUsed||0) + days;
+      await updateLeaveEntitlement(name, ly, { UnpaidUsed: String(used) });
+    }
+  }
+
   // 2. Create attendance records for each working day in range
   const workdays = getWorkdays(startDate, endDate);
   const recs = getRecords();
