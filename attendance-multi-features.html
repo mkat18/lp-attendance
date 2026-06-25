@@ -859,6 +859,7 @@ tr.flagged-row:hover td { background: #FFEAEA; }
         <div class="tbl-card"><div class="tbl-wrap"><table id="peopleTable"></table></div></div>
       </div>
       <div id="dpanel-missing" class="panel">
+        <div id="missingDayPicker"></div>
         <div class="tbl-card"><div class="tbl-wrap"><table id="missingTable"></table></div></div>
       </div>
       <div id="dpanel-breaks" class="panel">
@@ -3848,8 +3849,36 @@ function renderActiveTab(name){
   if(name==='chart') renderChart();
 }
 
+// ── Day picker for single-day tabs within a multi-day range ───────────────
+let _tabDayOverride = null; // null = use start of range
+
+function getTabDate() {
+  if (_tabDayOverride) return _tabDayOverride;
+  return getSelectedDate();
+}
+
+function renderTabDayPicker(containerEl) {
+  const from = getSelectedDate();
+  const to   = getSelectedDateTo();
+  if (from === to) { // single day — no picker needed
+    _tabDayOverride = null;
+    return '';
+  }
+  // Ensure override is within range
+  if (!_tabDayOverride || _tabDayOverride < from || _tabDayOverride > to) {
+    _tabDayOverride = to; // default to latest day (usually today)
+  }
+  return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+    <span style="font-size:12px;color:var(--text-3)">Showing day:</span>
+    <input type="date" value="${_tabDayOverride}" min="${from}" max="${to}"
+      onchange="_tabDayOverride=this.value; renderActiveTab(document.querySelector('.panel.active')?.id.replace('dpanel-',''))"
+      style="font-size:13px;padding:4px 8px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface)"/>
+    <span style="font-size:12px;color:var(--text-3)">(range: ${esc(from)} → ${esc(to)})</span>
+  </div>`;
+}
+
 function renderMissing() {
-  const date=getSelectedDate();
+  const date=getTabDate();
   const fn=document.getElementById('filterName').value.trim().toLowerCase();
   const allStaff=getStaff().filter(s=>s.role!=='superadmin');
   const dayRecs=getRecords().filter(r=>r.date===date);
@@ -3862,6 +3891,7 @@ function renderMissing() {
   const canSubmit=canEdit();
   const filter=window._missingFilter||null;
   window._missingFilter=null;
+  document.getElementById('missingDayPicker').innerHTML = renderTabDayPicker();
 
   // Not submitted
   const missing=allStaff.filter(s=>{
