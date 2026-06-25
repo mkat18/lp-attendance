@@ -1301,25 +1301,7 @@ tr.flagged-row:hover td { background: #FFEAEA; }
     </div>
   </div>
 </div>
-<div id="onBehalfModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:200;align-items:center;justify-content:center;backdrop-filter:blur(2px)">
-  <div class="modal-box">
-    <div class="modal-title">Submit leave on behalf</div>
-    <div class="modal-sub">Recording leave for <strong id="onBehalfName"></strong></div>
-    <div class="field">
-      <label style="display:block;font-size:12px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;font-family:var(--font-ui)">Status</label>
-      <select id="onBehalfStatus" style="font-size:14px">
-        <option value="leave">On leave</option>
-        <option value="halfday">Half day</option>
-      </select>
-    </div>
-    <div class="field">
-      <label style="display:block;font-size:12px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;font-family:var(--font-ui)">Reason <span style="color:var(--danger)">*</span></label>
-      <textarea id="onBehalfReason" placeholder="e.g. Annual leave, sick day…" style="width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:14px;color:var(--text);background:var(--surface-2);outline:none;resize:none;min-height:68px;line-height:1.5"></textarea>
-    </div>
-    <button class="btn-primary" onclick="confirmOnBehalf()" style="margin-bottom:8px">Submit</button>
-    <button class="modal-cancel" onclick="closeOnBehalfModal()">Cancel</button>
-  </div>
-</div>
+<!-- onBehalfModal removed — now uses dynamic modal via submitOnBehalf() -->
 
 <div id="manageTeamModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.6);z-index:200;align-items:center;justify-content:center;backdrop-filter:blur(4px)">
   <div style="background:var(--surface);border-radius:20px;padding:1.5rem;width:calc(100% - 2rem);max-width:420px;max-height:85vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.25)">
@@ -3792,32 +3774,165 @@ function renderEODCardIfNeeded() {
 
 // ── Submit on behalf ──────────────────────────────────────────────────────
 function submitOnBehalf(name) {
-  window._onBehalfName = name;
-  document.getElementById('onBehalfName').textContent = name;
-  document.getElementById('onBehalfStatus').value = 'leave';
-  document.getElementById('onBehalfReason').value = '';
-  document.getElementById('onBehalfModal').style.display = 'flex';
+  const existing = document.getElementById('_onBehalfLeaveModal');
+  if (existing) existing.remove();
+
+  const modal = document.createElement('div');
+  modal.id = '_onBehalfLeaveModal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.6);z-index:300;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);padding:1rem;overflow-y:auto';
+  modal.innerHTML = `
+    <div style="background:var(--surface);border-radius:20px;padding:1.5rem;width:100%;max-width:420px;box-shadow:0 20px 60px rgba(0,0,0,.25)">
+      <div style="font-size:17px;font-weight:700;color:var(--text);margin-bottom:2px">Submit leave for ${esc(name.split(' ')[0])}</div>
+      <div style="font-size:13px;color:var(--text-3);margin-bottom:1.2rem">This will create a leave request and update attendance records.</div>
+
+      <div class="field">
+        <label>Leave type <span style="color:var(--danger)">*</span></label>
+        <select id="_ob_leaveType" onchange="_obToggleBroker()" style="font-size:14px;padding:8px 10px;width:100%;border:1.5px solid var(--border);border-radius:var(--radius-sm)">
+          <option value="">— select —</option>
+          <option value="Annual Leave">Annual Leave</option>
+          <option value="Sick Leave">Sick Leave</option>
+          <option value="Unpaid Leave">Unpaid Leave</option>
+          <option value="Broker Holiday">Broker Holiday</option>
+        </select>
+      </div>
+
+      <div id="_ob_brokerField" style="display:none" class="field">
+        <label>Broker name <span style="color:var(--danger)">*</span></label>
+        <input type="text" id="_ob_brokerName" placeholder="Broker name…" style="font-size:14px;padding:8px 10px;width:100%;border:1.5px solid var(--border);border-radius:var(--radius-sm)"/>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px" class="field">
+        <div>
+          <label>Start date <span style="color:var(--danger)">*</span></label>
+          <input type="date" id="_ob_startDate" value="${today}" onchange="_obCalcDays()" style="font-size:14px;padding:8px 10px;width:100%;border:1.5px solid var(--border);border-radius:var(--radius-sm)"/>
+        </div>
+        <div>
+          <label>End date</label>
+          <input type="date" id="_ob_endDate" value="${today}" onchange="_obCalcDays()" style="font-size:14px;padding:8px 10px;width:100%;border:1.5px solid var(--border);border-radius:var(--radius-sm)"/>
+        </div>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+        <input type="checkbox" id="_ob_halfDay" onchange="_obCalcDays()" style="width:16px;height:16px;cursor:pointer"/>
+        <label for="_ob_halfDay" style="font-size:13px;font-weight:500;color:var(--text-2);cursor:pointer">Half day</label>
+        <select id="_ob_halfDaySession" style="font-size:13px;padding:4px 8px;border:1.5px solid var(--border);border-radius:var(--radius-sm);display:none">
+          <option value="AM">AM</option>
+          <option value="PM">PM</option>
+        </select>
+      </div>
+
+      <div style="font-size:13px;color:var(--brand);font-weight:600;margin-bottom:12px" id="_ob_daysCount"></div>
+
+      <div class="field">
+        <label>Reason <span style="color:var(--danger)">*</span></label>
+        <textarea id="_ob_reason" rows="2" placeholder="Reason for leave…"
+          style="width:100%;font-size:14px;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);resize:none"></textarea>
+      </div>
+
+      <div id="_ob_err" style="color:var(--danger);font-size:13px;margin-bottom:8px;display:none"></div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px">
+        <button onclick="document.getElementById('_onBehalfLeaveModal').remove()"
+          style="padding:12px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:var(--surface-2);color:var(--text-2);font-size:14px;cursor:pointer">Cancel</button>
+        <button onclick="_obSubmit('${name.replace(/'/g,"\\'")}',true)"
+          style="padding:12px;border-radius:var(--radius-sm);border:none;background:var(--brand);color:#fff;font-size:14px;font-weight:700;cursor:pointer">Submit &amp; approve</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  _obCalcDays();
 }
 
-function closeOnBehalfModal() {
-  document.getElementById('onBehalfModal').style.display = 'none';
+function _obToggleBroker() {
+  const type = document.getElementById('_ob_leaveType')?.value;
+  const f = document.getElementById('_ob_brokerField');
+  if (f) f.style.display = type === 'Broker Holiday' ? 'block' : 'none';
 }
 
-function confirmOnBehalf() {
-  const name = window._onBehalfName;
-  const status = document.getElementById('onBehalfStatus').value; // leave or halfday
-  const reason = document.getElementById('onBehalfReason').value.trim();
-  const date = getSelectedDate();
-  if (status==='leave' && !reason) {
-    showToast('Please enter a reason for leave.','err'); return;
+function _obCalcDays() {
+  const start = document.getElementById('_ob_startDate')?.value;
+  const end   = document.getElementById('_ob_endDate')?.value || start;
+  const half  = document.getElementById('_ob_halfDay')?.checked;
+  const sess  = document.getElementById('_ob_halfDaySession');
+  if (sess) sess.style.display = half ? 'inline-block' : 'none';
+  const count = start ? countLeaveDays(start, end, half) : 0;
+  const el = document.getElementById('_ob_daysCount');
+  if (el) el.textContent = count > 0 ? count + ' working day' + (count!==1?'s':'') : '';
+}
+
+async function _obSubmit(name) {
+  const leaveType   = document.getElementById('_ob_leaveType')?.value;
+  const startDate   = document.getElementById('_ob_startDate')?.value;
+  const endDate     = document.getElementById('_ob_endDate')?.value || startDate;
+  const halfDay     = document.getElementById('_ob_halfDay')?.checked || false;
+  const halfSession = document.getElementById('_ob_halfDaySession')?.value || 'AM';
+  const reason      = document.getElementById('_ob_reason')?.value.trim();
+  const brokerName  = document.getElementById('_ob_brokerName')?.value.trim() || '';
+  const errEl       = document.getElementById('_ob_err');
+
+  const errors = [];
+  if (!leaveType)  errors.push('Select a leave type.');
+  if (!startDate)  errors.push('Select a start date.');
+  if (!reason)     errors.push('Enter a reason.');
+  if (leaveType === 'Broker Holiday' && !brokerName) errors.push('Enter the broker name.');
+
+  if (errors.length) {
+    errEl.style.display = 'block';
+    errEl.textContent = errors.join(' ');
+    return;
   }
+
+  const days = countLeaveDays(startDate, endDate, halfDay);
+  if (days <= 0) { errEl.style.display='block'; errEl.textContent='No working days in range.'; return; }
+
+  // 1. Submit leave request as Approved (TL/HR submitting on behalf)
+  const ly = getLeaveYear(startDate);
+  const leavePayload = {
+    Title: name,
+    LeaveType: leaveType,
+    StartDate: startDate,
+    EndDate: endDate,
+    HalfDay: halfDay ? 'true' : 'false',
+    HalfDaySession: halfDay ? halfSession : '',
+    Reason: reason,
+    Status: 'Approved',
+    ApprovedBy: currentUser.name,
+    ApprovalDate: today,
+    ApprovalNotes: 'Submitted on behalf by ' + currentUser.name,
+    DaysRequested: String(days),
+    LeaveYear: ly,
+    BrokerName: brokerName,
+  };
+
+  try {
+    const res = await spPostDirect(SP_API + "('LeaveRequests')/items", leavePayload);
+    if (res) {
+      _leaveRequests.unshift({...leavePayload, Id: res.Id||res.ID});
+      LS.set('ci_leaveReq', _leaveRequests);
+    }
+  } catch(e) { console.warn('Leave request SP save failed:', e); }
+
+  // 2. Create attendance records for each working day in range
+  const workdays = getWorkdays(startDate, endDate);
   const recs = getRecords();
-  const existing = recs.findIndex(r=>r.date===date&&r.name===name);
-  if (existing>=0) { showToast(name.split(' ')[0]+' already has a record for this date.','err'); return; }
-  recs.push({name, date, status, reason, clockIn:null, clockOut:null, submittedBy:currentUser.name, msAccount:msalAccount?msalAccount.username:'', ts:Date.now()});
+  let created = 0;
+  for (const d of workdays) {
+    if (recs.find(r => r.date === d && r.name === name)) continue; // skip if already exists
+    const newRec = {
+      name, date:d,
+      status: halfDay && d === startDate ? 'halfday' : 'leave',
+      reason, clockIn:null, clockOut:null,
+      submittedBy: currentUser.name,
+      msAccount: msalAccount ? msalAccount.username : '',
+      ts: Date.now()
+    };
+    recs.push(newRec);
+    spSaveRecord(newRec).catch(()=>{});
+    created++;
+  }
   saveRecords(recs);
-  closeOnBehalfModal();
-  showToast('✓ Submitted for '+name.split(' ')[0]+'.','ok');
+
+  document.getElementById('_onBehalfLeaveModal')?.remove();
+  showToast(`✓ Leave submitted for ${name.split(' ')[0]} — ${days} day${days!==1?'s':''}, ${created} attendance record${created!==1?'s':''} created.`, 'ok');
   renderMetrics(); loadTabs();
 }
 (function initDashDates(){
