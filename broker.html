@@ -11079,36 +11079,131 @@ function bmToggleBtn(label, active) {
     font-weight:${active?'700':'400'};cursor:pointer"`;
 }
 
-// ── OPS MANAGER — Unassigned analysts view ─────────────────────────────────
+// ── OPS MANAGER — Unassigned analysts/trainees view ───────────────────────
+var _bmOpsRoleFilter   = '';
+var _bmOpsNameFilter   = '';
+var _bmOpsTeamFilter   = '';
+var _bmOpsTenureFilter = '';
+
 function bmUnassignedCard() {
   const card = document.createElement('div');
   card.className = 'card';
-  const eligible   = getStaff().filter(s => ['analyst','trainee'].includes(s.role));
-  const unassigned = eligible.filter(s => getBrokersForStaff(s.name).length === 0);
+
+  const allStaff    = getStaff().filter(s => ['analyst','trainee'].includes(s.role));
+  const unassigned  = allStaff.filter(s => getBrokersForStaff(s.name).length === 0);
+  const tls         = getStaff().filter(s => s.role === 'teamlead');
+  const teams       = tls.map(tl => ({ name: tl.name, label: tl.name.split(' ')[0]+"'s team" }));
+
+  const showTenure  = _bmOpsRoleFilter !== 'analyst';
+
   card.innerHTML = `
-    <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">🏦 Unassigned Analysts</div>
-    <p style="font-size:13px;color:var(--text-2);margin-bottom:14px">
-      ${unassigned.length} of ${eligible.length} analysts/trainees currently have no broker assigned.
-    </p>
-    ${!unassigned.length
-      ? `<div style="text-align:center;padding:1.5rem;color:var(--success);font-size:14px;font-weight:600">✓ All analysts have a broker assigned</div>`
-      : unassigned.map(s => {
-          const crms = getCRMsForStaff(s.name);
-          const tl   = getStaff().find(t => t.role==='teamlead' && getTeamForTL(t.name).includes(s.name));
-          return `<div style="padding:10px 0;border-bottom:1px solid var(--border)">
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
-              <span style="font-size:14px;font-weight:600;flex:1">${esc(s.name)}</span>
-              <span style="font-size:11px;background:var(--surface-2);border-radius:4px;padding:2px 7px;color:var(--text-3)">${esc(ROLE_LABEL[s.role]||s.role)}</span>
-              ${tl?`<span style="font-size:11px;color:var(--text-3)">👥 ${esc(tl.name.split(' ')[0])}'s team</span>`:''}
-            </div>
-            <div style="display:flex;flex-wrap:wrap;gap:4px">
-              ${crms.length
-                ? crms.map(c=>`<span style="font-size:11px;background:var(--brand-light);color:var(--brand);border-radius:50px;padding:2px 9px;font-weight:500">${esc(c)}</span>`).join('')
-                : '<span style="font-size:11px;color:var(--text-3);font-style:italic">No CRM skills recorded</span>'}
-            </div>
-          </div>`;
-        }).join('')}`;
+    <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">🏦 Unassigned Staff</div>
+    <p style="font-size:13px;color:var(--text-2);margin-bottom:14px">${unassigned.length} of ${allStaff.length} analysts/trainees have no broker assigned.</p>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:${showTenure?'8px':'14px'}">
+      <select onchange="_bmOpsRoleFilter=this.value;bmRefreshOps()"
+        style="font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)">
+        <option value="">All roles</option>
+        <option value="analyst" ${_bmOpsRoleFilter==='analyst'?'selected':''}>Analyst</option>
+        <option value="trainee" ${_bmOpsRoleFilter==='trainee'?'selected':''}>Trainee</option>
+      </select>
+      <select onchange="_bmOpsNameFilter=this.value;bmRefreshOps()"
+        style="font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)">
+        <option value="">All names</option>
+        ${unassigned.map(s=>`<option value="${esc(s.name)}" ${s.name===_bmOpsNameFilter?'selected':''}>${esc(s.name)}</option>`).join('')}
+      </select>
+      <select onchange="_bmOpsTeamFilter=this.value;bmRefreshOps()"
+        style="font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)">
+        <option value="">All teams</option>
+        ${teams.map(t=>`<option value="${esc(t.name)}" ${t.name===_bmOpsTeamFilter?'selected':''}>${esc(t.label)}</option>`).join('')}
+      </select>
+      ${showTenure ? `
+      <select onchange="_bmOpsTenureFilter=this.value;bmRefreshOps()"
+        style="font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)">
+        <option value="">Any tenure</option>
+        <option value="30" ${_bmOpsTenureFilter==='30'?'selected':''}>1+ month</option>
+        <option value="45" ${_bmOpsTenureFilter==='45'?'selected':''}>45+ days</option>
+        <option value="60" ${_bmOpsTenureFilter==='60'?'selected':''}>2+ months</option>
+        <option value="90" ${_bmOpsTenureFilter==='90'?'selected':''}>3+ months</option>
+      </select>` : '<div></div>'}
+    </div>
+
+    <div id="bmOpsContent">${bmOpsContent()}</div>`;
+
   return card;
+}
+
+function bmRefreshOps() {
+  const el = document.getElementById('bmOpsContent');
+  if (el) el.innerHTML = bmOpsContent();
+  // Show/hide tenure filter based on role selection
+  const showTenure = _bmOpsRoleFilter !== 'analyst';
+  const tenureSels = document.querySelectorAll('#brokerMgmtContent select');
+  // Rebuild card for tenure filter visibility
+  renderBrokerMgmtScreen();
+}
+
+function bmTenureDays(joinDate) {
+  if (!joinDate) return null;
+  const join = new Date(joinDate);
+  if (isNaN(join)) return null;
+  return Math.floor((Date.now() - join.getTime()) / 86400000);
+}
+
+function bmTenureLabel(days) {
+  if (days === null) return null;
+  const months = Math.floor(days / 30);
+  const rem    = days % 30;
+  if (months === 0) return `${days} day${days!==1?'s':''}`;
+  if (rem === 0)    return `${months} month${months!==1?'s':''}`;
+  return `${months} month${months!==1?'s':''} ${rem} day${rem!==1?'s':''}`;
+}
+
+function bmOpsContent() {
+  const allStaff   = getStaff().filter(s => ['analyst','trainee'].includes(s.role));
+  const unassigned = allStaff.filter(s => getBrokersForStaff(s.name).length === 0);
+  const showTenure = _bmOpsRoleFilter !== 'analyst';
+
+  let filtered = unassigned;
+  if (_bmOpsRoleFilter) filtered = filtered.filter(s => s.role === _bmOpsRoleFilter);
+  if (_bmOpsNameFilter) filtered = filtered.filter(s => s.name === _bmOpsNameFilter);
+  if (_bmOpsTeamFilter) {
+    const teamMembers = getTeamForTL(_bmOpsTeamFilter);
+    filtered = filtered.filter(s => teamMembers.includes(s.name));
+  }
+  if (_bmOpsTenureFilter && showTenure) {
+    const minDays = parseInt(_bmOpsTenureFilter);
+    filtered = filtered.filter(s => {
+      const days = bmTenureDays(s.joinDate);
+      return days !== null && days >= minDays;
+    });
+  }
+
+  if (!filtered.length) {
+    return '<div style="text-align:center;padding:1.5rem;color:var(--success);font-size:14px;font-weight:600">✓ No unassigned staff matching filters</div>';
+  }
+
+  return filtered.map(s => {
+    const crms  = getCRMsForStaff(s.name);
+    const tl    = getStaff().find(t => t.role==='teamlead' && getTeamForTL(t.name).includes(s.name));
+    const days  = bmTenureDays(s.joinDate);
+    const isTrainee = s.role === 'trainee';
+
+    return `<div style="padding:10px 0;border-bottom:1px solid var(--border)">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;flex-wrap:wrap">
+        <span style="font-size:14px;font-weight:600;flex:1">${esc(s.name)}</span>
+        <span style="font-size:11px;background:var(--surface-2);border-radius:4px;padding:2px 7px;color:var(--text-3)">${esc(ROLE_LABEL[s.role]||s.role)}</span>
+        ${tl?`<span style="font-size:11px;color:var(--text-3)">👥 ${esc(tl.name.split(' ')[0])}'s team</span>`:'<span style="font-size:11px;color:var(--danger)">No team</span>'}
+        ${isTrainee && days !== null ? `<span style="font-size:11px;background:#EDE9FE;color:#5B21B6;border-radius:4px;padding:2px 7px;font-weight:600">📅 ${bmTenureLabel(days)}</span>` : ''}
+      </div>
+      ${isTrainee && s.joinDate ? `<div style="font-size:11px;color:var(--text-3);margin-bottom:5px">Started ${esc(s.joinDate)}</div>` : ''}
+      <div style="display:flex;flex-wrap:wrap;gap:4px">
+        ${crms.length
+          ? crms.map(c=>`<span style="font-size:11px;background:var(--brand-light);color:var(--brand);border-radius:50px;padding:2px 9px;font-weight:500">${esc(c)}</span>`).join('')
+          : '<span style="font-size:11px;color:var(--text-3);font-style:italic">No CRM skills recorded</span>'}
+      </div>
+    </div>`;
+  }).join('');
 }
 
 // ── 1. BROKER LIST ─────────────────────────────────────────────────────────
