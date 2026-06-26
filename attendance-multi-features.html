@@ -11053,7 +11053,7 @@ function renderEODScreen() {
 
   const pf = (field, fallback='') => existing ? (existing[field] ?? fallback) : fallback;
 
-  // Populate tasks from existing report — always reload from saved on screen open
+  // Always reload tasks from saved report on screen open
   _eodTasks = (existing && existing.tasks) ? JSON.parse(JSON.stringify(existing.tasks)) : [];
   window._eodTasksLoaded = true;
 
@@ -11061,29 +11061,13 @@ function renderEODScreen() {
 
     <!-- ── TASKS ────────────────────────────────────── -->
     <div class="card" style="margin-bottom:1rem">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-        <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px">📋 Tasks today</div>
-        <button type="button" onclick="addEODTask()"
-          style="font-size:12px;padding:5px 12px;border-radius:50px;border:1.5px solid var(--brand);background:var(--brand-light);color:var(--brand);cursor:pointer;font-weight:600">
-          + Add task
-        </button>
-      </div>
+      <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">📋 Tasks today</div>
+      <button type="button" onclick="addEODTask()"
+        style="width:100%;padding:10px;border:1.5px dashed var(--brand);border-radius:var(--radius-sm);background:var(--brand-light);color:var(--brand);font-size:13px;font-weight:600;cursor:pointer;margin-bottom:10px">
+        + Add task
+      </button>
       <div style="cursor:pointer" onclick="toggleEODTasksPanel()">
-        <div id="eodTaskSummary">
-          ${(existing?.tasks?.length)
-            ? existing.tasks.map(t => {
-                const fmt = v => { if(!v) return '—'; const [h,m]=v.split(':'); const ap=+h<12?'AM':'PM'; return (+h%12||12)+':'+m+' '+ap; };
-                return `<div style="display:grid;grid-template-columns:2fr 1fr 1fr 2fr;gap:6px;padding:4px 0;border-bottom:1px solid var(--border);font-size:12px;color:var(--text-2)">
-                  <span style="font-weight:600;color:var(--text)">${esc(t.type||'Untitled')}</span>
-                  <span>${fmt(t.startTime)}</span>
-                  <span>${fmt(t.endTime)}</span>
-                  <span style="color:var(--text-3)">${esc(t.notes||'—')}</span>
-                </div>`;
-              }).join('') +
-              `<div style="font-size:11px;color:var(--text-3);margin-top:6px;text-align:right" id="eodTasksToggleIcon">▾ tap to edit</div>`
-            : '<div style="font-size:13px;color:var(--text-3)">No tasks yet — use + Add task above</div>'
-          }
-        </div>
+        <div id="eodTaskSummary"></div>
       </div>
       <div id="eodTasksPanel" style="display:none;margin-top:10px;border-top:1px solid var(--border);padding-top:10px">
         <div id="eodTaskList"></div>
@@ -11157,7 +11141,7 @@ function renderEODScreen() {
     }
   </form>`;
 
-  // Render task summary (panel starts collapsed — expands on click)
+  // Populate task summary now DOM is ready
   updateEODTaskSummary();
 
   // Init EOD download section
