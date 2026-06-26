@@ -918,6 +918,12 @@ tr.flagged-row:hover td { background: #FFEAEA; }
       <button class="btn-primary" onclick="saveProfileDetails()">Save details</button>
     </div>
 
+    <div class="card" id="crmSkillsCard" style="display:none;margin-bottom:1rem">
+      <div class="section-label">💻 My CRM Skills</div>
+      <p style="font-size:13px;color:var(--text-2);margin-bottom:12px">Select all the CRM systems you're competent in.</p>
+      <div id="crmSkillsChips" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+    </div>
+
     <div class="card">
       <div class="section-label">Change PIN</div>
       <p style="font-size:12px;color:var(--text-3);margin-bottom:12px">Enter a new 6-digit PIN twice to confirm.</p>
@@ -1114,43 +1120,7 @@ tr.flagged-row:hover td { background: #FFEAEA; }
       <a href="index.html" style="display:inline-block;font-size:13px;padding:8px 16px;background:var(--brand);color:#fff;border-radius:var(--radius-sm);text-decoration:none">Go to Portal →</a>
     </div>
 
-    <!-- ── Broker Management (superadmin only) ─────────────────────────── -->
-    <div class="card" id="brokerMgmtCard" style="display:none">
-      <div class="section-label">🏦 Broker List</div>
-      <p style="font-size:13px;color:var(--text-2);margin-bottom:12px">Manage brokers. Only superadmin can see or edit this list.</p>
-      <div style="display:flex;gap:8px;margin-bottom:12px">
-        <input type="text" id="newBrokerName" placeholder="Broker name…" style="flex:1;font-size:13px;padding:6px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)"/>
-        <button onclick="addBroker()" class="btn-sm" style="background:var(--brand);color:#fff;border-color:var(--brand)">+ Add</button>
-      </div>
-      <div id="brokerList"><div style="font-size:13px;color:var(--text-3)">Loading…</div></div>
-    </div>
-
-    <div class="card" id="brokerAssignCard" style="display:none">
-      <div class="section-label">👤 Broker Assignments</div>
-      <p style="font-size:13px;color:var(--text-2);margin-bottom:12px">Assign brokers to analysts and team leads.</p>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
-        <select id="baStaffSel" style="flex:1;font-size:13px;padding:6px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)">
-          <option value="">— select staff —</option>
-        </select>
-        <select id="baBrokerSel" style="flex:1;font-size:13px;padding:6px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)">
-          <option value="">— select broker —</option>
-        </select>
-        <button onclick="assignBrokerToStaff()" class="btn-sm" style="background:var(--brand);color:#fff;border-color:var(--brand)">Assign</button>
-      </div>
-      <div id="brokerAssignList"><div style="font-size:13px;color:var(--text-3)">Loading…</div></div>
-    </div>
-
-    <div class="card" id="crmMgmtCard" style="display:none">
-      <div class="section-label">💻 CRM Options &amp; Assignments</div>
-      <p style="font-size:13px;color:var(--text-2);margin-bottom:12px">Manage CRM software options and assign to staff.</p>
-      <div style="display:flex;gap:8px;margin-bottom:8px">
-        <input type="text" id="newCRMName" placeholder="CRM name (e.g. Infynity)…" style="flex:1;font-size:13px;padding:6px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)"/>
-        <button onclick="addCRMOption()" class="btn-sm" style="background:var(--brand);color:#fff;border-color:var(--brand)">+ Add</button>
-      </div>
-      <div id="crmOptionList" style="margin-bottom:14px"></div>
-      <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">CRM per analyst / TL</div>
-      <div id="staffCRMList"></div>
-    </div>
+    <!-- Broker/CRM management moved to dedicated Broker Management tab -->
 
     <div class="card" id="obsNotesStatsCard" style="display:none">
       <div class="section-label">📝 Observation Notes — Stats</div>
@@ -1209,6 +1179,15 @@ tr.flagged-row:hover td { background: #FFEAEA; }
       </div>
       <div id="eodDownloadPreview" style="font-size:13px;color:var(--text-3)">Select a date to preview or download.</div>
     </div>
+  </div>
+
+  <!-- ── BROKER MANAGEMENT SCREEN ────────────────────────────────────── -->
+  <div id="screen-brokermgmt" class="screen">
+    <div class="page-header">
+      <h1>🏦 Broker Management</h1>
+      <p id="brokerMgmtSub">Manage brokers, assignments and CRMs</p>
+    </div>
+    <div id="brokerMgmtContent"></div>
   </div>
 
   <!-- ── OTHER TASKS SCREEN ────────────────────────────────────────────── -->
@@ -1848,6 +1827,21 @@ function renderProfileScreen() {
   sv('profileEC2Name', me.ec2Name);
   sv('profileEC2Phone', me.ec2Phone);
   sv('profileEC2Relation', me.ec2Relation);
+
+  // CRM Skills — show for analyst, trainee, teamlead, opsmanager
+  const crmCard  = document.getElementById('crmSkillsCard');
+  const crmChips = document.getElementById('crmSkillsChips');
+  const crmRoles = ['analyst','trainee','teamlead','opsmanager'];
+  if (crmCard && crmChips && crmRoles.includes(currentUser.role)) {
+    crmCard.style.display = 'block';
+    if (!_crmOptions.length) {
+      loadCRMOptions().then(() => renderCRMSkillChips(crmChips, me.name));
+    } else {
+      renderCRMSkillChips(crmChips, me.name);
+    }
+  } else if (crmCard) {
+    crmCard.style.display = 'none';
+  }
 }
 
 async function saveProfileDetails() {
@@ -2062,23 +2056,23 @@ function exitPreview() {
 // Default permissions per role — used if SP has nothing
 const DEFAULT_PERMISSIONS = {
   hrmanager: {
-    tabs: { checkin:true, leave:true, dashboard:true, admin:true, files:false, myfiles:false, myteam:false, eod:false, performance:false, othertasks:false, feedback:false, profile:true },
+    tabs: { checkin:true, leave:true, dashboard:true, admin:true, brokermgmt:false, files:false, myfiles:false, myteam:false, eod:false, performance:false, othertasks:false, feedback:false, profile:true },
     features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canApproveLeave:true, canSeeLeaveBalance:true, canSeeTeamLeaveBalances:true, canSeeAllFiles:false, canAddStaff:true, canResetPins:true, canChangeRoles:false, canDeleteStaff:false, canExportData:true, canAddObsNotes:true }
   },
   teamlead: {
-    tabs: { checkin:true, leave:true, dashboard:true, admin:false, files:false, myfiles:false, myteam:false, eod:true, performance:false, othertasks:false, feedback:false, profile:true },
+    tabs: { checkin:true, leave:true, dashboard:true, admin:false, brokermgmt:true, files:false, myfiles:false, myteam:false, eod:true, performance:false, othertasks:false, feedback:false, profile:true },
     features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canSeeLeaveBalance:false, canApproveLeave:true, canSeeTeamLeaveBalances:true, canSeeAllFiles:true, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:true }
   },
   analyst: {
-    tabs: { checkin:true, leave:true, dashboard:false, admin:false, files:false, myfiles:false, myteam:false, eod:true, performance:false, othertasks:false, feedback:false, profile:true },
+    tabs: { checkin:true, leave:true, dashboard:false, admin:false, brokermgmt:false, files:false, myfiles:false, myteam:false, eod:true, performance:false, othertasks:false, feedback:false, profile:true },
     features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canSeeLeaveBalance:false, canApproveLeave:false, canSeeTeamLeaveBalances:false, canSeeAllFiles:true, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:false }
   },
   trainee: {
-    tabs: { checkin:true, leave:true, dashboard:false, admin:false, files:false, myfiles:false, myteam:false, eod:false, performance:false, othertasks:false, feedback:false, profile:true },
+    tabs: { checkin:true, leave:true, dashboard:false, admin:false, brokermgmt:false, files:false, myfiles:false, myteam:false, eod:false, performance:false, othertasks:false, feedback:false, profile:true },
     features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canSeeLeaveBalance:false, canApproveLeave:false, canSeeTeamLeaveBalances:false, canSeeAllFiles:false, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:false }
   },
   staff: {
-    tabs: { checkin:true, leave:true, dashboard:false, admin:false, files:false, myfiles:false, myteam:false, eod:false, performance:false, othertasks:false, feedback:false, profile:true },
+    tabs: { checkin:true, leave:true, dashboard:false, admin:false, brokermgmt:false, files:false, myfiles:false, myteam:false, eod:false, performance:false, othertasks:false, feedback:false, profile:true },
     features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canSeeLeaveBalance:false, canApproveLeave:false, canSeeTeamLeaveBalances:false, canSeeAllFiles:false, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:false }
   },
   hr: {
@@ -2086,23 +2080,23 @@ const DEFAULT_PERMISSIONS = {
     features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canSeeLeaveBalance:false, canApproveLeave:false, canSeeTeamLeaveBalances:false, canSeeAllFiles:false, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:false }
   },
   assistant: {
-    tabs: { checkin:true, leave:true, dashboard:false, admin:false, files:false, myfiles:false, myteam:false, eod:false, performance:false, othertasks:false, feedback:false, profile:true },
+    tabs: { checkin:true, leave:true, dashboard:false, admin:false, brokermgmt:false, files:false, myfiles:false, myteam:false, eod:false, performance:false, othertasks:false, feedback:false, profile:true },
     features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canSeeLeaveBalance:false, canApproveLeave:false, canSeeTeamLeaveBalances:false, canSeeAllFiles:false, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:false }
   },
   sales: {
-    tabs: { checkin:true, leave:true, dashboard:false, admin:false, files:false, myfiles:false, myteam:false, eod:false, performance:false, othertasks:false, feedback:false, profile:true },
+    tabs: { checkin:true, leave:true, dashboard:false, admin:false, brokermgmt:false, files:false, myfiles:false, myteam:false, eod:false, performance:false, othertasks:false, feedback:false, profile:true },
     features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canSeeLeaveBalance:false, canApproveLeave:false, canSeeTeamLeaveBalances:false, canSeeAllFiles:false, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:false }
   },
   customerservice: {
-    tabs: { checkin:true, leave:true, dashboard:false, admin:false, files:false, myfiles:false, myteam:false, eod:false, performance:false, othertasks:false, feedback:false, profile:true },
+    tabs: { checkin:true, leave:true, dashboard:false, admin:false, brokermgmt:false, files:false, myfiles:false, myteam:false, eod:false, performance:false, othertasks:false, feedback:false, profile:true },
     features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canSeeLeaveBalance:false, canApproveLeave:false, canSeeTeamLeaveBalances:false, canSeeAllFiles:false, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:false }
   },
   socialmedia: {
-    tabs: { checkin:true, leave:true, dashboard:false, admin:false, files:false, myfiles:false, myteam:false, eod:false, performance:false, othertasks:false, feedback:false, profile:true },
+    tabs: { checkin:true, leave:true, dashboard:false, admin:false, brokermgmt:false, files:false, myfiles:false, myteam:false, eod:false, performance:false, othertasks:false, feedback:false, profile:true },
     features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canApproveLeave:false, canSeeLeaveBalance:false, canSeeTeamLeaveBalances:false, canSeeAllFiles:false, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:false }
   },
   accountant: {
-    tabs: { checkin:true, leave:true, dashboard:false, admin:false, files:false, myfiles:false, myteam:false, eod:false, performance:false, othertasks:false, feedback:false, profile:true },
+    tabs: { checkin:true, leave:true, dashboard:false, admin:false, brokermgmt:false, files:false, myfiles:false, myteam:false, eod:false, performance:false, othertasks:false, feedback:false, profile:true },
     features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canApproveLeave:false, canSeeLeaveBalance:false, canSeeTeamLeaveBalances:false, canSeeAllFiles:false, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:false }
   },
   opsmanager: {
@@ -2532,7 +2526,7 @@ function buildNav() {
   let tabs = [];
   const r = currentUser.role;
   if (r === 'superadmin') {
-    tabs = [['dashboard','Dashboard'],['admin','Staff'],['profile','My Details']];
+    tabs = [['dashboard','Dashboard'],['brokermgmt','🏦 Brokers'],['admin','Staff'],['profile','My Details']];
   } else if (r === 'hrmanager') {
     tabs = [['checkin','Check in'],['leave','🌴 Leave'],['dashboard','Dashboard'],['admin','Staff'],['profile','My Details']];
     // hrmanager explicitly excluded from All Files tab
@@ -2540,7 +2534,7 @@ function buildNav() {
     // All other roles — build tabs dynamically from permissions
     const ALL_TABS_DEF = [
       ['checkin','Check in'], ['leave','🌴 Leave'], ['dashboard','Dashboard'],
-      ['admin','Staff'],  
+      ['admin','Staff'], ['brokermgmt','🏦 Brokers'],
       ['myteam','My Team'], ['eod','EOD'], 
         ['profile','My Details']
     ];
@@ -2583,10 +2577,16 @@ function goTab(name, btn) {
   if (name==='checkin')   initCheckin();
   if (name==='dashboard') { loadDashboard(); if (!window._dashRefreshTimer) window._dashRefreshTimer = setInterval(() => { if (document.getElementById('screen-dashboard')?.classList.contains('active')) loadDashboard(); }, 120000); }
   if (name==='myteam')    renderMyTeam();
-  if (name==='eod')       renderEODScreen();
-  if (name==='admin')     renderAdmin();
+  if (name==='eod')        renderEODScreen();
+  if (name==='admin')      renderAdmin();
   if (name==='leave')      renderLeaveScreen();
-  if (name==='profile')   { initCp(); renderProfileScreen(); }
+  if (name==='brokermgmt') renderBrokerMgmtScreen();
+  if (name==='profile') {
+    initCp();
+    // Load CRM options if not yet loaded (for CRM Skills section)
+    const crmLoad = _crmOptions.length ? Promise.resolve() : loadCRMOptions().then(loadStaffCRMs);
+    crmLoad.then(() => renderProfileScreen()).catch(() => renderProfileScreen());
+  }
 }
 
 function logout() {
@@ -6267,16 +6267,7 @@ function renderAdmin() {
     permCard.style.display=sa?'block':'none';
     if(sa) renderPermissionsEditor();
   }
-  // Broker + CRM management (superadmin only)
-  ['brokerMgmtCard','brokerAssignCard','crmMgmtCard'].forEach(id => {
-    const c = document.getElementById(id);
-    if(c) c.style.display = sa ? 'block' : 'none';
-  });
-  if(sa) {
-    loadBrokers().then(renderBrokerList);
-    loadBrokerAssignments().then(renderBrokerAssignList);
-    loadCRMOptions().then(() => loadStaffCRMs().then(renderCRMSection));
-  }
+  // Broker + CRM management now lives in dedicated Broker Management tab
   const btCard = document.getElementById('bulkTransferCard');
   if(btCard) btCard.style.display = (sa || isTeamLead()) ? 'block' : 'none';
 
@@ -8230,12 +8221,14 @@ async function loadBrokers() {
 }
 
 async function addBroker() {
-  const name = document.getElementById('newBrokerName')?.value.trim();
+  const input = document.getElementById('bmNewBroker') || document.getElementById('newBrokerName');
+  const name = input?.value.trim();
   if (!name) return;
   const res = await spPost(SP_API + "('Brokers')/items", {Title:name});
   if (res) {
-    document.getElementById('newBrokerName').value = '';
-    await loadBrokers(); renderBrokerList();
+    if (input) input.value = '';
+    await loadBrokers();
+    renderBrokerMgmtScreen();
     showToast('Broker added ✓','ok');
   }
 }
@@ -8243,7 +8236,7 @@ async function addBroker() {
 async function deleteBroker(id) {
   if (!confirm('Remove this broker? This will NOT remove existing assignments.')) return;
   await spDelete(SP_API + `('Brokers')/items(${id})`);
-  await loadBrokers(); renderBrokerList(); showToast('Broker removed','ok');
+  await loadBrokers(); renderBrokerMgmtScreen(); showToast('Broker removed','ok');
 }
 
 function renderBrokerList() {
@@ -8270,17 +8263,18 @@ function getBrokersForStaff(name) {
 }
 
 async function assignBrokerToStaff() {
-  const staffName = document.getElementById('baStaffSel')?.value;
-  const brokerName = document.getElementById('baBrokerSel')?.value;
+  const staffName = document.getElementById('bmStaffSel')?.value;
+  const brokerName = document.getElementById('bmBrokerSel')?.value;
   if (!staffName || !brokerName) { showToast('Select both staff and broker','err'); return; }
   if (_brokerAssignments.some(a=>a.staffName===staffName&&a.brokerName===brokerName)) { showToast('Already assigned','err'); return; }
   const res = await spPost(SP_API + "('BrokerAssignments')/items", {Title:staffName, BrokerName:brokerName});
-  if (res) { await loadBrokerAssignments(); renderBrokerAssignList(); showToast('Broker assigned ✓','ok'); }
+  if (res) { await loadBrokerAssignments(); renderBrokerMgmtScreen(); showToast('Broker assigned ✓','ok'); }
 }
 
 async function removeBrokerAssignment(id) {
+  if (!id) return;
   await spDelete(SP_API + `('BrokerAssignments')/items(${id})`);
-  await loadBrokerAssignments(); renderBrokerAssignList(); showToast('Assignment removed','ok');
+  await loadBrokerAssignments(); renderBrokerMgmtScreen(); showToast('Assignment removed','ok');
 }
 
 function renderBrokerAssignList() {
@@ -8330,15 +8324,16 @@ async function loadCRMOptions() {
 }
 
 async function addCRMOption() {
-  const name = document.getElementById('newCRMName')?.value.trim();
+  const input = document.getElementById('bmNewCRM') || document.getElementById('newCRMName');
+  const name = input?.value.trim();
   if (!name) return;
   const res = await spPost(SP_API + "('CRMOptions')/items",{Title:name});
-  if (res) { document.getElementById('newCRMName').value=''; await loadCRMOptions(); renderCRMSection(); showToast('CRM added ✓','ok'); }
+  if (res) { if(input) input.value=''; await loadCRMOptions(); renderBrokerMgmtScreen(); showToast('CRM added ✓','ok'); }
 }
 
 async function deleteCRMOption(id) {
   await spDelete(SP_API + `('CRMOptions')/items(${id})`);
-  await loadCRMOptions(); renderCRMSection(); showToast('CRM removed','ok');
+  await loadCRMOptions(); renderBrokerMgmtScreen(); showToast('CRM removed','ok');
 }
 
 async function loadStaffCRMs() {
@@ -8399,7 +8394,7 @@ async function toggleStaffCRM(staffName, crmName) {
   const current = getCRMsForStaff(staffName);
   const newList = current.includes(crmName) ? current.filter(c=>c!==crmName) : [...current, crmName];
   await saveStaffCRMSP(staffName, newList);
-  renderCRMSection();
+  renderBrokerMgmtScreen();
   showToast(staffName.split(' ')[0]+' CRMs updated ✓','ok');
 }
 
@@ -8453,7 +8448,182 @@ async function saveCoverageSP(absenteeName, date, coverName) {
   LS.set('ci_coverage_sp', _coverageSP);
 }
 
-// ── Bulk file transfer ─────────────────────────────────────────────────────
+// ── Broker Management Screen ──────────────────────────────────────────────
+async function renderBrokerMgmtScreen() {
+  const el = document.getElementById('brokerMgmtContent');
+  if (!el) return;
+  el.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--text-3)">Loading…</div>';
+
+  const sa = isSuperAdmin();
+  const isTL = isTeamLead();
+  const myTeam = isTL ? getTeamForTL(currentUser.name) : [];
+
+  await Promise.all([
+    loadBrokers(),
+    loadBrokerAssignments(),
+    loadCRMOptions(),
+    loadStaffCRMs(),
+  ]);
+
+  const allStaff = getStaff().filter(s => ['analyst','teamlead','trainee'].includes(s.role));
+  const viewStaff = sa ? allStaff : allStaff.filter(s => myTeam.includes(s.name));
+
+  el.innerHTML = '';
+
+  // ── Broker List (superadmin only) ───────────────────────────────────────
+  if (sa) {
+    const brokerCard = document.createElement('div');
+    brokerCard.className = 'card';
+    brokerCard.style.marginBottom = '1rem';
+    brokerCard.innerHTML = `
+      <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">🏦 Broker List</div>
+      <div style="display:flex;gap:8px;margin-bottom:12px">
+        <input type="text" id="bmNewBroker" placeholder="Broker name…"
+          style="flex:1;font-size:13px;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)"
+          onkeydown="if(event.key==='Enter'){addBroker();event.preventDefault()}"/>
+        <button onclick="addBroker()" style="padding:8px 16px;border-radius:var(--radius-sm);border:none;background:var(--brand);color:#fff;font-size:13px;font-weight:600;cursor:pointer">+ Add</button>
+      </div>
+      <div id="bmBrokerList">
+        ${!_brokers.length ? '<div style="font-size:13px;color:var(--text-3)">No brokers added yet.</div>' :
+          _brokers.map(b => `
+            <div style="display:flex;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)">
+              <span style="flex:1;font-size:14px;font-weight:500">${esc(b.name)}</span>
+              <button onclick="deleteBroker(${b.id})" style="font-size:12px;padding:3px 10px;border-radius:4px;border:1px solid var(--danger);color:var(--danger);background:transparent;cursor:pointer">Remove</button>
+            </div>`).join('')}
+      </div>`;
+    el.appendChild(brokerCard);
+  }
+
+  // ── Broker Assignments ───────────────────────────────────────────────────
+  const assignCard = document.createElement('div');
+  assignCard.className = 'card';
+  assignCard.style.marginBottom = '1rem';
+  assignCard.innerHTML = `
+    <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">👥 Broker Assignments</div>
+    ${sa ? `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--border)">
+      <select id="bmStaffSel" style="flex:1;font-size:13px;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)">
+        <option value="">— select staff —</option>
+        ${allStaff.map(s=>`<option value="${esc(s.name)}">${esc(s.name)} (${esc(ROLE_LABEL[s.role]||s.role)})</option>`).join('')}
+      </select>
+      <select id="bmBrokerSel" style="flex:1;font-size:13px;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)">
+        <option value="">— select broker —</option>
+        ${_brokers.map(b=>`<option value="${esc(b.name)}">${esc(b.name)}</option>`).join('')}
+      </select>
+      <button onclick="assignBrokerToStaff()" style="padding:8px 16px;border-radius:var(--radius-sm);border:none;background:var(--brand);color:#fff;font-size:13px;font-weight:600;cursor:pointer">Assign</button>
+    </div>` : ''}
+    <div id="bmAssignList">
+      ${viewStaff.map(s => {
+        const brokers = getBrokersForStaff(s.name);
+        return `<div style="padding:10px 0;border-bottom:1px solid var(--border)">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+            <span style="font-size:13px;font-weight:600;flex:1">${esc(s.name)}</span>
+            <span style="font-size:11px;color:var(--text-3)">${esc(ROLE_LABEL[s.role]||s.role)}</span>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px">
+            ${brokers.length ? brokers.map(b => {
+              const assign = _brokerAssignments.find(a=>a.staffName===s.name&&a.brokerName===b);
+              return `<div style="display:flex;align-items:center;gap:4px;background:var(--brand-light);border:1px solid var(--brand);border-radius:50px;padding:3px 10px">
+                <span style="font-size:12px;color:var(--brand);font-weight:500">${esc(b)}</span>
+                ${sa?`<button onclick="removeBrokerAssignment(${assign?.id})" style="background:transparent;border:none;color:var(--brand);cursor:pointer;font-size:14px;line-height:1;padding:0 0 0 2px">×</button>`:''}
+              </div>`;
+            }).join('') : '<span style="font-size:12px;color:var(--text-3)">No broker assigned</span>'}
+          </div>
+        </div>`;
+      }).join('')}
+    </div>`;
+  el.appendChild(assignCard);
+
+  // ── CRM Options (superadmin only) ────────────────────────────────────────
+  if (sa) {
+    const crmOptCard = document.createElement('div');
+    crmOptCard.className = 'card';
+    crmOptCard.style.marginBottom = '1rem';
+    crmOptCard.innerHTML = `
+      <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">💻 CRM Options</div>
+      <div style="display:flex;gap:8px;margin-bottom:12px">
+        <input type="text" id="bmNewCRM" placeholder="CRM name (e.g. Infynity)…"
+          style="flex:1;font-size:13px;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)"
+          onkeydown="if(event.key==='Enter'){addCRMOption();event.preventDefault()}"/>
+        <button onclick="addCRMOption()" style="padding:8px 16px;border-radius:var(--radius-sm);border:none;background:var(--brand);color:#fff;font-size:13px;font-weight:600;cursor:pointer">+ Add</button>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">
+        ${!_crmOptions.length ? '<span style="font-size:13px;color:var(--text-3)">No CRMs yet.</span>' :
+          _crmOptions.map(c => `
+            <div style="display:flex;align-items:center;gap:4px;background:var(--surface-2);border:1.5px solid var(--border);border-radius:50px;padding:4px 12px">
+              <span style="font-size:13px">${esc(c.name)}</span>
+              <button onclick="deleteCRMOption(${c.id})" style="background:transparent;border:none;color:var(--text-3);cursor:pointer;font-size:16px;line-height:1;padding:0 0 0 4px">×</button>
+            </div>`).join('')}
+      </div>`;
+    el.appendChild(crmOptCard);
+  }
+
+  // ── CRM Skills ───────────────────────────────────────────────────────────
+  if (_crmOptions.length) {
+    const crmAssignCard = document.createElement('div');
+    crmAssignCard.className = 'card';
+    crmAssignCard.innerHTML = `
+      <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">💻 CRM Skills</div>
+      <p style="font-size:12px;color:var(--text-3);margin-bottom:12px">${sa ? 'Click to toggle CRM skills for any staff member.' : 'Your team\'s CRM competencies (staff manage their own in Profile).'}</p>
+      <div id="bmCRMAssignList">
+        ${viewStaff.map(s => {
+          const staffCRMs = getCRMsForStaff(s.name);
+          return `<div style="padding:10px 0;border-bottom:1px solid var(--border)">
+            <div style="font-size:13px;font-weight:600;margin-bottom:6px">${esc(s.name)} <span style="font-size:11px;color:var(--text-3);font-weight:400">${esc(ROLE_LABEL[s.role]||s.role)}</span></div>
+            <div style="display:flex;flex-wrap:wrap;gap:6px">
+              ${_crmOptions.map(c => {
+                const sel = staffCRMs.includes(c.name);
+                return `<button type="button"
+                  ${sa ? `onclick="toggleStaffCRM('${s.name.replace(/'/g,"\\'")}','${esc(c.name)}')"` : ''}
+                  style="padding:6px 12px;border-radius:50px;border:1.5px solid ${sel?'var(--brand)':'var(--border)'};
+                  background:${sel?'var(--brand-light)':'var(--surface-2)'};color:${sel?'var(--brand)':'var(--text-3)'};
+                  cursor:${sa?'pointer':'default'};font-size:12px;font-weight:${sel?'600':'400'}">
+                  ${sel?'✓ ':''}${esc(c.name)}
+                </button>`;
+              }).join('')}
+            </div>
+          </div>`;
+        }).join('')}
+      </div>`;
+    el.appendChild(crmAssignCard);
+  }
+}
+
+// Override renderBrokerList and renderBrokerAssignList to also refresh the broker mgmt screen
+const _origRenderBrokerList = window.renderBrokerList;
+window.renderBrokerList = function() {
+  if (_origRenderBrokerList) _origRenderBrokerList.apply(this, arguments);
+  if (document.getElementById('screen-brokermgmt')?.classList.contains('active')) renderBrokerMgmtScreen();
+};
+
+function isBrokerMgmtActive() {
+  return document.getElementById('screen-brokermgmt')?.classList.contains('active');
+}
+function renderCRMSkillChips(container, staffName) {
+  if (!container) return;
+  const mySkills = getCRMsForStaff(staffName);
+  container.innerHTML = _crmOptions.map(c => {
+    const sel = mySkills.includes(c.name);
+    return `<button type="button" onclick="toggleMyCRMSkill('${staffName.replace(/'/g,"\\'")}','${esc(c.name)}')"
+      data-crm="${esc(c.name)}" data-selected="${sel}"
+      style="padding:8px 16px;border-radius:50px;border:1.5px solid ${sel?'var(--brand)':'var(--border)'};
+      background:${sel?'var(--brand-light)':'var(--surface-2)'};color:${sel?'var(--brand)':'var(--text-2)'};
+      font-size:13px;font-weight:${sel?'700':'400'};cursor:pointer">
+      ${sel?'✓ ':''}${esc(c.name)}
+    </button>`;
+  }).join('') || '<span style="font-size:13px;color:var(--text-3)">No CRM options set up yet — contact your administrator.</span>';
+}
+
+async function toggleMyCRMSkill(staffName, crmName) {
+  const current = getCRMsForStaff(staffName);
+  const newList = current.includes(crmName)
+    ? current.filter(c => c !== crmName)
+    : [...current, crmName];
+  await saveStaffCRMSP(staffName, newList);
+  const container = document.getElementById('crmSkillsChips');
+  if (container) renderCRMSkillChips(container, staffName);
+  showToast('CRM Skills updated ✓', 'ok');
+}
+
 function openBulkTransferModal() {
   const staff = getStaff().filter(s => s.role !== 'superadmin');
   const isTL = isTeamLead() && !isSuperAdmin();
