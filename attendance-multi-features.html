@@ -11118,6 +11118,9 @@ function renderEODScreen() {
     ${existing ? `<div style="text-align:center;font-size:12px;color:var(--text-3);margin-top:8px">Last submitted: ${esc(fmtDate(existing.submittedAt||existing.date))}</div>` : ''}
   </form>`;
 
+  // Render task list now that the DOM is ready
+  renderEODTaskList();
+
   // Init EOD download section
   const dlDate = document.getElementById('eodDownloadDate');
   if (dlDate && !dlDate.value) dlDate.value = today;
