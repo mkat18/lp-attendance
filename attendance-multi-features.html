@@ -1654,14 +1654,20 @@ const LS = {
 // ── API helpers ───────────────────────────────────────────────────────────
 async function spPost(url, body) {
   try {
+    const token = await getToken();
     const r = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Authorization': 'Bearer ' + token,
+        'Accept': 'application/json;odata=nometadata',
+        'Content-Type': 'application/json;odata=nometadata'
+      },
       body: JSON.stringify(body||{})
     });
-    return await r.json();
+    if (!r.ok) { console.warn('spPost failed:', r.status, url); return null; }
+    return await r.json().catch(()=>({ok:true}));
   } catch(e) {
-    console.error('Flow error:', e);
+    console.error('spPost error:', e);
     return null;
   }
 }
@@ -8314,12 +8320,20 @@ async function loadCRMOptions() {
     const res = await spGet(SP_API + "('CRMOptions')/items?$select=Id,Title&$top=100&$orderby=Title");
     if (res?.value) {
       if (!res.value.length) {
-        for (const n of DEFAULT_CRMS) await spPost(SP_API + "('CRMOptions')/items",{Title:n}).catch(()=>{});
-        return loadCRMOptions();
+        // Seed defaults — but only try once, don't recurse on failure
+        for (const n of DEFAULT_CRMS) {
+          await spPost(SP_API + "('CRMOptions')/items", {Title:n}).catch(()=>{});
+        }
+        // Reload once after seeding
+        const res2 = await spGet(SP_API + "('CRMOptions')/items?$select=Id,Title&$top=100&$orderby=Title").catch(()=>null);
+        if (res2?.value?.length) _crmOptions = res2.value.map(r=>({id:r.Id,name:r.Title}));
+        else _crmOptions = DEFAULT_CRMS.map((n,i)=>({id:i,name:n}));
+        return;
       }
-      _crmOptions = res.value.map(r=>({id:r.Id,name:r.Title})); return;
+      _crmOptions = res.value.map(r=>({id:r.Id,name:r.Title}));
+      return;
     }
-  } catch(e){}
+  } catch(e) { console.warn('loadCRMOptions failed:', e); }
   _crmOptions = DEFAULT_CRMS.map((n,i)=>({id:i,name:n}));
 }
 
