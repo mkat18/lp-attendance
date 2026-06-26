@@ -2466,6 +2466,7 @@ function handlePin() {
 async function loginAs(member) {
   currentUser={name:member.name, role:member.role};
   sessionStorage.setItem('lp_session', JSON.stringify({name:member.name, role:member.role}));
+  try { localStorage.setItem('lp_session_cross', JSON.stringify({name:member.name, role:member.role})); } catch(e) {}
   buildNav();
 
   // Restore last tab the user was on, otherwise go to default
@@ -5729,8 +5730,8 @@ async function onMsLogin(account) {
   requestGeo();
   await loadFromSharePoint().catch(()=>{});
   autoSaveMsEmail(account).catch(()=>{});
-  // Restore session from sessionStorage
-  const saved = sessionStorage.getItem('lp_session');
+  // Restore session from sessionStorage or cross-tab localStorage
+  const saved = sessionStorage.getItem('lp_session') || localStorage.getItem('lp_session_cross');
   if (saved) {
     try {
       const sess = JSON.parse(saved);
@@ -7185,12 +7186,12 @@ let _coverageLoaded = false;
 
 async function loadCoverageFromSP() {
   try {
-    const res = await spGet(SP_API+"('CoverageAssignments')/items?$select=Id,Title,CoverDate,CoverName,AssignedBy,AssignedAt&$top=500");
+    const res = await spGet(SP_API+"('CoverageAssignments')/items?$select=Id,Title,CoverDate,CoverName&$top=500");
     if (res?.value) {
       _coverageSP = res.value.map(r=>({
         id:r.Id, absenteeName:r.Title, date:r.CoverDate,
         coverName:r.CoverName||'', isNCR:r.CoverName==='_ncr',
-        assignedBy:r.AssignedBy||'', assignedAt:r.AssignedAt||''
+        assignedBy:'', assignedAt:''
       }));
       _coverageLoaded = true; return;
     }
@@ -7285,28 +7286,26 @@ function _renderCoverageSection(containerId) {
 
   el.innerHTML=`
     <div style="border-top:1.5px solid var(--border);margin-top:16px;padding-top:16px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
-        <div style="font-size:13px;font-weight:700;color:var(--text)">📋 Coverage assignments</div>
-        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-          <button onclick="coverStepDate(-1,'${containerId}')" style="padding:5px 8px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface-2);cursor:pointer;font-size:13px">‹</button>
-          <input type="date" value="${date}" onchange="_coverDate=this.value;_coverRangeMode=false;renderCoverageSection('${containerId}')"
-            style="font-size:13px;padding:5px 8px;border:1.5px solid var(--border);border-radius:var(--radius-sm)"/>
-          <button onclick="coverStepDate(1,'${containerId}')" style="padding:5px 8px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface-2);cursor:pointer;font-size:13px">›</button>
-          ${date!==todayStr?`<button onclick="_coverDate=null;_coverRangeMode=false;renderCoverageSection('${containerId}')" style="font-size:12px;padding:5px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface-2);cursor:pointer;color:var(--text-2)">Today</button>`:''}
-          <button onclick="_coverRangeMode=!_coverRangeMode;if(_coverRangeMode){_coverRangeFrom=_coverDate||'${todayStr}';_coverRangeTo=_coverDate||'${todayStr}';}renderCoverageSection('${containerId}')"
-            style="font-size:12px;padding:5px 12px;border:1.5px solid ${_coverRangeMode?'var(--brand)':'var(--border)'};border-radius:var(--radius-sm);background:${_coverRangeMode?'var(--brand-light)':'var(--surface-2)'};cursor:pointer;color:${_coverRangeMode?'var(--brand)':'var(--text-2)'};font-weight:${_coverRangeMode?'600':'400'}">
-            Apply to date range
-          </button>
-        </div>
+      <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:10px">📋 Coverage assignments</div>
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:${_coverRangeMode?'8':'12'}px;flex-wrap:wrap">
+        <button onclick="coverStepDate(-1,'${containerId}')" style="padding:6px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface-2);cursor:pointer;font-size:14px;line-height:1">‹</button>
+        <input type="date" value="${date}" onchange="_coverDate=this.value;_coverRangeMode=false;renderCoverageSection('${containerId}')"
+          style="font-size:13px;padding:6px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);flex:1;min-width:130px"/>
+        <button onclick="coverStepDate(1,'${containerId}')" style="padding:6px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface-2);cursor:pointer;font-size:14px;line-height:1">›</button>
+        ${date!==todayStr?`<button onclick="_coverDate=null;_coverRangeMode=false;renderCoverageSection('${containerId}')" style="font-size:12px;padding:6px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface-2);cursor:pointer;color:var(--text-2)">Today</button>`:''}
+        <button onclick="_coverRangeMode=!_coverRangeMode;if(_coverRangeMode){_coverRangeFrom=_coverDate||'${todayStr}';_coverRangeTo=_coverDate||'${todayStr}';}renderCoverageSection('${containerId}')"
+          style="font-size:12px;padding:6px 12px;border:1.5px solid ${_coverRangeMode?'var(--brand)':'var(--border)'};border-radius:var(--radius-sm);background:${_coverRangeMode?'var(--brand-light)':'var(--surface-2)'};cursor:pointer;color:${_coverRangeMode?'var(--brand)':'var(--text-2)'};font-weight:${_coverRangeMode?'600':'400'};white-space:nowrap">
+          Date range
+        </button>
       </div>
-      ${_coverRangeMode?`<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;background:var(--brand-light);border:1.5px solid var(--brand);border-radius:var(--radius-sm);padding:8px 12px;flex-wrap:wrap">
-        <span style="font-size:12px;color:var(--brand);font-weight:600">Date range:</span>
+      ${_coverRangeMode?`<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;background:var(--brand-light);border:1.5px solid var(--brand);border-radius:var(--radius-sm);padding:8px 12px;flex-wrap:wrap">
+        <span style="font-size:12px;color:var(--brand);font-weight:600;white-space:nowrap">From</span>
         <input type="date" value="${_coverRangeFrom}" onchange="_coverRangeFrom=this.value;renderCoverageSection('${containerId}')"
-          style="font-size:13px;padding:5px 8px;border:1.5px solid var(--border);border-radius:var(--radius-sm)"/>
+          style="font-size:13px;padding:5px 8px;border:1.5px solid var(--border);border-radius:var(--radius-sm);flex:1"/>
         <span style="font-size:12px;color:var(--text-3)">to</span>
         <input type="date" value="${_coverRangeTo}" onchange="_coverRangeTo=this.value;renderCoverageSection('${containerId}')"
-          style="font-size:13px;padding:5px 8px;border:1.5px solid var(--border);border-radius:var(--radius-sm)"/>
-        ${rangeDays?`<span style="font-size:11px;color:var(--brand);font-weight:600">${rangeDays} working day${rangeDays!==1?'s':''}</span>`:''}
+          style="font-size:13px;padding:5px 8px;border:1.5px solid var(--border);border-radius:var(--radius-sm);flex:1"/>
+        ${rangeDays?`<span style="font-size:11px;color:var(--brand);font-weight:600;white-space:nowrap">${rangeDays} working day${rangeDays!==1?'s':''}</span>`:''}
       </div>`:''}
       ${absentees.length===0
         ?`<div style="font-size:13px;color:var(--text-3);padding:8px 0">No staff on leave ${date===todayStr?'today':'on this date'}.</div>`
@@ -10756,6 +10755,30 @@ function myTeamToggleMember(name, teamNames) {
   else _myTeamExpanded.add(name);
   renderMyTeamEOD(teamNames);
 }
+// ── Performance state ──────────────────────────────────────────────────────
+let _perfPeriod      = '7';
+let _perfCustomFrom  = '';
+let _perfCustomTo    = '';
+let _perfAnalystFlt  = '';
+let _perfTeamFlt     = '';
+let _perfCharts      = {};
+let _perfView        = 'issues';
+let _perfDetailName  = '';
+let _perfSortKey     = 'over';
+let _perfSortDir     = -1;
+let _perfExpandedRow = '';
+let _perfOpenCard    = '';
+
+// ── applyPermissionVisibility (stub — full version in permissions editor) ──
+function applyPermissionVisibility() {
+  const sa = isSuperAdmin(), tl = isTeamLead(), om = isOpsManager();
+  // Hide/show nav elements by role as needed
+  document.querySelectorAll('[data-role-hide]').forEach(el => {
+    const roles = (el.getAttribute('data-role-hide')||'').split(',');
+    if (currentUser && roles.includes(currentUser.role)) el.style.display='none';
+  });
+}
+
 const TASK_COLORS = ['#378ADD','#5DCAA5','#EF9F27','#D85A30','#7F77DD','#D4537E','#639922','#888780','#F59E0B'];
 
 function perfGetDates() {
@@ -11009,11 +11032,6 @@ function renderPerformanceScreen() {
   setTimeout(()=>{ perfDrawPie(m.dist); perfDrawTrend(m.trend); perfRenderView(names,from,to,m); },50);
 }
 
-let _perfView='issues';
-let _perfDetailName='';
-let _perfSortKey='over';
-let _perfSortDir=-1;
-let _perfExpandedRow='';
 
 function perfSetView(v) {
   _perfView=v;
@@ -11211,7 +11229,6 @@ function perfDrawTrend(trend) {
   });
 }
 
-let _perfOpenCard = '';
 
 function perfToggleCard(id) {
   const detail = document.getElementById('psd-'+id);
