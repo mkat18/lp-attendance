@@ -902,7 +902,8 @@ tr.flagged-row:hover td { background: #FFEAEA; }
       <p style="font-size:12px;color:var(--text-3);margin-bottom:12px">Date of joining is set by your manager and cannot be changed here.</p>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
         <div class="field"><label>Phone number</label><input type="tel" id="profilePhone" placeholder="e.g. 0412 345 678"/></div>
-        <div class="field"><label>Email address</label><input type="email" id="profileEmail" placeholder="e.g. you@email.com"/></div>
+        <div class="field"><label>Work email</label><div id="profileWorkEmail" style="font-size:14px;padding:8px 10px;background:var(--surface-2);border-radius:var(--radius-sm);color:var(--text-2);border:1.5px solid var(--border)">—</div></div>
+        <div class="field"><label>Personal email <span style="font-size:11px;color:var(--text-3);font-weight:400">(optional)</span></label><input type="email" id="profilePersonalEmail" placeholder="e.g. you@gmail.com"/></div>
         <div class="field"><label>Date of birth</label><input type="date" id="profileDOB"/></div>
         <div class="field" style="grid-column:1/-1"><label>Home address</label><textarea id="profileAddress" rows="2" style="width:100%;font-size:13px;padding:8px;border-radius:var(--radius-sm);border:1.5px solid var(--border);resize:vertical"></textarea></div>
       </div>
@@ -1679,6 +1680,7 @@ function spToStaff(item) {
     dob: item.DOB||'',
     phone: item.Phone||'',
     email: item.Email||'',
+    personalEmail: item.PersonalEmail||'',
     address: item.Address||'',
     flexibleSchedule: item.FlexibleSchedule === 'true' || item.FlexibleSchedule === true,
     ec1Name: item.EmergencyContact1Name||'',
@@ -1815,7 +1817,10 @@ function renderProfileScreen() {
   if (!me) return;
   const sv = (id, val) => { const el=document.getElementById(id); if(el) el.value=val||''; };
   sv('profilePhone', me.phone);
-  sv('profileEmail', me.email);
+  sv('profilePersonalEmail', me.personalEmail);
+  // Work email — read only
+  const workEmailEl = document.getElementById('profileWorkEmail');
+  if (workEmailEl) workEmailEl.textContent = me.email || '—';
   sv('profileDOB', me.dob);
   sv('profileAddress', me.address);
   sv('profileEC1Name', me.ec1Name);
@@ -1853,7 +1858,7 @@ async function saveProfileDetails() {
   if (idx < 0) return;
   const gv = id => (document.getElementById(id)&&document.getElementById(id).value)||'';
   staff[idx].phone = gv('profilePhone');
-  staff[idx].email = gv('profileEmail');
+  staff[idx].personalEmail = gv('profilePersonalEmail');
   staff[idx].dob = gv('profileDOB');
   staff[idx].address = gv('profileAddress');
   staff[idx].ec1Name = ec1Name;
@@ -7508,6 +7513,7 @@ async function spSaveStaffMember(s) {
     EmergencyContact2Phone: String(s.ec2Phone||''),
     EmergencyContact2Relation: String(s.ec2Relation||''),
     FlexibleSchedule: s.flexibleSchedule ? 'true' : 'false',
+    PersonalEmail: String(s.personalEmail||''),
   };
   // Address is Multiple lines of text — add separately only if set
   if (s.address) payload.Address = String(s.address);

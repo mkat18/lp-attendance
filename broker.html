@@ -11936,16 +11936,17 @@ function getCoverageBP(date) {
 }
 
 // Populate broker dropdown when file modal opens
-function populateBrokerDropdown(currentBroker) {
+async function populateBrokerDropdown(currentBroker) {
   const sel = document.getElementById('fm_broker');
   if (!sel) return;
+  // Ensure broker assignments are loaded
+  if (!_brokerAssignsBP.length) await loadBrokerAssignmentsFromSP().catch(()=>{});
   const myBrokers = getBrokersForUserBP(currentUser.name);
-  sel.innerHTML = '<option value="">— select broker —</option>' +
-    myBrokers.map(b=>`<option value="${esc(b)}" ${b===currentBroker?'selected':''}>${esc(b)}</option>`).join('');
-  // If no brokers assigned, show all (fallback)
-  if (!myBrokers.length) {
-    sel.innerHTML = '<option value="">— no brokers assigned (contact SA) —</option>' +
-      _brokerListBP.map(b=>`<option value="${esc(b.name)}" ${b.name===currentBroker?'selected':''}>${esc(b.name)}</option>`).join('');
+  if (myBrokers.length) {
+    sel.innerHTML = '<option value="">— select broker —</option>' +
+      myBrokers.map(b=>`<option value="${esc(b)}" ${b===currentBroker?'selected':''}>${esc(b)}</option>`).join('');
+  } else {
+    sel.innerHTML = '<option value="" disabled>Broker unassigned — Contact Admin</option>';
   }
 }
 
