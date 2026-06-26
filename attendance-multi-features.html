@@ -1159,6 +1159,19 @@ tr.flagged-row:hover td { background: #FFEAEA; }
       <h1>📋 End of Day Report</h1>
       <p id="eodScreenSub">Complete before clocking out</p>
     </div>
+    <div style="display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap;align-items:center">
+      <div id="eodTLPersonWrap" style="display:none;flex:1">
+        <select id="eodTLPerson" onchange="eodNavDate()" style="width:100%;font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)">
+          <option value="">My EOD</option>
+        </select>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;flex:1">
+        <button onclick="eodStepDate(-1)" style="padding:6px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface-2);cursor:pointer;font-size:14px">‹</button>
+        <input type="date" id="eodDatePicker" style="flex:1;font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)" onchange="eodNavDate()"/>
+        <button onclick="eodStepDate(1)" style="padding:6px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface-2);cursor:pointer;font-size:14px">›</button>
+      </div>
+      <button onclick="eodGoToday()" id="eodTodayBtn" style="font-size:12px;padding:6px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface-2);cursor:pointer;display:none">Today</button>
+    </div>
     <div id="eodScreenContent"></div>
 
     <!-- ── EOD History + Download ────────────────────────────────── -->
@@ -11017,11 +11030,62 @@ function getTodayEODDraft(name) {
 }
 
 // ── Navigate to EOD from checkin screen ───────────────────────────────────
+let _eodViewDate   = null; // null = today
+let _eodViewPerson = null; // null = self
+
+function eodNavDate() {
+  const dp = document.getElementById('eodDatePicker');
+  const ps = document.getElementById('eodTLPerson');
+  _eodViewDate   = dp?.value || null;
+  _eodViewPerson = ps?.value || null;
+  const isToday  = !_eodViewDate || _eodViewDate === today;
+  const todayBtn = document.getElementById('eodTodayBtn');
+  if (todayBtn) todayBtn.style.display = isToday ? 'none' : 'block';
+  renderEODScreen();
+}
+
+function eodStepDate(dir) {
+  const dp = document.getElementById('eodDatePicker');
+  const cur = new Date(_eodViewDate || today);
+  cur.setDate(cur.getDate() + dir);
+  const newDate = cur.toISOString().split('T')[0];
+  if (newDate > today) return; // can't go future
+  if (dp) dp.value = newDate;
+  _eodViewDate = newDate;
+  eodNavDate();
+}
+
+function eodGoToday() {
+  const dp = document.getElementById('eodDatePicker');
+  if (dp) dp.value = today;
+  _eodViewDate = null;
+  _eodViewPerson = null;
+  const ps = document.getElementById('eodTLPerson');
+  if (ps) ps.value = '';
+  eodNavDate();
+}
+
 function goToEOD() {
   const tab = Array.from(document.querySelectorAll('.nav-tab')).find(b => b.textContent.trim() === 'EOD');
   if (tab) {
     document.querySelectorAll('.nav-tab').forEach(b => b.classList.remove('active'));
     tab.classList.add('active');
+  }
+  // Init date picker
+  _eodViewDate = null; _eodViewPerson = null;
+  const dp = document.getElementById('eodDatePicker');
+  if (dp) dp.value = today;
+  // TL person selector
+  const wrap = document.getElementById('eodTLPersonWrap');
+  const ps   = document.getElementById('eodTLPerson');
+  if (wrap && ps && isTeamLead()) {
+    wrap.style.display = 'block';
+    const team = getTeamForTL(currentUser.name);
+    ps.innerHTML = `<option value="">My EOD</option>` +
+      [...getStaff().filter(s => team.includes(s.name))].sort((a,b)=>a.name.localeCompare(b.name))
+        .map(s=>`<option value="${esc(s.name)}">${esc(s.name)}</option>`).join('');
+  } else if (wrap) {
+    wrap.style.display = 'none';
   }
   renderEODScreen();
   showScreen('eod');
@@ -11061,6 +11125,76 @@ function renderEODScreen() {
   const el = document.getElementById('eodScreenContent');
   if (!el) return;
 
+  const viewDate   = _eodViewDate || today;
+  const viewPerson = _eodViewPerson || currentUser.name;
+  const isPast     = viewDate < today;
+  const isOtherPerson = viewPerson !== currentUser.name;
+  const isReadOnly = isPast || isOtherPerson;
+
+  // Sync date picker
+  const dp = document.getElementById('eodDatePicker');
+  if (dp && dp.value !== viewDate) dp.value = viewDate;
+
+  // For past/other person — read-only view
+  if (isReadOnly) {
+    const reports = getEODReports().filter(r => r.name === viewPerson && r.date === viewDate);
+    const report  = reports.find(r => r.status === 'submitted') || reports[0] || null;
+
+    const sub = document.getElementById('eodScreenSub');
+    if (sub) sub.textContent = isOtherPerson
+      ? `${viewPerson.split(' ')[0]}'s EOD — ${fmtDate(viewDate)}`
+      : `Past EOD — ${fmtDate(viewDate)} (read only)`;
+
+    if (!report) {
+      el.innerHTML = `<div class="card" style="text-align:center;padding:2rem">
+        <div style="font-size:2rem;margin-bottom:10px">📭</div>
+        <div style="font-size:15px;font-weight:600">No EOD submitted</div>
+        <div style="font-size:13px;color:var(--text-3);margin-top:4px">${isOtherPerson?viewPerson.split(' ')[0]+' did':'You did'} not submit an EOD on ${esc(fmtDate(viewDate))}.</div>
+      </div>`;
+      return;
+    }
+
+    // Flatten tasks
+    const fmt = v => { if(!v) return '—'; const [h,m]=v.split(':'); const ap=+h<12?'AM':'PM'; return (+h%12||12)+':'+m+' '+ap; };
+    el.innerHTML = `
+      <div class="card" style="margin-bottom:1rem">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px">📋 Tasks</div>
+          <span style="font-size:11px;background:${report.status==='submitted'?'#D1FAE5':'#F3F4F6'};color:${report.status==='submitted'?'#065F46':'#6B7280'};border-radius:4px;padding:2px 8px;font-weight:600">${report.status==='submitted'?'✓ Submitted':'Draft'}</span>
+        </div>
+        ${(report.tasks||[]).length ? `
+          <div style="display:grid;grid-template-columns:2fr 1fr 1fr 2fr;gap:6px;padding:4px 0;border-bottom:1px solid var(--border);margin-bottom:4px">
+            <span style="font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase">Task</span>
+            <span style="font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase">Start</span>
+            <span style="font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase">End</span>
+            <span style="font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase">Notes</span>
+          </div>
+          ${report.tasks.map(t=>`
+            <div style="display:grid;grid-template-columns:2fr 1fr 1fr 2fr;gap:6px;padding:5px 0;border-bottom:0.5px solid var(--border);font-size:13px">
+              <span style="font-weight:500">${esc(t.type||'—')}${t.subType?' · '+esc(t.subType):''}</span>
+              <span style="color:var(--text-2)">${fmt(t.startTime)}</span>
+              <span style="color:var(--text-2)">${fmt(t.endTime)}</span>
+              <span style="color:var(--text-3)">${esc(t.notes||'—')}</span>
+            </div>`).join('')}` : '<div style="font-size:13px;color:var(--text-3)">No tasks recorded</div>'}
+      </div>
+
+      <div class="card" style="margin-bottom:1rem">
+        <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">📝 Wrap-up</div>
+        ${[
+          ['Challenges faced', report.challenges==='yes'?'Yes — '+(report.challengeDetail||''):'No'],
+          ['Support needed from TL', report.supportNeeded==='yes'?'Yes — '+(report.supportDetail||''):'No'],
+          ['First priority tomorrow', report.firstPriority||'—'],
+          ['Anything else', report.notes||'—'],
+        ].map(([label,val])=>`
+          <div style="padding:7px 0;border-bottom:0.5px solid var(--border)">
+            <div style="font-size:11px;color:var(--text-3);margin-bottom:2px">${esc(label)}</div>
+            <div style="font-size:13px;font-weight:500">${esc(val)}</div>
+          </div>`).join('')}
+      </div>`;
+    return;
+  }
+
+  // ── TODAY — editable mode (existing logic) ─────────────────────────────
   const submitted  = getTodayEODSubmitted(currentUser.name);
   const draft      = getTodayEODDraft(currentUser.name);
   const existing   = submitted || draft || null;
@@ -11270,10 +11404,17 @@ function downloadEOD(format) {
 
 // ── EOD Task management ───────────────────────────────────────────────────
 let _eodTasks = [];
-const EOD_TASK_TYPES = [
-  'Single CRM App','Single AOL App','Multi CRM App','Multi AOL App',
-  'Manual App','Servicing','Other File Tasks','Emails','Calls','Other Tasks','Team Meeting'
-];
+const EOD_TASK_TYPES = {
+  'CRM App':                 ['Single','Multiple'],
+  'AOL App':                 ['Single','Complex'],
+  'Pricing':                 ['Simple','Complex'],
+  'Servicing':               ['Simple','Complex'],
+  'Calls':                   ['Broker','Customer','Lender','Others'],
+  'Emails':                  ['Broker','Customer','Lender','Others'],
+  'Valuation':               [],
+  'Professional Development':[]
+};
+const EOD_TASK_KEYS = Object.keys(EOD_TASK_TYPES);
 
 function toggleEODTasksPanel() {
   const panel = document.getElementById('eodTasksPanel');
@@ -11289,7 +11430,7 @@ function updateEODTaskSummary() {
   const el = document.getElementById('eodTaskSummary');
   if (!el) return;
   if (!_eodTasks.length) {
-    el.innerHTML = '<span style="color:var(--text-3);font-size:13px">No tasks added yet</span>';
+    el.innerHTML = '<div style="font-size:13px;color:var(--text-3)">No tasks added yet — tap to add</div>';
     return;
   }
   const fmt12 = v => {
@@ -11300,17 +11441,17 @@ function updateEODTaskSummary() {
     return `${h12}:${String(m).padStart(2,'0')} ${ampm}`;
   };
   el.innerHTML = _eodTasks.map(t => `
-    <div style="display:grid;grid-template-columns:2fr 1fr 1fr 2fr;gap:8px;align-items:center;padding:5px 0;border-bottom:1px solid var(--border);font-size:12px">
-      <span style="font-weight:600;color:var(--text)">${esc(t.type||'—')}</span>
-      <span style="color:var(--text-2)">${fmt12(t.startTime)}</span>
-      <span style="color:var(--text-2)">${fmt12(t.endTime)}</span>
-      <span style="color:var(--text-3);font-style:${t.notes?'normal':'italic'}">${esc(t.notes||'No notes')}</span>
+    <div style="display:grid;grid-template-columns:2fr 1fr 1fr 2fr;gap:6px;padding:4px 0;border-bottom:1px solid var(--border);font-size:12px;color:var(--text-2)">
+      <span style="font-weight:600;color:var(--text)">${esc(t.type||'Untitled')}${t.subType?' · '+esc(t.subType):''}</span>
+      <span>${fmt12(t.startTime)}</span>
+      <span>${fmt12(t.endTime)}</span>
+      <span style="color:var(--text-3)">${esc(t.notes||'—')}</span>
     </div>`).join('') +
-    `<div style="font-size:11px;color:var(--text-3);margin-top:6px;text-align:right">Tap to edit ▾</div>`;
+    `<div style="font-size:11px;color:var(--text-3);margin-top:6px;text-align:right" id="eodTasksToggleIcon">▾ tap to edit</div>`;
 }
 
 function addEODTask() {
-  _eodTasks.push({type:'', startTime:'', endTime:'', notes:''});
+  _eodTasks.push({type:'', subType:'', startTime:'', endTime:'', notes:''});
   const panel = document.getElementById('eodTasksPanel');
   if (panel && panel.style.display === 'none') {
     panel.style.display = 'block';
@@ -11334,10 +11475,10 @@ function updateEODTask(idx, field, value) {
 function generateTimeOptions(selected, placeholder) {
   const times = [];
   for (let h = 6; h <= 21; h++) {
-    for (let m = 0; m < 60; m += 15) {
+    for (let m = 0; m < 60; m += 10) {
       if (h === 21 && m > 0) break;
       const ampm = h < 12 ? 'AM' : 'PM';
-      const h12 = h % 12 === 0 ? 12 : h % 12;
+      const h12  = h % 12 === 0 ? 12 : h % 12;
       const label = `${h12}:${String(m).padStart(2,'0')} ${ampm}`;
       const value = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
       times.push(`<option value="${value}" ${value===selected?'selected':''}>${label}</option>`);
@@ -11356,16 +11497,31 @@ function renderEODTaskList() {
 
   const selStyle = 'font-size:13px;padding:6px 8px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);cursor:pointer;width:100%';
 
-  el.innerHTML = _eodTasks.map((t, i) => `
+  el.innerHTML = _eodTasks.map((t, i) => {
+    const subOpts = EOD_TASK_TYPES[t.type] || [];
+    const hasSubTask = subOpts.length > 0;
+    return `
     <div style="background:var(--surface-2);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:8px">
-      <div style="display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:8px;align-items:end;margin-bottom:8px">
+      <div style="display:grid;grid-template-columns:2fr ${hasSubTask?'1fr':''} auto;gap:8px;align-items:end;margin-bottom:8px">
         <div>
           <div style="font-size:10px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px">Task type</div>
-          <select onchange="updateEODTask(${i},'type',this.value)" style="${selStyle}">
+          <select onchange="updateEODTaskType(${i},this.value)" style="${selStyle}">
             <option value="">— select —</option>
-            ${EOD_TASK_TYPES.map(ty=>`<option value="${esc(ty)}" ${t.type===ty?'selected':''}>${esc(ty)}</option>`).join('')}
+            ${EOD_TASK_KEYS.map(ty=>`<option value="${esc(ty)}" ${t.type===ty?'selected':''}>${esc(ty)}</option>`).join('')}
           </select>
         </div>
+        ${hasSubTask ? `
+        <div>
+          <div style="font-size:10px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px">Sub-task</div>
+          <select onchange="updateEODTask(${i},'subType',this.value)" style="${selStyle}">
+            <option value="">— select —</option>
+            ${subOpts.map(s=>`<option value="${esc(s)}" ${t.subType===s?'selected':''}>${esc(s)}</option>`).join('')}
+          </select>
+        </div>` : ''}
+        <button type="button" onclick="removeEODTask(${i})"
+          style="background:transparent;border:none;color:var(--text-3);font-size:18px;cursor:pointer;padding:0 4px;line-height:1;margin-bottom:3px">✕</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
         <div>
           <div style="font-size:10px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px">Start time</div>
           <select onchange="updateEODTask(${i},'startTime',this.value)" style="${selStyle}">
@@ -11374,17 +11530,37 @@ function renderEODTaskList() {
         </div>
         <div>
           <div style="font-size:10px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px">End time</div>
-          <select onchange="updateEODTask(${i},'endTime',this.value)" style="${selStyle}">
+          <select onchange="updateEODTaskEnd(${i},this.value)" style="${selStyle}">
             ${generateTimeOptions(t.endTime||'', 'end')}
           </select>
         </div>
-        <button type="button" onclick="removeEODTask(${i})"
-          style="background:transparent;border:none;color:var(--text-3);font-size:18px;cursor:pointer;padding:0 4px;line-height:1;flex-shrink:0;margin-bottom:2px">✕</button>
       </div>
       <textarea rows="2" onchange="updateEODTask(${i},'notes',this.value)"
         placeholder="Notes (optional)"
         style="width:100%;font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);resize:none;background:var(--surface);color:var(--text)">${esc(t.notes||'')}</textarea>
-    </div>`).join('');
+    </div>`;
+  }).join('');
+}
+
+function updateEODTaskType(idx, value) {
+  if (!_eodTasks[idx]) return;
+  _eodTasks[idx].type    = value;
+  _eodTasks[idx].subType = ''; // clear sub-task when type changes
+  renderEODTaskList();
+  updateEODTaskSummary();
+}
+
+function updateEODTaskEnd(idx, value) {
+  if (!_eodTasks[idx]) return;
+  const start = _eodTasks[idx].startTime;
+  if (start && value && value <= start) {
+    showToast('End time must be after start time', 'err');
+    // Reset the select visually
+    renderEODTaskList();
+    return;
+  }
+  _eodTasks[idx].endTime = value;
+  updateEODTaskSummary();
 }
 
 // ── Chip toggle ───────────────────────────────────────────────────────────
