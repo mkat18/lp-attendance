@@ -6161,10 +6161,11 @@ async function loadFromSharePoint() {
       loadBrokerFeedbackFromSP(),
       loadOtherTasksFromSP(),
       loadTeamsFromSP(),
-      loadBrokerListFromSP(),
-      loadBrokerAssignmentsFromSP(),
-      loadCRMDataFromSP(),
-      loadCoverageAssignmentsFromSP(),
+      loadBrokers(),
+      loadBrokerAssignments(),
+      loadCRMOptions(),
+      loadStaffCRMs(),
+      loadCoverageFromSP(),
     ]).catch(e => console.warn('Some SP loads failed:', e));
     // Update EDITABLE_ROLES from loaded roles
     if (_roles.length) EDITABLE_ROLES = _roles.map(r => r.title).filter(r => r !== 'superadmin');
@@ -8280,6 +8281,171 @@ function clearFilesFilters() {
   const staffSel=document.getElementById('filesFilterStaff');
   if(staffSel) staffSel.value='';
   renderFilesScreen();
+}
+
+
+// ══════════════════════════════════════════════════════════════════════════
+// ── BROKER DATA LOADING ───────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════
+let _brokers = [];
+let _brokerAssignments = [];
+let _crmOptions = [];
+let _staffCRMs = [];
+
+async function loadBrokers() {
+  try {
+    const res = await spGet(SP_API+"('Brokers')/items?$select=Id,Title&$top=500");
+    if (res?.value) { _brokers = res.value.map(r=>({id:r.Id,name:r.Title})); LS.set('ci_brokers',_brokers); return; }
+  } catch(e){}
+  _brokers = LS.get('ci_brokers') || [];
+}
+
+async function loadBrokerAssignments() {
+  try {
+    const res = await spGet(SP_API+"('BrokerAssignments')/items?$select=Id,Title,BrokerName&$top=1000");
+    if (res?.value) { _brokerAssignments = res.value.map(r=>({id:r.Id,staffName:r.Title,brokerName:r.BrokerName})); LS.set('ci_brokerassign',_brokerAssignments); return; }
+  } catch(e){}
+  _brokerAssignments = LS.get('ci_brokerassign') || [];
+}
+
+async function loadCRMOptions() {
+  try {
+    const res = await spGet(SP_API+"('CRMOptions')/items?$select=Id,Title&$top=200");
+    if (res?.value) { _crmOptions = res.value.map(r=>({id:r.Id,name:r.Title})); LS.set('ci_crmoptions',_crmOptions); return; }
+  } catch(e){}
+  _crmOptions = LS.get('ci_crmoptions') || [];
+}
+
+async function loadStaffCRMs() {
+  try {
+    const res = await spGet(SP_API+"('StaffCRMs')/items?$select=Id,Title,CRMList&$top=500");
+    if (res?.value) { _staffCRMs = res.value.map(r=>({id:r.Id,staffName:r.Title,crms:JSON.parse(r.CRMList||'[]')})); LS.set('ci_staffcrms',_staffCRMs); return; }
+  } catch(e){}
+  _staffCRMs = LS.get('ci_staffcrms') || [];
+}
+
+function getBrokersForStaff(staffName) {
+  return _brokerAssignments.filter(a=>a.staffName===staffName).map(a=>a.brokerName);
+}
+
+function getCRMsForStaff(staffName) {
+  return _staffCRMs.find(s=>s.staffName===staffName)?.crms || [];
+}
+
+async function assignBrokerToStaff() {
+  const staffName=document.getElementById('bmStaffSel')?.value;
+  const brokerName=document.getElementById('bmBrokerSel')?.value;
+  if(!staffName||!brokerName){showToast('Select both staff and broker.','err');return;}
+  if(_brokerAssignments.some(a=>a.staffName===staffName&&a.brokerName===brokerName)){showToast('Already assigned.','err');return;}
+  const res=await spPost(SP_API+"('BrokerAssignments')/items",{Title:staffName,BrokerName:brokerName});
+  if(res){await loadBrokerAssignments();renderBrokerMgmtScreen();showToast('Broker assigned ✓','ok');}
+}
+
+async function removeBrokerAssignment(id) {
+  if(!id) return;
+  try{await spDelete(SP_API+`('BrokerAssignments')/items(${id})`);await loadBrokerAssignments();renderBrokerMgmtScreen();showToast('Assignment removed.','ok');}
+  catch(e){showToast('Failed to remove.','err');}
+}
+
+async function addBroker() {
+  const input=document.getElementById('bmNewBroker');const name=input?.value.trim();
+  if(!name) return;
+  const res=await spPost(SP_API+"('Brokers')/items",{Title:name});
+  if(res){if(input)input.value='';await loadBrokers();renderBrokerMgmtScreen();showToast('Broker added ✓','ok');}
+}
+
+async function deleteBroker(id) {
+  try{await spDelete(SP_API+`('Brokers')/items(${id})`);await loadBrokers();renderBrokerMgmtScreen();showToast('Broker removed.','ok');}
+  catch(e){showToast('Failed to remove.','err');}
+}
+
+async function addCRMOption() {
+  const input=document.getElementById('bmNewCRM');const name=input?.value.trim();
+  if(!name) return;
+  const res=await spPost(SP_API+"('CRMOptions')/items",{Title:name});
+  if(res){if(input)input.value='';await loadCRMOptions();renderBrokerMgmtScreen();showToast('CRM added ✓','ok');}
+}
+
+async function deleteCRMOption(id) {
+  try{await spDelete(SP_API+`('CRMOptions')/items(${id})`);await loadCRMOptions();renderBrokerMgmtScreen();showToast('CRM removed.','ok');}
+  catch(e){showToast('Failed to remove.','err');}
+}
+
+async function toggleStaffCRM(staffName, crmName) {
+  const existing=_staffCRMs.find(s=>s.staffName===staffName);
+  let crms=existing?.crms?[...existing.crms]:[];
+  if(crms.includes(crmName)) crms=crms.filter(c=>c!==crmName); else crms.push(crmName);
+  const payload={Title:staffName,CRMList:JSON.stringify(crms)};
+  try{
+    if(existing) await spPatch(SP_API+`('StaffCRMs')/items(${existing.id})`,payload);
+    else await spPost(SP_API+"('StaffCRMs')/items",payload);
+    await loadStaffCRMs();renderBrokerMgmtScreen();
+  }catch(e){showToast('Failed to save CRM.','err');}
+}
+
+// ── Broker Management Screen ───────────────────────────────────────────────
+async function renderBrokerMgmtScreen() {
+  const el = document.getElementById('brokerMgmtContent');
+  if (!el) return;
+  el.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--text-3)">Loading…</div>';
+  try {
+    await Promise.all([loadBrokers(),loadBrokerAssignments(),loadCRMOptions(),loadStaffCRMs()]);
+  } catch(e) {
+    el.innerHTML = `<div class="card" style="text-align:center;padding:2rem">
+      <div style="font-size:1.5rem">⚠️</div>
+      <div style="font-weight:600;color:var(--danger);margin-top:8px">Error loading</div>
+      <div style="font-size:13px;color:var(--text-3);margin-top:4px">${esc(e.message||'')}</div>
+      <button onclick="renderBrokerMgmtScreen()" style="margin-top:12px;padding:8px 16px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface-2);cursor:pointer;font-size:13px">↺ Retry</button>
+    </div>`; return;
+  }
+  const sa=isSuperAdmin(),om=isOpsManager(),tl=isTeamLead();
+  const myTeam=tl?getTeamForTL(currentUser.name):[];
+  const allStaff=getStaff().filter(s=>['analyst','teamlead','trainee'].includes(s.role));
+  const viewStaff=(sa||om)?allStaff:allStaff.filter(s=>myTeam.includes(s.name));
+  el.innerHTML='';
+
+  if(om&&!sa){
+    const card=document.createElement('div');card.className='card';
+    const unassigned=allStaff.filter(s=>!getBrokersForStaff(s.name).length);
+    card.innerHTML=`<div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">👤 Analysts without broker</div>
+      ${unassigned.length?unassigned.map(s=>`<div style="padding:8px 0;border-bottom:0.5px solid var(--border)"><div style="font-size:13px;font-weight:500">${esc(s.name)}</div><div style="font-size:11px;color:var(--text-3)">${esc(ROLE_LABEL[s.role]||s.role)}</div></div>`).join(''):'<div style="font-size:13px;color:var(--success)">✓ All analysts have broker assigned.</div>'}`;
+    el.appendChild(card);return;
+  }
+
+  if(sa){
+    const brokerCard=document.createElement('div');brokerCard.className='card';brokerCard.style.marginBottom='1rem';
+    brokerCard.innerHTML=`<div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">🏦 Broker List</div>
+      <div style="display:flex;gap:8px;margin-bottom:12px"><input type="text" id="bmNewBroker" placeholder="Broker name…" style="flex:1;font-size:13px;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)" onkeydown="if(event.key==='Enter'){addBroker();event.preventDefault()}"/>
+      <button onclick="addBroker()" style="padding:8px 16px;border-radius:var(--radius-sm);border:none;background:var(--brand);color:#fff;font-size:13px;font-weight:600;cursor:pointer">+ Add</button></div>
+      ${!_brokers.length?'<div style="font-size:13px;color:var(--text-3)">No brokers added yet.</div>':_brokers.map(b=>`<div style="display:flex;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)"><span style="flex:1;font-size:14px;font-weight:500">${esc(b.name)}</span><button onclick="deleteBroker(${b.id})" style="font-size:12px;padding:3px 10px;border-radius:4px;border:1px solid var(--danger);color:var(--danger);background:transparent;cursor:pointer">Remove</button></div>`).join('')}`;
+    el.appendChild(brokerCard);
+  }
+
+  const assignCard=document.createElement('div');assignCard.className='card';assignCard.style.marginBottom='1rem';
+  assignCard.innerHTML=`<div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">👥 Broker Assignments</div>
+    ${sa?`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--border)">
+      <select id="bmStaffSel" style="flex:1;font-size:13px;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)"><option value="">— select staff —</option>${allStaff.map(s=>`<option value="${esc(s.name)}">${esc(s.name)} (${esc(ROLE_LABEL[s.role]||s.role)})</option>`).join('')}</select>
+      <select id="bmBrokerSel" style="flex:1;font-size:13px;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)"><option value="">— select broker —</option>${_brokers.map(b=>`<option value="${esc(b.name)}">${esc(b.name)}</option>`).join('')}</select>
+      <button onclick="assignBrokerToStaff()" style="padding:8px 16px;border-radius:var(--radius-sm);border:none;background:var(--brand);color:#fff;font-size:13px;font-weight:600;cursor:pointer">Assign</button>
+    </div>`:''}
+    ${viewStaff.map(s=>{const brokers=getBrokersForStaff(s.name);return`<div style="padding:10px 0;border-bottom:1px solid var(--border)"><div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span style="font-size:13px;font-weight:600;flex:1">${esc(s.name)}</span><span style="font-size:11px;color:var(--text-3)">${esc(ROLE_LABEL[s.role]||s.role)}</span></div><div style="display:flex;flex-wrap:wrap;gap:6px">${brokers.length?brokers.map(b=>{const assign=_brokerAssignments.find(a=>a.staffName===s.name&&a.brokerName===b);return`<div style="display:flex;align-items:center;gap:4px;background:var(--brand-light);border:1px solid var(--brand);border-radius:50px;padding:3px 10px"><span style="font-size:12px;color:var(--brand);font-weight:500">${esc(b)}</span>${sa?`<button onclick="removeBrokerAssignment(${assign?.id})" style="background:transparent;border:none;color:var(--brand);cursor:pointer;font-size:14px;line-height:1;padding:0 0 0 2px">×</button>`:''}</div>`;}).join(''):'<span style="font-size:12px;color:var(--text-3)">No broker assigned</span>'}</div></div>`;}).join('')}`;
+  el.appendChild(assignCard);
+
+  if(sa){
+    const crmOptCard=document.createElement('div');crmOptCard.className='card';crmOptCard.style.marginBottom='1rem';
+    crmOptCard.innerHTML=`<div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">💻 CRM Options</div>
+      <div style="display:flex;gap:8px;margin-bottom:12px"><input type="text" id="bmNewCRM" placeholder="CRM name…" style="flex:1;font-size:13px;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)" onkeydown="if(event.key==='Enter'){addCRMOption();event.preventDefault()}"/>
+      <button onclick="addCRMOption()" style="padding:8px 16px;border-radius:var(--radius-sm);border:none;background:var(--brand);color:#fff;font-size:13px;font-weight:600;cursor:pointer">+ Add</button></div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">${!_crmOptions.length?'<span style="font-size:13px;color:var(--text-3)">No CRMs yet.</span>':_crmOptions.map(c=>`<div style="display:flex;align-items:center;gap:4px;background:var(--surface-2);border:1.5px solid var(--border);border-radius:50px;padding:4px 12px"><span style="font-size:13px">${esc(c.name)}</span><button onclick="deleteCRMOption(${c.id})" style="background:transparent;border:none;color:var(--text-3);cursor:pointer;font-size:16px;line-height:1;padding:0 0 0 4px">×</button></div>`).join('')}</div>`;
+    el.appendChild(crmOptCard);
+  }
+
+  if(_crmOptions.length){
+    const crmAssignCard=document.createElement('div');crmAssignCard.className='card';
+    crmAssignCard.innerHTML=`<div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">🧑‍💻 CRM Skills</div>
+      ${viewStaff.map(s=>{const staffCRMs=getCRMsForStaff(s.name);return`<div style="padding:10px 0;border-bottom:1px solid var(--border)"><div style="font-size:13px;font-weight:600;margin-bottom:6px">${esc(s.name)} <span style="font-size:11px;color:var(--text-3);font-weight:400">${esc(ROLE_LABEL[s.role]||s.role)}</span></div><div style="display:flex;flex-wrap:wrap;gap:6px">${_crmOptions.map(c=>{const sel=staffCRMs.includes(c.name);return`<button type="button" onclick="${sa?`toggleStaffCRM('${s.name.replace(/'/g,"\\'")}','${esc(c.name)}')`:''}" style="font-size:12px;padding:4px 12px;border-radius:50px;border:1.5px solid ${sel?'var(--brand)':'var(--border)'};background:${sel?'var(--brand-light)':'var(--surface-2)'};color:${sel?'var(--brand)':'var(--text-3)'};cursor:${sa?'pointer':'default'};font-weight:${sel?'600':'400'}">${sel?'✓ ':''}${esc(c.name)}</button>`;}).join('')}</div></div>`;}).join('')}`;
+    el.appendChild(crmAssignCard);
+  }
 }
 
 function renderFilesScreen() {
@@ -10664,7 +10830,13 @@ function renderPerformanceScreen() {
         <option value="">All teams</option>
         ${tls.map(tl=>`<option value="${esc(tl.name)}" ${tl.name===_perfTeamFlt?'selected':''}>${esc(tl.name.split(' ')[0])}'s team</option>`).join('')}
       </select>
-    `:''}
+    `:`
+      <select onchange="_perfAnalystFlt=this.value;renderPerformanceScreen()"
+        style="font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)">
+        <option value="">All my analysts</option>
+        ${names.map(n=>`<option value="${esc(n)}" ${n===_perfAnalystFlt?'selected':''}>${esc(n)}</option>`).join('')}
+      </select>
+    `}
   </div>`;
 
   // Summary cards
