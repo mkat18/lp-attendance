@@ -11716,51 +11716,41 @@ function clvRender() {
   }
 }
 
-// ── EOD Task benchmarks (minutes) ─────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════
+// ── PERFORMANCE TAB — dashboard rebuild ──────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════
+
+let _perfPeriod     = '7';
+let _perfCustomFrom = '';
+let _perfCustomTo   = '';
+let _perfAnalystFlt = '';
+let _perfTeamFlt    = '';
+let _perfCharts     = {};
+
 const EOD_BENCHMARKS = {
-  'CRM App':    { 'Single':60*2, 'Multiple':60*4 },
-  'AOL App':    { 'Single':30,   'Complex':60 },
-  'Valuation':  { 'Single':10,   'Multiple':20 },
-  'Pricing':    { 'Simple':10,   'Complex':20 },
-  'Servicing':  { 'Simple':20,   'Complex':40 },
-  'Calls':      { 'Broker':60,   'Customer':30, 'Lender':60, 'Others':20 },
-  'Emails':     { 'Broker':30,   'Customer':60, 'Lender':30, 'Others':20 },
+  'CRM App':   {'Single':120,'Multiple':240},
+  'AOL App':   {'Single':30,'Complex':60},
+  'Valuation': {'Single':10,'Multiple':20},
+  'Pricing':   {'Simple':10,'Complex':20},
+  'Servicing': {'Simple':20,'Complex':40},
+  'Calls':     {'Broker':60,'Customer':30,'Lender':60,'Others':20},
+  'Emails':    {'Broker':30,'Customer':60,'Lender':30,'Others':20},
 };
+const TASK_COLORS = ['#378ADD','#5DCAA5','#EF9F27','#D85A30','#7F77DD','#D4537E','#639922','#888780','#F59E0B'];
 
-// ══════════════════════════════════════════════════════════════════════════
-// ── PERFORMANCE TAB — complete rebuild ───────────────────────────────────
-// ══════════════════════════════════════════════════════════════════════════
-
-// ── State ─────────────────────────────────────────────────────────────────
-let _perfPeriod      = '7';
-let _perfCustomFrom  = '';
-let _perfCustomTo    = '';
-let _perfAnalystFlt  = '';
-let _perfTeamFlt     = '';
-let _perfPage        = 0;
-const _perfExpanded  = new Set();
-const PERF_PER_PAGE  = 10;
-
-// ── Date helpers ──────────────────────────────────────────────────────────
 function perfGetDates() {
-  const todayStr = new Date().toISOString().split('T')[0];
-  if (_perfPeriod === 'today')     return { from: todayStr, to: todayStr };
-  if (_perfPeriod === 'yesterday') {
-    const y = new Date(); y.setDate(y.getDate()-1);
-    const ys = y.toISOString().split('T')[0];
-    return { from: ys, to: ys };
-  }
-  if (_perfPeriod === 'custom')    return { from: _perfCustomFrom||todayStr, to: _perfCustomTo||todayStr };
-  const d = new Date(); d.setDate(d.getDate() - parseInt(_perfPeriod));
-  return { from: d.toISOString().split('T')[0], to: todayStr };
+  const tod = new Date().toISOString().split('T')[0];
+  if (_perfPeriod==='today')     return {from:tod,to:tod};
+  if (_perfPeriod==='yesterday') { const y=new Date();y.setDate(y.getDate()-1);const ys=y.toISOString().split('T')[0];return{from:ys,to:ys};}
+  if (_perfPeriod==='custom')    return {from:_perfCustomFrom||tod,to:_perfCustomTo||tod};
+  const d=new Date();d.setDate(d.getDate()-parseInt(_perfPeriod));
+  return {from:d.toISOString().split('T')[0],to:tod};
 }
 
 function perfFmtMins(m) {
-  if (!m && m!==0) return '—';
-  const h=Math.floor(m/60), mn=m%60;
-  if (h>0&&mn>0) return `${h}h ${mn}m`;
-  if (h>0) return `${h}h`;
-  return `${mn}m`;
+  if (!m&&m!==0) return '—';
+  const h=Math.floor(Math.round(m)/60),mn=Math.round(m)%60;
+  return h>0?(mn>0?h+'h '+mn+'m':h+'h'):mn+'m';
 }
 
 function perfTaskMins(t) {
@@ -11770,309 +11760,426 @@ function perfTaskMins(t) {
   return Math.max(0,(eh*60+em)-(sh*60+sm));
 }
 
-// ── Metrics calculator ────────────────────────────────────────────────────
-function calcPerfMetrics(name, from, to) {
-  const todayStr = new Date().toISOString().split('T')[0];
-  const reports  = getEODReports().filter(r => r.name===name && r.status==='submitted' && r.date>=from && r.date<=to);
-  const todayRep = reports.find(r => r.date===todayStr);
+function perfWorkDays(from,to) {
+  let n=0;const cur=new Date(from),end=new Date(to);
+  while(cur<=end){const d=cur.getDay();if(d>0&&d<6)n++;cur.setDate(cur.getDate()+1);}
+  return n;
+}
 
-  // Working days in range (Mon-Fri)
-  let workDays=0;
-  const cur=new Date(from);
-  const end=new Date(to);
-  while(cur<=end){ const d=cur.getDay(); if(d>0&&d<6) workDays++; cur.setDate(cur.getDate()+1); }
+function calcAllMetrics(names, from, to) {
+  const todStr=new Date().toISOString().split('T')[0];
+  const reports=getEODReports().filter(r=>names.includes(r.name)&&r.status==='submitted'&&r.date>=from&&r.date<=to);
+  const wdays=perfWorkDays(from,to);
 
-  // EOD submission rate
-  const subRate = workDays ? Math.round(reports.length/workDays*100) : 0;
+  // Per task stats
+  const taskMap={};
+  const perDay={};
+  let pdMins=0, supportCount=0;
 
-  // Task stats
-  const taskMap = {};
-  let pdMins=0, totalTaskMins=0;
-  reports.forEach(r => {
-    (r.tasks||[]).forEach(t => {
-      if (!t.type) return;
+  reports.forEach(r=>{
+    if(!perDay[r.date]) perDay[r.date]={total:0,withinBench:0,total_tasks:0};
+    if(r.supportNeeded==='yes') supportCount++;
+    (r.tasks||[]).forEach(t=>{
+      if(!t.type) return;
       const mins=perfTaskMins(t);
-      if (t.type==='Professional Development') { pdMins+=mins; return; }
+      if(t.type==='Professional Development'){pdMins+=mins;return;}
       const key=t.type+'|'+(t.subType||'');
-      if (!taskMap[key]) taskMap[key]={type:t.type,subType:t.subType||'',sessions:[],overSessions:[],todayMins:null};
-      taskMap[key].sessions.push({mins,date:r.date});
-      totalTaskMins+=mins;
-      const bench=EOD_BENCHMARKS[t.type]?.[t.subType||''];
-      if (bench&&mins>bench) taskMap[key].overSessions.push({mins,date:r.date,over:mins-bench});
+      if(!taskMap[key]) taskMap[key]={type:t.type,subType:t.subType||'',sessions:[],totalMins:0};
+      if(mins>0){
+        taskMap[key].sessions.push({mins,date:r.date,name:r.name});
+        taskMap[key].totalMins+=mins;
+        perDay[r.date].total+=mins;
+        perDay[r.date].total_tasks++;
+        const bench=EOD_BENCHMARKS[t.type]?.[t.subType||''];
+        if(bench&&mins<=bench*1.05) perDay[r.date].withinBench++;
+      }
     });
   });
 
-  // Today tasks
-  if (todayRep) {
-    (todayRep.tasks||[]).forEach(t => {
-      if (!t.type||t.type==='Professional Development') return;
-      const key=t.type+'|'+(t.subType||'');
-      if (taskMap[key]) taskMap[key].todayMins=(taskMap[key].todayMins||0)+perfTaskMins(t);
-    });
-  }
+  // EOD submission per analyst
+  const subByAnalyst={};
+  names.forEach(n=>{
+    const rpts=reports.filter(r=>r.name===n);
+    subByAnalyst[n]={count:rpts.length,rate:wdays?Math.round(rpts.length/wdays*100):0};
+  });
+  const teamSubRate=wdays&&names.length?Math.round(reports.length/(wdays*names.length)*100):0;
 
   // Benchmark adherence
-  let onTrack=0, over=0;
-  Object.values(taskMap).forEach(s => {
-    const bench=EOD_BENCHMARKS[s.type]?.[s.subType];
-    if (!bench||!s.sessions.length) return;
-    const avg=s.sessions.reduce((a,b)=>a+b.mins,0)/s.sessions.length;
-    if (avg>bench) over++; else onTrack++;
-  });
-  const totalBench=onTrack+over;
-  const benchRate=totalBench ? Math.round(onTrack/totalBench*100) : null;
-
-  // Support flagged
-  const supportCount=reports.filter(r=>r.supportNeeded==='yes').length;
-
-  // Time distribution
-  const timeDist={};
+  let onTrack=0,over=0;
   Object.values(taskMap).forEach(s=>{
-    const total=s.sessions.reduce((a,b)=>a+b.mins,0);
-    if (!timeDist[s.type]) timeDist[s.type]=0;
-    timeDist[s.type]+=total;
+    if(!s.sessions.length) return;
+    const bench=EOD_BENCHMARKS[s.type]?.[s.subType];
+    if(!bench) return;
+    const avg=s.totalMins/s.sessions.length;
+    if(avg>bench*1.05) over++; else onTrack++;
+  });
+  const benchRate=(onTrack+over)?Math.round(onTrack/(onTrack+over)*100):null;
+
+  // Alerts
+  const alerts=Object.values(taskMap)
+    .filter(s=>{
+      const bench=EOD_BENCHMARKS[s.type]?.[s.subType];
+      if(!bench||!s.sessions.length) return false;
+      return s.totalMins/s.sessions.length>bench*1.05;
+    })
+    .map(s=>{
+      const bench=EOD_BENCHMARKS[s.type]?.[s.subType];
+      const avg=Math.round(s.totalMins/s.sessions.length);
+      return {label:`${s.type}${s.subType?' · '+s.subType:''}`,avg,bench,over:avg-bench,key:s.type+'|'+(s.subType||'')};
+    });
+
+  // Time distribution for pie
+  const dist=Object.values(taskMap).map(s=>({label:`${s.type} · ${s.subType||''}`,mins:s.totalMins,type:s.type,sub:s.subType}));
+
+  // Daily trend
+  const trend=Object.entries(perDay).sort((a,b)=>a[0].localeCompare(b[0])).map(([date,d])=>({
+    date:fmtDate(date).replace(/\d{4}/,'').trim(),
+    pct:d.total_tasks?Math.round(d.withinBench/d.total_tasks*100):null
+  }));
+
+  // Per analyst avg
+  const analystAvg=names.map(n=>{
+    const nr=reports.filter(r=>r.name===n);
+    let tot=0,cnt=0;
+    nr.forEach(r=>(r.tasks||[]).forEach(t=>{if(t.type&&t.type!=='Professional Development'){const m=perfTaskMins(t);if(m>0){tot+=m;cnt++;}};}));
+    return {name:n,avg:cnt?Math.round(tot/cnt):null};
   });
 
-  // Challenges log
-  const challengeLog=reports.filter(r=>r.challenges==='yes').map(r=>({date:r.date,detail:r.challengeDetail||''}));
-  const supportLog  =reports.filter(r=>r.supportNeeded==='yes').map(r=>({date:r.date,detail:r.supportDetail||''}));
+  const teamAvg=analystAvg.filter(a=>a.avg).reduce((s,a,_,arr)=>s+a.avg/arr.length,0)||null;
 
-  return {subRate,workDays,reportCount:reports.length,benchRate,onTrack,over,supportCount,pdMins,totalTaskMins,taskMap,timeDist,challengeLog,supportLog,pdTotalMins:pdMins};
+  return {taskMap,subByAnalyst,teamSubRate,benchRate,onTrack,over,supportCount,pdMins,alerts,dist,trend,analystAvg,teamAvg:teamAvg?Math.round(teamAvg):null,wdays,reportCount:reports.length};
 }
 
-// ── Filters row ───────────────────────────────────────────────────────────
-function perfFiltersHTML(names) {
-  const sa=isSuperAdmin(), om=isOpsManager();
-  const showFilters=sa||om;
-  const allStaff=getStaff().filter(s=>['analyst','trainee','teamlead'].includes(s.role));
-  const tls=getStaff().filter(s=>s.role==='teamlead');
-  return `
-    <div style="display:flex;gap:8px;flex-wrap:nowrap;align-items:center;margin-bottom:16px;overflow-x:auto;padding-bottom:4px">
-      <select onchange="_perfPeriod=this.value;_perfPage=0;_perfCustomFrom='';_perfCustomTo='';renderPerformanceScreen()"
-        style="font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);flex-shrink:0">
-        <option value="today" ${_perfPeriod==='today'?'selected':''}>Today</option>
-        <option value="yesterday" ${_perfPeriod==='yesterday'?'selected':''}>Yesterday</option>
-        <option value="7" ${_perfPeriod==='7'?'selected':''}>Last 7 days</option>
-        <option value="30" ${_perfPeriod==='30'?'selected':''}>Last 30 days</option>
-        <option value="60" ${_perfPeriod==='60'?'selected':''}>Last 60 days</option>
-        <option value="90" ${_perfPeriod==='90'?'selected':''}>Last 90 days</option>
-        <option value="custom" ${_perfPeriod==='custom'?'selected':''}>Custom</option>
-      </select>
-      ${_perfPeriod==='custom'?`
-        <input type="date" value="${_perfCustomFrom}" onchange="_perfCustomFrom=this.value;_perfPage=0;renderPerformanceScreen()"
-          style="font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);flex-shrink:0"/>
-        <span style="font-size:13px;color:var(--text-3);flex-shrink:0">to</span>
-        <input type="date" value="${_perfCustomTo}" onchange="_perfCustomTo=this.value;_perfPage=0;renderPerformanceScreen()"
-          style="font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);flex-shrink:0"/>
-      `:''}
-      ${showFilters?`
-        <select onchange="_perfAnalystFlt=this.value;_perfPage=0;renderPerformanceScreen()"
-          style="font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);flex-shrink:0">
-          <option value="">All analysts</option>
-          ${names.map(n=>`<option value="${esc(n)}" ${n===_perfAnalystFlt?'selected':''}>${esc(n)}</option>`).join('')}
-        </select>
-        <select onchange="_perfTeamFlt=this.value;_perfPage=0;renderPerformanceScreen()"
-          style="font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);flex-shrink:0">
-          <option value="">All teams</option>
-          ${tls.map(tl=>`<option value="${esc(tl.name)}" ${tl.name===_perfTeamFlt?'selected':''}>${esc(tl.name.split(' ')[0])}'s team</option>`).join('')}
-        </select>
-      `:''}
-    </div>`;
+function perfCellStyle(avg,bench) {
+  if(!avg) return {bg:'var(--surface-1)',text:'var(--text-3)',sub:'—'};
+  const r=avg/bench;
+  if(r<=1.05) return {bg:'#D1FAE5',text:'#065F46',sub:'✓ '+perfFmtMins(avg)};
+  if(r<=1.25) return {bg:'#FEF3C7',text:'#92400E',sub:'+'+perfFmtMins(Math.round(avg-bench))};
+  return {bg:'#FEE2E2',text:'#991B1B',sub:'+'+perfFmtMins(Math.round(avg-bench))};
 }
 
-// ── Single analyst collapsible card ──────────────────────────────────────
-function perfAnalystCard(name) {
+function renderPerformanceScreen() {
+  const el=document.getElementById('perfContent');
+  if(!el) return;
+
+  const sa=isSuperAdmin(),om=isOpsManager(),tl=isTeamLead();
+  let names=[];
+  if(sa||om) names=getStaff().filter(s=>['analyst','trainee'].includes(s.role)).map(s=>s.name).sort();
+  else if(tl) names=getTeamForTL(currentUser.name).sort();
+  else {el.innerHTML='';return;}
+
+  if(_perfAnalystFlt) names=names.filter(n=>n===_perfAnalystFlt);
+  if(_perfTeamFlt){const tm=getTeamForTL(_perfTeamFlt);names=names.filter(n=>tm.includes(n));}
+
   const {from,to}=perfGetDates();
-  const m=calcPerfMetrics(name,from,to);
-  const expanded=_perfExpanded.has(name);
-  const staff=getStaff().find(s=>s.name===name);
-  const role=ROLE_LABEL[staff?.role]||staff?.role||'';
-  const tl=getStaff().find(t=>t.role==='teamlead'&&getTeamForTL(t.name).includes(name));
-  const initials=name.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
+  const m=calcAllMetrics(names,from,to);
+  const tls=getStaff().filter(s=>s.role==='teamlead');
+  const allAnalysts=getStaff().filter(s=>['analyst','trainee'].includes(s.role)).map(s=>s.name).sort();
 
-  // Summary pills for collapsed view
-  const pills=[
-    {val:m.subRate+'%',lbl:'EOD submitted',col:m.subRate>=80?'#D1FAE5:#065F46':m.subRate>=50?'#FEF3C7:#92400E':'#FEE2E2:#991B1B'},
-    {val:m.benchRate!=null?m.benchRate+'%':'—',lbl:'On benchmark',col:m.benchRate==null?'var(--surface-2):var(--text-3)':m.benchRate>=80?'#D1FAE5:#065F46':m.benchRate>=60?'#FEF3C7:#92400E':'#FEE2E2:#991B1B'},
-    {val:m.supportCount||'0',lbl:'Support flags',col:m.supportCount>0?'#FEF3C7:#92400E':'var(--surface-2):var(--text-3)'},
-    {val:perfFmtMins(m.pdMins),lbl:'PD time',col:'var(--surface-2):var(--text-2)'},
-  ].map(p=>{const [bg,fg]=p.col.split(':');return `<div style="text-align:center;background:${bg};border-radius:var(--radius-sm);padding:6px 10px;min-width:72px"><div style="font-size:14px;font-weight:700;color:${fg}">${p.val}</div><div style="font-size:10px;color:${fg};opacity:.8;margin-top:1px;white-space:nowrap">${p.lbl}</div></div>`;}).join('');
+  // Destroy old charts
+  Object.values(_perfCharts).forEach(c=>{try{c.destroy();}catch(e){}});
+  _perfCharts={};
 
-  const header=`
-    <div style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:12px 14px" onclick="perfToggle('${name.replace(/'/g,"\\'")}')">
-      <div style="width:36px;height:36px;border-radius:50%;background:var(--brand-light);color:var(--brand);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;flex-shrink:0">${esc(initials)}</div>
-      <div style="flex:1;min-width:0">
-        <div style="font-size:14px;font-weight:600;color:var(--text)">${esc(name)}</div>
-        <div style="font-size:11px;color:var(--text-3)">${esc(role)}${tl?' · '+esc(tl.name.split(' ')[0])+"'s team":''}</div>
-      </div>
-      <div style="display:flex;gap:6px;flex-wrap:nowrap">${pills}</div>
-      <span style="font-size:18px;color:var(--text-3);margin-left:4px">${expanded?'▴':'▾'}</span>
-    </div>`;
+  // Filter row
+  const filterRow=`<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:nowrap;overflow-x:auto;padding-bottom:2px">
+    <select onchange="_perfPeriod=this.value;_perfCustomFrom='';_perfCustomTo='';renderPerformanceScreen()"
+      style="font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)">
+      <option value="today" ${_perfPeriod==='today'?'selected':''}>Today</option>
+      <option value="yesterday" ${_perfPeriod==='yesterday'?'selected':''}>Yesterday</option>
+      <option value="7" ${_perfPeriod==='7'?'selected':''}>Last 7 days</option>
+      <option value="30" ${_perfPeriod==='30'?'selected':''}>Last 30 days</option>
+      <option value="60" ${_perfPeriod==='60'?'selected':''}>Last 60 days</option>
+      <option value="90" ${_perfPeriod==='90'?'selected':''}>Last 90 days</option>
+      <option value="custom" ${_perfPeriod==='custom'?'selected':''}>Custom</option>
+    </select>
+    ${_perfPeriod==='custom'?`
+      <input type="date" value="${_perfCustomFrom}" onchange="_perfCustomFrom=this.value;renderPerformanceScreen()"
+        style="font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)"/>
+      <span style="font-size:13px;color:var(--text-3);align-self:center">to</span>
+      <input type="date" value="${_perfCustomTo}" onchange="_perfCustomTo=this.value;renderPerformanceScreen()"
+        style="font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)"/>
+    `:''}
+    ${sa||om?`
+      <select onchange="_perfAnalystFlt=this.value;renderPerformanceScreen()"
+        style="font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)">
+        <option value="">All analysts</option>
+        ${allAnalysts.map(n=>`<option value="${esc(n)}" ${n===_perfAnalystFlt?'selected':''}>${esc(n)}</option>`).join('')}
+      </select>
+      <select onchange="_perfTeamFlt=this.value;renderPerformanceScreen()"
+        style="font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)">
+        <option value="">All teams</option>
+        ${tls.map(tl=>`<option value="${esc(tl.name)}" ${tl.name===_perfTeamFlt?'selected':''}>${esc(tl.name.split(' ')[0])}'s team</option>`).join('')}
+      </select>
+    `:''}
+  </div>`;
 
-  if (!expanded) return `<div class="card" style="margin-bottom:8px;padding:0;overflow:hidden">${header}</div>`;
+  // Summary cards
+  const sc=(val,lbl,hint,col,onclick)=>`<div onclick="${onclick}" style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:16px;text-align:center;cursor:pointer;flex:1;min-width:130px" onmouseover="this.style.borderColor='var(--brand)'" onmouseout="this.style.borderColor='var(--border)'">
+    <div style="font-size:26px;font-weight:700;color:${col};margin-bottom:4px">${val}</div>
+    <div style="font-size:12px;color:var(--text-2);margin-bottom:6px">${lbl}</div>
+    <div style="font-size:11px;color:var(--text-3)">${hint}</div>
+  </div>`;
 
-  // Expanded content
-  const taskRows=Object.values(m.taskMap).map(s=>{
-    const bench=EOD_BENCHMARKS[s.type]?.[s.subType];
-    const count=s.sessions.length;
-    const avg=count?Math.round(s.sessions.reduce((a,b)=>a+b.mins,0)/count):null;
-    const overC=s.overSessions.length;
-    const avgOver=overC?Math.round(s.overSessions.reduce((a,b)=>a+b.over,0)/overC):0;
-    const badge=!bench||!count?`<span style="font-size:11px;color:var(--text-3)">—</span>`:
-      avg>bench?`<span style="font-size:11px;background:#FEF3C7;color:#92400E;border-radius:50px;padding:2px 8px;font-weight:600">⚠ Over (${overC}/${count}) avg +${perfFmtMins(avgOver)} over</span>`:
-      `<span style="font-size:11px;background:#D1FAE5;color:#065F46;border-radius:50px;padding:2px 8px;font-weight:600">✓ On track</span>`;
-    return `<tr>
-      <td style="padding:7px 0;border-bottom:0.5px solid var(--border)"><div style="font-size:13px;font-weight:500">${esc(s.type)}</div>${s.subType?`<div style="font-size:11px;color:var(--text-3)">${esc(s.subType)}</div>`:''}</td>
-      <td style="padding:7px 8px;border-bottom:0.5px solid var(--border);text-align:right;font-size:13px;color:var(--text-2)">${count}</td>
-      <td style="padding:7px 8px;border-bottom:0.5px solid var(--border);text-align:right;font-size:13px;color:var(--text-2)">${s.todayMins!=null?perfFmtMins(s.todayMins):'—'}</td>
-      <td style="padding:7px 8px;border-bottom:0.5px solid var(--border);text-align:right;font-size:13px;color:var(--text-2)">${avg!=null?perfFmtMins(avg):'—'}</td>
-      <td style="padding:7px 8px;border-bottom:0.5px solid var(--border);text-align:right;font-size:12px;color:var(--text-3)">${bench!=null?perfFmtMins(bench):'—'}</td>
-      <td style="padding:7px 0 7px 8px;border-bottom:0.5px solid var(--border);text-align:right">${badge}</td>
-    </tr>`;
-  }).join('');
+  const subCol=m.teamSubRate>=80?'var(--success)':m.teamSubRate>=60?'#F59E0B':'var(--danger)';
+  const benchCol=m.benchRate==null?'var(--text-3)':m.benchRate>=80?'var(--success)':m.benchRate>=60?'#F59E0B':'var(--danger)';
 
-  // Time distribution
-  const totalMins=Object.values(m.timeDist).reduce((a,b)=>a+b,0)||1;
-  const distBars=Object.entries(m.timeDist).sort((a,b)=>b[1]-a[1]).map(([type,mins])=>{
-    const pct=Math.round(mins/totalMins*100);
-    return `<div style="margin-bottom:6px">
-      <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px">
-        <span style="color:var(--text-2)">${esc(type)}</span>
-        <span style="color:var(--text-3)">${perfFmtMins(mins)} · ${pct}%</span>
-      </div>
-      <div style="background:var(--surface-2);border-radius:4px;height:6px;overflow:hidden">
-        <div style="width:${pct}%;height:100%;background:var(--brand);border-radius:4px"></div>
-      </div>
-    </div>`;
-  }).join('');
+  const summaryRow=`<div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap">
+    ${sc(m.teamSubRate+'%','EOD submission rate',`${m.reportCount} reports · ${m.wdays} working days`,subCol,"perfOpenModal('eod')")}
+    ${sc(m.benchRate!=null?m.benchRate+'%':'—','Team on benchmark',`${m.onTrack} ok · ${m.over} over`,benchCol,"perfOpenModal('bench')")}
+    ${sc(m.teamAvg?perfFmtMins(m.teamAvg):'—','Team avg per task','across all task types','var(--text)',"perfOpenModal('avg')")}
+    ${sc(m.supportCount,'Support flags','this period',m.supportCount>0?'var(--danger)':'var(--text-3)',"perfOpenModal('flags')")}
+  </div>`;
 
-  // Over-benchmark detail
-  const overDetails=Object.values(m.taskMap).filter(s=>s.overSessions.length>0).map(s=>`
-    <div style="margin-bottom:8px">
-      <div style="font-size:12px;font-weight:600;margin-bottom:4px">${esc(s.type)}${s.subType?' · '+esc(s.subType):''} <span style="font-size:11px;color:var(--text-3);font-weight:400">benchmark: ${perfFmtMins(EOD_BENCHMARKS[s.type]?.[s.subType])}</span></div>
-      ${s.overSessions.map(o=>`<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--danger);padding:2px 0">
-        <span>${esc(fmtDate(o.date))}</span>
-        <span>${perfFmtMins(o.mins)} <span style="color:var(--text-3)">(+${perfFmtMins(o.over)} over)</span></span>
-      </div>`).join('')}
-    </div>`).join('');
-
-  // Support & challenges log
-  const logHTML=[
-    ...m.supportLog.map(l=>`<div style="padding:5px 0;border-bottom:0.5px solid var(--border)"><span style="font-size:11px;background:#FEF3C7;color:#92400E;border-radius:4px;padding:1px 6px;font-weight:600;margin-right:6px">Support</span><span style="font-size:12px;color:var(--text-2)">${esc(fmtDate(l.date))}</span>${l.detail?`<div style="font-size:12px;color:var(--text-3);margin-top:2px">${esc(l.detail)}</div>`:''}</div>`),
-    ...m.challengeLog.map(l=>`<div style="padding:5px 0;border-bottom:0.5px solid var(--border)"><span style="font-size:11px;background:#FEE2E2;color:#991B1B;border-radius:4px;padding:1px 6px;font-weight:600;margin-right:6px">Challenge</span><span style="font-size:12px;color:var(--text-2)">${esc(fmtDate(l.date))}</span>${l.detail?`<div style="font-size:12px;color:var(--text-3);margin-top:2px">${esc(l.detail)}</div>`:''}</div>`),
-  ].sort((a,b)=>0).join('') || '<div style="font-size:13px;color:var(--text-3);padding:8px 0">No support or challenges flagged this period.</div>';
-
-  return `<div class="card" style="margin-bottom:8px;padding:0;overflow:hidden">
-    ${header}
-    <div style="border-top:1px solid var(--border);padding:14px 14px">
-
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px">
-        <div style="background:${m.subRate>=80?'#D1FAE5':m.subRate>=50?'#FEF3C7':'#FEE2E2'};border-radius:var(--radius-sm);padding:10px;text-align:center">
-          <div style="font-size:20px;font-weight:700;color:${m.subRate>=80?'#065F46':m.subRate>=50?'#92400E':'#991B1B'}">${m.subRate}%</div>
-          <div style="font-size:11px;color:${m.subRate>=80?'#065F46':m.subRate>=50?'#92400E':'#991B1B'};margin-top:1px">${m.reportCount}/${m.workDays} days</div>
-          <div style="font-size:10px;color:var(--text-3);margin-top:2px">EOD submitted</div>
-        </div>
-        <div style="background:${m.benchRate==null?'var(--surface-2)':m.benchRate>=80?'#D1FAE5':m.benchRate>=60?'#FEF3C7':'#FEE2E2'};border-radius:var(--radius-sm);padding:10px;text-align:center">
-          <div style="font-size:20px;font-weight:700;color:${m.benchRate==null?'var(--text-3)':m.benchRate>=80?'#065F46':m.benchRate>=60?'#92400E':'#991B1B'}">${m.benchRate!=null?m.benchRate+'%':'—'}</div>
-          <div style="font-size:11px;color:var(--text-3);margin-top:1px">${m.onTrack} ok · ${m.over} over</div>
-          <div style="font-size:10px;color:var(--text-3);margin-top:2px">On benchmark</div>
-        </div>
-        <div style="background:${m.supportCount>0?'#FEF3C7':'var(--surface-2)'};border-radius:var(--radius-sm);padding:10px;text-align:center">
-          <div style="font-size:20px;font-weight:700;color:${m.supportCount>0?'#92400E':'var(--text-3)'}">${m.supportCount}</div>
-          <div style="font-size:11px;color:var(--text-3);margin-top:1px">this period</div>
-          <div style="font-size:10px;color:var(--text-3);margin-top:2px">Support flagged</div>
-        </div>
-        <div style="background:var(--surface-2);border-radius:var(--radius-sm);padding:10px;text-align:center">
-          <div style="font-size:20px;font-weight:700;color:var(--text)">${perfFmtMins(m.pdMins)}</div>
-          <div style="font-size:11px;color:var(--text-3);margin-top:1px">total</div>
-          <div style="font-size:10px;color:var(--text-3);margin-top:2px">Prof. development</div>
-        </div>
-      </div>
-
-      ${taskRows?`
-      <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Task performance</div>
-      <div style="overflow-x:auto;margin-bottom:16px">
-        <table style="width:100%;border-collapse:collapse">
-          <thead><tr>
-            <th style="text-align:left;font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px;padding:0 0 6px;border-bottom:1px solid var(--border)">Task</th>
-            <th style="text-align:right;font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px;padding:0 8px 6px;border-bottom:1px solid var(--border)">Count</th>
-            <th style="text-align:right;font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px;padding:0 8px 6px;border-bottom:1px solid var(--border)">Today</th>
-            <th style="text-align:right;font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px;padding:0 8px 6px;border-bottom:1px solid var(--border)">Avg</th>
-            <th style="text-align:right;font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px;padding:0 8px 6px;border-bottom:1px solid var(--border)">Benchmark</th>
-            <th style="text-align:right;font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px;padding:0 0 6px;border-bottom:1px solid var(--border)">Status</th>
-          </tr></thead>
-          <tbody>${taskRows}</tbody>
-        </table>
-      </div>`:''}
-
-      ${distBars?`
-      <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Time distribution</div>
-      <div style="margin-bottom:16px">${distBars}</div>`:''}
-
-      ${overDetails?`
-      <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Over-benchmark detail</div>
-      <div style="margin-bottom:16px">${overDetails}</div>`:''}
-
-      <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Support & challenges log</div>
-      <div>${logHTML}</div>
+  // Charts row
+  const chartsRow=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
+    <div onclick="perfOpenModal('pie')" style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:14px;cursor:pointer" onmouseover="this.style.borderColor='var(--brand)'" onmouseout="this.style.borderColor='var(--border)'">
+      <div style="font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Time distribution — click to expand</div>
+      <canvas id="perf-pie" height="140"></canvas>
+    </div>
+    <div onclick="perfOpenModal('trend')" style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:14px;cursor:pointer" onmouseover="this.style.borderColor='var(--brand)'" onmouseout="this.style.borderColor='var(--border)'">
+      <div style="font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Benchmark trend — click to expand</div>
+      <canvas id="perf-trend" height="140"></canvas>
     </div>
   </div>`;
+
+  // Alert bar
+  const alertBar=m.alerts.length?`<div style="background:#FEF3C7;border:1px solid #FDE68A;border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:16px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+    <span style="font-size:13px;font-weight:600;color:#92400E;flex-shrink:0">⚠ Running over:</span>
+    ${m.alerts.map(a=>`<span onclick="perfOpenModal('drill','${a.key.replace(/'/g,"\\'")}')" style="background:white;border:1px solid #FCA5A5;border-radius:50px;padding:4px 12px;font-size:12px;color:#991B1B;cursor:pointer;white-space:nowrap" onmouseover="this.style.background='#FEE2E2'" onmouseout="this.style.background='white'">${esc(a.label)} — avg +${perfFmtMins(a.over)} over</span>`).join('')}
+  </div>`:'<div style="background:#D1FAE5;border:1px solid #6EE7B7;border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:16px;font-size:13px;color:#065F46;font-weight:600">✓ All tasks within benchmark this period</div>';
+
+  // Main table — rows=tasks, cols=analysts
+  const taskKeys=Object.keys(EOD_BENCHMARKS);
+  const taskSubKeys=[];
+  taskKeys.forEach(type=>Object.keys(EOD_BENCHMARKS[type]).forEach(sub=>taskSubKeys.push({type,sub})));
+
+  let tableHTML=`<div class="card" style="margin-bottom:12px">
+    <div style="font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">Avg time per task — click any cell to drill in</div>
+    <div style="overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead><tr>
+          <th style="text-align:left;padding:4px 8px 10px 0;font-size:11px;color:var(--text-3);font-weight:600;border-bottom:1px solid var(--border);min-width:130px">Task</th>
+          <th style="text-align:center;padding:4px 8px 10px;font-size:11px;color:var(--text-3);font-weight:600;border-bottom:1px solid var(--border)">Benchmark</th>
+          ${names.map(n=>`<th style="text-align:center;padding:4px 4px 10px;font-size:11px;color:var(--text-3);font-weight:600;border-bottom:1px solid var(--border);min-width:90px">${esc(n.split(' ')[0])}</th>`).join('')}
+        </tr></thead>
+        <tbody>`;
+
+  let lastType='';
+  taskSubKeys.forEach(({type,sub})=>{
+    const key=type+'|'+sub;
+    const s=m.taskMap[key];
+    const bench=EOD_BENCHMARKS[type][sub];
+    const isNew=type!==lastType; lastType=type;
+    tableHTML+=`<tr>
+      <td style="padding:6px 8px 6px 0;border-bottom:0.5px solid var(--border)">
+        ${isNew?`<div style="font-size:13px;font-weight:500;color:var(--text)">${esc(type)}</div>`:''}
+        <div style="font-size:11px;color:var(--text-3);${isNew?'margin-top:1px':''}">${esc(sub)}</div>
+      </td>
+      <td style="text-align:center;padding:6px 8px;border-bottom:0.5px solid var(--border);font-size:12px;color:var(--text-3)">${perfFmtMins(bench)}</td>
+      ${names.map(n=>{
+        const nsess=(s?.sessions||[]).filter(x=>x.name===n);
+        const avg=nsess.length?Math.round(nsess.reduce((a,b)=>a+b.mins,0)/nsess.length):null;
+        const cs=perfCellStyle(avg,bench);
+        return `<td style="padding:4px 4px 4px 0;border-bottom:0.5px solid var(--border)">
+          <div onclick="perfOpenModal('drill','${key.replace(/'/g,"\\'")}','${n.replace(/'/g,"\\'")}${names.length===1?'':''}')" style="border-radius:6px;padding:6px 10px;text-align:center;cursor:pointer;background:${cs.bg};color:${cs.text}" onmouseover="this.style.opacity='.8'" onmouseout="this.style.opacity='1'">
+            <div style="font-size:13px;font-weight:600">${avg!=null?perfFmtMins(avg):'—'}</div>
+            <div style="font-size:10px;margin-top:1px;opacity:.8">${nsess.length?cs.sub:'no data'}</div>
+          </div>
+        </td>`;
+      }).join('')}
+    </tr>`;
+  });
+  tableHTML+='</tbody></table></div></div>';
+
+  // Modal container
+  const modalContainer=`<div id="perf-modal-wrap" style="display:none;background:rgba(0,0,0,0.45);padding:16px;margin-top:12px;border-radius:var(--radius)">
+    <div id="perf-modal-inner" style="background:var(--surface);border-radius:var(--radius);border:1.5px solid var(--border);padding:1.25rem;max-width:600px;margin:0 auto"></div>
+  </div>`;
+
+  el.innerHTML=filterRow+summaryRow+chartsRow+alertBar+tableHTML+modalContainer;
+
+  // Store metrics for modal use
+  el._metrics=m;
+  el._names=names;
+
+  // Draw charts
+  setTimeout(()=>{
+    perfDrawPie(m.dist);
+    perfDrawTrend(m.trend);
+  },50);
 }
 
-function perfToggle(name) {
-  if (_perfExpanded.has(name)) _perfExpanded.delete(name);
-  else _perfExpanded.add(name);
-  renderPerformanceScreen();
+function perfDrawPie(dist) {
+  const canvas=document.getElementById('perf-pie');
+  if(!canvas) return;
+  if(_perfCharts.pie) try{_perfCharts.pie.destroy();}catch(e){}
+  const data=dist.filter(d=>d.mins>0);
+  _perfCharts.pie=new Chart(canvas,{
+    type:'doughnut',
+    data:{
+      labels:data.map(d=>d.label),
+      datasets:[{data:data.map(d=>Math.round(d.mins)),backgroundColor:TASK_COLORS.slice(0,data.length),borderWidth:2,borderColor:'var(--surface)'}]
+    },
+    options:{plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>' '+ctx.label+': '+perfFmtMins(ctx.raw)}}},cutout:'62%',animation:{duration:400}}
+  });
 }
 
-// ── Main render ───────────────────────────────────────────────────────────
-function renderPerformanceScreen() {
-  const el = document.getElementById('perfContent');
-  if (!el) return;
+function perfDrawTrend(trend) {
+  const canvas=document.getElementById('perf-trend');
+  if(!canvas) return;
+  if(_perfCharts.trend) try{_perfCharts.trend.destroy();}catch(e){}
+  const labels=trend.map(t=>t.date);
+  const vals=trend.map(t=>t.pct);
+  _perfCharts.trend=new Chart(canvas,{
+    type:'bar',
+    data:{
+      labels,
+      datasets:[
+        {label:'% on benchmark',data:vals,backgroundColor:vals.map(v=>v==null?'#E5E7EB':v>=80?'#34D399':v>=60?'#FCD34D':'#F87171'),borderRadius:3,borderSkipped:false},
+        {type:'line',label:'Target (80%)',data:Array(labels.length).fill(80),borderColor:'#F87171',borderWidth:1.5,borderDash:[4,3],pointRadius:0,fill:false,tension:0}
+      ]
+    },
+    options:{
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+(ctx.raw!=null?Math.round(ctx.raw)+'%':'no data')}}},
+      scales:{y:{min:0,max:100,ticks:{callback:v=>v+'%',font:{size:10}},grid:{color:'rgba(0,0,0,0.05)'}},x:{ticks:{font:{size:10}},grid:{display:false}}},
+      animation:{duration:400}
+    }
+  });
+}
 
-  const sa=isSuperAdmin(), om=isOpsManager(), tl=isTeamLead();
+function perfOpenModal(type, taskKey, analyst) {
+  const wrap=document.getElementById('perf-modal-wrap');
+  const inner=document.getElementById('perf-modal-inner');
+  if(!wrap||!inner) return;
 
-  // Get analyst pool
-  let allNames=[];
-  if (sa||om) {
-    allNames=getStaff().filter(s=>['analyst','trainee'].includes(s.role)).map(s=>s.name).sort();
-  } else if (tl) {
-    allNames=getTeamForTL(currentUser.name).sort();
-  } else { el.innerHTML=''; return; }
+  const el=document.getElementById('perfContent');
+  const m=el?._metrics||{};
+  const names=el?._names||[];
+  const close=`<button onclick="perfCloseModal()" style="float:right;background:transparent;border:none;font-size:22px;cursor:pointer;color:var(--text-3);line-height:1;margin:-4px -4px 0 0">×</button>`;
 
-  // Apply filters
-  let filtered=allNames;
-  if (_perfAnalystFlt) filtered=filtered.filter(n=>n===_perfAnalystFlt);
-  if (_perfTeamFlt) {
-    const tm=getTeamForTL(_perfTeamFlt);
-    filtered=filtered.filter(n=>tm.includes(n));
+  let html='';
+
+  if(type==='eod') {
+    html=`${close}<div style="font-size:15px;font-weight:700;margin-bottom:4px">EOD submission rate</div>
+    <div style="font-size:12px;color:var(--text-3);margin-bottom:14px">${names.length} analyst${names.length!==1?'s':''} · ${m.wdays||0} working days</div>
+    ${names.map(n=>{const s=m.subByAnalyst?.[n]||{count:0,rate:0};return`<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:0.5px solid var(--border)">
+      <span style="font-size:13px;font-weight:500;min-width:100px">${esc(n.split(' ')[0])}</span>
+      <div style="flex:1;height:8px;background:var(--surface-2);border-radius:4px;overflow:hidden"><div style="width:${s.rate}%;height:100%;background:${s.rate>=80?'#34D399':s.rate>=60?'#FCD34D':'#F87171'};border-radius:4px"></div></div>
+      <span style="font-size:13px;font-weight:700;color:${s.rate>=80?'#065F46':s.rate>=60?'#92400E':'#991B1B'};min-width:40px;text-align:right">${s.rate}%</span>
+      <span style="font-size:11px;color:var(--text-3)">${s.count}/${m.wdays||0} days</span>
+    </div>`;}).join('')}`;
+
+  } else if(type==='bench') {
+    html=`${close}<div style="font-size:15px;font-weight:700;margin-bottom:4px">Benchmark adherence</div>
+    <div style="font-size:12px;color:var(--text-3);margin-bottom:14px">Task type breakdown</div>
+    ${Object.entries(EOD_BENCHMARKS).map(([type,subs])=>Object.entries(subs).map(([sub,bench])=>{
+      const key=type+'|'+sub;
+      const s=m.taskMap?.[key];
+      const avg=s?.sessions?.length?Math.round(s.totalMins/s.sessions.length):null;
+      const over=avg&&avg>bench*1.05;
+      return`<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:0.5px solid var(--border)">
+        <div style="flex:1"><div style="font-size:13px;font-weight:500">${esc(type)}</div><div style="font-size:11px;color:var(--text-3)">${esc(sub)}</div></div>
+        <span style="font-size:12px;color:var(--text-3)">${perfFmtMins(bench)}</span>
+        <span style="font-size:13px;font-weight:700;min-width:60px;text-align:right;color:${avg==null?'var(--text-3)':over?'#991B1B':'#065F46'}">${avg!=null?perfFmtMins(avg):'—'}</span>
+        ${avg!=null?`<span style="font-size:11px;background:${over?'#FEE2E2':'#D1FAE5'};color:${over?'#991B1B':'#065F46'};border-radius:50px;padding:2px 8px;font-weight:600;white-space:nowrap">${over?'+'+perfFmtMins(avg-bench)+' over':'on track'}</span>`:'<span style="font-size:11px;color:var(--text-3)">no data</span>'}
+      </div>`;
+    }).join('')).join('')}`;
+
+  } else if(type==='avg') {
+    html=`${close}<div style="font-size:15px;font-weight:700;margin-bottom:4px">Avg time per task</div>
+    <div style="font-size:12px;color:var(--text-3);margin-bottom:14px">Per analyst comparison</div>
+    ${(m.analystAvg||[]).map(({name,avg})=>`<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:0.5px solid var(--border)">
+      <span style="font-size:13px;font-weight:500;min-width:100px">${esc(name.split(' ')[0])}</span>
+      <div style="flex:1;height:8px;background:var(--surface-2);border-radius:4px;overflow:hidden"><div style="width:${avg?Math.min(100,Math.round(avg/240*100)):0}%;height:100%;background:#378ADD;border-radius:4px"></div></div>
+      <span style="font-size:13px;font-weight:700;color:var(--text);min-width:60px;text-align:right">${avg?perfFmtMins(avg):'—'}</span>
+    </div>`).join('')}`;
+
+  } else if(type==='flags') {
+    const reports=getEODReports().filter(r=>names.includes(r.name)&&r.status==='submitted');
+    const flagged=reports.filter(r=>r.supportNeeded==='yes');
+    html=`${close}<div style="font-size:15px;font-weight:700;margin-bottom:4px">Support flags</div>
+    <div style="font-size:12px;color:var(--text-3);margin-bottom:14px">${flagged.length} flag${flagged.length!==1?'s':''} this period</div>
+    ${flagged.length?flagged.map(r=>`<div style="padding:8px 0;border-bottom:0.5px solid var(--border)">
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:3px">
+        <span style="font-size:13px;font-weight:500">${esc(r.name.split(' ')[0])}</span>
+        <span style="font-size:11px;color:var(--text-3)">${esc(fmtDate(r.date))}</span>
+      </div>
+      ${r.supportDetail?`<div style="font-size:12px;color:var(--text-2)">${esc(r.supportDetail)}</div>`:''}
+    </div>`).join(''):'<div style="font-size:13px;color:var(--text-3);padding:12px 0">No support flags this period.</div>'}`;
+
+  } else if(type==='pie') {
+    const dist=(m.dist||[]).filter(d=>d.mins>0).sort((a,b)=>b.mins-a.mins);
+    const total=dist.reduce((s,d)=>s+d.mins,0)||1;
+    html=`${close}<div style="font-size:15px;font-weight:700;margin-bottom:4px">Time distribution</div>
+    <div style="font-size:12px;color:var(--text-3);margin-bottom:14px">Total: ${perfFmtMins(total)} logged this period</div>
+    ${dist.map((d,i)=>{const pct=Math.round(d.mins/total*100);return`<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:0.5px solid var(--border)">
+      <span style="width:10px;height:10px;border-radius:50%;background:${TASK_COLORS[i%TASK_COLORS.length]};flex-shrink:0"></span>
+      <span style="flex:1;font-size:13px">${esc(d.label)}</span>
+      <div style="width:80px;height:6px;background:var(--surface-2);border-radius:3px;overflow:hidden"><div style="width:${pct}%;height:100%;background:${TASK_COLORS[i%TASK_COLORS.length]};border-radius:3px"></div></div>
+      <span style="font-size:12px;color:var(--text-3);min-width:30px;text-align:right">${pct}%</span>
+      <span style="font-size:12px;font-weight:500;min-width:52px;text-align:right">${perfFmtMins(d.mins)}</span>
+    </div>`;}).join('')}`;
+
+  } else if(type==='trend') {
+    const trend=m.trend||[];
+    html=`${close}<div style="font-size:15px;font-weight:700;margin-bottom:4px">Benchmark adherence trend</div>
+    <div style="font-size:12px;color:var(--text-3);margin-bottom:14px">Daily % of tasks within benchmark</div>
+    ${trend.map(({date,pct})=>`<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:0.5px solid var(--border)">
+      <span style="font-size:12px;color:var(--text-3);min-width:70px">${esc(date)}</span>
+      <div style="flex:1;height:8px;background:var(--surface-2);border-radius:4px;overflow:hidden"><div style="width:${pct||0}%;height:100%;background:${pct==null?'#E5E7EB':pct>=80?'#34D399':pct>=60?'#FCD34D':'#F87171'};border-radius:4px"></div></div>
+      <span style="font-size:13px;font-weight:700;min-width:36px;text-align:right;color:${pct==null?'var(--text-3)':pct>=80?'#065F46':pct>=60?'#92400E':'#991B1B'}">${pct!=null?Math.round(pct)+'%':'—'}</span>
+    </div>`).join('')}`;
+
+  } else if(type==='drill') {
+    const [dType,dSub]=(taskKey||'').split('|');
+    const bench=dType&&dSub?EOD_BENCHMARKS[dType]?.[dSub]:null;
+    const s=m.taskMap?.[taskKey];
+    const sessions=analyst?
+      (s?.sessions||[]).filter(x=>x.name===analyst):
+      (s?.sessions||[]);
+    const avg=sessions.length?Math.round(sessions.reduce((a,b)=>a+b.mins,0)/sessions.length):null;
+    const maxM=Math.max(...sessions.map(x=>x.mins),bench||0)*1.15||240;
+
+    html=`${close}<div style="font-size:15px;font-weight:700;margin-bottom:2px">${esc(dType)}${dSub?' · <span style="color:var(--text-3);font-weight:400">'+esc(dSub)+'</span>':''}</div>
+    <div style="font-size:12px;color:var(--text-3);margin-bottom:14px">${analyst?esc(analyst)+' · ':'All analysts · '}${sessions.length} session${sessions.length!==1?'s':''}</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px">
+      <div style="background:${avg&&bench&&avg>bench?'#FEE2E2':'#D1FAE5'};border-radius:8px;padding:10px;text-align:center">
+        <div style="font-size:18px;font-weight:700;color:${avg&&bench&&avg>bench?'#991B1B':'#065F46'}">${avg?perfFmtMins(avg):'—'}</div>
+        <div style="font-size:10px;opacity:.8;color:${avg&&bench&&avg>bench?'#991B1B':'#065F46'};margin-top:2px">avg</div>
+      </div>
+      <div style="background:var(--surface-2);border-radius:8px;padding:10px;text-align:center">
+        <div style="font-size:18px;font-weight:700;color:var(--text)">${bench?perfFmtMins(bench):'—'}</div>
+        <div style="font-size:10px;color:var(--text-3);margin-top:2px">benchmark</div>
+      </div>
+      <div style="background:${avg&&bench&&avg>bench?'#FEF3C7':'var(--surface-2)'};border-radius:8px;padding:10px;text-align:center">
+        <div style="font-size:18px;font-weight:700;color:${avg&&bench&&avg>bench?'#92400E':'var(--text-3)'}">${avg&&bench?perfFmtMins(Math.abs(avg-bench))+(avg>bench?' over':' under'):'—'}</div>
+        <div style="font-size:10px;margin-top:2px;color:${avg&&bench&&avg>bench?'#92400E':'var(--text-3)'}">${avg&&bench&&avg>bench?'avg over':'avg diff'}</div>
+      </div>
+    </div>
+    <div style="font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Session history</div>
+    ${sessions.length?sessions.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(s=>`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:0.5px solid var(--border)">
+      <span style="font-size:12px;color:var(--text-3);min-width:80px">${esc(fmtDate(s.date))}</span>
+      ${names.length>1&&!analyst?`<span style="font-size:12px;color:var(--text-2);min-width:70px">${esc(s.name.split(' ')[0])}</span>`:''}
+      <div style="flex:1;height:6px;background:var(--surface-2);border-radius:3px;overflow:hidden"><div style="width:${Math.min(100,Math.round(s.mins/maxM*100))}%;height:100%;background:${bench&&s.mins>bench?'#F87171':'#34D399'};border-radius:3px"></div></div>
+      <span style="font-size:13px;font-weight:700;min-width:56px;text-align:right;color:${bench&&s.mins>bench?'#991B1B':'#065F46'}">${perfFmtMins(s.mins)}${bench&&s.mins>bench?` <span style="font-size:10px;font-weight:400">(+${perfFmtMins(s.mins-bench)})</span>`:''}</span>
+    </div>`).join(''):'<div style="font-size:13px;color:var(--text-3);padding:8px 0">No sessions logged for this task.</div>'}`;
   }
 
-  // Pagination
-  const total=filtered.length;
-  const pages=Math.ceil(total/PERF_PER_PAGE)||1;
-  if (_perfPage>=pages) _perfPage=0;
-  const slice=filtered.slice(_perfPage*PERF_PER_PAGE,(_perfPage+1)*PERF_PER_PAGE);
+  inner.innerHTML=html;
+  wrap.style.display='block';
+  wrap.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
 
-  const pager=pages>1?`<div style="display:flex;justify-content:center;align-items:center;gap:10px;margin-top:12px">
-    <button onclick="_perfPage=Math.max(0,_perfPage-1);renderPerformanceScreen()" ${_perfPage===0?'disabled':''}
-      style="padding:6px 16px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:var(--surface-2);cursor:pointer;font-size:13px;${_perfPage===0?'opacity:.4':''}">← Prev</button>
-    <span style="font-size:13px;color:var(--text-3)">Page ${_perfPage+1} of ${pages} · ${total} analyst${total!==1?'s':''}</span>
-    <button onclick="_perfPage=Math.min(${pages-1},_perfPage+1);renderPerformanceScreen()" ${_perfPage>=pages-1?'disabled':''}
-      style="padding:6px 16px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:var(--surface-2);cursor:pointer;font-size:13px;${_perfPage>=pages-1?'opacity:.4':''}">Next →</button>
-  </div>`:'';
-
-  el.innerHTML=`
-    ${perfFiltersHTML(allNames)}
-    ${!slice.length?'<div class="card" style="text-align:center;padding:2rem;color:var(--text-3)">No analysts match filters.</div>':''}
-    ${slice.map(n=>perfAnalystCard(n)).join('')}
-    ${pager}`;
+function perfCloseModal() {
+  const w=document.getElementById('perf-modal-wrap');
+  if(w) w.style.display='none';
 }
 
 function setPerfDays(days, btn) {
-  _perfPeriod = days==='7'?'7':days==='30'?'30':String(days);
+  _perfPeriod=String(days);
   renderPerformanceScreen();
 }
+
 
 
 // ── Patch renderMyTeam — collapsible members + rebuilt performance pulse ──
