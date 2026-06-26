@@ -11712,6 +11712,214 @@ function clvRender() {
   }
 }
 
+// ── EOD Task benchmarks (minutes) ─────────────────────────────────────────
+const EOD_BENCHMARKS = {
+  'CRM App':    { 'Single':60*2, 'Multiple':60*4 },
+  'AOL App':    { 'Single':30,   'Complex':60 },
+  'Valuation':  { 'Single':10,   'Multiple':20 },
+  'Pricing':    { 'Simple':10,   'Complex':20 },
+  'Servicing':  { 'Simple':20,   'Complex':40 },
+  'Calls':      { 'Broker':60,   'Customer':30, 'Lender':60, 'Others':20 },
+  'Emails':     { 'Broker':30,   'Customer':60, 'Lender':30, 'Others':20 },
+};
+
+let _eodPerfPeriod    = '7';
+let _eodPerfAnalyst   = '';
+let _eodPerfTeam      = '';
+
+function getEODPerfDates() {
+  const now = new Date();
+  const to  = now.toISOString().split('T')[0];
+  let from;
+  const p = _eodPerfPeriod;
+  if (p === 'today') { from = to; }
+  else if (p === 'yesterday') {
+    const y = new Date(now); y.setDate(y.getDate()-1);
+    from = y.toISOString().split('T')[0]; return {from, to:from};
+  }
+  else { const d=new Date(now); d.setDate(d.getDate()-parseInt(p)); from=d.toISOString().split('T')[0]; }
+  return {from, to};
+}
+
+function taskMins(t) {
+  if (!t.startTime || !t.endTime) return 0;
+  const [sh,sm] = t.startTime.split(':').map(Number);
+  const [eh,em] = t.endTime.split(':').map(Number);
+  return Math.max(0, (eh*60+em) - (sh*60+sm));
+}
+
+function fmtMins(m) {
+  if (!m && m!==0) return '—';
+  const h = Math.floor(m/60), mn = m%60;
+  if (h>0 && mn>0) return `${h}h ${mn}m`;
+  if (h>0) return `${h}h`;
+  return `${mn}m`;
+}
+
+function calcEODTaskStats(name, from, to) {
+  const reports = getEODReports().filter(r =>
+    r.name===name && r.status==='submitted' && r.date>=from && r.date<=to
+  );
+  const todayStr = new Date().toISOString().split('T')[0];
+  const todayReport = reports.find(r => r.date===todayStr);
+  const todayTasks  = todayReport?.tasks || [];
+
+  // Aggregate all tasks
+  const stats = {}; // key = "type|subType"
+  reports.forEach(r => {
+    (r.tasks||[]).forEach(t => {
+      if (!t.type) return;
+      const key = t.type + '|' + (t.subType||'');
+      if (!stats[key]) stats[key] = {type:t.type, subType:t.subType||'', sessions:[], todayMins:null};
+      const mins = taskMins(t);
+      if (mins>0) stats[key].sessions.push(mins);
+    });
+  });
+
+  // Today's time per key
+  todayTasks.forEach(t => {
+    if (!t.type) return;
+    const key = t.type + '|' + (t.subType||'');
+    if (stats[key]) stats[key].todayMins = (stats[key].todayMins||0) + taskMins(t);
+  });
+
+  // PD total
+  let pdMins = 0;
+  reports.forEach(r => {
+    (r.tasks||[]).forEach(t => {
+      if (t.type==='Professional Development') pdMins += taskMins(t);
+    });
+  });
+
+  return {stats, pdMins, reportCount:reports.length};
+}
+
+function renderEODPerfCard(name) {
+  const {from, to} = getEODPerfDates();
+  const {stats, pdMins, reportCount} = calcEODTaskStats(name, from, to);
+
+  const rows = Object.values(stats).filter(s => s.type !== 'Professional Development');
+  let onTrack=0, over=0;
+
+  const selStyle = 'font-size:12px;color:var(--text-2)';
+
+  const tableRows = rows.map(s => {
+    const bench = EOD_BENCHMARKS[s.type]?.[s.subType];
+    const count  = s.sessions.length;
+    const avg    = count ? Math.round(s.sessions.reduce((a,b)=>a+b,0)/count) : null;
+    const today  = s.todayMins;
+    const overSessions = bench ? s.sessions.filter(m=>m>bench).length : 0;
+    const hasBench = bench != null;
+
+    let badge = '';
+    if (!hasBench || count<1) {
+      badge = `<span style="font-size:11px;color:var(--text-3)">—</span>`;
+    } else if (avg > bench) {
+      over++;
+      badge = `<span style="font-size:11px;background:#FEF3C7;color:#92400E;border-radius:50px;padding:2px 8px;font-weight:600">⚠ Over (${overSessions}/${count})</span>`;
+    } else {
+      onTrack++;
+      badge = `<span style="font-size:11px;background:#D1FAE5;color:#065F46;border-radius:50px;padding:2px 8px;font-weight:600">✓ On track</span>`;
+    }
+
+    return `<tr>
+      <td style="padding:7px 8px 7px 0;border-bottom:0.5px solid var(--border)">
+        <div style="font-size:13px;font-weight:500;color:var(--text)">${esc(s.type)}</div>
+        ${s.subType?`<div style="font-size:11px;color:var(--text-3)">${esc(s.subType)}</div>`:''}
+      </td>
+      <td style="padding:7px 8px 7px 0;border-bottom:0.5px solid var(--border);text-align:right;font-size:13px;color:var(--text-2)">${count}</td>
+      <td style="padding:7px 8px 7px 0;border-bottom:0.5px solid var(--border);text-align:right;font-size:13px;color:var(--text-2)">${today!=null?fmtMins(today):'—'}</td>
+      <td style="padding:7px 8px 7px 0;border-bottom:0.5px solid var(--border);text-align:right;font-size:13px;color:var(--text-2)">${avg!=null?fmtMins(avg):'—'}</td>
+      <td style="padding:7px 8px 7px 0;border-bottom:0.5px solid var(--border);text-align:right;font-size:12px;color:var(--text-3)">${bench!=null?fmtMins(bench):'—'}</td>
+      <td style="padding:7px 8px 7px 0;border-bottom:0.5px solid var(--border);text-align:right">${badge}</td>
+    </tr>`;
+  }).join('');
+
+  const initials = name.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
+
+  return `<div class="card" style="margin-bottom:12px">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+      <div style="width:36px;height:36px;border-radius:50%;background:var(--brand-light);color:var(--brand);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;flex-shrink:0">${esc(initials)}</div>
+      <div style="flex:1">
+        <div style="font-size:15px;font-weight:600">${esc(name)}</div>
+        <div style="font-size:12px;color:var(--text-3)">${reportCount} EOD report${reportCount!==1?'s':''} in period</div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <span style="font-size:12px;background:#D1FAE5;color:#065F46;border-radius:50px;padding:3px 10px;font-weight:600">${onTrack} on track</span>
+        ${over?`<span style="font-size:12px;background:#FEF3C7;color:#92400E;border-radius:50px;padding:3px 10px;font-weight:600">${over} over</span>`:''}
+      </div>
+    </div>
+    ${rows.length ? `
+    <div style="overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead>
+          <tr>
+            <th style="text-align:left;font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px;padding:0 8px 8px 0;border-bottom:1px solid var(--border)">Task</th>
+            <th style="text-align:right;font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px;padding:0 8px 8px 0;border-bottom:1px solid var(--border)">Count</th>
+            <th style="text-align:right;font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px;padding:0 8px 8px 0;border-bottom:1px solid var(--border)">Today</th>
+            <th style="text-align:right;font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px;padding:0 8px 8px 0;border-bottom:1px solid var(--border)">Avg</th>
+            <th style="text-align:right;font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px;padding:0 8px 8px 0;border-bottom:1px solid var(--border)">Benchmark</th>
+            <th style="text-align:right;font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px;padding:0 8px 8px 0;border-bottom:1px solid var(--border)">Status</th>
+          </tr>
+        </thead>
+        <tbody>${tableRows}</tbody>
+      </table>
+    </div>` : `<div style="font-size:13px;color:var(--text-3);text-align:center;padding:12px 0">No tasks logged in this period</div>`}
+    ${pdMins>0?`
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;margin-top:8px;border-top:1px solid var(--border)">
+      <div>
+        <div style="font-size:13px;font-weight:500">Professional development</div>
+        <div style="font-size:11px;color:var(--text-3)">No benchmark</div>
+      </div>
+      <div style="font-size:14px;font-weight:600;color:var(--text)">${fmtMins(pdMins)} total</div>
+    </div>`:''}
+  </div>`;
+}
+
+function renderEODPerfSection(el, names) {
+  const {from, to} = getEODPerfDates();
+  const allStaff = getStaff().filter(s=>['analyst','trainee','teamlead'].includes(s.role));
+  const tls = getStaff().filter(s=>s.role==='teamlead');
+
+  let filtered = names;
+  if (_eodPerfAnalyst) filtered = filtered.filter(n=>n===_eodPerfAnalyst);
+  if (_eodPerfTeam) {
+    const teamMembers = getTeamForTL(_eodPerfTeam);
+    filtered = filtered.filter(n=>teamMembers.includes(n));
+  }
+
+  const showTeamFilter = isSuperAdmin() || isOpsManager();
+  const showAnalystFilter = isSuperAdmin() || isOpsManager();
+
+  el.innerHTML = `
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:16px">
+      <select onchange="_eodPerfPeriod=this.value;renderEODPerfSection(document.getElementById('eodPerfContent'),${JSON.stringify(names)})"
+        style="font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)">
+        <option value="today" ${_eodPerfPeriod==='today'?'selected':''}>Today</option>
+        <option value="yesterday" ${_eodPerfPeriod==='yesterday'?'selected':''}>Yesterday</option>
+        <option value="7" ${_eodPerfPeriod==='7'?'selected':''}>Last 7 days</option>
+        <option value="30" ${_eodPerfPeriod==='30'?'selected':''}>Last 30 days</option>
+        <option value="60" ${_eodPerfPeriod==='60'?'selected':''}>Last 60 days</option>
+        <option value="90" ${_eodPerfPeriod==='90'?'selected':''}>Last 90 days</option>
+      </select>
+      ${showAnalystFilter?`
+      <select onchange="_eodPerfAnalyst=this.value;renderEODPerfSection(document.getElementById('eodPerfContent'),${JSON.stringify(names)})"
+        style="font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)">
+        <option value="">All analysts</option>
+        ${names.map(n=>`<option value="${esc(n)}" ${n===_eodPerfAnalyst?'selected':''}>${esc(n)}</option>`).join('')}
+      </select>`:''}
+      ${showTeamFilter?`
+      <select onchange="_eodPerfTeam=this.value;renderEODPerfSection(document.getElementById('eodPerfContent'),${JSON.stringify(names)})"
+        style="font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)">
+        <option value="">All teams</option>
+        ${tls.map(tl=>`<option value="${esc(tl.name)}" ${tl.name===_eodPerfTeam?'selected':''}>${esc(tl.name.split(' ')[0])}'s team</option>`).join('')}
+      </select>`:''}
+    </div>
+    <div id="eodPerfContent">
+      ${filtered.length ? filtered.map(n=>renderEODPerfCard(n)).join('') : '<div class="card" style="text-align:center;padding:2rem;color:var(--text-3)">No analysts match filters.</div>'}
+    </div>`;
+}
+
 function renderPerformanceScreen() {
   const el = document.getElementById('perfContent');
   if (!el) return;
@@ -11843,8 +12051,12 @@ function renderPerformanceScreen() {
           </div>
         </div>`;
       }).join('')}
-    </div>`;
+    </div>
+    <div style="font-size:15px;font-weight:700;color:var(--text);margin:20px 0 12px;padding-top:16px;border-top:1.5px solid var(--border)">📋 EOD Task Performance</div>`;
+
+  renderEODPerfSection(el, myTeam);
 }
+
 
 // ── Ops Manager performance view ──────────────────────────────────────────
 let _opsPerfView = 'analyst'; // 'analyst' | 'team'
@@ -12143,8 +12355,13 @@ function renderOpsSpareStaff(el) {
           </div>
         </div>`;
       }).join('')}` : ''}
-    </div>`;
+    </div>
+    <div style="font-size:15px;font-weight:700;color:var(--text);margin:20px 0 12px;padding-top:16px;border-top:1.5px solid var(--border)">📋 EOD Task Performance</div>`;
+
+  const allAnalysts = getStaff().filter(s=>['analyst','trainee','teamlead'].includes(s.role)).map(s=>s.name);
+  renderEODPerfSection(el, allAnalysts);
 }
+
 
 function setPerfDays(days, btn) {
   _perfDays = days;
