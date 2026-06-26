@@ -11235,6 +11235,7 @@ function renderEODScreen() {
       </div>
       <div id="eodTasksPanel" style="display:none;margin-top:10px;border-top:1px solid var(--border);padding-top:10px">
         <div id="eodTaskList"></div>
+        <div id="eodAddForm" style="display:none;background:var(--surface-2);border:1.5px solid var(--brand);border-radius:var(--radius-sm);padding:12px;margin-top:8px"></div>
       </div>
     </div>
 
@@ -11407,11 +11408,11 @@ let _eodTasks = [];
 const EOD_TASK_TYPES = {
   'CRM App':                 ['Single','Multiple'],
   'AOL App':                 ['Single','Complex'],
+  'Valuation':               ['Single','Multiple'],
   'Pricing':                 ['Simple','Complex'],
   'Servicing':               ['Simple','Complex'],
   'Calls':                   ['Broker','Customer','Lender','Others'],
   'Emails':                  ['Broker','Customer','Lender','Others'],
-  'Valuation':               [],
   'Professional Development':[]
 };
 const EOD_TASK_KEYS = Object.keys(EOD_TASK_TYPES);
@@ -11451,15 +11452,122 @@ function updateEODTaskSummary() {
 }
 
 function addEODTask() {
-  _eodTasks.push({type:'', subType:'', startTime:'', endTime:'', notes:''});
+  // Auto-expand panel
   const panel = document.getElementById('eodTasksPanel');
   if (panel && panel.style.display === 'none') {
     panel.style.display = 'block';
     const icon = document.getElementById('eodTasksToggleIcon');
     if (icon) icon.textContent = '▴ collapse';
   }
+  showEODAddForm();
+}
+
+function showEODAddForm() {
+  const form = document.getElementById('eodAddForm');
+  if (!form) return;
+  form.style.display = 'block';
+
+  const selStyle = 'font-size:13px;padding:6px 8px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);cursor:pointer;width:100%';
+  const lblStyle = 'font-size:10px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px';
+
+  form.innerHTML = `
+    <div style="font-size:12px;font-weight:600;color:var(--brand);margin-bottom:10px">New task</div>
+    <div style="display:grid;grid-template-columns:2fr 1fr 1fr 2fr;gap:8px;align-items:end;margin-bottom:10px" id="eodAddRow">
+      <div>
+        <div style="${lblStyle}">Task</div>
+        <select id="eodAddType" onchange="eodAddTypeChanged()" style="${selStyle}">
+          <option value="">— select —</option>
+          ${EOD_TASK_KEYS.map(ty=>`<option value="${esc(ty)}">${esc(ty)}</option>`).join('')}
+        </select>
+      </div>
+      <div id="eodAddSubWrap" style="display:none">
+        <div style="${lblStyle}">Sub-task</div>
+        <select id="eodAddSub" style="${selStyle}">
+          <option value="">— select —</option>
+        </select>
+      </div>
+      <div id="eodAddStartWrap">
+        <div style="${lblStyle}">Start time</div>
+        <select id="eodAddStart" style="${selStyle}">
+          ${generateTimeOptions('','start')}
+        </select>
+      </div>
+      <div id="eodAddEndWrap">
+        <div style="${lblStyle}">End time</div>
+        <select id="eodAddEnd" style="${selStyle}">
+          ${generateTimeOptions('','end')}
+        </select>
+      </div>
+      <div>
+        <div style="${lblStyle}">Notes</div>
+        <input type="text" id="eodAddNotes" placeholder="Optional…"
+          style="font-size:13px;padding:6px 8px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);width:100%"/>
+      </div>
+    </div>
+    <div id="eodAddErr" style="font-size:12px;color:var(--danger);margin-bottom:8px;display:none"></div>
+    <div style="display:flex;gap:8px">
+      <button type="button" onclick="confirmAddEODTask()"
+        style="padding:8px 18px;border-radius:var(--radius-sm);border:none;background:var(--brand);color:#fff;font-size:13px;font-weight:600;cursor:pointer">Add task</button>
+      <button type="button" onclick="cancelAddEODTask()"
+        style="padding:8px 18px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:var(--surface-2);color:var(--text-2);font-size:13px;cursor:pointer">Cancel</button>
+    </div>`;
+
+  // Update grid columns after render
+  eodAddTypeChanged();
+}
+
+function eodAddTypeChanged() {
+  const type    = document.getElementById('eodAddType')?.value;
+  const subWrap = document.getElementById('eodAddSubWrap');
+  const subSel  = document.getElementById('eodAddSub');
+  const row     = document.getElementById('eodAddRow');
+  if (!subWrap || !subSel || !row) return;
+
+  const subOpts = EOD_TASK_TYPES[type] || [];
+  const hasSub  = subOpts.length > 0;
+
+  subWrap.style.display = hasSub ? 'block' : 'none';
+  if (hasSub) {
+    subSel.innerHTML = '<option value="">— select —</option>' +
+      subOpts.map(s=>`<option value="${esc(s)}">${esc(s)}</option>`).join('');
+  }
+  // Adjust grid columns
+  row.style.gridTemplateColumns = hasSub ? '2fr 1fr 1fr 1fr 2fr' : '2fr 1fr 1fr 2fr';
+}
+
+function confirmAddEODTask() {
+  const type  = document.getElementById('eodAddType')?.value;
+  const sub   = document.getElementById('eodAddSub')?.value;
+  const start = document.getElementById('eodAddStart')?.value;
+  const end   = document.getElementById('eodAddEnd')?.value;
+  const notes = document.getElementById('eodAddNotes')?.value.trim();
+  const errEl = document.getElementById('eodAddErr');
+
+  const subOpts = EOD_TASK_TYPES[type] || [];
+  const needsSub = subOpts.length > 0;
+
+  const errors = [];
+  if (!type)           errors.push('Select a task type.');
+  if (needsSub && !sub) errors.push('Select a sub-task.');
+  if (!start)          errors.push('Select a start time.');
+  if (!end)            errors.push('Select an end time.');
+  if (start && end && end <= start) errors.push('End time must be after start time.');
+
+  if (errors.length) {
+    errEl.style.display = 'block';
+    errEl.textContent   = errors.join(' ');
+    return;
+  }
+
+  _eodTasks.push({ type, subType: sub||'', startTime: start, endTime: end, notes });
+  cancelAddEODTask();
   renderEODTaskList();
   updateEODTaskSummary();
+}
+
+function cancelAddEODTask() {
+  const form = document.getElementById('eodAddForm');
+  if (form) { form.style.display = 'none'; form.innerHTML = ''; }
 }
 
 function removeEODTask(idx) {
