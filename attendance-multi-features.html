@@ -3488,7 +3488,7 @@ function tapCard(key, row) {
     rows = allRecs.filter(r => r.status!=='leave'&&!r.hasPhoto).map(r => personRow(r.name, 'No selfie', 'var(--danger)'));
     title = 'No selfie'; emptyMsg = 'All selfies captured ✓';
   } else if (key === 'eod') {
-    const eodRpts   = getEODReports().filter(r => r.date === date);
+    const eodRpts   = getEODReports().filter(r => r.date === date && r.status === 'submitted');
     const submitted = new Set(eodRpts.map(r => r.name));
     const onLeave   = new Set(allRecs.filter(r => r.date===date && r.status==='leave').map(r => r.name));
     const eligible  = allStaff.filter(s => roleHasEOD(s.role) && !onLeave.has(s.name));
@@ -3664,7 +3664,7 @@ function renderMetrics() {
 
   // ── Compute data needed for Row 3 ──────────────────────────────────────
   const patterns     = isManager()||isSuperAdmin() ? detectAbsencePatterns() : [];
-  const eodRpts      = isManager()||isSuperAdmin() ? getEODReports().filter(r=>r.date===date) : [];
+  const eodRpts      = isManager()||isSuperAdmin() ? getEODReports().filter(r=>r.date===date&&r.status==='submitted') : [];
   const onLeaveNames = new Set(allRecs.filter(r=>r.date===date&&r.status==='leave').map(r=>r.name));
   const eodEligible  = allStaff.filter(s=>roleHasEOD(s.role) && !onLeaveNames.has(s.name));
   const eodCount     = eodRpts.filter(r=>eodEligible.some(s=>s.name===r.name)).length;
@@ -10973,7 +10973,17 @@ function roleHasEOD(role) {
 // ── Storage ────────────────────────────────────────────────────────────────
 
 function getTodayEOD(name) {
-  return getEODReports().find(r => r.name === name && r.date === today) || null;
+  // Returns submitted report if exists, otherwise draft
+  const all = getEODReports().filter(r => r.name === name && r.date === today);
+  return all.find(r => r.status === 'submitted') || all.find(r => r.status === 'draft') || all[0] || null;
+}
+
+function getTodayEODSubmitted(name) {
+  return getEODReports().find(r => r.name === name && r.date === today && r.status === 'submitted') || null;
+}
+
+function getTodayEODDraft(name) {
+  return getEODReports().find(r => r.name === name && r.date === today && r.status === 'draft') || null;
 }
 
 // ── Navigate to EOD from checkin screen ───────────────────────────────────
@@ -11021,7 +11031,10 @@ function renderEODScreen() {
   const el = document.getElementById('eodScreenContent');
   if (!el) return;
 
-  const existing = getTodayEOD(currentUser.name);
+  const submitted  = getTodayEODSubmitted(currentUser.name);
+  const draft      = getTodayEODDraft(currentUser.name);
+  const existing   = submitted || draft || null;
+  const isDraft    = !submitted && !!draft;
   const rec = getRecords().find(r => r.date === today && r.name === currentUser.name);
   const hasCheckedIn = rec && rec.status !== 'leave';
 
@@ -11036,7 +11049,7 @@ function renderEODScreen() {
   }
 
   const sub = document.getElementById('eodScreenSub');
-  if (sub) sub.textContent = existing ? 'Submitted — you can update anytime' : 'Complete before clocking out';
+  if (sub) sub.textContent = submitted ? 'Submitted — you can update anytime' : isDraft ? '⚠ Draft saved — not yet submitted' : 'Complete before clocking out';
 
   const pf = (field, fallback='') => existing ? (existing[field] ?? fallback) : fallback;
 
@@ -11049,17 +11062,24 @@ function renderEODScreen() {
     <!-- ── TASKS ────────────────────────────────────── -->
     <div class="card" style="margin-bottom:1rem">
       <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer" onclick="toggleEODTasksPanel()">
-        <div>
-          <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px">📋 Tasks today</div>
-          <div id="eodTaskSummary" style="font-size:13px;color:var(--text-2);margin-top:4px">${
-            (existing?.tasks?.length)
-              ? existing.tasks.length + ' task' + (existing.tasks.length!==1?'s':'') + ' — ' +
-                existing.tasks.slice(0,3).map(t=>t.type||'Untitled').join(', ') +
-                (existing.tasks.length>3?' +more':'')
-              : 'No tasks added yet'
-          }</div>
+        <div style="flex:1">
+          <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">📋 Tasks today</div>
+          <div id="eodTaskSummary">
+            ${(existing?.tasks?.length)
+              ? existing.tasks.map(t => {
+                  const fmt = v => { if(!v) return '—'; const [h,m]=v.split(':'); const ap=+h<12?'AM':'PM'; return (+h%12||12)+':'+m+' '+ap; };
+                  return `<div style="display:grid;grid-template-columns:2fr 1fr 1fr 2fr;gap:6px;padding:3px 0;border-bottom:1px solid var(--border);font-size:12px;color:var(--text-2)">
+                    <span style="font-weight:600;color:var(--text)">${esc(t.type||'Untitled')}</span>
+                    <span>${fmt(t.startTime)}</span>
+                    <span>${fmt(t.endTime)}</span>
+                    <span style="color:var(--text-3)">${esc(t.notes||'—')}</span>
+                  </div>`;
+                }).join('')
+              : '<div style="font-size:13px;color:var(--text-3)">No tasks added yet — tap to add</div>'
+            }
+          </div>
         </div>
-        <span id="eodTasksToggleIcon" style="font-size:18px;color:var(--text-3);transition:transform .2s">▾</span>
+        <span id="eodTasksToggleIcon" style="font-size:18px;color:var(--text-3);margin-left:12px">▾</span>
       </div>
       <div id="eodTasksPanel" style="display:none;margin-top:12px">
         <div id="eodTaskList"></div>
@@ -11128,10 +11148,15 @@ function renderEODScreen() {
     </div>
 
     <div id="eodSubmitErr" style="color:var(--danger);font-size:13px;margin-bottom:8px;display:none"></div>
-    <button type="submit" class="btn-primary" style="width:100%;padding:14px;font-size:16px">
-      ${existing ? 'Update EOD report' : 'Submit EOD report'}
-    </button>
-    ${existing ? `<div style="text-align:center;font-size:12px;color:var(--text-3);margin-top:8px">Last submitted: ${esc(fmtDate(existing.submittedAt||existing.date))}</div>` : ''}
+    ${isDraft ? `<div style="background:#FFF8E1;border:1.5px solid #F59E0B;border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:10px;font-size:13px;color:#92400E">⚠ Draft saved — this has not been submitted to your team lead yet.</div>` : ''}
+    ${submitted
+      ? `<button type="submit" class="btn-primary" style="width:100%;padding:14px;font-size:16px">Update EOD report</button>
+         <div style="text-align:center;font-size:12px;color:var(--text-3);margin-top:8px">Submitted at ${esc(submitted.submittedAt||'')}</div>`
+      : `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+           <button type="button" onclick="saveDraftEOD()" style="padding:14px;font-size:15px;font-weight:600;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:var(--surface-2);color:var(--text-2);cursor:pointer">💾 Save draft</button>
+           <button type="submit" class="btn-primary" style="padding:14px;font-size:15px">Submit EOD</button>
+         </div>`
+    }
   </form>`;
 
   // Render task summary (panel starts collapsed — expands on click)
@@ -11251,10 +11276,25 @@ function toggleEODTasksPanel() {
 function updateEODTaskSummary() {
   const el = document.getElementById('eodTaskSummary');
   if (!el) return;
-  if (!_eodTasks.length) { el.textContent = 'No tasks added yet'; return; }
-  el.textContent = _eodTasks.length + ' task' + (_eodTasks.length!==1?'s':'') + ' — ' +
-    _eodTasks.slice(0,3).map(t=>t.type||'Untitled').join(', ') +
-    (_eodTasks.length>3?' +more':'');
+  if (!_eodTasks.length) {
+    el.innerHTML = '<span style="color:var(--text-3);font-size:13px">No tasks added yet</span>';
+    return;
+  }
+  const fmt12 = v => {
+    if (!v) return '—';
+    const [h,m] = v.split(':').map(Number);
+    const ampm = h < 12 ? 'AM' : 'PM';
+    const h12 = h % 12 === 0 ? 12 : h % 12;
+    return `${h12}:${String(m).padStart(2,'0')} ${ampm}`;
+  };
+  el.innerHTML = _eodTasks.map(t => `
+    <div style="display:grid;grid-template-columns:2fr 1fr 1fr 2fr;gap:8px;align-items:center;padding:5px 0;border-bottom:1px solid var(--border);font-size:12px">
+      <span style="font-weight:600;color:var(--text)">${esc(t.type||'—')}</span>
+      <span style="color:var(--text-2)">${fmt12(t.startTime)}</span>
+      <span style="color:var(--text-2)">${fmt12(t.endTime)}</span>
+      <span style="color:var(--text-3);font-style:${t.notes?'normal':'italic'}">${esc(t.notes||'No notes')}</span>
+    </div>`).join('') +
+    `<div style="font-size:11px;color:var(--text-3);margin-top:6px;text-align:right">Tap to edit ▾</div>`;
 }
 
 function addEODTask() {
@@ -11394,52 +11434,64 @@ function setEODYN(field, val, btn) {
     document.getElementById('eodSNDetail_wrap').style.display = val==='yes'?'block':'none';
 }
 
+async function saveDraftEOD() {
+  const report = buildEODReport('draft');
+  const all = getEODReports().filter(r => !(r.name===currentUser.name && r.date===today));
+  all.push(report);
+  saveEODReports(all);
+  spSyncEOD(report).catch(()=>{});
+  showToast('Draft saved ✓', 'ok');
+  renderEODScreen();
+}
+
+function buildEODReport(status) {
+  return {
+    id: genFileId(),
+    name: currentUser.name,
+    role: currentUser.role,
+    date: today,
+    status,
+    submittedAt: status === 'submitted' ? new Date().toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit',hour12:true}) : null,
+    submittedTs: status === 'submitted' ? Date.now() : null,
+    draftSavedAt: new Date().toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit',hour12:true}),
+    tasks: JSON.parse(JSON.stringify(_eodTasks)),
+    challenges:      document.getElementById('eod_challenges')?.value||'',
+    challengeDetail: document.getElementById('eod_challengeDetail')?.value.trim()||'',
+    supportNeeded:   document.getElementById('eod_supportNeeded')?.value||'',
+    supportDetail:   document.getElementById('eod_supportDetail')?.value.trim()||'',
+    firstPriority:   document.getElementById('eod_firstPriority')?.value.trim()||'',
+    notes:           document.getElementById('eod_notes')?.value.trim()||'',
+  };
+}
+
 function submitEOD(e) {
   e.preventDefault();
   const errEl = document.getElementById('eodSubmitErr');
 
-  const challenges   = document.getElementById('eod_challenges')?.value||'';
-  const supportNeeded= document.getElementById('eod_supportNeeded')?.value||'';
+  const challenges    = document.getElementById('eod_challenges')?.value||'';
+  const supportNeeded = document.getElementById('eod_supportNeeded')?.value||'';
 
-  // Validation (relaxed — only challenges and support needed are required)
   const errors = [];
   if (!challenges) errors.push('Answer the challenges question.');
   if (challenges === 'yes' && !document.getElementById('eod_challengeDetail')?.value.trim())
     errors.push('Describe the challenge briefly.');
   if (!supportNeeded) errors.push('Answer the support needed question.');
 
-  if (errors.length > 0) {
+  if (errors.length) {
     errEl.style.display = 'block';
     errEl.innerHTML = '⚠️ ' + errors.join('<br>⚠️ ');
     return;
   }
   errEl.style.display = 'none';
 
-  const report = {
-    id: genFileId(),
-    name: currentUser.name,
-    role: currentUser.role,
-    date: today,
-    submittedAt: new Date().toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit',hour12:true}),
-    submittedTs: Date.now(),
-    tasks: JSON.parse(JSON.stringify(_eodTasks)),
-    challenges,
-    challengeDetail: document.getElementById('eod_challengeDetail')?.value.trim()||'',
-    supportNeeded,
-    supportDetail: document.getElementById('eod_supportDetail')?.value.trim()||'',
-    firstPriority: document.getElementById('eod_firstPriority')?.value.trim()||'',
-    notes: document.getElementById('eod_notes')?.value.trim()||'',
-  };
-
-  // Save
+  const report = buildEODReport('submitted');
   const all = getEODReports().filter(r => !(r.name===currentUser.name && r.date===today));
   all.push(report);
   saveEODReports(all);
   spSyncEOD(report).catch(()=>{});
 
-  // Reset task loaded flag so next open picks up saved tasks
-  window._eodTasksLoaded = false;
   _eodTasks = [];
+  window._eodTasksLoaded = false;
 
   showToast('✓ EOD report submitted!', 'ok');
   updateEODPromptCard();
@@ -11447,410 +11499,52 @@ function submitEOD(e) {
 }
 
 
+
+
 // ── Patch renderEODSummary for new fields ─────────────────────────────────
 const _origRenderEODSummary = window.renderEODSummary;
 window.renderEODSummary = function(el, teamNames, date) {
   date = date||today;
-  const reports = getEODReports().filter(r=>r.date===date&&teamNames.includes(r.name));
-  const staff = getStaff().filter(s=>roleHasEOD(s.role)&&teamNames.includes(s.name));
-  const submitted = new Set(reports.map(r=>r.name));
-  const missing = staff.filter(s=>!submitted.has(s.name));
-  const lowConf = reports.filter(r=>r.confidence<=2);
-  const brokerNeg = reports.filter(r=>(r.brokerConcernTags||[]).some(t=>
-    ['Raised complaint','Unclear brief','Unreasonable expectation','Slow to respond','Changed requirements','Rude or dismissive'].includes(t)));
-  const supportFlags = reports.filter(r=>r.supportNeeded==='yes');
-  const handoverFlags = reports.filter(r=>r.handover);
-  const moodEmoji = {tough:'😔',ok:'😐',good:'😊'};
-
+  const allReports    = getEODReports().filter(r=>r.date===date&&teamNames.includes(r.name));
+  const submittedRpts = allReports.filter(r=>r.status==='submitted');
+  const draftRpts     = allReports.filter(r=>r.status==='draft');
+  const submittedNames= new Set(submittedRpts.map(r=>r.name));
+  const draftNames    = new Set(draftRpts.map(r=>r.name).filter(n=>!submittedNames.has(n)));
+  const staff         = getStaff().filter(s=>roleHasEOD(s.role)&&teamNames.includes(s.name));
+  const missing       = staff.filter(s=>!submittedNames.has(s.name)&&!draftNames.has(s.name));
+  const supportFlags  = submittedRpts.filter(r=>r.supportNeeded==='yes');
   el.innerHTML = `
     <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">📋 EOD Reports — ${esc(date)}</div>
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px">
-      <div style="background:${missing.length>0?'var(--danger-light)':'var(--success-light)'};border-radius:var(--radius-sm);padding:8px;text-align:center">
-        <div style="font-size:20px;font-weight:700;color:${missing.length>0?'var(--danger)':'var(--success)'}">${reports.length}/${staff.length}</div>
+      <div style="background:var(--success-light);border-radius:var(--radius-sm);padding:8px;text-align:center">
+        <div style="font-size:20px;font-weight:700;color:var(--success)">${submittedRpts.length}/${staff.length}</div>
         <div style="font-size:10px;color:var(--text-3)">Submitted</div>
       </div>
-      <div style="background:${lowConf.length>0?'var(--danger-light)':'var(--surface-2)'};border-radius:var(--radius-sm);padding:8px;text-align:center">
-        <div style="font-size:20px;font-weight:700;color:${lowConf.length>0?'var(--danger)':'var(--text-3)'}">${lowConf.length}</div>
-        <div style="font-size:10px;color:var(--text-3)">Low conf.</div>
+      <div style="background:${draftNames.size>0?'#F3F4F6':'var(--surface-2)'};border-radius:var(--radius-sm);padding:8px;text-align:center">
+        <div style="font-size:20px;font-weight:700;color:${draftNames.size>0?'#6B7280':'var(--text-3)'}">${draftNames.size}</div>
+        <div style="font-size:10px;color:var(--text-3)">Drafts</div>
       </div>
-      <div style="background:${brokerNeg.length>0?'#FEF3C7':'var(--surface-2)'};border-radius:var(--radius-sm);padding:8px;text-align:center">
-        <div style="font-size:20px;font-weight:700;color:${brokerNeg.length>0?'#92400E':'var(--text-3)'}">${brokerNeg.length}</div>
-        <div style="font-size:10px;color:var(--text-3)">Broker issues</div>
+      <div style="background:${missing.length>0?'var(--danger-light)':'var(--surface-2)'};border-radius:var(--radius-sm);padding:8px;text-align:center">
+        <div style="font-size:20px;font-weight:700;color:${missing.length>0?'var(--danger)':'var(--text-3)'}">${missing.length}</div>
+        <div style="font-size:10px;color:var(--text-3)">Not started</div>
       </div>
     </div>
-    ${handoverFlags.length>0?`<div style="background:#EDE9FE;border-radius:var(--radius-sm);padding:8px 12px;font-size:12px;color:#5B21B6;margin-bottom:8px;font-weight:600">🔄 Off tomorrow: ${handoverFlags.map(r=>esc(r.name.split(' ')[0])).join(', ')} — review their files</div>`:''}
-    ${missing.length>0?`<div style="background:var(--danger-light);border-radius:var(--radius-sm);padding:8px 12px;font-size:12px;color:var(--danger);margin-bottom:8px">⏳ Not submitted: ${missing.map(s=>esc(s.name.split(' ')[0])).join(', ')}</div>`:''}
-    ${reports.map(r => {
-      const confColor = r.confidence>=4?'var(--success)':r.confidence>=3?'var(--warn)':'var(--danger)';
-      const negTags = (r.brokerConcernTags||[]).filter(t=>['Raised complaint','Unclear brief','Unreasonable expectation','Slow to respond','Changed requirements','Rude or dismissive'].includes(t));
-      const posTags = (r.brokerConcernTags||[]).filter(t=>['Clear instructions','Responsive','Supportive','Good feedback','Easy to work with'].includes(t));
-      const flags = [];
-      if (r.confidence<=2) flags.push('<span style="background:var(--danger-light);color:var(--danger);border-radius:4px;padding:1px 6px;font-size:11px;font-weight:600">Low confidence</span>');
-      if (negTags.length>0) flags.push('<span style="background:#FEF3C7;color:#92400E;border-radius:4px;padding:1px 6px;font-size:11px;font-weight:600">Broker issue</span>');
-      if (r.supportNeeded==='yes') flags.push('<span style="background:var(--brand-light);color:var(--brand);border-radius:4px;padding:1px 6px;font-size:11px;font-weight:600">Needs support</span>');
-      if (r.handover) flags.push('<span style="background:#EDE9FE;color:#5B21B6;border-radius:4px;padding:1px 6px;font-size:11px;font-weight:600">Off tomorrow</span>');
-      return `<div style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:8px">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
-          <div style="font-size:13px;font-weight:700;color:var(--text)">${esc(r.name.split(' ')[0])} ${moodEmoji[r.mood]||''} <span style="font-size:11px;color:var(--text-3)">· ${esc(fmtDate(r.submittedAt||''))}</span></div>
-          <div style="display:flex;align-items:center;gap:6px">
-            <span style="font-size:15px;font-weight:700;color:${confColor}">${r.confidence}/5</span>
-            <span style="font-size:12px;color:var(--text-3)">${r.checklist||''}</span>
-          </div>
-        </div>
-        ${flags.length>0?`<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px">${flags.join('')}</div>`:''}
-        ${(r.blockers||[]).length>0&&!r.blockers.includes('Nobody — no blockers')?`<div style="font-size:12px;color:var(--danger)">🔴 Blocked: ${r.blockers.map(b=>esc(b)).join(', ')}${r.blockerDetail?' — '+esc(r.blockerDetail):''}</div>`:''}
-        ${negTags.length>0?`<div style="font-size:12px;color:#92400E">📣 Broker: ${negTags.map(t=>esc(t)).join(', ')}${r.brokerConcernDetail?' — '+esc(r.brokerConcernDetail):''}</div>`:''}
-        ${posTags.length>0?`<div style="font-size:12px;color:var(--success)">👍 ${posTags.map(t=>esc(t)).join(', ')}</div>`:''}
-        ${r.challengeDetail?`<div style="font-size:12px;color:var(--text-2)">⚠️ ${esc(r.challengeDetail)}</div>`:''}
-        ${r.supportDetail?`<div style="font-size:12px;color:var(--brand)">🙋 ${esc(r.supportDetail)}</div>`:''}
-        ${r.tomorrow?`<div style="font-size:12px;color:var(--text-3)">→ Tomorrow: ${esc(r.tomorrow)}</div>`:''}
-        ${r.notes?`<div style="font-size:12px;color:var(--text-3);font-style:italic">"${esc(r.notes)}"</div>`:''}
-      </div>`;
-    }).join('')}`;
+    <div style="margin-bottom:8px">
+      ${staff.map(s => {
+        const isS = submittedNames.has(s.name);
+        const isD = draftNames.has(s.name);
+        const badge = isS
+          ? `<span style="font-size:11px;background:#D1FAE5;color:#065F46;border-radius:4px;padding:1px 8px;font-weight:600">✓ Submitted</span>`
+          : isD
+          ? `<span style="font-size:11px;background:#F3F4F6;color:#6B7280;border-radius:4px;padding:1px 8px;font-weight:600">Draft</span>`
+          : `<span style="font-size:11px;background:#FEE2E2;color:#991B1B;border-radius:4px;padding:1px 8px;font-weight:600">Not started</span>`;
+        return `<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border)">
+          <span style="font-size:13px;font-weight:500">${esc(s.name.split(' ')[0])}</span>${badge}</div>`;
+      }).join('')}
+    </div>
+    ${supportFlags.length?`<div style="background:var(--brand-light);border-radius:var(--radius-sm);padding:8px 12px;font-size:12px;color:var(--brand);font-weight:600">🙋 Support needed: ${supportFlags.map(r=>esc(r.name.split(' ')[0])).join(', ')}</div>`:''}
+  `;
 };
-
-
-// ══════════════════════════════════════════════════════════════════════════
-// ── PERFORMANCE SYSTEM (Team Lead only) ───────────────────────────────────
-// ══════════════════════════════════════════════════════════════════════════
-
-// ── Core: get N days ago as YYYY-MM-DD ────────────────────────────────────
-function daysAgoStr(n) {
-  const d = new Date();
-  d.setDate(d.getDate() - n);
-  return d.toISOString().split('T')[0];
-}
-
-function dateRange(days) {
-  const dates = [];
-  for (let i = days - 1; i >= 0; i--) dates.push(daysAgoStr(i));
-  return dates;
-}
-
-// ── Broker complaint tags (negative) ─────────────────────────────────────
-const BROKER_COMPLAINT_TAGS = [
-  'Raised complaint','Unclear brief','Unreasonable expectation',
-  'Slow to respond','Changed requirements','Rude or dismissive'
-];
-
-// ══════════════════════════════════════════════════════════════════════════
-// ── ANALYTICS ENGINE ──────────────────────────────────────────────────────
-// ══════════════════════════════════════════════════════════════════════════
-
-function calcPersonPerformance(name, days) {
-  const from = daysAgoStr(days);
-  const eodAll = getEODReports().filter(r => r.name === name && r.date >= from && r.date <= today);
-  const filesAll = getFileEntries().filter(f => f.owner === name);
-  const otherTasksAll = getOtherTasks().filter(t => t.owner === name && t.date >= from);
-
-  // ── EOD metrics ──────────────────────────────────────────────────────
-  const eodCount = eodAll.length;
-  const workDays = days; // approximate
-  const submissionRate = workDays > 0 ? Math.round((eodCount / workDays) * 100) : 0;
-
-  // Average confidence
-  const confScores = eodAll.filter(r => r.confidence).map(r => r.confidence);
-  const avgConf = confScores.length > 0
-    ? (confScores.reduce((a,b)=>a+b,0) / confScores.length).toFixed(1)
-    : null;
-
-  // Consecutive low confidence (≤2) ending at most recent report
-  const sortedEOD = [...eodAll].sort((a,b) => a.date.localeCompare(b.date));
-  let consecLowConf = 0;
-  for (let i = sortedEOD.length - 1; i >= 0; i--) {
-    if ((sortedEOD[i].confidence||0) <= 2) consecLowConf++;
-    else break;
-  }
-
-  // Checklist completion
-  const clYes = eodAll.filter(r => r.checklist === 'Yes').length;
-  const clPartial = eodAll.filter(r => r.checklist === 'Partially').length;
-  const clNo = eodAll.filter(r => r.checklist === 'No').length;
-  const clRate = eodCount > 0 ? Math.round((clYes / eodCount) * 100) : null;
-
-  // Broker complaints
-  const brokerComplaints = eodAll.filter(r =>
-    (r.brokerConcernTags||[]).some(t => BROKER_COMPLAINT_TAGS.includes(t))
-  );
-  const brokerComplaintCount = brokerComplaints.length;
-
-  // Mood distribution
-  const moodCounts = {tough:0, ok:0, good:0};
-  eodAll.forEach(r => { if (r.mood && moodCounts[r.mood] !== undefined) moodCounts[r.mood]++; });
-
-  // Support requests
-  const supportCount = eodAll.filter(r => r.supportNeeded === 'yes').length;
-
-  // Same blocker repeating (3+ times)
-  const blockerFreq = {};
-  eodAll.forEach(r => (r.blockers||[]).forEach(b => {
-    if (b !== 'Nobody — no blockers') blockerFreq[b] = (blockerFreq[b]||0) + 1;
-  }));
-  const repeatedBlockers = Object.entries(blockerFreq).filter(([,c]) => c >= 3).map(([b,c]) => ({b,c}));
-
-  // ── File metrics ──────────────────────────────────────────────────────
-  const activeFiles = filesAll.filter(f => f.active !== false && f.status !== 'Settlement');
-  const staleFiles = activeFiles.filter(f => {
-    const daysSince = (Date.now() - (f.updatedTs||0)) / 86400000;
-    return daysSince >= 3;
-  });
-  const settledFiles = filesAll.filter(f => f.status === 'Settlement' || f.active === false);
-  const settledInPeriod = settledFiles.filter(f => f.settledAt >= from);
-
-  // Loan volume in period
-  const volumeInPeriod = settledInPeriod
-    .filter(f => f.loanAmount)
-    .reduce((sum,f) => sum + (f.loanAmount||0), 0);
-
-  // Stage regressions — count files that went backward
-  const stageOrder = ['Data Collection','Pre-Qualification','Application Start','Pending Info',
-    'Submitted to Lender','MIR','Conditionally Approved','Unconditionally Approved','Loan Documents','Settlement'];
-  let regressionCount = 0;
-  filesAll.forEach(f => {
-    const hist = f.stageHistory || [];
-    for (let i = 1; i < hist.length; i++) {
-      const prevIdx = stageOrder.indexOf(hist[i-1].stage);
-      const currIdx = stageOrder.indexOf(hist[i].stage);
-      if (prevIdx > 0 && currIdx >= 0 && currIdx < prevIdx) regressionCount++;
-    }
-  });
-
-  // One-touch approvals
-  const oneTouchCount = filesAll.filter(f => {
-    const hist = f.stageHistory || [];
-    const subIdx = hist.findLastIndex(h => h.stage === 'Submitted to Lender');
-    const unconIdx = hist.findLastIndex(h => h.stage === 'Unconditionally Approved');
-    if (subIdx < 0 || unconIdx <= subIdx) return false;
-    return hist.slice(subIdx+1, unconIdx).length === 0;
-  }).length;
-
-  // Avg time from creation to Unconditionally Approved
-  const approvalTimes = filesAll
-    .filter(f => f.unconditionalAt && f.createdAt)
-    .map(f => {
-      const d = (new Date(f.unconditionalAt) - new Date(f.createdAt)) / 86400000;
-      return d >= 0 ? d : null;
-    }).filter(d => d !== null);
-  const avgApprovalDays = approvalTimes.length > 0
-    ? (approvalTimes.reduce((a,b)=>a+b,0)/approvalTimes.length).toFixed(1)
-    : null;
-
-  // ── Alert flags ────────────────────────────────────────────────────────
-  const alerts = [];
-  if (consecLowConf >= 3)
-    alerts.push({ level:'red', msg: `Low confidence for ${consecLowConf} consecutive days` });
-  if (brokerComplaintCount >= 1)
-    alerts.push({ level:'amber', msg: `${brokerComplaintCount} broker complaint${brokerComplaintCount>1?'s':''} in this period` });
-  if (clRate !== null && clRate < 50)
-    alerts.push({ level:'amber', msg: `Checklist completed only ${clRate}% of days` });
-  if (staleFiles.length >= 3)
-    alerts.push({ level:'amber', msg: `${staleFiles.length} stale files not updated in 3+ days` });
-  if (repeatedBlockers.length > 0)
-    alerts.push({ level:'amber', msg: `Same blocker repeating: ${repeatedBlockers.map(({b,c})=>b+' ('+c+'×)').join(', ')}` });
-  if (avgConf !== null && parseFloat(avgConf) <= 2.5 && confScores.length >= 3)
-    alerts.push({ level:'amber', msg: `Average confidence only ${avgConf}/5` });
-  if (moodCounts.tough >= 4 && eodCount >= 5)
-    alerts.push({ level:'amber', msg: `${moodCounts.tough} tough day reports — may need a check-in` });
-
-  // ── Traffic light ─────────────────────────────────────────────────────
-  const redCount = alerts.filter(a => a.level==='red').length;
-  const amberCount = alerts.filter(a => a.level==='amber').length;
-  const pulse = redCount > 0 ? 'red' : amberCount >= 2 ? 'amber' : amberCount === 1 ? 'amber' : 'green';
-
-  return {
-    name, eodCount, submissionRate, avgConf, consecLowConf,
-    clRate, clYes, clPartial, clNo,
-    brokerComplaintCount, brokerComplaints,
-    moodCounts, supportCount, repeatedBlockers,
-    activeFiles: activeFiles.length, staleFiles: staleFiles.length,
-    settledInPeriod: settledInPeriod.length, volumeInPeriod,
-    regressionCount, oneTouchCount, avgApprovalDays,
-    alerts, pulse, days,
-  };
-}
-
-// ══════════════════════════════════════════════════════════════════════════
-// ── OPTION A: Performance Pulse card on My Team screen ────────────────────
-// ══════════════════════════════════════════════════════════════════════════
-
-function renderPerformancePulse(containerEl, teamNames) {
-  const pulseData = teamNames
-    .map(name => calcPersonPerformance(name, 7))
-    .sort((a,b) => {
-      const order = {red:0, amber:1, green:2};
-      return order[a.pulse] - order[b.pulse];
-    });
-
-  const redCount = pulseData.filter(p => p.pulse==='red').length;
-  const amberCount = pulseData.filter(p => p.pulse==='amber').length;
-
-  const div = document.createElement('div');
-  div.className = 'card';
-  div.style.marginTop = '1rem';
-  div.innerHTML = `
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-      <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px">📊 Performance Pulse — last 7 days</div>
-
-    </div>
-    ${redCount>0||amberCount>0?`<div style="background:${redCount>0?'var(--danger-light)':'#FFFBEB'};border-radius:var(--radius-sm);padding:8px 12px;font-size:12px;color:${redCount>0?'var(--danger)':'#92400E'};margin-bottom:10px;font-weight:600">
-      ${redCount>0?`🔴 ${redCount} person${redCount>1?'s':''} need${redCount>1?'':'s'} attention`:''}
-      ${amberCount>0?`${redCount>0?' · ':''}⚠️ ${amberCount} person${amberCount>1?'s':''} to watch`:''}
-    </div>`:''}
-    <div style="display:flex;flex-direction:column;gap:6px">
-      ${pulseData.map(p => {
-        const pulseColor = p.pulse==='red'?'var(--danger)':p.pulse==='amber'?'#D97706':'var(--success)';
-        const pulseBg = p.pulse==='red'?'var(--danger-light)':p.pulse==='amber'?'#FEF3C7':'var(--success-light)';
-        const pulseIcon = p.pulse==='red'?'🔴':p.pulse==='amber'?'⚠️':'🟢';
-        return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:${pulseBg};border-radius:var(--radius-sm)">
-          <div style="flex:1">
-            <div style="font-size:13px;font-weight:600;color:var(--text)">${pulseIcon} ${esc(p.name)}</div>
-            ${p.alerts.length>0?`<div style="font-size:11px;color:${pulseColor};margin-top:2px">${p.alerts[0].msg}${p.alerts.length>1?' +more':''}</div>`:'<div style="font-size:11px;color:var(--success)">On track</div>'}
-          </div>
-          <div style="text-align:right;flex-shrink:0">
-            ${p.avgConf!==null?`<div style="font-size:13px;font-weight:700;color:${parseFloat(p.avgConf)>=4?'var(--success)':parseFloat(p.avgConf)>=3?'#D97706':'var(--danger)'}">${p.avgConf}/5</div>`:''}
-            <div style="font-size:10px;color:var(--text-3)">${p.eodCount} EODs</div>
-          </div>
-        </div>`;
-      }).join('')}
-    </div>`;
-  containerEl.appendChild(div);
-}
-
-// ══════════════════════════════════════════════════════════════════════════
-// ── OPTION B+C: Full Performance Screen ───────────────────────────────────
-// ══════════════════════════════════════════════════════════════════════════
-
-let _perfDays = 7;
-
-function renderPerformanceScreen() {
-  if (!isTeamLead()) return;
-  const el = document.getElementById('perfContent');
-  if (!el) return;
-
-  const myTeam = getTeamForTL(currentUser.name);
-  if (myTeam.length === 0) {
-    el.innerHTML = `<div class="card" style="text-align:center;padding:2rem">
-      <div style="font-size:2rem;margin-bottom:10px">👥</div>
-      <div style="font-size:15px;font-weight:600;color:var(--text)">No team assigned yet</div>
-    </div>`;
-    return;
-  }
-
-  const perfData = myTeam
-    .map(name => calcPersonPerformance(name, _perfDays))
-    .sort((a,b) => {
-      const order = {red:0, amber:1, green:2};
-      return order[a.pulse] - order[b.pulse];
-    });
-
-  const alertsAll = perfData.flatMap(p => p.alerts.map(a => ({...a, name:p.name})));
-  const fmt$ = v => '$' + Math.round(v).toLocaleString('en-AU');
-
-  el.innerHTML = `
-    <!-- Period selector -->
-    <div style="display:flex;gap:8px;margin-bottom:1rem">
-      ${[7,14,30].map(d => `<button onclick="setPerfDays(${d},this)"
-        style="padding:7px 16px;border-radius:50px;border:1.5px solid ${_perfDays===d?'var(--brand)':'var(--border)'};
-        background:${_perfDays===d?'var(--brand-light)':'var(--surface-2)'};
-        color:${_perfDays===d?'var(--brand)':'var(--text-2)'};font-size:13px;font-weight:${_perfDays===d?'700':'400'};cursor:pointer">
-        Last ${d} days
-      </button>`).join('')}
-    </div>
-
-    <!-- OPTION C: Automatic alerts -->
-    ${alertsAll.length > 0 ? `
-    <div class="card" style="margin-bottom:1rem;border-color:#F59E0B;background:#FFFBEB">
-      <div style="font-size:11px;font-weight:700;color:#92400E;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">⚡ Automatic alerts</div>
-      ${alertsAll.map(a => `
-        <div style="display:flex;align-items:flex-start;gap:8px;padding:7px 0;border-bottom:1px solid #FDE68A">
-          <span style="font-size:13px">${a.level==='red'?'🔴':'⚠️'}</span>
-          <div>
-            <span style="font-size:13px;font-weight:600;color:var(--text)">${esc(a.name.split(' ')[0])}</span>
-            <span style="font-size:13px;color:var(--text-2)"> — ${esc(a.msg)}</span>
-          </div>
-        </div>`).join('')}
-    </div>` : `
-    <div class="card" style="margin-bottom:1rem;border-color:#BBF7D0;background:#F0FDF4">
-      <div style="font-size:13px;font-weight:600;color:var(--success);text-align:center;padding:4px 0">✅ No performance alerts — team is on track</div>
-    </div>`}
-
-    <!-- OPTION B: Performance Summary per person -->
-    <div class="card" style="margin-bottom:1rem">
-      <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">📋 Performance Summary — last ${_perfDays} days</div>
-
-      <!-- Summary table header -->
-      <div style="display:grid;grid-template-columns:1fr repeat(5,auto);gap:4px 8px;align-items:center;padding:6px 8px;background:var(--surface-2);border-radius:var(--radius-sm);margin-bottom:6px;font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.3px">
-        <span>Analyst</span>
-        <span style="text-align:center">Pulse</span>
-        <span style="text-align:center">Conf.</span>
-        <span style="text-align:center">Checklist</span>
-        <span style="text-align:center">Stale</span>
-        <span style="text-align:center">EODs</span>
-      </div>
-
-      ${perfData.map(p => {
-        const pulseIcon = p.pulse==='red'?'🔴':p.pulse==='amber'?'⚠️':'🟢';
-        const confColor = p.avgConf ? (parseFloat(p.avgConf)>=4?'var(--success)':parseFloat(p.avgConf)>=3?'#D97706':'var(--danger)') : 'var(--text-3)';
-        return `
-        <div style="border:1.5px solid var(--border);border-radius:var(--radius-sm);margin-bottom:8px;overflow:hidden">
-          <!-- Row summary -->
-          <div style="display:grid;grid-template-columns:1fr repeat(5,auto);gap:4px 8px;align-items:center;padding:8px 10px;cursor:pointer"
-            onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">
-            <span style="font-size:13px;font-weight:600;color:var(--text)">${esc(p.name)}</span>
-            <span style="text-align:center;font-size:14px">${pulseIcon}</span>
-            <span style="text-align:center;font-size:13px;font-weight:700;color:${confColor}">${p.avgConf!==null?p.avgConf+'/5':'—'}</span>
-            <span style="text-align:center;font-size:12px;color:${p.clRate!==null?(p.clRate>=80?'var(--success)':p.clRate>=50?'#D97706':'var(--danger)'):'var(--text-3)'}">${p.clRate!==null?p.clRate+'%':'—'}</span>
-            <span style="text-align:center;font-size:12px;color:${p.staleFiles>2?'var(--danger)':p.staleFiles>0?'#D97706':'var(--success)'}">${p.staleFiles}</span>
-            <span style="text-align:center;font-size:12px;color:var(--text-3)">${p.eodCount}</span>
-          </div>
-
-          <!-- Expanded detail -->
-          <div style="display:none;padding:10px 12px;border-top:1px solid var(--border);background:var(--surface-2)">
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
-
-              <div>
-                <div style="font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">EOD Quality</div>
-                <div style="font-size:12px;color:var(--text-2)">Submitted: ${p.eodCount} day${p.eodCount!==1?'s':''} of ${_perfDays}</div>
-                <div style="font-size:12px;color:var(--text-2)">Avg confidence: ${p.avgConf!==null?p.avgConf+'/5':'No data'}</div>
-                <div style="font-size:12px;color:var(--text-2)">Checklist: ✅${p.clYes} 🟡${p.clPartial} ❌${p.clNo}</div>
-                <div style="font-size:12px;color:var(--text-2)">Mood: 😊${p.moodCounts.good} 😐${p.moodCounts.ok} 😔${p.moodCounts.tough}</div>
-                ${p.brokerComplaintCount>0?`<div style="font-size:12px;color:var(--danger);margin-top:4px">📣 ${p.brokerComplaintCount} broker complaint${p.brokerComplaintCount>1?'s':''}</div>`:''}
-                ${p.supportCount>0?`<div style="font-size:12px;color:var(--brand)">🙋 Requested support ${p.supportCount}×</div>`:''}
-              </div>
-
-              <div>
-                <div style="font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">File Performance</div>
-                <div style="font-size:12px;color:var(--text-2)">Active files: ${p.activeFiles}</div>
-                <div style="font-size:12px;color:${p.staleFiles>0?'var(--danger)':'var(--text-2)'}">Stale files: ${p.staleFiles}</div>
-                <div style="font-size:12px;color:var(--text-2)">Settled (period): ${p.settledInPeriod}</div>
-                ${p.volumeInPeriod>0?`<div style="font-size:12px;color:var(--success)">Volume: ${fmt$(p.volumeInPeriod)}</div>`:''}
-                ${p.oneTouchCount>0?`<div style="font-size:12px;color:var(--brand)">⚡ ${p.oneTouchCount} one-touch approval${p.oneTouchCount>1?'s':''}</div>`:''}
-                ${p.avgApprovalDays!==null?`<div style="font-size:12px;color:var(--text-2)">Avg to approval: ${p.avgApprovalDays}d</div>`:''}
-                ${p.regressionCount>0?`<div style="font-size:12px;color:var(--warn)">⚠️ ${p.regressionCount} stage regression${p.regressionCount>1?'s':''}</div>`:''}
-              </div>
-            </div>
-
-            ${p.alerts.length>0?`
-            <div style="background:${p.pulse==='red'?'var(--danger-light)':'#FEF3C7'};border-radius:var(--radius-sm);padding:8px 10px">
-              <div style="font-size:10px;font-weight:700;color:${p.pulse==='red'?'var(--danger)':'#92400E'};text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Flags</div>
-              ${p.alerts.map(a=>`<div style="font-size:12px;color:${a.level==='red'?'var(--danger)':'#92400E'}">${a.level==='red'?'🔴':'⚠️'} ${esc(a.msg)}</div>`).join('')}
-            </div>`:''}
-
-            ${p.repeatedBlockers.length>0?`
-            <div style="margin-top:8px;font-size:12px;color:var(--warn)">
-              🔁 Recurring blockers: ${p.repeatedBlockers.map(({b,c})=>esc(b)+' ('+c+'×)').join(', ')}
-            </div>`:''}
-
-            ${p.brokerComplaints.length>0?`
-            <div style="margin-top:8px">
-              <div style="font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Broker complaint detail</div>
-              ${p.brokerComplaints.map(r=>`<div style="font-size:12px;color:var(--danger)">${esc(fmtDate(r.date))}: ${(r.brokerConcernTags||[]).filter(t=>BROKER_COMPLAINT_TAGS.includes(t)).map(t=>esc(t)).join(', ')}${r.brokerConcernDetail?' — '+esc(r.brokerConcernDetail):''}</div>`).join('')}
-            </div>`:''}
-          </div>
-        </div>`;
-      }).join('')}
-    </div>`;
-}
 
 function setPerfDays(days, btn) {
   _perfDays = days;
