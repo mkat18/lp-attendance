@@ -841,7 +841,9 @@ tr.flagged-row:hover td { background: #FFEAEA; }
     <!-- ── Tabs ─────────────────────────────────────────────────────── -->
     <div class="dashboard-tabs" style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:1rem 1.1rem;box-shadow:var(--shadow-sm)">
       <div style="margin-bottom:10px">
-        <input type="text" id="filterName" placeholder="🔍 Filter by name…" oninput="loadTabs()" style="font-size:13px;width:100%;padding:6px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)"/>
+        <select id="filterName" onchange="loadTabs();renderMetrics()" style="font-size:13px;width:100%;padding:6px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text)">
+          <option value="">— All staff —</option>
+        </select>
       </div>
       <div class="tab-bar" style="margin-bottom:.75rem">
         <button class="tab active" onclick="switchDashTab('records',this)">Records</button>
@@ -3968,8 +3970,8 @@ async function _obSubmit(name) {
 function loadTabs() {
   const from=document.getElementById('fromDate').value||today;
   const to=document.getElementById('toDate').value||today;
-  const fn=document.getElementById('filterName').value.trim().toLowerCase();
-  tabData=getRecords().filter(r=>r.date>=from&&r.date<=to&&(!fn||r.name.toLowerCase().includes(fn)));
+  const fn=document.getElementById('filterName').value.trim();
+  tabData=getRecords().filter(r=>r.date>=from&&r.date<=to&&(!fn||r.name === fn));
   const active=document.querySelector('.panel.active');
   if(active) renderActiveTab(active.id.replace('dpanel-',''));
 }
@@ -4015,7 +4017,7 @@ function renderTabDayPicker(containerEl) {
 
 function renderMissing() {
   const date=getTabDate();
-  const fn=document.getElementById('filterName').value.trim().toLowerCase();
+  const fn=document.getElementById('filterName').value.trim();
   const allStaff=getStaff().filter(s=>s.role!=='superadmin');
   const dayRecs=getRecords().filter(r=>r.date===date);
   const submitted=new Set(dayRecs.map(r=>r.name));
@@ -4032,7 +4034,7 @@ function renderMissing() {
   // Not submitted
   const missing=allStaff.filter(s=>{
     if(submitted.has(s.name)) return false;
-    if(fn&&!s.name.toLowerCase().includes(fn)) return false;
+    if(fn&&!s.name === fn) return false;
     return true;
   }).sort((a,b)=>{
     const aM=a.startTime?parseInt(a.startTime)*60+parseInt(a.startTime.split(':')[1]):999;
@@ -4043,7 +4045,7 @@ function renderMissing() {
   // Late clock in
   const lateIn=allStaff.filter(s=>{
     if(!s.startTime) return false;
-    if(fn&&!s.name.toLowerCase().includes(fn)) return false;
+    if(fn&&!s.name === fn) return false;
     const rec=dayRecs.find(r=>r.name===s.name);
     if(!rec||!rec.clockIn) return false;
     const scheduledMs=new Date(date+'T'+s.startTime+':00').getTime();
@@ -4053,7 +4055,7 @@ function renderMissing() {
   // Early clock out
   const earlyOut=allStaff.filter(s=>{
     if(!s.endTime) return false;
-    if(fn&&!s.name.toLowerCase().includes(fn)) return false;
+    if(fn&&!s.name === fn) return false;
     const rec=dayRecs.find(r=>r.name===s.name);
     if(!rec||!rec.clockOut) return false;
     const scheduledEndMs=new Date(date+'T'+s.endTime+':00').getTime();
@@ -4134,14 +4136,14 @@ function renderMissing() {
 function renderLateTab() {
   const from = document.getElementById('fromDate').value;
   const to   = document.getElementById('toDate').value;
-  const fn   = document.getElementById('filterName').value.trim().toLowerCase();
+  const fn   = document.getElementById('filterName').value.trim();
   const allStaff = getStaff().filter(s=>s.role!=='superadmin'&&s.startTime);
   const allRecs  = getRecords().filter(r=>r.date>=from&&r.date<=to);
   const singleDay = from===to;
 
   const rows = [];
   for (const s of allStaff) {
-    if (fn && !s.name.toLowerCase().includes(fn)) continue;
+    if (fn && !s.name === fn) continue;
     const recs = allRecs.filter(r=>r.name===s.name&&r.clockIn);
     for (const r of recs) {
       const scheduledMs = new Date(r.date+'T'+s.startTime+':00').getTime();
@@ -4181,14 +4183,14 @@ function renderLateTab() {
 function renderEarlyTab() {
   const from = document.getElementById('fromDate').value;
   const to   = document.getElementById('toDate').value;
-  const fn   = document.getElementById('filterName').value.trim().toLowerCase();
+  const fn   = document.getElementById('filterName').value.trim();
   const allStaff = getStaff().filter(s=>s.role!=='superadmin'&&s.endTime);
   const allRecs  = getRecords().filter(r=>r.date>=from&&r.date<=to);
   const singleDay = from===to;
 
   const rows = [];
   for (const s of allStaff) {
-    if (fn && !s.name.toLowerCase().includes(fn)) continue;
+    if (fn && !s.name === fn) continue;
     const recs = allRecs.filter(r=>r.name===s.name&&r.clockOut);
     for (const r of recs) {
       const scheduledEndMs = new Date(r.date+'T'+s.endTime+':00').getTime();
@@ -4228,12 +4230,12 @@ function renderEarlyTab() {
 function renderSuspiciousTab() {
   const from = document.getElementById('fromDate').value;
   const to   = document.getElementById('toDate').value;
-  const fn   = document.getElementById('filterName').value.trim().toLowerCase();
+  const fn   = document.getElementById('filterName').value.trim();
   const allRecs = getRecords().filter(r=>r.date>=from&&r.date<=to&&r.msAccount);
   const singleDay = from===to;
 
   const rows = allRecs.filter(r=>{
-    if (fn && !r.name.toLowerCase().includes(fn)) return false;
+    if (fn && !r.name === fn) return false;
     const msName = r.msAccount.split('@')[0].toLowerCase().replace(/[._]/g,' ');
     const staffName = r.name.toLowerCase();
     const msFirst = msName.split(' ')[0], staffFirst = staffName.split(' ')[0];
@@ -5738,7 +5740,17 @@ function renderOfficeManager() {
     </div>`).join('');
 }
 
+function populateFilterNameDropdown() {
+  const sel = document.getElementById('filterName');
+  if (!sel) return;
+  const current = sel.value;
+  const staff = getStaff().filter(s => s.role !== 'superadmin').sort((a,b) => a.name.localeCompare(b.name));
+  sel.innerHTML = '<option value="">— All staff —</option>' +
+    staff.map(s => `<option value="${esc(s.name)}" ${s.name===current?'selected':''}>${esc(s.name)}</option>`).join('');
+}
+
 function loadDashboard() {
+  populateFilterNameDropdown();
   // Refresh live data from SP before rendering
   Promise.all([
     spGet(SP_API + "('AttendanceRecords')/items?$top=5000").then(r => { if (r&&r.value) { _records=r.value.map(spToRecord); LS.set('ci_records',_records); } }),
@@ -5803,7 +5815,7 @@ function renderRecords() {
 function renderPeople() {
   const from=document.getElementById('fromDate').value, to=document.getElementById('toDate').value;
   const singleDay=from===to;
-  const fn=document.getElementById('filterName').value.trim().toLowerCase();
+  const fn=document.getElementById('filterName').value.trim();
   if(singleDay){
     const allPeople=getStaff().filter(s=>s.role!=='superadmin').map(s=>s.name).filter(n=>!fn||n.toLowerCase().includes(fn)).sort();
     const submittedMap={};
@@ -5868,7 +5880,7 @@ function renderPeople() {
 
 function renderBreaks() {
   const from=document.getElementById('fromDate').value, to=document.getElementById('toDate').value;
-  const fn=document.getElementById('filterName').value.trim().toLowerCase();
+  const fn=document.getElementById('filterName').value.trim();
   const singleDay=from===to;
   const isViewingToday=singleDay&&from===today;
   const ongoingBreaks=getOngoingBreaks();
