@@ -2126,7 +2126,7 @@ async function loadPermissions() {
         }
       }
       LS.set('ci_permissions', _permissions);
-    setTimeout(applyPermissionVisibility, 100);
+      setTimeout(() => { buildNav(); applyPermissionVisibility(); }, 100);
     }
   } catch(e) {
     const cached = LS.get('ci_permissions');
@@ -2137,11 +2137,18 @@ async function loadPermissions() {
 
 // Get permissions for current user's role
 function getPerms() {
-  // During preview — MUST check this first before isSuperAdmin()
-  // because _realRole is 'superadmin' and isSuperAdmin() would return true
+  // During preview — use SP permissions if available, merged with defaults
   if (_previewRole) {
-    const role = currentUser?.role; // this IS the preview role
-    return DEFAULT_PERMISSIONS[role] || DEFAULT_PERMISSIONS.staff;
+    const role = currentUser?.role;
+    const spPerms = _permissions[role];
+    const defaults = DEFAULT_PERMISSIONS[role] || DEFAULT_PERMISSIONS.staff;
+    if (spPerms && (spPerms.tabs || spPerms.features)) {
+      return {
+        tabs:     { ...(defaults.tabs||{}),     ...(spPerms.tabs||{}) },
+        features: { ...(defaults.features||{}), ...(spPerms.features||{}) }
+      };
+    }
+    return defaults;
   }
   if (isSuperAdmin()) return null; // real superadmin — always has everything
   const role = currentUser?.role;
@@ -2227,7 +2234,7 @@ const FEATURE_LABELS = {
   canAddObsNotes: 'Can add observation notes',
 };
 
-let EDITABLE_ROLES = ['hrmanager','teamlead','analyst','trainee','staff','hr','assistant','sales','customerservice','socialmedia','accountant']; // Updated dynamically from SP
+let EDITABLE_ROLES = ['hrmanager','opsmanager','teamlead','analyst','trainee','staff','hr','assistant','sales','customerservice','socialmedia','accountant'];
 
 let _editingRole = null;
 let _pendingPermissions = null;
@@ -5757,6 +5764,7 @@ function loadDashboard() {
     spGet(SP_API + "('AttendanceBreaks')/items?$top=5000").then(r => { if (r&&r.value) { _breaks=r.value.map(spToBreak); LS.set('ci_breaks',_breaks); } }),
     loadCoverageFromSP(),
     loadBrokerAssignments(),
+    loadPermissions(),
   ]).catch(()=>{}).finally(() => {
     renderNeedsAttention(); renderMetrics(); loadTabs(); renderWeeklyWidgets();
   });
@@ -7291,7 +7299,7 @@ async function loadFromSharePoint() {
       loadTeamsFromSP(),
     ]).catch(e => console.warn('Some SP loads failed:', e));
     // Update EDITABLE_ROLES from loaded roles
-    if (_roles.length) EDITABLE_ROLES = _roles.map(r => r.title);
+    if (_roles.length) EDITABLE_ROLES = _roles.map(r => r.title).filter(r => r !== 'superadmin');
   } catch(e) {
     console.error('SharePoint load error:', e);
   }
