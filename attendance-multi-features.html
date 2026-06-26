@@ -11040,11 +11040,9 @@ function renderEODScreen() {
 
   const pf = (field, fallback='') => existing ? (existing[field] ?? fallback) : fallback;
 
-  // Populate tasks from existing report (only on first load)
-  if (!window._eodTasksLoaded) {
-    _eodTasks = (existing && existing.tasks) ? JSON.parse(JSON.stringify(existing.tasks)) : [];
-    window._eodTasksLoaded = true;
-  }
+  // Populate tasks from existing report — always reload from saved on screen open
+  _eodTasks = (existing && existing.tasks) ? JSON.parse(JSON.stringify(existing.tasks)) : [];
+  window._eodTasksLoaded = true;
 
   el.innerHTML = `<form onsubmit="submitEOD(event)">
 
@@ -11235,7 +11233,7 @@ function updateEODTask(idx, field, value) {
   if (_eodTasks[idx]) _eodTasks[idx][field] = value;
 }
 
-function generateTimeOptions(selected) {
+function generateTimeOptions(selected, placeholder) {
   const times = [];
   for (let h = 6; h <= 21; h++) {
     for (let m = 0; m < 60; m += 15) {
@@ -11247,7 +11245,7 @@ function generateTimeOptions(selected) {
       times.push(`<option value="${value}" ${value===selected?'selected':''}>${label}</option>`);
     }
   }
-  return '<option value="">— time —</option>' + times.join('');
+  return `<option value="">— ${placeholder} —</option>` + times.join('');
 }
 
 function renderEODTaskList() {
@@ -11258,23 +11256,32 @@ function renderEODTaskList() {
     return;
   }
 
-  const selStyle = 'font-size:13px;padding:6px 8px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);cursor:pointer';
+  const selStyle = 'font-size:13px;padding:6px 8px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);cursor:pointer;width:100%';
 
   el.innerHTML = _eodTasks.map((t, i) => `
     <div style="background:var(--surface-2);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:8px">
-      <div style="display:grid;grid-template-columns:1fr auto auto auto;gap:8px;align-items:center;margin-bottom:8px">
-        <select onchange="updateEODTask(${i},'type',this.value)" style="${selStyle}">
-          <option value="">— task type —</option>
-          ${EOD_TASK_TYPES.map(ty=>`<option value="${esc(ty)}" ${t.type===ty?'selected':''}>${esc(ty)}</option>`).join('')}
-        </select>
-        <select onchange="updateEODTask(${i},'startTime',this.value)" style="${selStyle};min-width:100px" title="Start time">
-          ${generateTimeOptions(t.startTime||'')}
-        </select>
-        <select onchange="updateEODTask(${i},'endTime',this.value)" style="${selStyle};min-width:100px" title="End time">
-          ${generateTimeOptions(t.endTime||'')}
-        </select>
+      <div style="display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:8px;align-items:end;margin-bottom:8px">
+        <div>
+          <div style="font-size:10px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px">Task type</div>
+          <select onchange="updateEODTask(${i},'type',this.value)" style="${selStyle}">
+            <option value="">— select —</option>
+            ${EOD_TASK_TYPES.map(ty=>`<option value="${esc(ty)}" ${t.type===ty?'selected':''}>${esc(ty)}</option>`).join('')}
+          </select>
+        </div>
+        <div>
+          <div style="font-size:10px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px">Start time</div>
+          <select onchange="updateEODTask(${i},'startTime',this.value)" style="${selStyle}">
+            ${generateTimeOptions(t.startTime||'', 'start')}
+          </select>
+        </div>
+        <div>
+          <div style="font-size:10px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px">End time</div>
+          <select onchange="updateEODTask(${i},'endTime',this.value)" style="${selStyle}">
+            ${generateTimeOptions(t.endTime||'', 'end')}
+          </select>
+        </div>
         <button type="button" onclick="removeEODTask(${i})"
-          style="background:transparent;border:none;color:var(--text-3);font-size:18px;cursor:pointer;padding:0 4px;line-height:1;flex-shrink:0">✕</button>
+          style="background:transparent;border:none;color:var(--text-3);font-size:18px;cursor:pointer;padding:0 4px;line-height:1;flex-shrink:0;margin-bottom:2px">✕</button>
       </div>
       <textarea rows="2" onchange="updateEODTask(${i},'notes',this.value)"
         placeholder="Notes (optional)"
