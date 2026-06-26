@@ -1181,15 +1181,6 @@ tr.flagged-row:hover td { background: #FFEAEA; }
     </div>
   </div>
 
-  <!-- ── BROKER MANAGEMENT SCREEN ────────────────────────────────────── -->
-  <div id="screen-brokermgmt" class="screen">
-    <div class="page-header">
-      <h1>🏦 Broker Management</h1>
-      <p id="brokerMgmtSub">Manage brokers, assignments and CRMs</p>
-    </div>
-    <div id="brokerMgmtContent"></div>
-  </div>
-
   <!-- ── OTHER TASKS SCREEN ────────────────────────────────────────────── -->
 </main>
 
@@ -2062,23 +2053,23 @@ function exitPreview() {
 // Default permissions per role — used if SP has nothing
 const DEFAULT_PERMISSIONS = {
   hrmanager: {
-    tabs: { checkin:true, leave:true, dashboard:true, admin:true, brokermgmt:false, files:false, myfiles:false, myteam:false, eod:false, performance:false, othertasks:false, feedback:false, profile:true },
+    tabs: { checkin:true, leave:true, dashboard:true, admin:true, files:false, myfiles:false, myteam:false, eod:false, performance:false, othertasks:false, feedback:false, profile:true },
     features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canApproveLeave:true, canSeeLeaveBalance:true, canSeeTeamLeaveBalances:true, canSeeAllFiles:false, canAddStaff:true, canResetPins:true, canChangeRoles:false, canDeleteStaff:false, canExportData:true, canAddObsNotes:true }
   },
   teamlead: {
-    tabs: { checkin:true, leave:true, dashboard:true, admin:false, brokermgmt:true, files:false, myfiles:false, myteam:false, eod:true, performance:false, othertasks:false, feedback:false, profile:true },
+    tabs: { checkin:true, leave:true, dashboard:true, admin:false, files:false, myfiles:false, myteam:false, eod:true, performance:false, othertasks:false, feedback:false, profile:true },
     features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canSeeLeaveBalance:false, canApproveLeave:true, canSeeTeamLeaveBalances:true, canSeeAllFiles:true, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:true }
   },
   analyst: {
-    tabs: { checkin:true, leave:true, dashboard:false, admin:false, brokermgmt:false, files:false, myfiles:false, myteam:false, eod:true, performance:false, othertasks:false, feedback:false, profile:true },
+    tabs: { checkin:true, leave:true, dashboard:false, admin:false, files:false, myfiles:false, myteam:false, eod:true, performance:false, othertasks:false, feedback:false, profile:true },
     features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canSeeLeaveBalance:false, canApproveLeave:false, canSeeTeamLeaveBalances:false, canSeeAllFiles:true, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:false }
   },
   trainee: {
-    tabs: { checkin:true, leave:true, dashboard:false, admin:false, brokermgmt:false, files:false, myfiles:false, myteam:false, eod:false, performance:false, othertasks:false, feedback:false, profile:true },
+    tabs: { checkin:true, leave:true, dashboard:false, admin:false, files:false, myfiles:false, myteam:false, eod:false, performance:false, othertasks:false, feedback:false, profile:true },
     features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canSeeLeaveBalance:false, canApproveLeave:false, canSeeTeamLeaveBalances:false, canSeeAllFiles:false, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:false }
   },
   staff: {
-    tabs: { checkin:true, leave:true, dashboard:false, admin:false, brokermgmt:false, files:false, myfiles:false, myteam:false, eod:false, performance:false, othertasks:false, feedback:false, profile:true },
+    tabs: { checkin:true, leave:true, dashboard:false, admin:false, files:false, myfiles:false, myteam:false, eod:false, performance:false, othertasks:false, feedback:false, profile:true },
     features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canSeeLeaveBalance:false, canApproveLeave:false, canSeeTeamLeaveBalances:false, canSeeAllFiles:false, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:false }
   },
   hr: {
@@ -2086,23 +2077,23 @@ const DEFAULT_PERMISSIONS = {
     features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canSeeLeaveBalance:false, canApproveLeave:false, canSeeTeamLeaveBalances:false, canSeeAllFiles:false, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:false }
   },
   assistant: {
-    tabs: { checkin:true, leave:true, dashboard:false, admin:false, brokermgmt:false, files:false, myfiles:false, myteam:false, eod:false, performance:false, othertasks:false, feedback:false, profile:true },
+    tabs: { checkin:true, leave:true, dashboard:false, admin:false, files:false, myfiles:false, myteam:false, eod:false, performance:false, othertasks:false, feedback:false, profile:true },
     features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canSeeLeaveBalance:false, canApproveLeave:false, canSeeTeamLeaveBalances:false, canSeeAllFiles:false, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:false }
   },
   sales: {
-    tabs: { checkin:true, leave:true, dashboard:false, admin:false, brokermgmt:false, files:false, myfiles:false, myteam:false, eod:false, performance:false, othertasks:false, feedback:false, profile:true },
+    tabs: { checkin:true, leave:true, dashboard:false, admin:false, files:false, myfiles:false, myteam:false, eod:false, performance:false, othertasks:false, feedback:false, profile:true },
     features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canSeeLeaveBalance:false, canApproveLeave:false, canSeeTeamLeaveBalances:false, canSeeAllFiles:false, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:false }
   },
   customerservice: {
-    tabs: { checkin:true, leave:true, dashboard:false, admin:false, brokermgmt:false, files:false, myfiles:false, myteam:false, eod:false, performance:false, othertasks:false, feedback:false, profile:true },
+    tabs: { checkin:true, leave:true, dashboard:false, admin:false, files:false, myfiles:false, myteam:false, eod:false, performance:false, othertasks:false, feedback:false, profile:true },
     features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canSeeLeaveBalance:false, canApproveLeave:false, canSeeTeamLeaveBalances:false, canSeeAllFiles:false, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:false }
   },
   socialmedia: {
-    tabs: { checkin:true, leave:true, dashboard:false, admin:false, brokermgmt:false, files:false, myfiles:false, myteam:false, eod:false, performance:false, othertasks:false, feedback:false, profile:true },
+    tabs: { checkin:true, leave:true, dashboard:false, admin:false, files:false, myfiles:false, myteam:false, eod:false, performance:false, othertasks:false, feedback:false, profile:true },
     features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canApproveLeave:false, canSeeLeaveBalance:false, canSeeTeamLeaveBalances:false, canSeeAllFiles:false, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:false }
   },
   accountant: {
-    tabs: { checkin:true, leave:true, dashboard:false, admin:false, brokermgmt:false, files:false, myfiles:false, myteam:false, eod:false, performance:false, othertasks:false, feedback:false, profile:true },
+    tabs: { checkin:true, leave:true, dashboard:false, admin:false, files:false, myfiles:false, myteam:false, eod:false, performance:false, othertasks:false, feedback:false, profile:true },
     features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canApproveLeave:false, canSeeLeaveBalance:false, canSeeTeamLeaveBalances:false, canSeeAllFiles:false, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:false }
   },
   opsmanager: {
@@ -2532,7 +2523,7 @@ function buildNav() {
   let tabs = [];
   const r = currentUser.role;
   if (r === 'superadmin') {
-    tabs = [['dashboard','Dashboard'],['brokermgmt','🏦 Brokers'],['admin','Staff'],['profile','My Details']];
+    tabs = [['dashboard','Dashboard'],['admin','Staff'],['profile','My Details']];
   } else if (r === 'hrmanager') {
     tabs = [['checkin','Check in'],['leave','🌴 Leave'],['dashboard','Dashboard'],['admin','Staff'],['profile','My Details']];
     // hrmanager explicitly excluded from All Files tab
@@ -2540,7 +2531,7 @@ function buildNav() {
     // All other roles — build tabs dynamically from permissions
     const ALL_TABS_DEF = [
       ['checkin','Check in'], ['leave','🌴 Leave'], ['dashboard','Dashboard'],
-      ['admin','Staff'], ['brokermgmt','🏦 Brokers'],
+      ['admin','Staff'],
       ['myteam','My Team'], ['eod','EOD'], 
         ['profile','My Details']
     ];
@@ -2586,7 +2577,6 @@ function goTab(name, btn) {
   if (name==='eod')        renderEODScreen();
   if (name==='admin')      renderAdmin();
   if (name==='leave')      renderLeaveScreen();
-  if (name==='brokermgmt') renderBrokerMgmtScreen();
   if (name==='profile') {
     initCp();
     // Load CRM options if not yet loaded (for CRM Skills section)
@@ -8234,7 +8224,7 @@ async function addBroker() {
   if (res) {
     if (input) input.value = '';
     await loadBrokers();
-    renderBrokerMgmtScreen();
+    
     showToast('Broker added ✓','ok');
   }
 }
@@ -8242,7 +8232,7 @@ async function addBroker() {
 async function deleteBroker(id) {
   if (!confirm('Remove this broker? This will NOT remove existing assignments.')) return;
   await spDelete(SP_API + `('Brokers')/items(${id})`);
-  await loadBrokers(); renderBrokerMgmtScreen(); showToast('Broker removed','ok');
+  await loadBrokers(); showToast('Broker removed','ok');
 }
 
 function renderBrokerList() {
@@ -8274,13 +8264,13 @@ async function assignBrokerToStaff() {
   if (!staffName || !brokerName) { showToast('Select both staff and broker','err'); return; }
   if (_brokerAssignments.some(a=>a.staffName===staffName&&a.brokerName===brokerName)) { showToast('Already assigned','err'); return; }
   const res = await spPost(SP_API + "('BrokerAssignments')/items", {Title:staffName, BrokerName:brokerName});
-  if (res) { await loadBrokerAssignments(); renderBrokerMgmtScreen(); showToast('Broker assigned ✓','ok'); }
+  if (res) { await loadBrokerAssignments(); showToast('Broker assigned ✓','ok'); }
 }
 
 async function removeBrokerAssignment(id) {
   if (!id) return;
   await spDelete(SP_API + `('BrokerAssignments')/items(${id})`);
-  await loadBrokerAssignments(); renderBrokerMgmtScreen(); showToast('Assignment removed','ok');
+  await loadBrokerAssignments(); showToast('Assignment removed','ok');
 }
 
 function renderBrokerAssignList() {
@@ -8342,12 +8332,12 @@ async function addCRMOption() {
   const name = input?.value.trim();
   if (!name) return;
   const res = await spPost(SP_API + "('CRMOptions')/items",{Title:name});
-  if (res) { if(input) input.value=''; await loadCRMOptions(); renderBrokerMgmtScreen(); showToast('CRM added ✓','ok'); }
+  if (res) { if(input) input.value=''; await loadCRMOptions(); showToast('CRM added ✓','ok'); }
 }
 
 async function deleteCRMOption(id) {
   await spDelete(SP_API + `('CRMOptions')/items(${id})`);
-  await loadCRMOptions(); renderBrokerMgmtScreen(); showToast('CRM removed','ok');
+  await loadCRMOptions(); showToast('CRM removed','ok');
 }
 
 async function loadStaffCRMs() {
@@ -8408,7 +8398,7 @@ async function toggleStaffCRM(staffName, crmName) {
   const current = getCRMsForStaff(staffName);
   const newList = current.includes(crmName) ? current.filter(c=>c!==crmName) : [...current, crmName];
   await saveStaffCRMSP(staffName, newList);
-  renderBrokerMgmtScreen();
+  
   showToast(staffName.split(' ')[0]+' CRMs updated ✓','ok');
 }
 
@@ -8460,419 +8450,6 @@ async function saveCoverageSP(absenteeName, date, coverName) {
     if (res) _coverageSP.push({id:res.d?.Id||res.ID, absenteeName, date, coverName, assignedBy:payload.AssignedBy, assignedAt:payload.AssignedAt});
   }
   LS.set('ci_coverage_sp', _coverageSP);
-}
-
-// ── Broker Management Screen ──────────────────────────────────────────────
-let _bmBrokerListOpen    = false;
-let _bmAssignOpen        = false;
-let _bmAssignView        = 'staff';
-let _bmAssignStaffFilter = '';
-let _bmAssignRoleFilter  = '';
-let _bmAssignBrkFilter   = '';
-let _bmCRMSkillsOpen     = false;
-let _bmCRMSkillsView     = 'staff';
-let _bmCRMStaffFilter    = '';
-let _bmCRMRoleFilter     = '';
-let _bmCRMFilter         = '';
-
-async function renderBrokerMgmtScreen() {
-  const el = document.getElementById('brokerMgmtContent');
-  if (!el) return;
-  el.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--text-3)">Loading…</div>';
-  try {
-    await Promise.all([
-      loadBrokers().catch(()=>{}),
-      loadBrokerAssignments().catch(()=>{}),
-      loadCRMOptions().catch(()=>{}),
-      loadStaffCRMs().catch(()=>{}),
-    ]);
-    el.innerHTML = '';
-    if (isSuperAdmin()) el.appendChild(bmBrokerListCard());
-    el.appendChild(bmAssignCard());
-    if (isSuperAdmin()) el.appendChild(bmCRMOptionsCard());
-    el.appendChild(bmCRMSkillsCard());
-  } catch(e) {
-    el.innerHTML = `<div class="card" style="text-align:center;padding:2rem">
-      <div style="font-size:1.5rem">⚠️</div>
-      <div style="font-weight:600;color:var(--danger);margin-top:8px">Error loading</div>
-      <div style="font-size:13px;color:var(--text-3);margin-top:4px">${esc(e.message||'')}</div>
-      <button onclick="renderBrokerMgmtScreen()" style="margin-top:12px;padding:8px 16px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface-2);cursor:pointer;font-size:13px">↺ Retry</button>
-    </div>`;
-  }
-}
-
-// ── helpers ────────────────────────────────────────────────────────────────
-function bmViewStaff() {
-  const all = getStaff().filter(s=>['analyst','teamlead','trainee'].includes(s.role));
-  if (isSuperAdmin()) return all;
-  const team = getTeamForTL(currentUser.name);
-  return all.filter(s=>team.includes(s.name));
-}
-function bmSectionHeader(label, count, openVar, toggleFn) {
-  return `<div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer" onclick="${toggleFn}()">
-    <div>
-      <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px">${label}</div>
-      <div style="font-size:13px;color:var(--text-2);margin-top:2px">${count}</div>
-    </div>
-    <span style="font-size:18px;color:var(--text-3)" id="${openVar}Icon">${window[openVar]?'▴':'▾'}</span>
-  </div>`;
-}
-function bmToggleSection(openVar, bodyId) {
-  window[openVar] = !window[openVar];
-  const body = document.getElementById(bodyId);
-  const icon = document.getElementById(openVar+'Icon');
-  if (body) body.style.display = window[openVar] ? 'block' : 'none';
-  if (icon) icon.textContent = window[openVar] ? '▴' : '▾';
-}
-function bmToggleBtn(label, active) {
-  return `style="padding:5px 14px;border-radius:50px;font-size:12px;border:1.5px solid ${active?'var(--brand)':'var(--border)'};
-    background:${active?'var(--brand-light)':'var(--surface-2)'};color:${active?'var(--brand)':'var(--text-2)'};
-    font-weight:${active?'700':'400'};cursor:pointer"`;
-}
-
-// ── 1. BROKER LIST ─────────────────────────────────────────────────────────
-function bmBrokerListCard() {
-  const c = document.createElement('div');
-  c.className = 'card'; c.style.marginBottom = '1rem';
-  c.innerHTML = `
-    ${bmSectionHeader('🏦 Broker List', _brokers.length+' brokers', '_bmBrokerListOpen', 'bmToggleBrokerList')}
-    <div style="margin-top:12px">
-      <div style="display:flex;gap:8px">
-        <input type="text" id="bmNewBroker" placeholder="New broker name…"
-          style="flex:1;font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)"
-          onkeydown="if(event.key==='Enter'){addBroker();event.preventDefault()}"/>
-        <button onclick="addBroker()" style="padding:7px 16px;border-radius:var(--radius-sm);border:none;background:var(--brand);color:#fff;font-size:13px;font-weight:600;cursor:pointer">+ Add</button>
-      </div>
-    </div>
-    <div id="bmBrokerListBody" style="display:${_bmBrokerListOpen?'block':'none'};margin-top:12px">
-      ${bmBrokerListBody()}
-    </div>`;
-  return c;
-}
-function bmBrokerListBody() {
-  const sorted = [..._brokers].sort((a,b)=>a.name.localeCompare(b.name));
-  if (!sorted.length) return '<div style="font-size:13px;color:var(--text-3);padding:8px 0">No brokers yet.</div>';
-  const letters = [...new Set(sorted.map(b=>b.name[0]?.toUpperCase()))].sort();
-  let html = `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px">
-    ${letters.map(l=>`<button onclick="document.getElementById('bml_${l}')?.scrollIntoView({behavior:'smooth',block:'nearest'})"
-      style="padding:2px 8px;border-radius:4px;border:1px solid var(--border);background:var(--surface-2);font-size:12px;font-weight:600;cursor:pointer;color:var(--brand)">${l}</button>`).join('')}
-  </div><div style="max-height:300px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius-sm)">`;
-  let last = '';
-  sorted.forEach(b=>{
-    const L = b.name[0]?.toUpperCase();
-    if (L!==last) { html+=`<div id="bml_${L}" style="font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;padding:6px 10px 2px;background:var(--surface-2);border-bottom:1px solid var(--border)">${L}</div>`; last=L; }
-    html+=`<div style="display:flex;align-items:center;padding:7px 10px;border-bottom:1px solid var(--border)">
-      <span style="flex:1;font-size:13px">${esc(b.name)}</span>
-      <button onclick="deleteBroker(${b.id})" style="font-size:11px;padding:2px 8px;border-radius:4px;border:1px solid var(--danger);color:var(--danger);background:transparent;cursor:pointer">Remove</button>
-    </div>`;
-  });
-  return html+'</div>';
-}
-function bmToggleBrokerList() { bmToggleSection('_bmBrokerListOpen','bmBrokerListBody'); }
-
-// ── 2. BROKER ASSIGNMENTS ─────────────────────────────────────────────────
-function bmAssignCard() {
-  const c = document.createElement('div');
-  c.className = 'card'; c.style.marginBottom = '1rem';
-  const staff  = bmViewStaff();
-  const roles  = [...new Set(staff.map(s=>s.role))].sort();
-  const sa     = isSuperAdmin();
-
-  c.innerHTML = `
-    ${bmSectionHeader('👥 Broker Assignments',
-      `${_brokerAssignments.length} assignment${_brokerAssignments.length!==1?'s':''}`,
-      '_bmAssignOpen', 'bmToggleAssign')}
-    <div id="bmAssignBody" style="display:${_bmAssignOpen?'block':'none'};margin-top:14px">
-      <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
-        <button onclick="bmSetAssignView('staff')" ${bmToggleBtn('By staff', _bmAssignView==='staff')}>By staff</button>
-        <button onclick="bmSetAssignView('broker')" ${bmToggleBtn('By broker', _bmAssignView==='broker')}>By broker</button>
-      </div>
-      ${_bmAssignView==='staff' ? `
-        <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
-          <select id="bmAssignStaffSel" onchange="_bmAssignStaffFilter=this.value;bmRefreshAssignContent()"
-            style="flex:1;font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)">
-            <option value="">All staff</option>
-            ${staff.map(s=>`<option value="${esc(s.name)}" ${s.name===_bmAssignStaffFilter?'selected':''}>${esc(s.name)}</option>`).join('')}
-          </select>
-          <select id="bmAssignRoleSel" onchange="_bmAssignRoleFilter=this.value;bmRefreshAssignContent()"
-            style="font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)">
-            <option value="">All roles</option>
-            ${roles.map(r=>`<option value="${r}" ${r===_bmAssignRoleFilter?'selected':''}>${esc(ROLE_LABEL[r]||r)}</option>`).join('')}
-          </select>
-        </div>` : `
-        <div style="display:flex;gap:8px;margin-bottom:12px">
-          <select id="bmAssignBrkSel" onchange="_bmAssignBrkFilter=this.value;bmRefreshAssignContent()"
-            style="flex:1;font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)">
-            <option value="">All brokers</option>
-            ${[..._brokers].sort((a,b)=>a.name.localeCompare(b.name)).map(b=>`<option value="${esc(b.name)}" ${b.name===_bmAssignBrkFilter?'selected':''}>${esc(b.name)}</option>`).join('')}
-          </select>
-        </div>`}
-      <div id="bmAssignContent">${bmAssignContent()}</div>
-    </div>`;
-  return c;
-}
-function bmToggleAssign() { bmToggleSection('_bmAssignOpen','bmAssignBody'); }
-function bmSetAssignView(v) {
-  _bmAssignView=v; _bmAssignStaffFilter=''; _bmAssignRoleFilter=''; _bmAssignBrkFilter='';
-  const el = document.getElementById('bmAssignBody');
-  if (el) el.innerHTML = bmBuildAssignInner();
-}
-function bmBuildAssignInner() {
-  const staff = bmViewStaff();
-  const roles = [...new Set(staff.map(s=>s.role))].sort();
-  const sa = isSuperAdmin();
-  return `
-    <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
-      <button onclick="bmSetAssignView('staff')" ${bmToggleBtn('By staff', _bmAssignView==='staff')}>By staff</button>
-      <button onclick="bmSetAssignView('broker')" ${bmToggleBtn('By broker', _bmAssignView==='broker')}>By broker</button>
-    </div>
-    ${_bmAssignView==='staff' ? `
-      <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
-        <select onchange="_bmAssignStaffFilter=this.value;bmRefreshAssignContent()"
-          style="flex:1;font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)">
-          <option value="">All staff</option>
-          ${staff.map(s=>`<option value="${esc(s.name)}" ${s.name===_bmAssignStaffFilter?'selected':''}>${esc(s.name)}</option>`).join('')}
-        </select>
-        <select onchange="_bmAssignRoleFilter=this.value;bmRefreshAssignContent()"
-          style="font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)">
-          <option value="">All roles</option>
-          ${roles.map(r=>`<option value="${r}" ${r===_bmAssignRoleFilter?'selected':''}>${esc(ROLE_LABEL[r]||r)}</option>`).join('')}
-        </select>
-      </div>` : `
-      <div style="display:flex;gap:8px;margin-bottom:12px">
-        <select onchange="_bmAssignBrkFilter=this.value;bmRefreshAssignContent()"
-          style="flex:1;font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)">
-          <option value="">All brokers</option>
-          ${[..._brokers].sort((a,b)=>a.name.localeCompare(b.name)).map(b=>`<option value="${esc(b.name)}" ${b.name===_bmAssignBrkFilter?'selected':''}>${esc(b.name)}</option>`).join('')}
-        </select>
-      </div>`}
-    <div id="bmAssignContent">${bmAssignContent()}</div>`;
-}
-function bmRefreshAssignContent() {
-  const el = document.getElementById('bmAssignContent');
-  if (el) el.innerHTML = bmAssignContent();
-}
-function bmAssignContent() {
-  const sa    = isSuperAdmin();
-  const staff = bmViewStaff();
-  if (_bmAssignView === 'staff') {
-    let filtered = staff;
-    if (_bmAssignStaffFilter) filtered = filtered.filter(s=>s.name===_bmAssignStaffFilter);
-    if (_bmAssignRoleFilter)  filtered = filtered.filter(s=>s.role===_bmAssignRoleFilter);
-    if (!filtered.length) return '<div style="font-size:13px;color:var(--text-3)">No staff found.</div>';
-    return filtered.map(s=>{
-      const brokers  = getBrokersForStaff(s.name);
-      const assigned = _brokerAssignments.filter(a=>a.staffName===s.name);
-      const avail    = _brokers.filter(b=>!brokers.includes(b.name));
-      return `<div style="padding:10px 0;border-bottom:1px solid var(--border)">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:7px">
-          <span style="font-size:13px;font-weight:600;flex:1">${esc(s.name)}</span>
-          <span style="font-size:11px;background:var(--surface-2);border-radius:4px;padding:2px 7px;color:var(--text-3)">${esc(ROLE_LABEL[s.role]||s.role)}</span>
-        </div>
-        <div style="display:flex;flex-wrap:wrap;gap:5px;align-items:center">
-          ${brokers.map(b=>{const a=assigned.find(x=>x.brokerName===b);return `
-            <span style="display:inline-flex;align-items:center;gap:3px;background:var(--brand-light);border:1px solid var(--brand);border-radius:50px;padding:4px 10px;font-size:12px;color:var(--brand);font-weight:500">
-              ${esc(b)}
-              ${sa&&a?`<button onclick="bmRemoveAssign(${a.id})" style="background:transparent;border:none;color:var(--brand);cursor:pointer;font-size:15px;line-height:1;padding:0 0 0 4px;font-weight:700">×</button>`:''}
-            </span>`}).join('')}
-          ${!brokers.length?'<span style="font-size:12px;color:var(--text-3);font-style:italic">No broker assigned</span>':''}
-          ${sa&&avail.length?`<select onchange="bmAddAssign('${s.name.replace(/'/g,"\\'")}',this.value,this)"
-            style="font-size:12px;padding:4px 8px;border:1.5px dashed var(--border);border-radius:50px;background:var(--surface-2);color:var(--text-2);cursor:pointer">
-            <option value="">+ Add broker</option>
-            ${avail.map(b=>`<option value="${esc(b.name)}">${esc(b.name)}</option>`).join('')}
-          </select>`:''}
-        </div>
-      </div>`;
-    }).join('');
-  } else {
-    let brokers = [..._brokers].sort((a,b)=>a.name.localeCompare(b.name));
-    if (_bmAssignBrkFilter) brokers = brokers.filter(b=>b.name===_bmAssignBrkFilter);
-    if (!brokers.length) return '<div style="font-size:13px;color:var(--text-3)">No brokers found.</div>';
-    return brokers.map(broker=>{
-      const assigned     = _brokerAssignments.filter(a=>a.brokerName===broker.name);
-      const assignedNames= new Set(assigned.map(a=>a.staffName));
-      return `<div style="padding:10px 0;border-bottom:1px solid var(--border)">
-        <div style="font-size:13px;font-weight:600;margin-bottom:7px">${esc(broker.name)} <span style="font-size:11px;color:var(--text-3);font-weight:400">${assigned.length} assigned</span></div>
-        <div style="display:flex;flex-wrap:wrap;gap:5px">
-          ${staff.map(s=>{
-            const sel=assignedNames.has(s.name);
-            const a=assigned.find(x=>x.staffName===s.name);
-            return `<button onclick="${sa?`bmToggleAssign2('${broker.name.replace(/'/g,"\\'")}','${s.name.replace(/'/g,"\\'")}',${a?a.id:'null'})`:''}"
-              style="padding:4px 12px;border-radius:50px;border:1.5px solid ${sel?'var(--brand)':'var(--border)'};
-              background:${sel?'var(--brand-light)':'var(--surface-2)'};color:${sel?'var(--brand)':'var(--text-2)'};
-              font-size:12px;font-weight:${sel?'600':'400'};cursor:${sa?'pointer':'default'}">
-              ${sel?'✓ ':''}${esc(s.name.split(' ')[0])}
-            </button>`;
-          }).join('')}
-        </div>
-      </div>`;
-    }).join('');
-  }
-}
-async function bmRemoveAssign(id) {
-  await spDelete(SP_API+`('BrokerAssignments')/items(${id})`);
-  await loadBrokerAssignments(); bmRefreshAssignContent(); showToast('Removed ✓','ok');
-}
-async function bmAddAssign(staffName, brokerName, sel) {
-  if (!brokerName) return; if (sel) sel.value='';
-  const res = await spPost(SP_API+"('BrokerAssignments')/items",{Title:staffName,BrokerName:brokerName});
-  if (res) { await loadBrokerAssignments(); bmRefreshAssignContent(); showToast(staffName.split(' ')[0]+' → '+brokerName+' ✓','ok'); }
-}
-async function bmToggleAssign2(brokerName, staffName, existingId) {
-  if (existingId && existingId!=='null' && existingId!==null) {
-    await spDelete(SP_API+`('BrokerAssignments')/items(${existingId})`);
-    await loadBrokerAssignments(); bmRefreshAssignContent(); showToast('Removed ✓','ok');
-  } else {
-    const res = await spPost(SP_API+"('BrokerAssignments')/items",{Title:staffName,BrokerName:brokerName});
-    if (res) { await loadBrokerAssignments(); bmRefreshAssignContent(); showToast(staffName.split(' ')[0]+' → '+brokerName+' ✓','ok'); }
-  }
-}
-
-// ── 3. CRM OPTIONS ─────────────────────────────────────────────────────────
-function bmCRMOptionsCard() {
-  const c = document.createElement('div');
-  c.className = 'card'; c.style.marginBottom = '1rem';
-  c.innerHTML = `
-    <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">💻 CRM Options</div>
-    <div style="display:flex;gap:8px;margin-bottom:12px">
-      <input type="text" id="bmNewCRM" placeholder="Add CRM name…"
-        style="flex:1;font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)"
-        onkeydown="if(event.key==='Enter'){addCRMOption();event.preventDefault()}"/>
-      <button onclick="addCRMOption()" style="padding:7px 16px;border-radius:var(--radius-sm);border:none;background:var(--brand);color:#fff;font-size:13px;font-weight:600;cursor:pointer">+ Add</button>
-    </div>
-    <div style="display:flex;flex-wrap:wrap;gap:7px">
-      ${!_crmOptions.length?'<span style="font-size:13px;color:var(--text-3)">No CRM options yet.</span>':
-        _crmOptions.map(c=>`<span style="display:inline-flex;align-items:center;gap:4px;background:var(--surface-2);border:1.5px solid var(--border);border-radius:50px;padding:5px 12px">
-          <span style="font-size:13px;font-weight:500">${esc(c.name)}</span>
-          <button onclick="deleteCRMOption(${c.id})" style="background:transparent;border:none;color:var(--text-3);cursor:pointer;font-size:16px;line-height:1;padding:0 0 0 4px">×</button>
-        </span>`).join('')}
-    </div>`;
-  return c;
-}
-
-// ── 4. CRM SKILLS ─────────────────────────────────────────────────────────
-function bmCRMSkillsCard() {
-  const c = document.createElement('div');
-  c.className = 'card';
-  const staff  = bmViewStaff();
-  const roles  = [...new Set(staff.map(s=>s.role))].sort();
-  const sa     = isSuperAdmin();
-  const totalAssigned = staff.filter(s=>getCRMsForStaff(s.name).length>0).length;
-
-  c.innerHTML = `
-    ${bmSectionHeader('🧑‍💻 CRM Skills',
-      `${totalAssigned} of ${staff.length} staff have CRM skills`,
-      '_bmCRMSkillsOpen', 'bmToggleCRMSkills')}
-    <div id="bmCRMSkillsBody" style="display:${_bmCRMSkillsOpen?'block':'none'};margin-top:14px">
-      ${bmCRMSkillsInner()}
-    </div>`;
-  return c;
-}
-function bmToggleCRMSkills() { bmToggleSection('_bmCRMSkillsOpen','bmCRMSkillsBody'); }
-
-function bmCRMSkillsInner() {
-  const staff = bmViewStaff();
-  const roles = [...new Set(staff.map(s=>s.role))].sort();
-  const sa    = isSuperAdmin();
-  return `
-    <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
-      <button onclick="bmSetCRMView('staff')" ${bmToggleBtn('By staff',_bmCRMSkillsView==='staff')}>By staff</button>
-      <button onclick="bmSetCRMView('crm')" ${bmToggleBtn('By CRM',_bmCRMSkillsView==='crm')}>By CRM</button>
-    </div>
-    ${_bmCRMSkillsView==='staff'?`
-      <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
-        <select onchange="_bmCRMStaffFilter=this.value;bmRefreshCRM()"
-          style="flex:1;font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)">
-          <option value="">All staff</option>
-          ${staff.map(s=>`<option value="${esc(s.name)}" ${s.name===_bmCRMStaffFilter?'selected':''}>${esc(s.name)}</option>`).join('')}
-        </select>
-        <select onchange="_bmCRMRoleFilter=this.value;bmRefreshCRM()"
-          style="font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)">
-          <option value="">All roles</option>
-          ${roles.map(r=>`<option value="${r}" ${r===_bmCRMRoleFilter?'selected':''}>${esc(ROLE_LABEL[r]||r)}</option>`).join('')}
-        </select>
-      </div>`:
-    `<div style="display:flex;gap:8px;margin-bottom:12px">
-        <select onchange="_bmCRMFilter=this.value;bmRefreshCRM()"
-          style="flex:1;font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)">
-          <option value="">All CRMs</option>
-          ${_crmOptions.map(c=>`<option value="${esc(c.name)}" ${c.name===_bmCRMFilter?'selected':''}>${esc(c.name)}</option>`).join('')}
-        </select>
-      </div>`}
-    <div id="bmCRMContent">${bmCRMContent()}</div>`;
-}
-function bmSetCRMView(v) {
-  _bmCRMSkillsView=v; _bmCRMStaffFilter=''; _bmCRMRoleFilter=''; _bmCRMFilter='';
-  const el = document.getElementById('bmCRMSkillsBody');
-  if (el) el.innerHTML = bmCRMSkillsInner();
-}
-function bmRefreshCRM() {
-  const el = document.getElementById('bmCRMContent');
-  if (el) el.innerHTML = bmCRMContent();
-}
-function bmCRMContent() {
-  const sa    = isSuperAdmin();
-  const staff = bmViewStaff();
-  if (_bmCRMSkillsView === 'staff') {
-    let filtered = staff;
-    if (_bmCRMStaffFilter) filtered = filtered.filter(s=>s.name===_bmCRMStaffFilter);
-    if (_bmCRMRoleFilter)  filtered = filtered.filter(s=>s.role===_bmCRMRoleFilter);
-    if (!filtered.length) return '<div style="font-size:13px;color:var(--text-3)">No staff found.</div>';
-    return filtered.map(s=>{
-      const skills = getCRMsForStaff(s.name);
-      return `<div style="padding:10px 0;border-bottom:1px solid var(--border)">
-        <div style="font-size:13px;font-weight:600;margin-bottom:6px">
-          ${esc(s.name)} <span style="font-size:11px;color:var(--text-3);font-weight:400">${esc(ROLE_LABEL[s.role]||s.role)}</span>
-        </div>
-        <div style="display:flex;flex-wrap:wrap;gap:5px">
-          ${!_crmOptions.length?'<span style="font-size:12px;color:var(--text-3)">No CRM options set up</span>':
-            _crmOptions.map(c=>{const sel=skills.includes(c.name);return `
-            <button ${sa?`onclick="bmToggleCRMSkill2('${s.name.replace(/'/g,"\\'")}','${esc(c.name)}')"`:''} 
-              style="padding:4px 12px;border-radius:50px;border:1.5px solid ${sel?'var(--brand)':'var(--border)'};
-              background:${sel?'var(--brand-light)':'var(--surface-2)'};color:${sel?'var(--brand)':'var(--text-2)'};
-              font-size:12px;font-weight:${sel?'600':'400'};cursor:${sa?'pointer':'default'}">
-              ${sel?'✓ ':''}${esc(c.name)}
-            </button>`;}).join('')}
-        </div>
-      </div>`;
-    }).join('');
-  } else {
-    let crms = _crmOptions;
-    if (_bmCRMFilter) crms = crms.filter(c=>c.name===_bmCRMFilter);
-    if (!crms.length) return '<div style="font-size:13px;color:var(--text-3)">No CRMs found.</div>';
-    return crms.map(crm=>{
-      const knowers = staff.filter(s=>getCRMsForStaff(s.name).includes(crm.name));
-      return `<div style="padding:10px 0;border-bottom:1px solid var(--border)">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-          <span style="font-size:13px;font-weight:600;flex:1">${esc(crm.name)}</span>
-          <span style="font-size:12px;background:${knowers.length?'var(--success-light)':'var(--surface-2)'};
-            color:${knowers.length?'var(--success)':'var(--text-3)'};border-radius:50px;padding:2px 10px;font-weight:600">
-            ${knowers.length} staff
-          </span>
-        </div>
-        <div style="display:flex;flex-wrap:wrap;gap:5px">
-          ${staff.map(s=>{const sel=knowers.some(k=>k.name===s.name);return `
-            <button ${sa?`onclick="bmToggleCRMSkill2('${s.name.replace(/'/g,"\\'")}','${esc(crm.name)}')"`:''} 
-              style="padding:4px 12px;border-radius:50px;border:1.5px solid ${sel?'var(--brand)':'var(--border)'};
-              background:${sel?'var(--brand-light)':'var(--surface-2)'};color:${sel?'var(--brand)':'var(--text-2)'};
-              font-size:12px;font-weight:${sel?'600':'400'};cursor:${sa?'pointer':'default'}">
-              ${sel?'✓ ':''}${esc(s.name.split(' ')[0])}
-            </button>`;}).join('')}
-        </div>
-      </div>`;
-    }).join('');
-  }
-}
-async function bmToggleCRMSkill2(staffName, crmName) {
-  const cur = getCRMsForStaff(staffName);
-  const nw  = cur.includes(crmName)?cur.filter(c=>c!==crmName):[...cur,crmName];
-  await saveStaffCRMSP(staffName, nw);
-  bmRefreshCRM();
-  showToast(staffName.split(' ')[0]+' — '+crmName+' updated ✓','ok');
-}
-
-function isBrokerMgmtActive() {
-  return document.getElementById('screen-brokermgmt')?.classList.contains('active');
 }
 
 function renderCRMSkillChips(container, staffName) {
