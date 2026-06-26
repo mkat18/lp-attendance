@@ -11049,7 +11049,7 @@ function renderEODScreen() {
   }
 
   const sub = document.getElementById('eodScreenSub');
-  if (sub) sub.textContent = submitted ? 'Submitted — you can update anytime' : isDraft ? '⚠ Draft saved — not yet submitted' : 'Complete before clocking out';
+  if (sub) sub.textContent = submitted ? 'Submitted — you can update anytime' : isDraft ? 'Draft saved — tap Submit EOD when done' : 'Complete before clocking out';
 
   const pf = (field, fallback='') => existing ? (existing[field] ?? fallback) : fallback;
 
@@ -11061,35 +11061,33 @@ function renderEODScreen() {
 
     <!-- ── TASKS ────────────────────────────────────── -->
     <div class="card" style="margin-bottom:1rem">
-      <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer" onclick="toggleEODTasksPanel()">
-        <div style="flex:1">
-          <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">📋 Tasks today</div>
-          <div id="eodTaskSummary">
-            ${(existing?.tasks?.length)
-              ? existing.tasks.map(t => {
-                  const fmt = v => { if(!v) return '—'; const [h,m]=v.split(':'); const ap=+h<12?'AM':'PM'; return (+h%12||12)+':'+m+' '+ap; };
-                  return `<div style="display:grid;grid-template-columns:2fr 1fr 1fr 2fr;gap:6px;padding:3px 0;border-bottom:1px solid var(--border);font-size:12px;color:var(--text-2)">
-                    <span style="font-weight:600;color:var(--text)">${esc(t.type||'Untitled')}</span>
-                    <span>${fmt(t.startTime)}</span>
-                    <span>${fmt(t.endTime)}</span>
-                    <span style="color:var(--text-3)">${esc(t.notes||'—')}</span>
-                  </div>`;
-                }).join('')
-              : '<div style="font-size:13px;color:var(--text-3)">No tasks added yet — tap to add</div>'
-            }
-          </div>
-        </div>
-        <span id="eodTasksToggleIcon" style="font-size:18px;color:var(--text-3);margin-left:12px">▾</span>
-      </div>
-      <div id="eodTasksPanel" style="display:none;margin-top:12px">
-        <div id="eodTaskList"></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px">📋 Tasks today</div>
         <button type="button" onclick="addEODTask()"
-          style="width:100%;padding:10px;border:1.5px dashed var(--border);border-radius:var(--radius-sm);background:transparent;color:var(--text-3);font-size:13px;cursor:pointer;margin-top:4px">
+          style="font-size:12px;padding:5px 12px;border-radius:50px;border:1.5px solid var(--brand);background:var(--brand-light);color:var(--brand);cursor:pointer;font-weight:600">
           + Add task
         </button>
       </div>
-    </div>
-      </button>
+      <div style="cursor:pointer" onclick="toggleEODTasksPanel()">
+        <div id="eodTaskSummary">
+          ${(existing?.tasks?.length)
+            ? existing.tasks.map(t => {
+                const fmt = v => { if(!v) return '—'; const [h,m]=v.split(':'); const ap=+h<12?'AM':'PM'; return (+h%12||12)+':'+m+' '+ap; };
+                return `<div style="display:grid;grid-template-columns:2fr 1fr 1fr 2fr;gap:6px;padding:4px 0;border-bottom:1px solid var(--border);font-size:12px;color:var(--text-2)">
+                  <span style="font-weight:600;color:var(--text)">${esc(t.type||'Untitled')}</span>
+                  <span>${fmt(t.startTime)}</span>
+                  <span>${fmt(t.endTime)}</span>
+                  <span style="color:var(--text-3)">${esc(t.notes||'—')}</span>
+                </div>`;
+              }).join('') +
+              `<div style="font-size:11px;color:var(--text-3);margin-top:6px;text-align:right" id="eodTasksToggleIcon">▾ tap to edit</div>`
+            : '<div style="font-size:13px;color:var(--text-3)">No tasks yet — use + Add task above</div>'
+          }
+        </div>
+      </div>
+      <div id="eodTasksPanel" style="display:none;margin-top:10px;border-top:1px solid var(--border);padding-top:10px">
+        <div id="eodTaskList"></div>
+      </div>
     </div>
 
     <!-- ── WRAP-UP ─────────────────────────────────── -->
@@ -11148,12 +11146,12 @@ function renderEODScreen() {
     </div>
 
     <div id="eodSubmitErr" style="color:var(--danger);font-size:13px;margin-bottom:8px;display:none"></div>
-    ${isDraft ? `<div style="background:#FFF8E1;border:1.5px solid #F59E0B;border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:10px;font-size:13px;color:#92400E">⚠ Draft saved — this has not been submitted to your team lead yet.</div>` : ''}
+    ${isDraft ? `<div style="font-size:12px;color:var(--text-3);margin-bottom:8px">📝 Draft saved at ${esc(draft.draftSavedAt||'')} — not yet submitted</div>` : ''}
     ${submitted
       ? `<button type="submit" class="btn-primary" style="width:100%;padding:14px;font-size:16px">Update EOD report</button>
          <div style="text-align:center;font-size:12px;color:var(--text-3);margin-top:8px">Submitted at ${esc(submitted.submittedAt||'')}</div>`
       : `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-           <button type="button" onclick="saveDraftEOD()" style="padding:14px;font-size:15px;font-weight:600;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:var(--surface-2);color:var(--text-2);cursor:pointer">💾 Save draft</button>
+           <button type="button" onclick="saveDraftEOD()" style="padding:14px;font-size:15px;font-weight:600;border-radius:var(--radius-sm);border:1.5px solid #D97706;background:#FEF3C7;color:#92400E;cursor:pointer">Save draft</button>
            <button type="submit" class="btn-primary" style="padding:14px;font-size:15px">Submit EOD</button>
          </div>`
     }
@@ -11265,12 +11263,12 @@ const EOD_TASK_TYPES = [
 
 function toggleEODTasksPanel() {
   const panel = document.getElementById('eodTasksPanel');
-  const icon  = document.getElementById('eodTasksToggleIcon');
   if (!panel) return;
   const open = panel.style.display !== 'none';
   panel.style.display = open ? 'none' : 'block';
-  if (icon) icon.textContent = open ? '▾' : '▴';
-  if (!open) renderEODTaskList(); // render tasks when expanding
+  const icon = document.getElementById('eodTasksToggleIcon');
+  if (icon) icon.textContent = open ? '▾ tap to edit' : '▴ collapse';
+  if (!open) renderEODTaskList();
 }
 
 function updateEODTaskSummary() {
@@ -11299,12 +11297,11 @@ function updateEODTaskSummary() {
 
 function addEODTask() {
   _eodTasks.push({type:'', startTime:'', endTime:'', notes:''});
-  // Auto-expand panel when adding first task
   const panel = document.getElementById('eodTasksPanel');
-  const icon  = document.getElementById('eodTasksToggleIcon');
   if (panel && panel.style.display === 'none') {
     panel.style.display = 'block';
-    if (icon) icon.textContent = '▴';
+    const icon = document.getElementById('eodTasksToggleIcon');
+    if (icon) icon.textContent = '▴ collapse';
   }
   renderEODTaskList();
   updateEODTaskSummary();
