@@ -8448,6 +8448,88 @@ async function renderBrokerMgmtScreen() {
   }
 }
 
+// ── Cover file assignment ──────────────────────────────────────────────────
+function openCoverFileModal(absenteeName) {
+  const existing = document.getElementById('coverFileModal');
+  if (existing) existing.remove();
+
+  const allFiles = getFileEntries();
+  const activeFiles = allFiles.filter(f =>
+    f.owner === absenteeName && f.active !== false &&
+    !['Settled','Declined','Withdrawn'].includes(f.status)
+  );
+  const candidates = getStaff().filter(s=>['analyst','trainee'].includes(s.role)&&s.name!==absenteeName);
+
+  const modal = document.createElement('div');
+  modal.id = 'coverFileModal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:1rem;overflow-y:auto';
+  modal.innerHTML = `
+    <div style="background:var(--surface);border-radius:var(--radius);padding:1.25rem;width:100%;max-width:560px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <div style="font-size:15px;font-weight:700">📁 Assign files — ${esc(absenteeName.split(' ')[0])}</div>
+        <button onclick="document.getElementById('coverFileModal').remove()" style="background:transparent;border:none;font-size:22px;cursor:pointer;color:var(--text-3)">×</button>
+      </div>
+      <div style="margin-bottom:12px">
+        <div style="font-size:12px;color:var(--text-3);margin-bottom:6px">Assign to:</div>
+        <select id="coverFileAssignee" style="width:100%;font-size:13px;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)">
+          <option value="">— select cover person —</option>
+          ${candidates.map(s=>`<option value="${esc(s.name)}">${esc(s.name)}</option>`).join('')}
+        </select>
+      </div>
+      <div style="font-size:12px;color:var(--text-3);margin-bottom:8px">Select files to assign:</div>
+      ${!activeFiles.length ? '<div style="font-size:13px;color:var(--text-3);padding:8px 0">No active files.</div>' :
+        activeFiles.map(f=>`<label style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:0.5px solid var(--border);cursor:pointer">
+          <input type="checkbox" value="${esc(f.id)}" ${f.coverAssignee?'disabled checked':''} style="width:16px;height:16px;cursor:pointer"/>
+          <div style="flex:1">
+            <div style="font-size:13px;font-weight:500">${esc(f.client)}</div>
+            <div style="font-size:11px;color:var(--text-3)">${esc(f.status)}${f.coverAssignee?` · already with ${esc(f.coverAssignee.split(' ')[0])}`:''}</div>
+          </div>
+        </label>`).join('')}
+      <div style="display:flex;gap:8px;margin-top:14px">
+        <button onclick="confirmCoverFileAssign('${absenteeName.replace(/'/g,"\\'")}',document.getElementById('coverFileAssignee').value)"
+          style="flex:1;padding:10px;border-radius:var(--radius-sm);border:none;background:var(--brand);color:#fff;font-size:13px;font-weight:600;cursor:pointer">Assign selected</button>
+        <button onclick="document.getElementById('coverFileModal').remove()"
+          style="padding:10px 16px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:transparent;font-size:13px;cursor:pointer">Cancel</button>
+      </div>
+    </div>`;
+  modal.addEventListener('click', e=>{if(e.target===modal)modal.remove();});
+  document.body.appendChild(modal);
+}
+
+async function confirmCoverFileAssign(absenteeName, assigneeName) {
+  if (!assigneeName) { showToast('Select a cover person first.','err'); return; }
+  const checked = [...document.querySelectorAll('#coverFileModal input[type=checkbox]:checked:not(:disabled)')].map(cb=>cb.value);
+  if (!checked.length) { showToast('Select at least one file.','err'); return; }
+
+  const files = getFileEntries();
+  let updated = 0;
+  for (const id of checked) {
+    const f = files.find(x=>x.id===id);
+    if (!f) continue;
+    f.coverAssignee = assigneeName;
+    f.coverOriginalOwner = absenteeName;
+    await spSyncFileEntry(f).catch(()=>{});
+    updated++;
+  }
+  saveFileEntries(files);
+  document.getElementById('coverFileModal')?.remove();
+  showToast(`${updated} file${updated!==1?'s':''} assigned to ${assigneeName.split(' ')[0]}.`,'ok');
+  renderFilesScreen();
+  if(document.getElementById('screen-myfiles')?.classList.contains('active')) renderMyFilesScreen();
+}
+
+async function claimFileBack(fileId) {
+  const files = getFileEntries();
+  const f = files.find(x=>x.id===fileId);
+  if (!f) return;
+  delete f.coverAssignee;
+  delete f.coverOriginalOwner;
+  await spSyncFileEntry(f).catch(()=>{});
+  saveFileEntries(files);
+  showToast('File claimed back ✓','ok');
+  renderMyFilesScreen();
+}
+
 function renderFilesScreen() {
   const el = document.getElementById('filesContent');
   if (!el) return;
@@ -8553,11 +8635,19 @@ function renderFilesToday(el, allFiles, teamNames) {
     byOwner[f.owner].push(f);
   });
 
-  el.innerHTML = Object.entries(byOwner).map(([name, files]) => `
-    <div class="card" style="margin-bottom:10px">
-      <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">${esc(name)}</div>
+  el.innerHTML = Object.entries(byOwner).map(([name, files]) => {
+    const onLeaveToday = getRecords().find(r=>r.name===name&&r.date===today&&r.status==='leave');
+    const coverBtn = isTeamLead() && onLeaveToday
+      ? `<button onclick="openCoverFileModal('${name.replace(/'/g,"\\'")}');event.stopPropagation()" style="font-size:11px;padding:3px 10px;border-radius:50px;border:1.5px solid var(--brand);background:var(--brand-light);color:var(--brand);cursor:pointer;font-weight:600">📌 Assign cover files</button>`
+      : '';
+    return `<div class="card" style="margin-bottom:10px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+        <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;flex:1">${esc(name)}</div>
+        ${coverBtn}
+      </div>
       ${files.map(f => fileCard(f, true)).join('')}
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 function renderFilesActive(el, allFiles) {
@@ -8930,6 +9020,9 @@ function renderMyFilesScreen() {
   if (!el) return;
   if (currentUser.role === 'hrmanager') { el.innerHTML = '<div class="card">Files not available for HR Manager.</div>'; return; }
 
+  // Include files being covered by current user
+  const coveredFiles = getFileEntries().filter(f=>f.coverAssignee===currentUser.name&&f.coverOriginalOwner);
+
   // Determine whose files to show based on role + lookup selector
   let ownerPool;
   if (isSuperAdmin()) {
@@ -8945,7 +9038,12 @@ function renderMyFilesScreen() {
     ownerPool = [currentUser.name]; // analyst sees own files only
   }
 
-  const allFiles = getFileEntries().filter(f => ownerPool.includes(f.owner));
+  const ownFiles = getFileEntries().filter(f => ownerPool.includes(f.owner));
+  // Include files being covered by current user (analysts only, not TL/SA browsing)
+  const extraCovered = (!isSuperAdmin() && !isTeamLead())
+    ? coveredFiles.filter(f=>!ownFiles.find(x=>x.id===f.id))
+    : [];
+  const allFiles = [...ownFiles, ...extraCovered];
   const mySearchQ = (document.getElementById('myFilesSearch')?.value||'').toLowerCase().trim();
   const myFiltered = mySearchQ ? allFiles.filter(f=>(f.client||'').toLowerCase().includes(mySearchQ)||(f.lender||'').toLowerCase().includes(mySearchQ)) : allFiles;
 
@@ -9313,14 +9411,17 @@ function fileCard(f, showControls) {
   const urgent = f.priority === 'urgent';
   const hasExpiredSoon = f.attachments && f.attachments.some(a => a.expiresAt - Date.now() < 3 * 86400000 && a.expiresAt > Date.now());
   const canEdit = showControls && (isTeamLead() || isSuperAdmin() || f.owner === currentUser.name);
+  const isCovered = !!f.coverAssignee;
+  const isCovering = f.coverAssignee === currentUser.name && f.coverOriginalOwner;
 
-  // Quick status dropdown options
   const statusOptions = FILE_STATUSES.map(s =>
     `<option value="${esc(s)}" ${f.status===s?'selected':''}>${esc(s)}</option>`
   ).join('');
 
   const canDelete = showControls && (isSuperAdmin() || f.owner === currentUser.name);
   return `<div style="padding:12px 14px${stale?';border-left:3px solid #EF4444':''}${urgent?';border-left:3px solid #F59E0B':''}">
+    ${isCovered&&f.owner===currentUser.name?`<div style="font-size:11px;background:#EDE9FE;color:#5B21B6;border-radius:4px;padding:3px 8px;margin-bottom:6px;font-weight:600">📌 Covered by ${esc(f.coverAssignee.split(' ')[0])} · <button onclick="claimFileBack('${f.id}')" style="background:transparent;border:none;color:#5B21B6;cursor:pointer;font-size:11px;text-decoration:underline;padding:0;font-weight:600">Claim back</button></div>`:''}
+    ${isCovering?`<div style="font-size:11px;background:#EDE9FE;color:#5B21B6;border-radius:4px;padding:3px 8px;margin-bottom:6px;font-weight:600">📌 Covering for ${esc(f.coverOriginalOwner.split(' ')[0])}</div>`:''}
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:6px">
       <div style="flex:1;min-width:0">
         <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:2px">
@@ -9335,7 +9436,6 @@ function fileCard(f, showControls) {
       </div>
       <span style="background:${sc.bg};color:${sc.color};border-radius:50px;padding:3px 9px;font-size:11px;font-weight:600;white-space:nowrap;flex-shrink:0">${esc(f.status)}</span>
     </div>
-    ${f.fileBlocker?`<div style="font-size:12px;color:var(--danger);margin-bottom:3px">🔴 <b>Blocked:</b> ${esc(f.fileBlocker)}</div>`:''}
     ${getNoteLatest(f.done)?`<div style="font-size:12px;color:var(--text-2);margin-bottom:3px">✅ <b>Done:</b> ${esc(getNoteLatest(f.done))}</div>`:''}
     ${getNoteLatest(f.pending)?`<div style="font-size:12px;color:var(--warn);margin-bottom:3px">⏳ <b>Pending:</b> ${esc(getNoteLatest(f.pending))}</div>`:''}
     ${f.attachments&&f.attachments.length>0?`<div style="font-size:11px;color:var(--text-3);margin-top:4px">📎 ${f.attachments.length} attachment${f.attachments.length>1?'s':''}${hasExpiredSoon?' · ⚠️ expiring soon':''}</div>`:''}
@@ -10849,22 +10949,37 @@ function renderPerformanceScreen() {
   const subCol=m.teamSubRate>=80?'var(--success)':m.teamSubRate>=60?'#F59E0B':'var(--danger)';
   const benchCol=m.benchRate==null?'var(--text-3)':m.benchRate>=80?'var(--success)':m.benchRate>=60?'#F59E0B':'var(--danger)';
 
+  const mkCard=(id,val,lbl,hint,col)=>`
+    <div style="flex:1;min-width:130px">
+      <div id="psc-${id}" onclick="perfToggleCard('${id}')" style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:16px;text-align:center;cursor:pointer" onmouseover="this.style.borderColor='var(--brand)'" onmouseout="if(!document.getElementById('psd-${id}').offsetHeight)this.style.borderColor='var(--border)'">
+        <div style="font-size:26px;font-weight:700;color:${col};margin-bottom:4px">${val}</div>
+        <div style="font-size:12px;color:var(--text-2);margin-bottom:6px">${lbl}</div>
+        <div style="font-size:11px;color:var(--text-3)">${hint}</div>
+      </div>
+      <div id="psd-${id}" style="display:none;background:var(--surface);border:1.5px solid var(--brand);border-top:none;border-radius:0 0 var(--radius) var(--radius);padding:1rem"></div>
+    </div>`;
+
   const summaryRow=`<div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap">
-    ${sc(m.teamSubRate+'%','EOD submission rate',`${m.reportCount} reports · ${m.wdays} working days`,subCol,"perfOpenModal('eod')")}
-    ${sc(m.benchRate!=null?m.benchRate+'%':'—','Team on benchmark',`${m.onTrack} ok · ${m.over} over`,benchCol,"perfOpenModal('bench')")}
-    ${sc(m.teamAvg?perfFmtMins(m.teamAvg):'—','Team avg per task','across all task types','var(--text)',"perfOpenModal('avg')")}
-    ${sc(m.supportCount,'Support flags','this period',m.supportCount>0?'var(--danger)':'var(--text-3)',"perfOpenModal('flags')")}
+    ${mkCard('eod',m.teamSubRate+'%','EOD submission rate',`${m.reportCount} reports · ${m.wdays} working days`,subCol)}
+    ${mkCard('bench',m.benchRate!=null?m.benchRate+'%':'—','Team on benchmark',`${m.onTrack} ok · ${m.over} over`,benchCol)}
+    ${mkCard('avg',m.teamAvg?perfFmtMins(m.teamAvg):'—','Team avg per task','across all task types','var(--text)')}
+    ${mkCard('flags',m.supportCount,'Support flags','this period',m.supportCount>0?'var(--danger)':'var(--text-3)')}
   </div>`;
 
-  // Charts row
   const chartsRow=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
-    <div onclick="perfOpenModal('pie')" style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:14px;cursor:pointer" onmouseover="this.style.borderColor='var(--brand)'" onmouseout="this.style.borderColor='var(--border)'">
-      <div style="font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Time distribution — click to expand</div>
-      <canvas id="perf-pie" height="140"></canvas>
+    <div>
+      <div id="psc-pie" onclick="perfToggleCard('pie')" style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:14px;cursor:pointer" onmouseover="this.style.borderColor='var(--brand)'" onmouseout="this.style.borderColor='var(--border)'">
+        <div style="font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Time distribution — click to expand</div>
+        <canvas id="perf-pie" height="140"></canvas>
+      </div>
+      <div id="psd-pie" style="display:none;background:var(--surface);border:1.5px solid var(--brand);border-top:none;border-radius:0 0 var(--radius) var(--radius);padding:1rem"></div>
     </div>
-    <div onclick="perfOpenModal('trend')" style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:14px;cursor:pointer" onmouseover="this.style.borderColor='var(--brand)'" onmouseout="this.style.borderColor='var(--border)'">
-      <div style="font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Benchmark trend — click to expand</div>
-      <canvas id="perf-trend" height="140"></canvas>
+    <div>
+      <div id="psc-trend" onclick="perfToggleCard('trend')" style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:14px;cursor:pointer" onmouseover="this.style.borderColor='var(--brand)'" onmouseout="this.style.borderColor='var(--border)'">
+        <div style="font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Benchmark trend — click to expand</div>
+        <canvas id="perf-trend" height="140"></canvas>
+      </div>
+      <div id="psd-trend" style="display:none;background:var(--surface);border:1.5px solid var(--brand);border-top:none;border-radius:0 0 var(--radius) var(--radius);padding:1rem"></div>
     </div>
   </div>`;
 
@@ -10889,8 +11004,7 @@ function renderPerformanceScreen() {
       style="font-size:13px;padding:7px 16px;border-radius:50px;border:1.5px solid ${_perfView==='detail'?'var(--brand)':'var(--border)'};background:${_perfView==='detail'?'var(--brand-light)':'var(--surface-2)'};color:${_perfView==='detail'?'var(--brand)':'var(--text-2)'};cursor:pointer;font-weight:${_perfView==='detail'?'700':'400'}">Analyst detail</button>
   </div>`;
   const viewContainer=`<div id="perf-view-container"></div>`;
-  const modalContainer=`<div id="perf-modal-wrap" style="display:none;background:rgba(0,0,0,0.45);padding:16px;margin-top:12px;border-radius:var(--radius)"><div id="perf-modal-inner" style="background:var(--surface);border-radius:var(--radius);border:1.5px solid var(--border);padding:1.25rem;max-width:600px;margin:0 auto"></div></div>`;
-  el.innerHTML=filterRow+summaryRow+alertBar+viewToggle+viewContainer+chartsRow+modalContainer;
+  el.innerHTML=filterRow+summaryRow+alertBar+viewToggle+viewContainer+chartsRow;
   el._metrics=m; el._names=names;
   setTimeout(()=>{ perfDrawPie(m.dist); perfDrawTrend(m.trend); perfRenderView(names,from,to,m); },50);
 }
@@ -11097,7 +11211,127 @@ function perfDrawTrend(trend) {
   });
 }
 
+let _perfOpenCard = '';
+
+function perfToggleCard(id) {
+  const detail = document.getElementById('psd-'+id);
+  const card   = document.getElementById('psc-'+id);
+  if (!detail) return;
+  const isOpen = detail.style.display !== 'none';
+  // Close all
+  document.querySelectorAll('[id^="psd-"]').forEach(d=>{ d.style.display='none'; d.innerHTML=''; });
+  document.querySelectorAll('[id^="psc-"]').forEach(c=>c.style.borderColor='var(--border)');
+  if (isOpen) { _perfOpenCard=''; return; }
+  // Open this one
+  _perfOpenCard = id;
+  detail.style.display = 'block';
+  if (card) card.style.borderColor = 'var(--brand)';
+  perfFillCard(id, detail);
+}
+
+function perfFillCard(id, el) {
+  const m = document.getElementById('perfContent')?._metrics || {};
+  const names = document.getElementById('perfContent')?._names || [];
+  const close = `<button onclick="perfToggleCard('${id}')" style="float:right;background:transparent;border:none;font-size:18px;cursor:pointer;color:var(--text-3);line-height:1">×</button>`;
+
+  if (id==='eod') {
+    el.innerHTML=`${close}<div style="font-size:13px;font-weight:600;margin-bottom:12px">EOD submission rate — per analyst</div>
+    ${names.map(n=>{const s=m.subByAnalyst?.[n]||{count:0,rate:0};return`<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:0.5px solid var(--border)">
+      <span style="font-size:13px;font-weight:500;min-width:100px">${esc(n.split(' ')[0])}</span>
+      <div style="flex:1;height:8px;background:var(--surface-2);border-radius:4px;overflow:hidden"><div style="width:${s.rate}%;height:100%;background:${s.rate>=80?'#34D399':s.rate>=60?'#FCD34D':'#F87171'};border-radius:4px"></div></div>
+      <span style="font-size:13px;font-weight:600;color:${s.rate>=80?'#065F46':s.rate>=60?'#92400E':'#991B1B'};min-width:40px;text-align:right">${s.rate}%</span>
+      <span style="font-size:11px;color:var(--text-3)">${s.count}/${m.wdays||0} days</span>
+    </div>`;}).join('')}`;
+  } else if (id==='bench') {
+    el.innerHTML=`${close}<div style="font-size:13px;font-weight:600;margin-bottom:12px">Benchmark adherence — by task type</div>
+    ${Object.entries(EOD_BENCHMARKS).map(([type,subs])=>Object.entries(subs).map(([sub,bench])=>{
+      const key=type+'|'+sub;const s=m.taskMap?.[key];
+      const avg=s?.sessions?.length?Math.round(s.totalMins/s.sessions.length):null;
+      const over=avg&&avg>bench;
+      return`<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:0.5px solid var(--border)">
+        <div style="flex:1"><div style="font-size:13px;font-weight:500">${esc(type)}</div><div style="font-size:11px;color:var(--text-3)">${esc(sub)}</div></div>
+        <span style="font-size:12px;color:var(--text-3)">${perfFmtMins(bench)}</span>
+        <span style="font-size:13px;font-weight:600;color:${avg==null?'var(--text-3)':over?'#991B1B':'#065F46'};min-width:56px;text-align:right">${avg!=null?perfFmtMins(avg):'—'}</span>
+        ${avg!=null?`<span style="font-size:11px;background:${over?'#FEE2E2':'#D1FAE5'};color:${over?'#991B1B':'#065F46'};border-radius:50px;padding:2px 7px;font-weight:600;white-space:nowrap">${over?'+'+perfFmtMins(avg-bench)+' over':'on track'}</span>`:''}
+      </div>`;
+    }).join('')).join('')}`;
+  } else if (id==='avg') {
+    el.innerHTML=`${close}<div style="font-size:13px;font-weight:600;margin-bottom:12px">Avg time per task — per analyst</div>
+    ${(m.analystAvg||[]).map(({name,avg})=>`<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:0.5px solid var(--border)">
+      <span style="font-size:13px;font-weight:500;min-width:100px">${esc(name.split(' ')[0])}</span>
+      <div style="flex:1;height:8px;background:var(--surface-2);border-radius:4px;overflow:hidden"><div style="width:${avg?Math.min(100,Math.round(avg/240*100)):0}%;height:100%;background:#378ADD;border-radius:4px"></div></div>
+      <span style="font-size:13px;font-weight:600;color:var(--text);min-width:56px;text-align:right">${avg?perfFmtMins(avg):'—'}</span>
+    </div>`).join('')}`;
+  } else if (id==='flags') {
+    const reports=getEODReports().filter(r=>names.includes(r.name)&&r.status==='submitted');
+    const flagged=reports.filter(r=>r.supportNeeded==='yes');
+    el.innerHTML=`${close}<div style="font-size:13px;font-weight:600;margin-bottom:12px">Support flags — ${flagged.length} this period</div>
+    ${flagged.length?flagged.map(r=>`<div style="padding:7px 0;border-bottom:0.5px solid var(--border)">
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:2px">
+        <span style="font-size:13px;font-weight:500">${esc(r.name.split(' ')[0])}</span>
+        <span style="font-size:11px;color:var(--text-3)">${esc(fmtDate(r.date))}</span>
+      </div>
+      ${r.supportDetail?`<div style="font-size:12px;color:var(--text-2)">${esc(r.supportDetail)}</div>`:''}
+    </div>`).join(''):'<div style="font-size:13px;color:var(--text-3);padding:8px 0">No support flags this period.</div>'}`;
+  } else if (id==='pie') {
+    const dist=(m.dist||[]).filter(d=>d.mins>0).sort((a,b)=>b.mins-a.mins);
+    const total=dist.reduce((s,d)=>s+d.mins,0)||1;
+    el.innerHTML=`${close}<div style="font-size:13px;font-weight:600;margin-bottom:12px">Time distribution — ${perfFmtMins(total)} total</div>
+    ${dist.map((d,i)=>{const pct=Math.round(d.mins/total*100);return`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:0.5px solid var(--border)">
+      <span style="width:10px;height:10px;border-radius:50%;background:${TASK_COLORS[i%TASK_COLORS.length]};flex-shrink:0"></span>
+      <span style="flex:1;font-size:12px">${esc(d.label)}</span>
+      <div style="width:60px;height:6px;background:var(--surface-2);border-radius:3px;overflow:hidden"><div style="width:${pct}%;height:100%;background:${TASK_COLORS[i%TASK_COLORS.length]};border-radius:3px"></div></div>
+      <span style="font-size:12px;color:var(--text-3);min-width:30px;text-align:right">${pct}%</span>
+      <span style="font-size:12px;font-weight:500;min-width:48px;text-align:right">${perfFmtMins(d.mins)}</span>
+    </div>`;}).join('')}`;
+  } else if (id==='trend') {
+    const trend=m.trend||[];
+    el.innerHTML=`${close}<div style="font-size:13px;font-weight:600;margin-bottom:12px">Daily benchmark adherence</div>
+    ${trend.map(({date,pct})=>`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:0.5px solid var(--border)">
+      <span style="font-size:12px;color:var(--text-3);min-width:70px">${esc(date)}</span>
+      <div style="flex:1;height:8px;background:var(--surface-2);border-radius:4px;overflow:hidden"><div style="width:${pct||0}%;height:100%;background:${pct==null?'#E5E7EB':pct>=80?'#34D399':pct>=60?'#FCD34D':'#F87171'};border-radius:4px"></div></div>
+      <span style="font-size:13px;font-weight:600;min-width:36px;text-align:right;color:${pct==null?'var(--text-3)':pct>=80?'#065F46':pct>=60?'#92400E':'#991B1B'}">${pct!=null?Math.round(pct)+'%':'—'}</span>
+    </div>`).join('')}`;
+  }
+}
+
 function perfOpenModal(type, taskKey, analyst) {
+  // For drill-in from alert pills — open inline in view container
+  const m=document.getElementById('perfContent')?._metrics||{};
+  const names=document.getElementById('perfContent')?._names||[];
+  const c=document.getElementById('perf-view-container');
+  if(!c) return;
+  const {from,to}=perfGetDates();
+  const [dType,dSub]=(taskKey||'').split('|');
+  const bench=dType&&dSub?EOD_BENCHMARKS[dType]?.[dSub]:null;
+  const s=m.taskMap?.[taskKey];
+  const sessions=analyst?(s?.sessions||[]).filter(x=>x.name===analyst):(s?.sessions||[]);
+  const avg=sessions.length?Math.round(sessions.reduce((a,b)=>a+b.mins,0)/sessions.length):null;
+  const maxM=Math.max(...sessions.map(x=>x.mins),bench||0)*1.15||240;
+  const close=`<button onclick="perfRenderView(${JSON.stringify(names)},'${from}','${to}',document.getElementById('perfContent')._metrics)" style="font-size:12px;padding:4px 12px;border-radius:50px;border:1.5px solid var(--border);background:var(--surface-2);cursor:pointer;margin-bottom:12px">← Back</button>`;
+  c.innerHTML=`${close}
+    <div style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:1rem 1.25rem">
+      <div style="font-size:15px;font-weight:700;margin-bottom:2px">${esc(dType)}${dSub?' · <span style="color:var(--text-3);font-weight:400">'+esc(dSub)+'</span>':''}</div>
+      <div style="font-size:12px;color:var(--text-3);margin-bottom:14px">${analyst?esc(analyst)+' · ':'All analysts · '}${sessions.length} session${sessions.length!==1?'s':''}</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px">
+        <div style="background:${avg&&bench&&avg>bench?'#FEE2E2':'#D1FAE5'};border-radius:8px;padding:10px;text-align:center"><div style="font-size:18px;font-weight:700;color:${avg&&bench&&avg>bench?'#991B1B':'#065F46'}">${avg?perfFmtMins(avg):'—'}</div><div style="font-size:10px;opacity:.8;margin-top:2px;color:${avg&&bench&&avg>bench?'#991B1B':'#065F46'}">avg</div></div>
+        <div style="background:var(--surface-2);border-radius:8px;padding:10px;text-align:center"><div style="font-size:18px;font-weight:700;color:var(--text)">${bench?perfFmtMins(bench):'—'}</div><div style="font-size:10px;color:var(--text-3);margin-top:2px">benchmark</div></div>
+        <div style="background:${avg&&bench&&avg>bench?'#FEF3C7':'var(--surface-2)'};border-radius:8px;padding:10px;text-align:center"><div style="font-size:18px;font-weight:700;color:${avg&&bench&&avg>bench?'#92400E':'var(--text-3)'}">${avg&&bench?perfFmtMins(Math.abs(avg-bench))+(avg>bench?' over':' under'):'—'}</div><div style="font-size:10px;margin-top:2px;color:${avg&&bench&&avg>bench?'#92400E':'var(--text-3)'}">avg diff</div></div>
+      </div>
+      <div style="font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Session history</div>
+      ${sessions.length?sessions.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(s=>`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:0.5px solid var(--border)">
+        <span style="font-size:12px;color:var(--text-3);min-width:80px">${esc(fmtDate(s.date))}</span>
+        ${names.length>1&&!analyst?`<span style="font-size:12px;color:var(--text-2);min-width:70px">${esc(s.name.split(' ')[0])}</span>`:''}
+        <div style="flex:1;height:6px;background:var(--surface-2);border-radius:3px;overflow:hidden"><div style="width:${Math.min(100,Math.round(s.mins/maxM*100))}%;height:100%;background:${bench&&s.mins>bench?'#F87171':'#34D399'};border-radius:3px"></div></div>
+        <span style="font-size:13px;font-weight:700;min-width:56px;text-align:right;color:${bench&&s.mins>bench?'#991B1B':'#065F46'}">${perfFmtMins(s.mins)}${bench&&s.mins>bench?` <span style="font-size:10px;font-weight:400">(+${perfFmtMins(s.mins-bench)})</span>`:''}</span>
+      </div>`).join(''):'<div style="font-size:13px;color:var(--text-3);padding:8px 0">No sessions logged.</div>'}
+    </div>`;
+}
+
+function perfCloseModal() {
+  const w=document.getElementById('perf-modal-wrap');
+  if(w) w.style.display='none';
+}
   const wrap=document.getElementById('perf-modal-wrap');
   const inner=document.getElementById('perf-modal-inner');
   if(!wrap||!inner) return;
@@ -11215,15 +11449,6 @@ function perfOpenModal(type, taskKey, analyst) {
     </div>`).join(''):'<div style="font-size:13px;color:var(--text-3);padding:8px 0">No sessions logged for this task.</div>'}`;
   }
 
-  inner.innerHTML=html;
-  wrap.style.display='block';
-  wrap.scrollIntoView({behavior:'smooth',block:'nearest'});
-}
-
-function perfCloseModal() {
-  const w=document.getElementById('perf-modal-wrap');
-  if(w) w.style.display='none';
-}
 
 function setPerfDays(days, btn) {
   _perfPeriod=String(days);
