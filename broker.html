@@ -738,7 +738,6 @@ tr.flagged-row:hover td { background: #FFEAEA; }
       <p id="myteamSubtitle">Live status of your team today</p>
     </div>
     <div id="myteamContent"></div>
-    <div id="coverSection-myteam"></div>
   </div>
 
   <!-- ── FILES SCREEN (Team Lead only) ───────────────────────────────────── -->
@@ -2187,7 +2186,7 @@ function goTab(name, btn) {
   // Save last tab for session restore
   try { sessionStorage.setItem('lp_last_tab', name); } catch(e) {}
   showScreen(name);
-  if (name==='myteam')    { renderMyTeam(); renderCoverageSection('coverSection-myteam'); }
+  if (name==='myteam')    renderMyTeam();
   if (name==='files')     renderFilesScreen();
   if (name==='myfiles')   renderMyFilesScreen();
   if (name==='brokermgmt') { renderBrokerMgmtScreen(); renderCoverageSection('coverSection-brokermgmt'); }
@@ -7254,30 +7253,60 @@ function coverageCandidates(excludeName) {
   return getStaff().filter(s=>['analyst','trainee'].includes(s.role)&&s.name!==excludeName).sort((a,b)=>a.name.localeCompare(b.name));
 }
 
-let _coverDate = null;
+let _coverDate      = null;
+let _coverRangeMode = false;
+let _coverRangeFrom = '';
+let _coverRangeTo   = '';
+
+function coverWorkingDays(from, to) {
+  const days=[]; const cur=new Date(from); const end=new Date(to);
+  while(cur<=end){const d=cur.getDay();if(d>0&&d<6)days.push(cur.toISOString().split('T')[0]);cur.setDate(cur.getDate()+1);}
+  return days;
+}
 
 function renderCoverageSection(containerId) {
-  const el = document.getElementById(containerId);
-  if (!el||!canAssignCoverage()) return;
-  const todayStr = new Date().toISOString().split('T')[0];
-  const date = _coverDate||todayStr;
-  const absentees = coverageScope(date);
-  const coverage = getCoverageForDate(date);
-  const candidates = coverageCandidates('');
-  const selStyle = 'font-size:13px;padding:6px 8px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);min-width:140px';
+  const el=document.getElementById(containerId);
+  if(!el||!canAssignCoverage()) return;
+  el.innerHTML='<div style="border-top:1.5px solid var(--border);margin-top:16px;padding-top:16px;font-size:13px;color:var(--text-3)">Loading coverage…</div>';
+  loadCoverageFromSP().then(()=>_renderCoverageSection(containerId));
+}
 
-  el.innerHTML = `
+function _renderCoverageSection(containerId) {
+  const el=document.getElementById(containerId);
+  if(!el||!canAssignCoverage()) return;
+  const todayStr=new Date().toISOString().split('T')[0];
+  const date=_coverDate||todayStr;
+  const absentees=coverageScope(date);
+  const coverage=getCoverageForDate(date);
+  const candidates=coverageCandidates('').filter(s=>s.role!=='teamlead');
+  const selStyle='font-size:13px;padding:6px 8px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);min-width:140px';
+  const rangeDays=_coverRangeMode&&_coverRangeFrom&&_coverRangeTo&&_coverRangeFrom<=_coverRangeTo?coverWorkingDays(_coverRangeFrom,_coverRangeTo).length:0;
+
+  el.innerHTML=`
     <div style="border-top:1.5px solid var(--border);margin-top:16px;padding-top:16px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
         <div style="font-size:13px;font-weight:700;color:var(--text)">📋 Coverage assignments</div>
-        <div style="display:flex;align-items:center;gap:6px">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
           <button onclick="coverStepDate(-1,'${containerId}')" style="padding:5px 8px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface-2);cursor:pointer;font-size:13px">‹</button>
-          <input type="date" value="${date}" onchange="_coverDate=this.value;renderCoverageSection('${containerId}')"
+          <input type="date" value="${date}" onchange="_coverDate=this.value;_coverRangeMode=false;renderCoverageSection('${containerId}')"
             style="font-size:13px;padding:5px 8px;border:1.5px solid var(--border);border-radius:var(--radius-sm)"/>
           <button onclick="coverStepDate(1,'${containerId}')" style="padding:5px 8px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface-2);cursor:pointer;font-size:13px">›</button>
-          ${date!==todayStr?`<button onclick="_coverDate=null;renderCoverageSection('${containerId}')" style="font-size:12px;padding:5px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface-2);cursor:pointer;color:var(--text-2)">Today</button>`:''}
+          ${date!==todayStr?`<button onclick="_coverDate=null;_coverRangeMode=false;renderCoverageSection('${containerId}')" style="font-size:12px;padding:5px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface-2);cursor:pointer;color:var(--text-2)">Today</button>`:''}
+          <button onclick="_coverRangeMode=!_coverRangeMode;if(_coverRangeMode){_coverRangeFrom=_coverDate||'${todayStr}';_coverRangeTo=_coverDate||'${todayStr}';}renderCoverageSection('${containerId}')"
+            style="font-size:12px;padding:5px 12px;border:1.5px solid ${_coverRangeMode?'var(--brand)':'var(--border)'};border-radius:var(--radius-sm);background:${_coverRangeMode?'var(--brand-light)':'var(--surface-2)'};cursor:pointer;color:${_coverRangeMode?'var(--brand)':'var(--text-2)'};font-weight:${_coverRangeMode?'600':'400'}">
+            Apply to date range
+          </button>
         </div>
       </div>
+      ${_coverRangeMode?`<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;background:var(--brand-light);border:1.5px solid var(--brand);border-radius:var(--radius-sm);padding:8px 12px;flex-wrap:wrap">
+        <span style="font-size:12px;color:var(--brand);font-weight:600">Date range:</span>
+        <input type="date" value="${_coverRangeFrom}" onchange="_coverRangeFrom=this.value;renderCoverageSection('${containerId}')"
+          style="font-size:13px;padding:5px 8px;border:1.5px solid var(--border);border-radius:var(--radius-sm)"/>
+        <span style="font-size:12px;color:var(--text-3)">to</span>
+        <input type="date" value="${_coverRangeTo}" onchange="_coverRangeTo=this.value;renderCoverageSection('${containerId}')"
+          style="font-size:13px;padding:5px 8px;border:1.5px solid var(--border);border-radius:var(--radius-sm)"/>
+        ${rangeDays?`<span style="font-size:11px;color:var(--brand);font-weight:600">${rangeDays} working day${rangeDays!==1?'s':''}</span>`:''}
+      </div>`:''}
       ${absentees.length===0
         ?`<div style="font-size:13px;color:var(--text-3);padding:8px 0">No staff on leave ${date===todayStr?'today':'on this date'}.</div>`
         :absentees.map(name=>{
@@ -7304,26 +7333,39 @@ function renderCoverageSection(containerId) {
 }
 
 async function coverSave(absenteeName, date, containerId) {
-  const val = document.getElementById('cov_sel_'+absenteeName.replace(/\s/g,'_'))?.value;
-  if (!val) { showToast('Select a person or NCR first.','err'); return; }
-  const isNCR = val==='_ncr';
-  const ok = await saveCoverageToSP(absenteeName, date, isNCR?'':val, isNCR);
-  if (ok) { showToast(isNCR?`NCR set for ${absenteeName.split(' ')[0]}`:`${val.split(' ')[0]} assigned as cover for ${absenteeName.split(' ')[0]}`,'ok'); renderCoverageSection(containerId); }
+  const val=document.getElementById('cov_sel_'+absenteeName.replace(/\s/g,'_'))?.value;
+  if(!val){showToast('Select a person or NCR first.','err');return;}
+  const isNCR=val==='_ncr';
+  if(_coverRangeMode&&_coverRangeFrom&&_coverRangeTo&&_coverRangeFrom<=_coverRangeTo) {
+    const days=coverWorkingDays(_coverRangeFrom,_coverRangeTo);
+    if(!days.length){showToast('No working days in range.','err');return;}
+    let saved=0;
+    for(const d of days){const ok=await saveCoverageToSP(absenteeName,d,isNCR?'':val,isNCR);if(ok)saved++;}
+    showToast(`Coverage set for ${saved} working day${saved!==1?'s':''}.`,'ok');
+    _coverRangeMode=false;
+  } else {
+    const ok=await saveCoverageToSP(absenteeName,date,isNCR?'':val,isNCR);
+    if(!ok) return;
+    showToast(isNCR?`NCR set for ${absenteeName.split(' ')[0]}`:`${val.split(' ')[0]} assigned for ${absenteeName.split(' ')[0]}`,'ok');
+  }
+  renderCoverageSection(containerId);
 }
 
 async function coverRemove(absenteeName, date, containerId) {
-  const ok = await removeCoverageFromSP(absenteeName, date);
-  if (ok) { showToast(`Coverage removed for ${absenteeName.split(' ')[0]}.`,'ok'); renderCoverageSection(containerId); }
+  const ok=await removeCoverageFromSP(absenteeName,date);
+  if(ok){showToast(`Coverage removed for ${absenteeName.split(' ')[0]}.`,'ok');renderCoverageSection(containerId);}
 }
 
 function coverStepDate(dir, containerId) {
-  const todayStr = new Date().toISOString().split('T')[0];
-  const cur = new Date(_coverDate||todayStr);
+  const todayStr=new Date().toISOString().split('T')[0];
+  const cur=new Date(_coverDate||todayStr);
   cur.setDate(cur.getDate()+dir);
-  const nd = cur.toISOString().split('T')[0];
-  _coverDate = nd===todayStr?null:nd;
+  const nd=cur.toISOString().split('T')[0];
+  _coverDate=nd===todayStr?null:nd;
+  _coverRangeMode=false;
   renderCoverageSection(containerId);
 }
+
 
 function updateCoverBanner() {
   const banner = document.getElementById('coverBanner');
@@ -12163,7 +12205,7 @@ function renderPerformanceScreen() {
   </div>`;
   const viewContainer=`<div id="perf-view-container"></div>`;
   const modalContainer=`<div id="perf-modal-wrap" style="display:none;background:rgba(0,0,0,0.45);padding:16px;margin-top:12px;border-radius:var(--radius)"><div id="perf-modal-inner" style="background:var(--surface);border-radius:var(--radius);border:1.5px solid var(--border);padding:1.25rem;max-width:600px;margin:0 auto"></div></div>`;
-  el.innerHTML=filterRow+summaryRow+chartsRow+alertBar+viewToggle+viewContainer+modalContainer;
+  el.innerHTML=filterRow+summaryRow+alertBar+viewToggle+viewContainer+chartsRow+modalContainer;
   el._metrics=m; el._names=names;
   setTimeout(()=>{ perfDrawPie(m.dist); perfDrawTrend(m.trend); perfRenderView(names,from,to,m); },50);
 }
