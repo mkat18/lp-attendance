@@ -7599,8 +7599,8 @@ function showChecklistModal(fileIdx) {
     '<div id="checklistItems">' + sectionsHtml + '</div>' +
     '<div id="checklistError" style="color:var(--danger);font-size:12px;margin:8px 0;display:none">Please answer all items before submitting.</div>' +
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:1rem">' +
-    '<button class="btn-primary" onclick="submitChecklist(' + fileIdx + ')" style="width:100%">Save checklist</button>' +
-    '<button onclick="deferChecklist(' + fileIdx + ')" style="width:100%;padding:10px 16px;border:1.5px solid #FDE68A;border-radius:var(--radius-sm);background:#FEF3C7;color:#92400E;cursor:pointer;font-size:13px;font-weight:600">I\'ll submit later</button>' +
+    '<button class="btn-primary" onclick="submitChecklist(' + fileIdx + ')" style="width:100%">Submit checklist</button>' +
+    '<button onclick="deferChecklist(' + fileIdx + ')" style="width:100%;padding:10px 16px;border:1.5px solid #FDE68A;border-radius:var(--radius-sm);background:#FEF3C7;color:#92400E;cursor:pointer;font-size:13px;font-weight:600">Complete later</button>' +
     '</div>' +
     '</div>';
 
@@ -12273,15 +12273,15 @@ window.renderMyTeam = function() {
 
 
     // ── Checklist detail button ────────────────────────────────────────────
-    const submittedCount2 = teamFiles.filter(f => f.checklistSubmitted).length;
-    if (submittedCount2 > 0) {
-      const btnDiv = document.createElement('div');
-      btnDiv.style.marginTop = '10px';
-      btnDiv.innerHTML = `<button onclick="openChecklistViewer()" style="width:100%;padding:10px;border:1.5px solid var(--brand);border-radius:var(--radius-sm);background:var(--brand-light);color:var(--brand);font-size:13px;font-weight:600;cursor:pointer">
-        📋 View checklist responses (${submittedCount2} submitted)
-      </button>`;
-      myteamEl.appendChild(btnDiv);
-    }
+    // ── Checklist viewer button — always visible for TL ──────────────────
+    const allSubmittedChecklists = getFileEntries().filter(f => myTeamNames.includes(f.owner) && f.checklistSubmitted).length;
+    const btnDiv = document.createElement('div');
+    btnDiv.className = 'card';
+    btnDiv.style.marginTop = '12px';
+    btnDiv.innerHTML = `<button onclick="openChecklistViewer()" style="width:100%;padding:10px;border:1.5px solid var(--brand);border-radius:var(--radius-sm);background:var(--brand-light);color:var(--brand);font-size:13px;font-weight:600;cursor:pointer">
+      📋 View checklist responses${allSubmittedChecklists?' ('+allSubmittedChecklists+' submitted)':''}
+    </button>`;
+    myteamEl.appendChild(btnDiv);
   }
 };
 
