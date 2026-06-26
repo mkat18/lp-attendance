@@ -1911,10 +1911,13 @@ async function loadRolesFromSP() {
     const res = await spGet(SP_API + "('Roles')/items?$select=Id,Title,Label&$top=100&$orderby=Title");
     if (res && res.value && res.value.length) {
       const spRoles = res.value.map(r => ({ title: (r.Title||'').toLowerCase(), label: r.Label || r.Title }));
+      // Deduplicate by title (in case SP has duplicate rows)
+      const seen = new Set();
+      const deduped = spRoles.filter(r => r.title && !seen.has(r.title) && seen.add(r.title));
       // Always merge SP roles with any defaults not yet in SP
-      const spTitles = new Set(spRoles.map(r => r.title));
+      const spTitles = new Set(deduped.map(r => r.title));
       const missingDefaults = getDefaultRoles().filter(d => !spTitles.has(d.title));
-      _roles = [...spRoles, ...missingDefaults];
+      _roles = [...deduped, ...missingDefaults];
       LS.set('ci_roles', _roles);
       updateRoleLabel();
       // Seed missing roles to SP silently in background

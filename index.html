@@ -921,8 +921,25 @@ init();
 <script>
 // ── Permission Manager ─────────────────────────────────────────────────────
 const PM_APPS  = ['attendance','broker'];
-const PM_ROLES = ['hrmanager','opsmanager','teamlead','analyst','trainee','assistant','sales','customerservice','socialmedia','accountant'];
-const PM_ROLE_LABEL = {hrmanager:'HR Mgr',opsmanager:'Ops Mgr',teamlead:'Team Lead',analyst:'Analyst',trainee:'Trainee',assistant:'Asst',sales:'Sales',customerservice:'CS',socialmedia:'Social',accountant:'Acct'};
+let PM_ROLES = ['hrmanager','opsmanager','teamlead','analyst','trainee','staff','assistant','sales','socialmedia','accountant'];
+let PM_ROLE_LABEL = {hrmanager:'HR Mgr',opsmanager:'Ops Mgr',teamlead:'Team Lead',analyst:'Analyst',trainee:'Trainee',staff:'Staff',assistant:'Asst',sales:'Sales',socialmedia:'Social',accountant:'Acct'};
+
+async function loadPortalRoles() {
+  try {
+    const res = await _pmGet("('Roles')/items?$select=Title,Label&$top=100&$orderby=Title");
+    if (res && res.value && res.value.length) {
+      const seen = new Set();
+      const roles = res.value
+        .map(r => ({title:(r.Title||'').toLowerCase(), label:r.Label||r.Title}))
+        .filter(r => r.title && r.title !== 'superadmin' && !seen.has(r.title) && seen.add(r.title));
+      if (roles.length) {
+        PM_ROLES = roles.map(r => r.title);
+        PM_ROLE_LABEL = {};
+        roles.forEach(r => { PM_ROLE_LABEL[r.title] = r.label.length > 8 ? r.label.substring(0,8) : r.label; });
+      }
+    }
+  } catch(e) { console.warn('loadPortalRoles failed:', e); }
+}
 
 let _pmDefs    = [];
 let _pmValues  = {};
@@ -1180,7 +1197,7 @@ async function openPermManager() {
     document.getElementById('permContent').innerHTML = '<div style="padding:30px;text-align:center;color:#b91c1c;font-size:13px">Could not connect to SharePoint.<br>Check that the PermissionKeys list exists.</div>';
     return;
   }
-  await _pmLoadValues();
+  await Promise.all([_pmLoadValues(), loadPortalRoles()]);
   renderPermContent();
 }
 
