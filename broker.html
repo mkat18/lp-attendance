@@ -1564,18 +1564,13 @@ function updateRoleLabel() {
 function getRoles() { return _roles.length ? _roles : getDefaultRoles(); }
 
 function getDefaultRoles() {
+  // Only roles with hardcoded logic — everything else managed purely via SP
   return [
-    {title:'hrmanager',label:'HR Manager'},
-    {title:'opsmanager',label:'Ops Manager'},
-    {title:'teamlead',label:'Team Lead'},
-    {title:'analyst',label:'Analyst'},
-    {title:'trainee',label:'Trainee'},
-    {title:'staff',label:'Staff'},
-    {title:'hr',label:'HR'},
-    {title:'assistant',label:'Assistant'},
-    {title:'sales',label:'Sales'},
-    {title:'socialmedia',label:'Social Media'},
-    {title:'accountant',label:'Accountant'},
+    {title:'hrmanager',  label:'HR Manager'},
+    {title:'opsmanager', label:'Ops Manager'},
+    {title:'teamlead',   label:'Team Lead'},
+    {title:'analyst',    label:'Analyst'},
+    {title:'trainee',    label:'Trainee'},
   ];
 }
 

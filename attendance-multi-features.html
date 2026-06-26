@@ -1918,7 +1918,7 @@ async function loadRolesFromSP() {
       const spTitles = new Set(deduped.map(r => r.title));
       const missingDefaults = getDefaultRoles().filter(d => !spTitles.has(d.title));
       _roles = [...deduped, ...missingDefaults];
-      LS.set('ci_roles', _roles);
+      LS.set('ci_roles', _roles); // update cache with fresh SP data
       updateRoleLabel();
       // Seed missing roles to SP silently in background
       missingDefaults.forEach(r =>
@@ -1946,18 +1946,13 @@ function updateRoleLabel() {
 function getRoles() { return _roles.length ? _roles : getDefaultRoles(); }
 
 function getDefaultRoles() {
+  // Only roles with hardcoded logic — everything else managed purely via SP
   return [
-    {title:'hrmanager',label:'HR Manager'},
-    {title:'opsmanager',label:'Ops Manager'},
-    {title:'teamlead',label:'Team Lead'},
-    {title:'analyst',label:'Analyst'},
-    {title:'trainee',label:'Trainee'},
-    {title:'staff',label:'Staff'},
-    {title:'hr',label:'HR'},
-    {title:'assistant',label:'Assistant'},
-    {title:'sales',label:'Sales'},
-    {title:'socialmedia',label:'Social Media'},
-    {title:'accountant',label:'Accountant'},
+    {title:'hrmanager',  label:'HR Manager'},
+    {title:'opsmanager', label:'Ops Manager'},
+    {title:'teamlead',   label:'Team Lead'},
+    {title:'analyst',    label:'Analyst'},
+    {title:'trainee',    label:'Trainee'},
   ];
 }
 
@@ -6265,6 +6260,17 @@ function renderAdmin() {
   }
   const btCard = document.getElementById('bulkTransferCard');
   if(btCard) btCard.style.display = (sa || isTeamLead()) ? 'block' : 'none';
+
+  // Re-render staff list after fresh roles load (clears stale localStorage cache)
+  loadRolesFromSP().then(() => {
+    // Rebuild the staff role dropdowns with fresh roles from SP
+    document.querySelectorAll('select[onchange*="changeRoleByName"]').forEach(sel => {
+      const current = sel.value;
+      sel.innerHTML = '<option value="">— role —</option>' +
+        getRoles().filter(r => r.title !== 'superadmin')
+          .map(r => `<option value="${r.title}" ${r.title===current?'selected':''}>${r.label}</option>`).join('');
+    });
+  }).catch(()=>{});
   const phCard=document.getElementById('publicHolidaysCard');
   if(phCard) {
     phCard.style.display=sa?'block':'none';
