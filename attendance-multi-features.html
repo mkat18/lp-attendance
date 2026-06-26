@@ -8454,15 +8454,16 @@ async function renderBrokerMgmtScreen() {
   if (!el) return;
   el.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--text-3)">Loading…</div>';
 
-  const sa = isSuperAdmin();
-  const isTL = isTeamLead();
-  const myTeam = isTL ? getTeamForTL(currentUser.name) : [];
+  try {
+    const sa = isSuperAdmin();
+    const isTL = isTeamLead();
+    const myTeam = isTL ? getTeamForTL(currentUser.name) : [];
 
   await Promise.all([
-    loadBrokers(),
-    loadBrokerAssignments(),
-    loadCRMOptions(),
-    loadStaffCRMs(),
+    loadBrokers().catch(()=>{}),
+    loadBrokerAssignments().catch(()=>{}),
+    loadCRMOptions().catch(()=>{}),
+    loadStaffCRMs().catch(()=>{}),
   ]);
 
   const allStaff = getStaff().filter(s => ['analyst','teamlead','trainee'].includes(s.role));
@@ -8585,6 +8586,16 @@ async function renderBrokerMgmtScreen() {
         }).join('')}
       </div>`;
     el.appendChild(crmAssignCard);
+    }
+
+  } catch(e) {
+    console.error('renderBrokerMgmtScreen error:', e);
+    el.innerHTML = `<div class="card" style="text-align:center;padding:2rem;color:var(--danger)">
+      <div style="font-size:1.5rem;margin-bottom:8px">⚠️</div>
+      <div style="font-weight:600">Could not load broker management data</div>
+      <div style="font-size:13px;color:var(--text-3);margin-top:4px">${esc(e.message||'Unknown error')}</div>
+      <button onclick="renderBrokerMgmtScreen()" style="margin-top:12px;padding:8px 16px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface-2);cursor:pointer;font-size:13px">Try again</button>
+    </div>`;
   }
 }
 
