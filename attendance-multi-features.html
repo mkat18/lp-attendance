@@ -694,6 +694,7 @@ tr.flagged-row:hover td { background: #FFEAEA; }
       <h1 id="checkinGreeting">How are you working today?</h1>
       <p id="checkinDate2"></p>
     </div>
+    <div id="coverBanner" style="display:none"></div>
     <!-- First priority from yesterday's EOD -->
     <div id="firstPriorityBanner" style="display:none;background:var(--brand-light);border:1.5px solid var(--brand);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:12px;display:flex;align-items:flex-start;gap:10px">
       <span style="font-size:18px;flex-shrink:0">📌</span>
@@ -2905,6 +2906,7 @@ function initCheckin() {
     d.toLocaleDateString('en-AU',{weekday:'long',day:'numeric',month:'long'});
   document.getElementById('checkinGreeting').textContent =
     'How are you working today, '+currentUser.name.split(' ')[0]+'?';
+  updateCoverBanner();
   selectedStatus=null;
   document.querySelectorAll('.status-btn').forEach(b=>b.classList.remove('active'));
 
@@ -8426,31 +8428,37 @@ let _coverageSP = []; // [{id, date, absenteeName, coverName, assignedBy, assign
 
 async function loadCoverageFromSP() {
   try {
-    const res = await spGet(SP_API + "('CoverageAssignments')/items?$select=Id,Title,CoverDate,CoverName,AssignedBy,AssignedAt&$top=500");
+    const res = await spGet(SP_API+"('CoverageAssignments')/items?$select=Id,Title,CoverDate,CoverName,IsNCR,AssignedBy,AssignedAt&$top=500");
     if (res?.value) {
-      _coverageSP = res.value.map(r=>({id:r.Id,absenteeName:r.Title,date:r.CoverDate,coverName:r.CoverName,assignedBy:r.AssignedBy,assignedAt:r.AssignedAt}));
-      LS.set('ci_coverage_sp',_coverageSP); return;
+      _coverageSP = res.value.map(r=>({
+        id:r.Id, absenteeName:r.Title, date:r.CoverDate,
+        coverName:r.CoverName||'', isNCR:r.IsNCR||false,
+        assignedBy:r.AssignedBy||'', assignedAt:r.AssignedAt||''
+      }));
+      LS.set('ci_coverage_sp', _coverageSP);
+      return;
     }
   } catch(e){}
   _coverageSP = LS.get('ci_coverage_sp') || [];
 }
 
 function getCoverageForDate(date) {
-  // Start with localStorage (always available as fallback)
-  const lsCov = getCoverage();
   const result = {};
-  // Add all localStorage entries for this date
-  Object.entries(lsCov).forEach(([key, val]) => {
-    const parts = key.split('_');
-    const d = parts[0];
-    const name = parts.slice(1).join('_');
-    if (d === date) result[name] = val;
-  });
-  // SP entries override localStorage (SP is source of truth when available)
-  _coverageSP.filter(r => r.date === date).forEach(r => {
-    result[r.absenteeName] = r.coverName;
+  _coverageSP.filter(r=>r.date===date).forEach(r=>{
+    result[r.absenteeName] = r.isNCR ? '_ncr' : r.coverName;
   });
   return result;
+}
+
+function updateCoverBanner() {
+  const banner = document.getElementById('coverBanner');
+  if (!banner||!currentUser) return;
+  const todayStr = new Date().toISOString().split('T')[0];
+  const covering = (_coverageSP||[]).filter(r=>r.date===todayStr&&r.coverName===currentUser.name&&!r.isNCR);
+  banner.style.display = covering.length?'block':'none';
+  banner.innerHTML = covering.length?`<div style="background:#EDE9FE;border:1.5px solid #C4B5FD;border-radius:var(--radius-sm);padding:10px 14px;font-size:13px;color:#5B21B6;font-weight:500;margin-bottom:12px">
+    📌 You're covering ${covering.map(r=>esc(r.absenteeName.split(' ')[0])).join(' & ')} today
+  </div>`:'';
 }
 
 async function saveCoverageSP(absenteeName, date, coverName) {

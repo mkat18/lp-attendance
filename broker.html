@@ -738,6 +738,7 @@ tr.flagged-row:hover td { background: #FFEAEA; }
       <p id="myteamSubtitle">Live status of your team today</p>
     </div>
     <div id="myteamContent"></div>
+    <div id="coverSection-myteam"></div>
   </div>
 
   <!-- ── FILES SCREEN (Team Lead only) ───────────────────────────────────── -->
@@ -836,6 +837,7 @@ tr.flagged-row:hover td { background: #FFEAEA; }
     <p id="brokerMgmtSub">Manage brokers, assignments and CRM skills</p>
   </div>
   <div id="brokerMgmtContent"></div>
+  <div id="coverSection-brokermgmt"></div>
 </div>
 
 <div id="screen-othertasks" class="screen">
@@ -2185,10 +2187,10 @@ function goTab(name, btn) {
   // Save last tab for session restore
   try { sessionStorage.setItem('lp_last_tab', name); } catch(e) {}
   showScreen(name);
-  if (name==='myteam')    renderMyTeam();
+  if (name==='myteam')    { renderMyTeam(); renderCoverageSection('coverSection-myteam'); }
   if (name==='files')     renderFilesScreen();
   if (name==='myfiles')   renderMyFilesScreen();
-  if (name==='brokermgmt') renderBrokerMgmtScreen();
+  if (name==='brokermgmt') { renderBrokerMgmtScreen(); renderCoverageSection('coverSection-brokermgmt'); }
   if (name==='feedback')  renderFeedbackScreen();
   if (name==='performance') renderPerformanceScreen();
   if (name==='othertasks') renderOtherTasksScreen();
@@ -7181,66 +7183,157 @@ function renderAbsencePatternCard() {
 
 // ─── COVERAGE / REPLACEMENT ASSIGNMENT ───────────────────────────────────
 // Coverage data: { date_name: coverName }
-function getCoverage() { return LS.get('ci_coverage') || {}; }
-function saveCoverage(c) { LS.set('ci_coverage', c); }
+// ══════════════════════════════════════════════════════════════════════════
+// ── COVERAGE SYSTEM — complete rebuild ───────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════
 
-function assignCover(absenteeName, date) {
-  const staff = getStaff().filter(s => s.role === 'staff' && s.name !== absenteeName);
-  const coverage = getCoverage();
-  const key = date + '_' + absenteeName;
-  const current = coverage[key] || '';
+let _coverageSP = [];
+let _coverageLoaded = false;
 
-  const options = staff.map(s =>
-    `<option value="${esc(s.name)}" ${current===s.name?'selected':''}>${esc(s.name)}</option>`
-  ).join('');
-
-  const div = document.createElement('div');
-  div.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.6);z-index:300;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)';
-  div.innerHTML = `<div style="background:var(--surface);border-radius:20px;padding:1.5rem;width:calc(100%-2rem);max-width:360px;box-shadow:0 20px 60px rgba(0,0,0,.25)">
-    <div style="font-size:17px;font-weight:700;color:var(--text);margin-bottom:6px">Assign cover for ${esc(absenteeName.split(' ')[0])}</div>
-    <div style="font-size:13px;color:var(--text-3);margin-bottom:1rem">${esc(date)}</div>
-    <select id="_coverSelect" style="width:100%;font-size:15px;padding:10px;border-radius:var(--radius-sm);border:1.5px solid var(--border);margin-bottom:1rem">
-      <option value="">— select cover person —</option>
-      ${options}
-    </select>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-      <button onclick="this.closest('div[style*=fixed]').remove()" style="padding:12px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:transparent;color:var(--text-2);font-size:15px;cursor:pointer">Cancel</button>
-      <button onclick="saveCoverAssign('${absenteeName.replace(/'/g,"\\'")}','${date}',document.getElementById('_coverSelect').value,this)" style="padding:12px;border-radius:var(--radius-sm);border:none;background:var(--brand);color:#fff;font-size:15px;font-weight:700;cursor:pointer">Save</button>
-    </div>
-  </div>`;
-  document.body.appendChild(div);
+async function loadCoverageFromSP() {
+  try {
+    const res = await spGet(SP_API+"('CoverageAssignments')/items?$select=Id,Title,CoverDate,CoverName,IsNCR,AssignedBy,AssignedAt&$top=500");
+    if (res?.value) {
+      _coverageSP = res.value.map(r=>({
+        id:r.Id, absenteeName:r.Title, date:r.CoverDate,
+        coverName:r.CoverName||'', isNCR:r.IsNCR||false,
+        assignedBy:r.AssignedBy||'', assignedAt:r.AssignedAt||''
+      }));
+      _coverageLoaded = true; return;
+    }
+  } catch(e){}
+  _coverageSP = LS.get('ci_coverage_sp') || [];
+  _coverageLoaded = true;
 }
 
-function saveCoverAssign(absenteeName, date, coverName, btn) {
-  if (!coverName) { showToast('Select a person first.','err'); return; }
-  const coverage = getCoverage();
-  const key = date + '_' + absenteeName;
-  coverage[key] = coverName;
-  saveCoverage(coverage);
-  showToast(coverName.split(' ')[0] + ' assigned as cover for ' + absenteeName.split(' ')[0] + '.', 'ok');
-  btn.closest('div[style*="fixed"]').remove();
-  renderMetrics();
+function getCoverageForDate(date) {
+  const result = {};
+  _coverageSP.filter(r=>r.date===date).forEach(r=>{
+    result[r.absenteeName] = r.isNCR ? '_ncr' : r.coverName;
+  });
+  return result;
 }
 
-function renderCoverageCard(date) {
-  const dayRecs = getRecords().filter(r => r.date === date);
-  const onLeave = dayRecs.filter(r => r.status === 'leave');
-  if (onLeave.length === 0) return `<div class="met" style="grid-column:1/-1"><div class="met-lbl">🔄 Coverage</div><div class="met-val" style="color:var(--success)">—</div><div class="met-sub">no leave today ✓</div></div>`;
-  const coverage = getCoverage();
-  const unassigned = onLeave.filter(r => !coverage[date+'_'+r.name]);
-  return `<div class="met" style="grid-column:1/-1;${unassigned.length>0?'border-color:#FECACA':''}">
-    <div class="met-lbl">🔄 Coverage</div>
-    <div class="met-val" style="color:${unassigned.length>0?'var(--danger)':'var(--success)'}">${unassigned.length} unassigned</div>
-    <div class="met-sub" style="white-space:normal">
-      ${onLeave.map(r => {
-        const cov = coverage[date+'_'+r.name];
-        return `<span style="display:inline-flex;align-items:center;gap:4px;margin:2px 4px 2px 0">
-          ${esc(r.name.split(' ')[0])}: ${cov?'<b>'+esc(cov.split(' ')[0])+'</b>':'<span style="color:var(--danger)">unassigned</span>'}
-          <button onclick="assignCover('${r.name.replace(/'/g,"\\'")}','${date}')" style="font-size:10px;padding:1px 6px;border-radius:4px;border:1px solid var(--border);background:var(--surface-2);cursor:pointer">${cov?'change':'assign'}</button>
-        </span>`;
-      }).join('')}
-    </div>
-  </div>`;
+async function saveCoverageToSP(absenteeName, date, coverName, isNCR) {
+  const existing = _coverageSP.find(r=>r.absenteeName===absenteeName&&r.date===date);
+  const payload = {Title:absenteeName, CoverDate:date, CoverName:isNCR?'':coverName, IsNCR:isNCR||false, AssignedBy:currentUser?.name||'', AssignedAt:new Date().toISOString()};
+  try {
+    if (existing) {
+      await spPatch(SP_API+`('CoverageAssignments')/items(${existing.id})`, payload);
+      Object.assign(existing, {coverName:payload.CoverName, isNCR:payload.IsNCR, assignedBy:payload.AssignedBy, assignedAt:payload.AssignedAt});
+    } else {
+      const res = await spPost(SP_API+"('CoverageAssignments')/items", payload);
+      _coverageSP.push({id:res?.d?.Id||res?.ID||res?.id, absenteeName, date, coverName:payload.CoverName, isNCR:payload.IsNCR, assignedBy:payload.AssignedBy, assignedAt:payload.AssignedAt});
+    }
+    LS.set('ci_coverage_sp', _coverageSP);
+    return true;
+  } catch(e) { showToast('Failed to save coverage.','err'); return false; }
+}
+
+async function removeCoverageFromSP(absenteeName, date) {
+  const existing = _coverageSP.find(r=>r.absenteeName===absenteeName&&r.date===date);
+  if (!existing) return true;
+  try {
+    await spDelete(SP_API+`('CoverageAssignments')/items(${existing.id})`);
+    _coverageSP = _coverageSP.filter(r=>!(r.absenteeName===absenteeName&&r.date===date));
+    LS.set('ci_coverage_sp', _coverageSP);
+    return true;
+  } catch(e) { showToast('Failed to remove coverage.','err'); return false; }
+}
+
+function canAssignCoverage() { return isSuperAdmin()||isOpsManager()||isTeamLead(); }
+
+function coverageScope(date) {
+  const allRecs = getRecords().filter(r=>r.date===date&&r.status==='leave');
+  if (isSuperAdmin()||isOpsManager()) return allRecs.map(r=>r.name);
+  if (isTeamLead()) { const t=getTeamForTL(currentUser.name); return allRecs.filter(r=>t.includes(r.name)).map(r=>r.name); }
+  return [];
+}
+
+function coverageCandidates(excludeName) {
+  return getStaff().filter(s=>['analyst','trainee'].includes(s.role)&&s.name!==excludeName).sort((a,b)=>a.name.localeCompare(b.name));
+}
+
+let _coverDate = null;
+
+function renderCoverageSection(containerId) {
+  const el = document.getElementById(containerId);
+  if (!el||!canAssignCoverage()) return;
+  const todayStr = new Date().toISOString().split('T')[0];
+  const date = _coverDate||todayStr;
+  const absentees = coverageScope(date);
+  const coverage = getCoverageForDate(date);
+  const candidates = coverageCandidates('');
+  const selStyle = 'font-size:13px;padding:6px 8px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);min-width:140px';
+
+  el.innerHTML = `
+    <div style="border-top:1.5px solid var(--border);margin-top:16px;padding-top:16px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+        <div style="font-size:13px;font-weight:700;color:var(--text)">📋 Coverage assignments</div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <button onclick="coverStepDate(-1,'${containerId}')" style="padding:5px 8px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface-2);cursor:pointer;font-size:13px">‹</button>
+          <input type="date" value="${date}" onchange="_coverDate=this.value;renderCoverageSection('${containerId}')"
+            style="font-size:13px;padding:5px 8px;border:1.5px solid var(--border);border-radius:var(--radius-sm)"/>
+          <button onclick="coverStepDate(1,'${containerId}')" style="padding:5px 8px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface-2);cursor:pointer;font-size:13px">›</button>
+          ${date!==todayStr?`<button onclick="_coverDate=null;renderCoverageSection('${containerId}')" style="font-size:12px;padding:5px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface-2);cursor:pointer;color:var(--text-2)">Today</button>`:''}
+        </div>
+      </div>
+      ${absentees.length===0
+        ?`<div style="font-size:13px;color:var(--text-3);padding:8px 0">No staff on leave ${date===todayStr?'today':'on this date'}.</div>`
+        :absentees.map(name=>{
+            const cov=coverage[name];const isNCR=cov==='_ncr';const hasCover=cov&&!isNCR;
+            return `<div style="background:var(--surface-2);border:1.5px solid ${hasCover?'var(--border)':isNCR?'#FDE68A':'var(--danger)'};border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:8px">
+              <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                <div style="flex:1;min-width:100px">
+                  <div style="font-size:13px;font-weight:600">${esc(name)}</div>
+                  <div style="font-size:11px;margin-top:2px">${hasCover?`<span style="color:var(--success)">✓ Covered by ${esc(cov.split(' ')[0])}</span>`:isNCR?`<span style="color:#92400E">NCR — no cover needed</span>`:`<span style="color:var(--danger)">Unassigned</span>`}</div>
+                </div>
+                <select id="cov_sel_${name.replace(/\s/g,'_')}" style="${selStyle}">
+                  <option value="">— assign cover —</option>
+                  <option value="_ncr" ${isNCR?'selected':''}>No cover required</option>
+                  ${candidates.map(s=>`<option value="${esc(s.name)}" ${cov===s.name?'selected':''}>${esc(s.name)}</option>`).join('')}
+                </select>
+                <button onclick="coverSave('${name.replace(/'/g,"\\'")}','${date}','${containerId}')"
+                  style="font-size:13px;padding:6px 14px;border-radius:var(--radius-sm);border:none;background:var(--brand);color:#fff;font-weight:600;cursor:pointer">${hasCover||isNCR?'Update':'Assign'}</button>
+                ${hasCover||isNCR?`<button onclick="coverRemove('${name.replace(/'/g,"\\'")}','${date}','${containerId}')"
+                  style="font-size:13px;padding:6px 10px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:transparent;color:var(--danger);cursor:pointer">✕</button>`:''}
+              </div>
+            </div>`;
+          }).join('')}
+    </div>`;
+}
+
+async function coverSave(absenteeName, date, containerId) {
+  const val = document.getElementById('cov_sel_'+absenteeName.replace(/\s/g,'_'))?.value;
+  if (!val) { showToast('Select a person or NCR first.','err'); return; }
+  const isNCR = val==='_ncr';
+  const ok = await saveCoverageToSP(absenteeName, date, isNCR?'':val, isNCR);
+  if (ok) { showToast(isNCR?`NCR set for ${absenteeName.split(' ')[0]}`:`${val.split(' ')[0]} assigned as cover for ${absenteeName.split(' ')[0]}`,'ok'); renderCoverageSection(containerId); }
+}
+
+async function coverRemove(absenteeName, date, containerId) {
+  const ok = await removeCoverageFromSP(absenteeName, date);
+  if (ok) { showToast(`Coverage removed for ${absenteeName.split(' ')[0]}.`,'ok'); renderCoverageSection(containerId); }
+}
+
+function coverStepDate(dir, containerId) {
+  const todayStr = new Date().toISOString().split('T')[0];
+  const cur = new Date(_coverDate||todayStr);
+  cur.setDate(cur.getDate()+dir);
+  const nd = cur.toISOString().split('T')[0];
+  _coverDate = nd===todayStr?null:nd;
+  renderCoverageSection(containerId);
+}
+
+function updateCoverBanner() {
+  const banner = document.getElementById('coverBanner');
+  if (!banner||!currentUser) return;
+  const todayStr = new Date().toISOString().split('T')[0];
+  const covering = _coverageSP.filter(r=>r.date===todayStr&&r.coverName===currentUser.name&&!r.isNCR);
+  banner.style.display = covering.length?'block':'none';
+  banner.innerHTML = covering.length?`<div style="background:#EDE9FE;border:1.5px solid #C4B5FD;border-radius:var(--radius-sm);padding:10px 14px;font-size:13px;color:#5B21B6;font-weight:500;margin-bottom:12px">
+    📌 You're covering ${covering.map(r=>esc(r.absenteeName.split(' ')[0])).join(' & ')} today
+  </div>`:'';
 }
 
 // ─── FLOOR CONFIRMATION ───────────────────────────────────────────────────
