@@ -6133,42 +6133,35 @@ async function spSyncTeams(teamsObj) {
 }
 
 async function loadFromSharePoint() {
+  const timeout = new Promise(resolve => setTimeout(resolve, 20000)); // 20s max
   try {
-    const [staffRes, recRes, brkRes] = await Promise.all([
-      spGet(SP_API + "('AttendanceStaff')/items?$top=500"),
-      spGet(SP_API + "('AttendanceRecords')/items?$top=5000"),
-      spGet(SP_API + "('AttendanceBreaks')/items?$top=5000"),
-    ]);
-    if (staffRes && staffRes.value && staffRes.value.length > 0) {
-      _staff = staffRes.value.map(spToStaff);
-      LS.set('ci_staff', _staff);
-    }
-    if (recRes && recRes.value && recRes.value.length > 0) {
-      _records = recRes.value.map(spToRecord);
-      LS.set('ci_records', _records);
-    }
-    if (brkRes && brkRes.value && brkRes.value.length > 0) {
-      _breaks = brkRes.value.map(spToBreak);
-      LS.set('ci_breaks', _breaks);
-    }
-    // Load all other data from SP in parallel
-    await Promise.all([
-      loadObsNotesFromSP(),
-      loadPermissions(),
-      loadRolesFromSP(),
-      loadFileEntriesFromSP(),
-      loadEODFromSP(),
-      loadBrokerFeedbackFromSP(),
-      loadOtherTasksFromSP(),
-      loadTeamsFromSP(),
-      loadBrokers(),
-      loadBrokerAssignments(),
-      loadCRMOptions(),
-      loadStaffCRMs(),
-      loadCoverageFromSP(),
-    ]).catch(e => console.warn('Some SP loads failed:', e));
-    // Update EDITABLE_ROLES from loaded roles
-    if (_roles.length) EDITABLE_ROLES = _roles.map(r => r.title).filter(r => r !== 'superadmin');
+    const load = async () => {
+      const [staffRes, recRes, brkRes] = await Promise.all([
+        spGet(SP_API + "('AttendanceStaff')/items?$top=500"),
+        spGet(SP_API + "('AttendanceRecords')/items?$top=5000"),
+        spGet(SP_API + "('AttendanceBreaks')/items?$top=5000"),
+      ]);
+      if (staffRes?.value?.length) { _staff = staffRes.value.map(spToStaff); LS.set('ci_staff', _staff); }
+      if (recRes?.value?.length)   { _records = recRes.value.map(spToRecord); LS.set('ci_records', _records); }
+      if (brkRes?.value?.length)   { _breaks = brkRes.value.map(spToBreak); LS.set('ci_breaks', _breaks); }
+      await Promise.all([
+        loadObsNotesFromSP(),
+        loadPermissions(),
+        loadRolesFromSP(),
+        loadFileEntriesFromSP(),
+        loadEODFromSP(),
+        loadBrokerFeedbackFromSP(),
+        loadOtherTasksFromSP(),
+        loadTeamsFromSP(),
+        loadBrokers(),
+        loadBrokerAssignments(),
+        loadCRMOptions(),
+        loadStaffCRMs(),
+        loadCoverageFromSP(),
+      ]).catch(e => console.warn('Some SP loads failed:', e));
+      if (_roles.length) EDITABLE_ROLES = _roles.map(r => r.title).filter(r => r !== 'superadmin');
+    };
+    await Promise.race([load(), timeout]);
   } catch(e) {
     console.error('SharePoint load error:', e);
   }
@@ -11339,124 +11332,6 @@ function perfCloseModal() {
   const w=document.getElementById('perf-modal-wrap');
   if(w) w.style.display='none';
 }
-  const wrap=document.getElementById('perf-modal-wrap');
-  const inner=document.getElementById('perf-modal-inner');
-  if(!wrap||!inner) return;
-
-  const el=document.getElementById('perfContent');
-  const m=el?._metrics||{};
-  const names=el?._names||[];
-  const close=`<button onclick="perfCloseModal()" style="float:right;background:transparent;border:none;font-size:22px;cursor:pointer;color:var(--text-3);line-height:1;margin:-4px -4px 0 0">×</button>`;
-
-  let html='';
-
-  if(type==='eod') {
-    html=`${close}<div style="font-size:15px;font-weight:700;margin-bottom:4px">EOD submission rate</div>
-    <div style="font-size:12px;color:var(--text-3);margin-bottom:14px">${names.length} analyst${names.length!==1?'s':''} · ${m.wdays||0} working days</div>
-    ${names.map(n=>{const s=m.subByAnalyst?.[n]||{count:0,rate:0};return`<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:0.5px solid var(--border)">
-      <span style="font-size:13px;font-weight:500;min-width:100px">${esc(n.split(' ')[0])}</span>
-      <div style="flex:1;height:8px;background:var(--surface-2);border-radius:4px;overflow:hidden"><div style="width:${s.rate}%;height:100%;background:${s.rate>=80?'#34D399':s.rate>=60?'#FCD34D':'#F87171'};border-radius:4px"></div></div>
-      <span style="font-size:13px;font-weight:700;color:${s.rate>=80?'#065F46':s.rate>=60?'#92400E':'#991B1B'};min-width:40px;text-align:right">${s.rate}%</span>
-      <span style="font-size:11px;color:var(--text-3)">${s.count}/${m.wdays||0} days</span>
-    </div>`;}).join('')}`;
-
-  } else if(type==='bench') {
-    html=`${close}<div style="font-size:15px;font-weight:700;margin-bottom:4px">Benchmark adherence</div>
-    <div style="font-size:12px;color:var(--text-3);margin-bottom:14px">Task type breakdown</div>
-    ${Object.entries(EOD_BENCHMARKS).map(([type,subs])=>Object.entries(subs).map(([sub,bench])=>{
-      const key=type+'|'+sub;
-      const s=m.taskMap?.[key];
-      const avg=s?.sessions?.length?Math.round(s.totalMins/s.sessions.length):null;
-      const over=avg&&avg>bench*1.05;
-      return`<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:0.5px solid var(--border)">
-        <div style="flex:1"><div style="font-size:13px;font-weight:500">${esc(type)}</div><div style="font-size:11px;color:var(--text-3)">${esc(sub)}</div></div>
-        <span style="font-size:12px;color:var(--text-3)">${perfFmtMins(bench)}</span>
-        <span style="font-size:13px;font-weight:700;min-width:60px;text-align:right;color:${avg==null?'var(--text-3)':over?'#991B1B':'#065F46'}">${avg!=null?perfFmtMins(avg):'—'}</span>
-        ${avg!=null?`<span style="font-size:11px;background:${over?'#FEE2E2':'#D1FAE5'};color:${over?'#991B1B':'#065F46'};border-radius:50px;padding:2px 8px;font-weight:600;white-space:nowrap">${over?'+'+perfFmtMins(avg-bench)+' over':'on track'}</span>`:'<span style="font-size:11px;color:var(--text-3)">no data</span>'}
-      </div>`;
-    }).join('')).join('')}`;
-
-  } else if(type==='avg') {
-    html=`${close}<div style="font-size:15px;font-weight:700;margin-bottom:4px">Avg time per task</div>
-    <div style="font-size:12px;color:var(--text-3);margin-bottom:14px">Per analyst comparison</div>
-    ${(m.analystAvg||[]).map(({name,avg})=>`<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:0.5px solid var(--border)">
-      <span style="font-size:13px;font-weight:500;min-width:100px">${esc(name.split(' ')[0])}</span>
-      <div style="flex:1;height:8px;background:var(--surface-2);border-radius:4px;overflow:hidden"><div style="width:${avg?Math.min(100,Math.round(avg/240*100)):0}%;height:100%;background:#378ADD;border-radius:4px"></div></div>
-      <span style="font-size:13px;font-weight:700;color:var(--text);min-width:60px;text-align:right">${avg?perfFmtMins(avg):'—'}</span>
-    </div>`).join('')}`;
-
-  } else if(type==='flags') {
-    const reports=getEODReports().filter(r=>names.includes(r.name)&&r.status==='submitted');
-    const flagged=reports.filter(r=>r.supportNeeded==='yes');
-    html=`${close}<div style="font-size:15px;font-weight:700;margin-bottom:4px">Support flags</div>
-    <div style="font-size:12px;color:var(--text-3);margin-bottom:14px">${flagged.length} flag${flagged.length!==1?'s':''} this period</div>
-    ${flagged.length?flagged.map(r=>`<div style="padding:8px 0;border-bottom:0.5px solid var(--border)">
-      <div style="display:flex;gap:8px;align-items:center;margin-bottom:3px">
-        <span style="font-size:13px;font-weight:500">${esc(r.name.split(' ')[0])}</span>
-        <span style="font-size:11px;color:var(--text-3)">${esc(fmtDate(r.date))}</span>
-      </div>
-      ${r.supportDetail?`<div style="font-size:12px;color:var(--text-2)">${esc(r.supportDetail)}</div>`:''}
-    </div>`).join(''):'<div style="font-size:13px;color:var(--text-3);padding:12px 0">No support flags this period.</div>'}`;
-
-  } else if(type==='pie') {
-    const dist=(m.dist||[]).filter(d=>d.mins>0).sort((a,b)=>b.mins-a.mins);
-    const total=dist.reduce((s,d)=>s+d.mins,0)||1;
-    html=`${close}<div style="font-size:15px;font-weight:700;margin-bottom:4px">Time distribution</div>
-    <div style="font-size:12px;color:var(--text-3);margin-bottom:14px">Total: ${perfFmtMins(total)} logged this period</div>
-    ${dist.map((d,i)=>{const pct=Math.round(d.mins/total*100);return`<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:0.5px solid var(--border)">
-      <span style="width:10px;height:10px;border-radius:50%;background:${TASK_COLORS[i%TASK_COLORS.length]};flex-shrink:0"></span>
-      <span style="flex:1;font-size:13px">${esc(d.label)}</span>
-      <div style="width:80px;height:6px;background:var(--surface-2);border-radius:3px;overflow:hidden"><div style="width:${pct}%;height:100%;background:${TASK_COLORS[i%TASK_COLORS.length]};border-radius:3px"></div></div>
-      <span style="font-size:12px;color:var(--text-3);min-width:30px;text-align:right">${pct}%</span>
-      <span style="font-size:12px;font-weight:500;min-width:52px;text-align:right">${perfFmtMins(d.mins)}</span>
-    </div>`;}).join('')}`;
-
-  } else if(type==='trend') {
-    const trend=m.trend||[];
-    html=`${close}<div style="font-size:15px;font-weight:700;margin-bottom:4px">Benchmark adherence trend</div>
-    <div style="font-size:12px;color:var(--text-3);margin-bottom:14px">Daily % of tasks within benchmark</div>
-    ${trend.map(({date,pct})=>`<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:0.5px solid var(--border)">
-      <span style="font-size:12px;color:var(--text-3);min-width:70px">${esc(date)}</span>
-      <div style="flex:1;height:8px;background:var(--surface-2);border-radius:4px;overflow:hidden"><div style="width:${pct||0}%;height:100%;background:${pct==null?'#E5E7EB':pct>=80?'#34D399':pct>=60?'#FCD34D':'#F87171'};border-radius:4px"></div></div>
-      <span style="font-size:13px;font-weight:700;min-width:36px;text-align:right;color:${pct==null?'var(--text-3)':pct>=80?'#065F46':pct>=60?'#92400E':'#991B1B'}">${pct!=null?Math.round(pct)+'%':'—'}</span>
-    </div>`).join('')}`;
-
-  } else if(type==='drill') {
-    const [dType,dSub]=(taskKey||'').split('|');
-    const bench=dType&&dSub?EOD_BENCHMARKS[dType]?.[dSub]:null;
-    const s=m.taskMap?.[taskKey];
-    const sessions=analyst?
-      (s?.sessions||[]).filter(x=>x.name===analyst):
-      (s?.sessions||[]);
-    const avg=sessions.length?Math.round(sessions.reduce((a,b)=>a+b.mins,0)/sessions.length):null;
-    const maxM=Math.max(...sessions.map(x=>x.mins),bench||0)*1.15||240;
-
-    html=`${close}<div style="font-size:15px;font-weight:700;margin-bottom:2px">${esc(dType)}${dSub?' · <span style="color:var(--text-3);font-weight:400">'+esc(dSub)+'</span>':''}</div>
-    <div style="font-size:12px;color:var(--text-3);margin-bottom:14px">${analyst?esc(analyst)+' · ':'All analysts · '}${sessions.length} session${sessions.length!==1?'s':''}</div>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px">
-      <div style="background:${avg&&bench&&avg>bench?'#FEE2E2':'#D1FAE5'};border-radius:8px;padding:10px;text-align:center">
-        <div style="font-size:18px;font-weight:700;color:${avg&&bench&&avg>bench?'#991B1B':'#065F46'}">${avg?perfFmtMins(avg):'—'}</div>
-        <div style="font-size:10px;opacity:.8;color:${avg&&bench&&avg>bench?'#991B1B':'#065F46'};margin-top:2px">avg</div>
-      </div>
-      <div style="background:var(--surface-2);border-radius:8px;padding:10px;text-align:center">
-        <div style="font-size:18px;font-weight:700;color:var(--text)">${bench?perfFmtMins(bench):'—'}</div>
-        <div style="font-size:10px;color:var(--text-3);margin-top:2px">benchmark</div>
-      </div>
-      <div style="background:${avg&&bench&&avg>bench?'#FEF3C7':'var(--surface-2)'};border-radius:8px;padding:10px;text-align:center">
-        <div style="font-size:18px;font-weight:700;color:${avg&&bench&&avg>bench?'#92400E':'var(--text-3)'}">${avg&&bench?perfFmtMins(Math.abs(avg-bench))+(avg>bench?' over':' under'):'—'}</div>
-        <div style="font-size:10px;margin-top:2px;color:${avg&&bench&&avg>bench?'#92400E':'var(--text-3)'}">${avg&&bench&&avg>bench?'avg over':'avg diff'}</div>
-      </div>
-    </div>
-    <div style="font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Session history</div>
-    ${sessions.length?sessions.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(s=>`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:0.5px solid var(--border)">
-      <span style="font-size:12px;color:var(--text-3);min-width:80px">${esc(fmtDate(s.date))}</span>
-      ${names.length>1&&!analyst?`<span style="font-size:12px;color:var(--text-2);min-width:70px">${esc(s.name.split(' ')[0])}</span>`:''}
-      <div style="flex:1;height:6px;background:var(--surface-2);border-radius:3px;overflow:hidden"><div style="width:${Math.min(100,Math.round(s.mins/maxM*100))}%;height:100%;background:${bench&&s.mins>bench?'#F87171':'#34D399'};border-radius:3px"></div></div>
-      <span style="font-size:13px;font-weight:700;min-width:56px;text-align:right;color:${bench&&s.mins>bench?'#991B1B':'#065F46'}">${perfFmtMins(s.mins)}${bench&&s.mins>bench?` <span style="font-size:10px;font-weight:400">(+${perfFmtMins(s.mins-bench)})</span>`:''}</span>
-    </div>`).join(''):'<div style="font-size:13px;color:var(--text-3);padding:8px 0">No sessions logged for this task.</div>'}`;
-  }
-
-
 function setPerfDays(days, btn) {
   _perfPeriod=String(days);
   renderPerformanceScreen();
