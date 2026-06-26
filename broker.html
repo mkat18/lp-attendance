@@ -12152,61 +12152,185 @@ function renderPerformanceScreen() {
   const taskSubKeys=[];
   taskKeys.forEach(type=>Object.keys(EOD_BENCHMARKS[type]).forEach(sub=>taskSubKeys.push({type,sub})));
 
-  let tableHTML=`<div class="card" style="margin-bottom:12px">
-    <div style="font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">Avg time per task — click any cell to drill in</div>
-    <div style="overflow-x:auto">
-      <table style="width:100%;border-collapse:collapse;font-size:12px">
-        <thead><tr>
-          <th style="text-align:left;padding:4px 8px 10px 0;font-size:11px;color:var(--text-3);font-weight:600;border-bottom:1px solid var(--border);min-width:130px">Task</th>
-          <th style="text-align:center;padding:4px 8px 10px;font-size:11px;color:var(--text-3);font-weight:600;border-bottom:1px solid var(--border)">Benchmark</th>
-          ${names.map(n=>`<th style="text-align:center;padding:4px 4px 10px;font-size:11px;color:var(--text-3);font-weight:600;border-bottom:1px solid var(--border);min-width:90px">${esc(n.split(' ')[0])}</th>`).join('')}
-        </tr></thead>
-        <tbody>`;
+  // 3-view bottom section
+  const viewToggle=`<div style="display:flex;gap:6px;margin-bottom:14px">
+    <button onclick="perfSetView('issues')" id="pvbtn-issues"
+      style="font-size:13px;padding:7px 16px;border-radius:50px;border:1.5px solid ${_perfView==='issues'?'var(--brand)':'var(--border)'};background:${_perfView==='issues'?'var(--brand-light)':'var(--surface-2)'};color:${_perfView==='issues'?'var(--brand)':'var(--text-2)'};cursor:pointer;font-weight:${_perfView==='issues'?'700':'400'}">Issues only</button>
+    <button onclick="perfSetView('all')" id="pvbtn-all"
+      style="font-size:13px;padding:7px 16px;border-radius:50px;border:1.5px solid ${_perfView==='all'?'var(--brand)':'var(--border)'};background:${_perfView==='all'?'var(--brand-light)':'var(--surface-2)'};color:${_perfView==='all'?'var(--brand)':'var(--text-2)'};cursor:pointer;font-weight:${_perfView==='all'?'700':'400'}">All analysts</button>
+    <button onclick="perfSetView('detail')" id="pvbtn-detail"
+      style="font-size:13px;padding:7px 16px;border-radius:50px;border:1.5px solid ${_perfView==='detail'?'var(--brand)':'var(--border)'};background:${_perfView==='detail'?'var(--brand-light)':'var(--surface-2)'};color:${_perfView==='detail'?'var(--brand)':'var(--text-2)'};cursor:pointer;font-weight:${_perfView==='detail'?'700':'400'}">Analyst detail</button>
+  </div>`;
+  const viewContainer=`<div id="perf-view-container"></div>`;
+  const modalContainer=`<div id="perf-modal-wrap" style="display:none;background:rgba(0,0,0,0.45);padding:16px;margin-top:12px;border-radius:var(--radius)"><div id="perf-modal-inner" style="background:var(--surface);border-radius:var(--radius);border:1.5px solid var(--border);padding:1.25rem;max-width:600px;margin:0 auto"></div></div>`;
+  el.innerHTML=filterRow+summaryRow+chartsRow+alertBar+viewToggle+viewContainer+modalContainer;
+  el._metrics=m; el._names=names;
+  setTimeout(()=>{ perfDrawPie(m.dist); perfDrawTrend(m.trend); perfRenderView(names,from,to,m); },50);
+}
 
-  let lastType='';
+let _perfView='issues';
+let _perfDetailName='';
+let _perfSortKey='over';
+let _perfSortDir=-1;
+let _perfExpandedRow='';
+
+function perfSetView(v) {
+  _perfView=v;
+  const el=document.getElementById('perfContent');
+  const names=el?._names||[];
+  const m=el?._metrics||{};
+  const {from,to}=perfGetDates();
+  ['issues','all','detail'].forEach(x=>{
+    const b=document.getElementById('pvbtn-'+x);
+    if(!b) return;
+    b.style.borderColor=x===v?'var(--brand)':'var(--border)';
+    b.style.background=x===v?'var(--brand-light)':'var(--surface-2)';
+    b.style.color=x===v?'var(--brand)':'var(--text-2)';
+    b.style.fontWeight=x===v?'700':'400';
+  });
+  perfRenderView(names,from,to,m);
+}
+
+function perfRenderView(names,from,to,m) {
+  const c=document.getElementById('perf-view-container');
+  if(!c) return;
+  if(_perfView==='issues') c.innerHTML=perfIssuesHTML(names,m);
+  if(_perfView==='all')    c.innerHTML=perfAllHTML(names,m);
+  if(_perfView==='detail') c.innerHTML=perfDetailHTML(names,from,to);
+}
+
+function perfIssuesHTML(names,m) {
+  const taskSubKeys=[];
+  Object.keys(EOD_BENCHMARKS).forEach(type=>Object.keys(EOD_BENCHMARKS[type]).forEach(sub=>taskSubKeys.push({type,sub})));
+  const issues=[];
   taskSubKeys.forEach(({type,sub})=>{
     const key=type+'|'+sub;
-    const s=m.taskMap[key];
     const bench=EOD_BENCHMARKS[type][sub];
-    const isNew=type!==lastType; lastType=type;
-    tableHTML+=`<tr>
-      <td style="padding:6px 8px 6px 0;border-bottom:0.5px solid var(--border)">
-        ${isNew?`<div style="font-size:13px;font-weight:500;color:var(--text)">${esc(type)}</div>`:''}
-        <div style="font-size:11px;color:var(--text-3);${isNew?'margin-top:1px':''}">${esc(sub)}</div>
-      </td>
-      <td style="text-align:center;padding:6px 8px;border-bottom:0.5px solid var(--border);font-size:12px;color:var(--text-3)">${perfFmtMins(bench)}</td>
-      ${names.map(n=>{
-        const nsess=(s?.sessions||[]).filter(x=>x.name===n);
-        const avg=nsess.length?Math.round(nsess.reduce((a,b)=>a+b.mins,0)/nsess.length):null;
-        const cs=perfCellStyle(avg,bench);
-        return `<td style="padding:4px 4px 4px 0;border-bottom:0.5px solid var(--border)">
-          <div onclick="perfOpenModal('drill','${key.replace(/'/g,"\\'")}','${n.replace(/'/g,"\\'")}${names.length===1?'':''}')" style="border-radius:6px;padding:6px 10px;text-align:center;cursor:pointer;background:${cs.bg};color:${cs.text}" onmouseover="this.style.opacity='.8'" onmouseout="this.style.opacity='1'">
-            <div style="font-size:13px;font-weight:600">${avg!=null?perfFmtMins(avg):'—'}</div>
-            <div style="font-size:10px;margin-top:1px;opacity:.8">${nsess.length?cs.sub:'no data'}</div>
-          </div>
-        </td>`;
-      }).join('')}
-    </tr>`;
+    const s=m.taskMap?.[key];
+    if(!s?.sessions?.length) return;
+    const overAnalysts=names.map(n=>{
+      const nsess=(s.sessions||[]).filter(x=>x.name===n);
+      if(!nsess.length) return null;
+      const avg=Math.round(nsess.reduce((a,b)=>a+b.mins,0)/nsess.length);
+      const overSess=nsess.filter(x=>x.mins>bench).length;
+      return avg>bench?{name:n,avg,over:avg-bench,sessions:nsess.length,overSess}:null;
+    }).filter(Boolean);
+    if(overAnalysts.length) issues.push({type,sub,bench,key,overAnalysts});
   });
-  tableHTML+='</tbody></table></div></div>';
-
-  // Modal container
-  const modalContainer=`<div id="perf-modal-wrap" style="display:none;background:rgba(0,0,0,0.45);padding:16px;margin-top:12px;border-radius:var(--radius)">
-    <div id="perf-modal-inner" style="background:var(--surface);border-radius:var(--radius);border:1.5px solid var(--border);padding:1.25rem;max-width:600px;margin:0 auto"></div>
-  </div>`;
-
-  el.innerHTML=filterRow+summaryRow+chartsRow+alertBar+tableHTML+modalContainer;
-
-  // Store metrics for modal use
-  el._metrics=m;
-  el._names=names;
-
-  // Draw charts
-  setTimeout(()=>{
-    perfDrawPie(m.dist);
-    perfDrawTrend(m.trend);
-  },50);
+  const okTasks=taskSubKeys.filter(({type,sub})=>{
+    const key=type+'|'+sub;
+    const bench=EOD_BENCHMARKS[type][sub];
+    const s=m.taskMap?.[key];
+    if(!s?.sessions?.length) return false;
+    return !names.some(n=>{
+      const nsess=(s.sessions||[]).filter(x=>x.name===n);
+      if(!nsess.length) return false;
+      return Math.round(nsess.reduce((a,b)=>a+b.mins,0)/nsess.length)>bench;
+    });
+  });
+  if(!issues.length) return `<div style="background:#D1FAE5;border:1px solid #6EE7B7;border-radius:var(--radius-sm);padding:14px 16px;font-size:14px;color:#065F46;font-weight:600">✓ No benchmark issues this period — all analysts on track.</div>`;
+  const issueCards=issues.map(({type,sub,bench,key,overAnalysts})=>{
+    const severity=overAnalysts.some(a=>a.over>bench*0.25||a.overSess===a.sessions)?'red':'amber';
+    const maxMins=Math.max(...overAnalysts.map(a=>a.avg),bench)*1.1;
+    return `<div style="border-left:3px solid ${severity==='red'?'#EF4444':'#F59E0B'};border-radius:0 var(--radius-sm) var(--radius-sm) 0;padding:12px 16px;margin-bottom:10px;background:var(--surface);border-top:0.5px solid var(--border);border-right:0.5px solid var(--border);border-bottom:0.5px solid var(--border)">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div><div style="font-size:14px;font-weight:600;color:var(--text)">${esc(type)} · <span style="color:var(--text-3);font-weight:400">${esc(sub)}</span></div><div style="font-size:11px;color:var(--text-3);margin-top:2px">Benchmark: ${perfFmtMins(bench)}</div></div>
+        <span style="font-size:11px;background:${severity==='red'?'#FEE2E2':'#FEF3C7'};color:${severity==='red'?'#991B1B':'#92400E'};border-radius:50px;padding:3px 10px;font-weight:600;white-space:nowrap">${overAnalysts.length} analyst${overAnalysts.length!==1?'s':''} over</span>
+      </div>
+      ${overAnalysts.map(a=>`<div style="margin-bottom:6px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:12px;font-weight:500;min-width:90px;color:var(--text)">${esc(a.name.split(' ')[0])}</span>
+          <div style="flex:1;height:8px;background:var(--surface-2);border-radius:4px;overflow:hidden;border:0.5px solid var(--border)"><div style="width:${Math.min(100,Math.round(a.avg/maxMins*100))}%;height:100%;background:${a.over>bench*0.2?'#F87171':'#FCD34D'};border-radius:4px"></div></div>
+          <span style="font-size:12px;font-weight:600;min-width:80px;text-align:right;color:${a.over>bench*0.2?'#991B1B':'#92400E'}">${perfFmtMins(a.avg)} <span style="font-size:10px;font-weight:400">(+${perfFmtMins(a.over)})</span></span>
+        </div>
+        <div style="font-size:11px;color:var(--text-3);margin-left:98px">${a.overSess} of ${a.sessions} sessions over</div>
+      </div>`).join('')}
+      <div style="height:1px;background:var(--border);margin:4px 0 6px"></div>
+      <div style="display:flex;justify-content:flex-end"><span onclick="perfOpenModal('drill','${key}','')" style="font-size:12px;color:var(--brand);cursor:pointer;font-weight:500">View all sessions →</span></div>
+    </div>`;
+  }).join('');
+  const clearSection=okTasks.length?`<div style="background:var(--surface);border:1.5px solid #6EE7B7;border-radius:var(--radius-sm);overflow:hidden"><div style="display:flex;align-items:center;gap:8px;padding:10px 14px;cursor:pointer" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none';this.querySelector('.ch').textContent=this.nextElementSibling.style.display==='none'?'▾ Show':'▴ Hide'"><span style="font-size:13px;font-weight:600;color:#065F46;flex:1">✓ ${okTasks.length} task type${okTasks.length!==1?'s':''} all clear</span><span class="ch" style="font-size:12px;color:#065F46">▾ Show</span></div><div style="display:none;padding:0 14px 10px">${okTasks.map(({type,sub})=>`<div style="font-size:12px;color:#065F46;padding:4px 0;border-bottom:0.5px solid #D1FAE5">✓ ${esc(type)} · ${esc(sub)}</div>`).join('')}</div></div>`:'';
+  return `<div style="font-size:12px;color:var(--text-3);margin-bottom:12px">${issues.length} issue${issues.length!==1?'s':''} · ${okTasks.length} task type${okTasks.length!==1?'s':''} all clear</div>`+issueCards+clearSection;
 }
+
+function perfAllHTML(names,m) {
+  const thS='font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px;padding:8px 10px;border-bottom:1px solid var(--border);cursor:pointer;white-space:nowrap;user-select:none';
+  const sortArr=[...names].map(n=>{
+    const s=m.subByAnalyst?.[n]||{rate:0};
+    let onTrack=0,over=0;
+    Object.values(m.taskMap||{}).forEach(tk=>{
+      const bench=EOD_BENCHMARKS[tk.type]?.[tk.subType];
+      if(!bench) return;
+      const nsess=(tk.sessions||[]).filter(x=>x.name===n);
+      if(!nsess.length) return;
+      const avg=nsess.reduce((a,b)=>a+b.mins,0)/nsess.length;
+      if(avg>bench*1.05) over++; else onTrack++;
+    });
+    const benchRate=(onTrack+over)?Math.round(onTrack/(onTrack+over)*100):null;
+    const flags=(getEODReports()||[]).filter(r=>r.name===n&&r.status==='submitted'&&r.supportNeeded==='yes').length;
+    return {name:n,eod:s.rate,bench:benchRate,over,flags};
+  }).sort((a,b)=>{
+    const va=a[_perfSortKey]??-1,vb=b[_perfSortKey]??-1;
+    return typeof va==='string'?va.localeCompare(vb)*_perfSortDir:(vb-va)*_perfSortDir;
+  });
+  const th=(key,lbl)=>`<th style="${thS}" onclick="_perfSortKey='${key}';_perfSortDir*=-1;document.getElementById('perf-view-container').innerHTML=perfAllHTML(document.getElementById('perfContent')._names||[],document.getElementById('perfContent')._metrics||{})">${lbl}${_perfSortKey===key?(_perfSortDir<0?' ▾':' ▴'):''}</th>`;
+  const rows=sortArr.map(a=>{
+    const isExp=_perfExpandedRow===a.name;
+    const initials=a.name.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
+    const taskSubKeys2=[];
+    Object.keys(EOD_BENCHMARKS).forEach(type=>Object.keys(EOD_BENCHMARKS[type]).forEach(sub=>taskSubKeys2.push({type,sub})));
+    const detailRows=isExp?taskSubKeys2.map(({type,sub})=>{
+      const key=type+'|'+sub;
+      const bench=EOD_BENCHMARKS[type][sub];
+      const s=m.taskMap?.[key];
+      const nsess=(s?.sessions||[]).filter(x=>x.name===a.name);
+      if(!nsess.length) return '';
+      const avg=Math.round(nsess.reduce((x,b)=>x+b.mins,0)/nsess.length);
+      const over=avg>bench;
+      return `<div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:12px"><span style="flex:1;color:var(--text-2)">${esc(type)} · ${esc(sub)}</span><div style="width:80px;height:6px;background:var(--surface-0);border-radius:3px;overflow:hidden"><div style="width:${Math.min(100,Math.round(avg/bench*80))}%;height:100%;background:${over?'#F87171':'#34D399'};border-radius:3px"></div></div><span style="min-width:56px;text-align:right;font-weight:500;color:${over?'#991B1B':'#065F46'}">${perfFmtMins(avg)}${over?` <span style="font-size:10px;font-weight:400">(+${perfFmtMins(avg-bench)})</span>`:''}</span></div>`;
+    }).join(''):'';
+    return `<tr onclick="_perfExpandedRow='${isExp?'':a.name.replace(/'/g,"\\'")}';document.getElementById('perf-view-container').innerHTML=perfAllHTML(document.getElementById('perfContent')._names||[],document.getElementById('perfContent')._metrics||{})" style="cursor:pointer;${isExp?'background:var(--surface-2);':''}">
+      <td style="padding:10px;border-bottom:0.5px solid var(--border);vertical-align:top">
+        <div style="display:flex;align-items:center;gap:8px"><div style="width:28px;height:28px;border-radius:50%;background:var(--brand-light);color:var(--brand);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;flex-shrink:0">${esc(initials)}</div><span style="font-size:13px;font-weight:500;color:var(--text)">${esc(a.name)}</span></div>
+        ${isExp&&detailRows?`<div style="margin-top:10px;margin-left:36px;padding:10px;background:var(--surface);border-radius:var(--radius-sm);border:0.5px solid var(--border)">${detailRows}</div>`:''}
+      </td>
+      <td style="text-align:center;padding:10px 8px;border-bottom:0.5px solid var(--border);vertical-align:top"><span style="font-size:12px;background:${a.eod>=80?'#D1FAE5':a.eod>=60?'#FEF3C7':'#FEE2E2'};color:${a.eod>=80?'#065F46':a.eod>=60?'#92400E':'#991B1B'};border-radius:50px;padding:3px 8px;font-weight:500">${a.eod}%</span></td>
+      <td style="text-align:center;padding:10px 8px;border-bottom:0.5px solid var(--border);vertical-align:top"><span style="font-size:12px;background:${a.bench==null?'var(--surface-2)':a.bench>=85?'#D1FAE5':a.bench>=65?'#FEF3C7':'#FEE2E2'};color:${a.bench==null?'var(--text-3)':a.bench>=85?'#065F46':a.bench>=65?'#92400E':'#991B1B'};border-radius:50px;padding:3px 8px;font-weight:500">${a.bench!=null?a.bench+'%':'—'}</span></td>
+      <td style="text-align:center;padding:10px 8px;border-bottom:0.5px solid var(--border);vertical-align:top"><span style="font-size:12px;background:${a.over===0?'var(--surface-2)':'#FEE2E2'};color:${a.over===0?'var(--text-3)':'#991B1B'};border-radius:50px;padding:3px 8px;font-weight:500">${a.over} task${a.over!==1?'s':''}</span></td>
+      <td style="text-align:center;padding:10px 8px;border-bottom:0.5px solid var(--border);vertical-align:top"><span style="font-size:12px;background:${a.flags===0?'var(--surface-2)':a.flags>=3?'#FEE2E2':'#FEF3C7'};color:${a.flags===0?'var(--text-3)':a.flags>=3?'#991B1B':'#92400E'};border-radius:50px;padding:3px 8px;font-weight:500">${a.flags}</span></td>
+    </tr>`;
+  }).join('');
+  return `<div style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);overflow:hidden"><table style="width:100%;border-collapse:collapse"><thead style="background:var(--surface-2)"><tr>${th('name','Analyst')}${th('eod','EOD rate')}${th('bench','Benchmark')}${th('over','Tasks over')}${th('flags','Flags')}</tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+
+function perfDetailHTML(names,from,to) {
+  if(!_perfDetailName&&names.length) _perfDetailName=names[0];
+  const name=_perfDetailName||names[0]||'';
+  if(!name) return '<div style="font-size:13px;color:var(--text-3);padding:1rem">No analysts available.</div>';
+  const reports=getEODReports().filter(r=>r.name===name&&r.status==='submitted'&&r.date>=from&&r.date<=to);
+  const taskTotals={};let pdMins=0;
+  reports.forEach(r=>(r.tasks||[]).forEach(t=>{
+    if(!t.type) return;
+    const mins=perfTaskMins(t);
+    if(t.type==='Professional Development'){pdMins+=mins;return;}
+    const key=t.type+'|'+(t.subType||'');
+    taskTotals[key]=(taskTotals[key]||0)+mins;
+  }));
+  const entries=Object.entries(taskTotals).filter(([,m])=>m>0).sort((a,b)=>b[1]-a[1]);
+  const maxMins=entries[0]?.[1]||1;
+  const initials=name.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
+  const analystOpts=names.map(n=>`<option value="${esc(n)}" ${n===name?'selected':''}>${esc(n)}</option>`).join('');
+  const bars=entries.map(([key,total])=>{
+    const [type,sub]=key.split('|');
+    const bench=EOD_BENCHMARKS[type]?.[sub||''];
+    const count=reports.reduce((n,r)=>n+(r.tasks||[]).filter(t=>t.type===type&&(t.subType||'')===(sub||'')).length,0);
+    const avg=count?Math.round(total/count):0;
+    const over=bench&&avg>bench;
+    return `<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span style="color:var(--text-2);font-weight:500">${esc(type)}${sub?` · <span style="color:var(--text-3);font-weight:400">${esc(sub)}</span>`:''}</span><span style="color:var(--text-3)">${count} session${count!==1?'s':''} · ${perfFmtMins(total)} total${bench?' · avg '+perfFmtMins(avg):''}</span></div><div style="height:10px;background:var(--surface-2);border-radius:5px;overflow:hidden;border:0.5px solid var(--border)"><div style="width:${Math.round(total/maxMins*100)}%;height:100%;background:${over?'#F87171':'#34D399'};border-radius:5px"></div></div>${bench&&over?`<div style="font-size:10px;color:#991B1B;margin-top:3px;text-align:right">⚠ avg +${perfFmtMins(avg-bench)} over benchmark (${perfFmtMins(bench)})</div>`:''}</div>`;
+  }).join('');
+  return `<div style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:1rem 1.25rem"><div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap"><div style="width:36px;height:36px;border-radius:50%;background:var(--brand-light);color:var(--brand);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;flex-shrink:0">${esc(initials)}</div><select onchange="_perfDetailName=this.value;document.getElementById('perf-view-container').innerHTML=perfDetailHTML(document.getElementById('perfContent')._names||[],'${from}','${to}')" style="font-size:14px;font-weight:600;border:none;background:transparent;color:var(--text);cursor:pointer;padding:0">${analystOpts}</select><span style="font-size:12px;color:var(--text-3)">${reports.length} EOD reports this period</span></div><div style="font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">Time spent per task type</div>${entries.length?bars:'<div style="font-size:13px;color:var(--text-3);padding:8px 0">No tasks logged this period.</div>'}${pdMins>0?`<div style="border-top:1px solid var(--border);margin-top:12px;padding-top:12px;display:flex;justify-content:space-between;align-items:center"><div><div style="font-size:13px;font-weight:500">Professional development</div><div style="font-size:11px;color:var(--text-3)">no benchmark</div></div><div style="font-size:15px;font-weight:600">${perfFmtMins(pdMins)} <span style="font-size:12px;font-weight:400;color:var(--text-3)">total</span></div></div>`:''}</div>`;
+}
+
 
 function perfDrawPie(dist) {
   const canvas=document.getElementById('perf-pie');
