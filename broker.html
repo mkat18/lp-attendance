@@ -10299,1684 +10299,197 @@ function renderEODSummary(el, teamNames, date) {
 }
 
 // ── Patch renderMyTeam to include EOD tab ─────────────────────────────────
-const _origRenderMyTeam = window.renderMyTeam;
+// ── My Team — single consolidated EOD section ─────────────────────────────
+let _myTeamEODPeriod  = 'today';
+let _myTeamEODPerson  = '';
+let _myTeamEODFromDt  = '';
+let _myTeamEODToDt    = '';
+const _myTeamExpanded = new Set();
+
+const _origRenderMyTeamFinal = window.renderMyTeam;
 window.renderMyTeam = function() {
-  if (_origRenderMyTeam) _origRenderMyTeam.apply(this, arguments);
+  if (_origRenderMyTeamFinal) _origRenderMyTeamFinal.apply(this, arguments);
+  if (!isTeamLead()) return;
   const myteamEl = document.getElementById('myteamContent');
   if (!myteamEl) return;
   const myTeamNames = getTeamForTL(currentUser.name);
-  if (myTeamNames.length === 0) return;
+  if (!myTeamNames.length) return;
 
-  let eodDiv = document.getElementById('myTeamEODSummary');
-  if (!eodDiv) {
-    eodDiv = document.createElement('div');
-    eodDiv.id = 'myTeamEODSummary';
-    eodDiv.className = 'card';
-    eodDiv.style.marginTop = '1rem';
-    myteamEl.appendChild(eodDiv);
-  }
+  const eodDiv = document.createElement('div');
+  eodDiv.id = 'myTeamEODBlock';
+  eodDiv.className = 'card';
+  eodDiv.style.marginTop = '12px';
+  myteamEl.appendChild(eodDiv);
 
-  // Build with filter controls
-  const sixMonthsAgo = new Date(); sixMonthsAgo.setMonth(sixMonthsAgo.getMonth()-6);
-  const defaultFrom = sixMonthsAgo.toISOString().split('T')[0];
-  const analystOptions = getStaff()
-    .filter(s => EOD_ROLES.includes(s.role) && myTeamNames.includes(s.name))
-    .map(s => `<option value="${esc(s.name)}">${esc(s.name.split(' ')[0])}</option>`).join('');
+  renderMyTeamEOD(myTeamNames);
 
-  eodDiv.innerHTML = `
-    <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">📋 EOD Reports</div>
-    ${dateRangePicker('eodSum', 'refreshMyTeamEOD()', analystOptions, 'today')}
-    <div id="eodSumContent"></div>`;
-
-  setTimeout(() => { setDRP('eodSum','today'); }, 50);
-};
-
-function refreshMyTeamEOD() {
-  const el = document.getElementById('eodSumContent');
-  if (!el) return;
-  const { from, to, staff: filterStaff } = getDRPRange('eodSum');
-  const myTeamNames = getTeamForTL(currentUser.name);
-
-  const reports = getEODReports().filter(r =>
-    r.date >= from && r.date <= to &&
-    myTeamNames.includes(r.name) &&
-    (!filterStaff || r.name === filterStaff)
-  );
-
-  const staff = getStaff().filter(s =>
-    EOD_ROLES.includes(s.role) && myTeamNames.includes(s.name) &&
-    (!filterStaff || s.name === filterStaff)
-  );
-
-  const submittedCount = reports.length;
-  const lowConf    = reports.filter(r => (r.confidence||0) <= 2);
-  const brokerFlags= reports.filter(r => r.brokerConcern === 'yes');
-  const supportFlags=reports.filter(r => r.supportNeeded === 'yes');
-
-  const card = (id, count, total, bg, color, label, details) => `
-    <div style="background:${bg};border-radius:var(--radius-sm);padding:10px;text-align:center;cursor:${details.length?'pointer':'default'}"
-      onclick="${details.length?`toggleEodCard('${id}')`:''}">
-      <div style="font-size:22px;font-weight:700;color:${color}">${total!==null?count+'/'+total:count}</div>
-      <div style="font-size:11px;color:${color};font-weight:600">${label}${details.length?' ▾':''}</div>
-    </div>`;
-
-  const expand = (id, bg, color, details) => `
-    <div id="eod_exp_${id}" style="display:none;background:${bg};border-radius:var(--radius-sm);padding:8px 12px;margin-top:-4px;margin-bottom:4px;font-size:12px;color:${color}">
-      ${details.length ? details.map(r=>`
-        <div style="padding:4px 0;border-bottom:1px solid rgba(0,0,0,0.06)">
-          <span style="font-weight:600">${esc(r.name?.split(' ')[0]||r)}</span>
-          ${r.date&&r.date!==today?`<span style="opacity:.6;margin-left:4px">· ${fmtDate(r.date)}</span>`:''}
-          ${r.confidence?`<span style="float:right;opacity:.7">${r.confidence}/5 ⭐</span>`:''}
-          ${r.brokerConcernDetail?`<div style="font-size:11px;opacity:.8">📣 ${esc(r.brokerConcernDetail)}</div>`:''}
-          ${r.challengeDetail?`<div style="font-size:11px;opacity:.8">⚠️ ${esc(r.challengeDetail)}</div>`:''}
-          ${r.supportDetail?`<div style="font-size:11px;opacity:.8">🙋 ${esc(r.supportDetail)}</div>`:''}
-        </div>`).join('')
-      : '<div style="opacity:.6;padding:4px 0">None</div>'}
-    </div>`;
-
-  el.innerHTML = `
-    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:8px">
-      ${card('sub',  submittedCount,  staff.length, submittedCount>=staff.length?'var(--success-light)':'var(--danger-light)', submittedCount>=staff.length?'var(--success)':'var(--danger)', 'Submitted', reports)}
-      ${card('lc',   lowConf.length,  null, lowConf.length>0?'var(--danger-light)':'var(--surface-2)', lowConf.length>0?'var(--danger)':'var(--text-3)', 'Low confidence', lowConf)}
-      ${card('bf',   brokerFlags.length, null, brokerFlags.length>0?'#FEF3C7':'var(--surface-2)', brokerFlags.length>0?'#92400E':'var(--text-3)', 'Broker concerns', brokerFlags)}
-      ${card('sf',   supportFlags.length, null, supportFlags.length>0?'var(--brand-light)':'var(--surface-2)', supportFlags.length>0?'var(--brand)':'var(--text-3)', 'Need support', supportFlags)}
-    </div>
-    ${expand('sub',  submittedCount>=staff.length?'var(--success-light)':'var(--danger-light)', submittedCount>=staff.length?'var(--success)':'var(--danger)', reports)}
-    ${expand('lc',   lowConf.length>0?'var(--danger-light)':'var(--surface-2)', lowConf.length>0?'var(--danger)':'var(--text-3)', lowConf)}
-    ${expand('bf',   brokerFlags.length>0?'#FEF3C7':'var(--surface-2)', brokerFlags.length>0?'#92400E':'var(--text-3)', brokerFlags)}
-    ${expand('sf',   supportFlags.length>0?'var(--brand-light)':'var(--surface-2)', supportFlags.length>0?'var(--brand)':'var(--text-3)', supportFlags)}`;
-}
-
-function toggleEodCard(id) {
-  const el = document.getElementById('eod_exp_'+id);
-  if (!el) return;
-  el.style.display = el.style.display === 'none' ? 'block' : 'none';
-}
-
-function toggleObsCard(id) {
-  const el = document.getElementById('obs_exp_'+id);
-  if (!el) return;
-  el.style.display = el.style.display === 'none' ? 'block' : 'none';
-}
-
-// ── Patch manager dashboard to show EOD summary card ─────────────────────
-const _origRenderMetricsEOD = window.renderMetrics;
-window.renderMetrics = function() {
-  if (_origRenderMetricsEOD) _origRenderMetricsEOD.apply(this, arguments);
-  if (!isManager()) return;
-  const metricsEl = document.getElementById('metrics');
-  if (!metricsEl) return;
-  // Use dashboard selected date so EOD card respects the date picker
-  const selFrom = getSelectedDate();
-  const selTo   = getSelectedDateTo();
-  const selRecs = getRecords().filter(r => r.date >= selFrom && r.date <= selTo && r.status !== 'leave' && r.status !== 'absent');
-  const selNames = [...new Set(selRecs.map(r => r.name))];
-  const allAnalysts = getStaff().filter(s => EOD_ROLES.includes(s.role) && selNames.includes(s.name)).map(s => s.name);
-  if (allAnalysts.length === 0) return;
-  const todayReports = getEODReports().filter(r => r.date >= selFrom && r.date <= selTo && allAnalysts.includes(r.name));
-  const lowConf = todayReports.filter(r => r.confidence <= 2).length;
-  const brokerFlags = todayReports.filter(r => r.brokerConcern === 'yes').length;
-  const notSubmitted = allAnalysts.length - todayReports.length;
-
-  const eodCard = document.createElement('div');
-  eodCard.className = 'met';
-  eodCard.style.cssText = `grid-column:1/-1;cursor:pointer;${(lowConf>0||brokerFlags>0)?'border-color:#F59E0B;background:#FFFBEB':''}`;
-  eodCard.onclick = () => { /* could expand to full EOD view */ };
-  eodCard.innerHTML = `
-    <div class="met-lbl">📋 EOD Reports</div>
-    <div class="met-val" style="color:${notSubmitted>0?'var(--danger)':'var(--success)'}">${todayReports.length}/${allAnalysts.length}</div>
-    <div class="met-sub">${notSubmitted>0?notSubmitted+' not submitted · ':''}${lowConf>0?'⚠️ '+lowConf+' low confidence · ':''}${brokerFlags>0?'📣 '+brokerFlags+' broker concern':''}${notSubmitted===0&&lowConf===0&&brokerFlags===0?'all clear ✓':''}</div>`;
-  metricsEl.appendChild(eodCard);
-};
-
-// ── Patch lockCheckin / initCheckin to show EOD prompt card ──────────────
-const _origLockCheckinEOD = window.lockCheckin;
-window.lockCheckin = function() {
-  if (_origLockCheckinEOD) _origLockCheckinEOD.apply(this, arguments);
-  if (EOD_ROLES.includes(currentUser?.role)) setTimeout(updateEODPromptCard, 100);
-};
-const _origInitCheckinEOD = window.initCheckin;
-window.initCheckin = function() {
-  if (_origInitCheckinEOD) _origInitCheckinEOD.apply(this, arguments);
-  if (EOD_ROLES.includes(currentUser?.role)) setTimeout(updateEODPromptCard, 300);
-};
-
-
-// ══════════════════════════════════════════════════════════════════════════
-// ── PATCH PACK: ALL V11 FIXES ──────────────────────────────────════════════
-// ══════════════════════════════════════════════════════════════════════════
-
-// ── OTHER TASKS SYSTEM ────────────────────────────────────────────────────
-const OTHER_TASK_TYPES = [
-  'Training session','Team meeting','Internal admin',
-  'Compliance / audit','System / tool issue','Process improvement',
-  'Onboarding support','Other'
-];
-
-
-function renderOtherTasksScreen() {
-  const el = document.getElementById('otherTasksContent');
-  if (!el) return;
-  const myTasks = getOtherTasks()
-    .filter(t => t.owner === currentUser.name)
-    .sort((a,b) => b.ts - a.ts);
-
-  const todayTasks = myTasks.filter(t => t.date === today);
-
-  el.innerHTML = `
-    <div class="card" style="margin-bottom:1rem">
-      <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">Log a task</div>
-      <div class="field">
-        <label>Task type</label>
-        <select id="ot_type" style="font-size:14px">
-          ${OTHER_TASK_TYPES.map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join('')}
-        </select>
-      </div>
-      <div class="field">
-        <label>Description <span style="color:var(--danger)">*</span></label>
-        <textarea id="ot_desc" placeholder="e.g. Conducted onboarding training for new analyst Ravi — covered Infynity and checklist process"
-          style="width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:14px;color:var(--text);background:var(--surface-2);outline:none;resize:none;min-height:68px;line-height:1.5"></textarea>
-      </div>
-      <div style="display:flex;gap:8px">
-        <div class="field" style="flex:1;margin-bottom:0">
-          <label>Time spent</label>
-          <select id="ot_duration" style="font-size:14px">
-            <option value="15">15 min</option>
-            <option value="30">30 min</option>
-            <option value="45">45 min</option>
-            <option value="60" selected>1 hour</option>
-            <option value="90">1.5 hours</option>
-            <option value="120">2 hours</option>
-            <option value="180">3 hours</option>
-            <option value="240">4+ hours</option>
-          </select>
-        </div>
-      </div>
-      <button onclick="saveOtherTask()" class="btn-primary" style="margin-top:12px">Add task</button>
-    </div>
-
-    <div class="card">
-      <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Today's other tasks (${todayTasks.length})</div>
-      ${todayTasks.length === 0
-        ? '<div style="font-size:13px;color:var(--text-3)">None logged yet today.</div>'
-        : todayTasks.map(t => `
-          <div style="display:flex;align-items:flex-start;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);gap:8px">
-            <div style="flex:1">
-              <div style="font-size:13px;font-weight:600;color:var(--text)">${esc(t.type)}</div>
-              <div style="font-size:12px;color:var(--text-2);margin-top:2px">${esc(t.desc)}</div>
-              <div style="font-size:11px;color:var(--text-3);margin-top:2px">⏱ ${t.duration >= 60 ? Math.floor(t.duration/60)+'h'+(t.duration%60?''+t.duration%60+'m':'') : t.duration+'min'}</div>
-            </div>
-            <button onclick="deleteOtherTask('${t.id}')" style="background:var(--danger-light);color:var(--danger);border:none;border-radius:4px;padding:3px 8px;font-size:11px;cursor:pointer;flex-shrink:0">✕</button>
-          </div>`).join('')}
-    </div>`;
-}
-
-function saveOtherTask() {
-  const desc = document.getElementById('ot_desc')?.value.trim();
-  if (!desc) { showToast('Enter a description.','err'); return; }
-  const task = {
-    id: genFileId(),
-    owner: currentUser.name,
-    date: today,
-    type: document.getElementById('ot_type').value,
-    desc,
-    duration: parseInt(document.getElementById('ot_duration').value)||60,
-    ts: Date.now(),
-  };
-  const tasks = getOtherTasks();
-  tasks.push(task);
-  saveOtherTasks(tasks);
-  spSyncOtherTask(task).catch(()=>{});
-  showToast('Task logged ✓','ok');
-  renderOtherTasksScreen();
-}
-
-function deleteOtherTask(id) {
-  spDeleteOtherTask(id).catch(()=>{});
-  const tasks = getOtherTasks().filter(t => t.id !== id);
-  saveOtherTasks(tasks);
-  renderOtherTasksScreen();
-}
-
-// ── EOD: replace broker concern Yes/No with chip multi-select ─────────────
-// Override renderEODScreen to inject improved version
-const _origRenderEODScreen = window.renderEODScreen;
-window.renderEODScreen = function() {
-  const el = document.getElementById('eodScreenContent');
-  if (!el) return;
-
-  const existing = getTodayEOD(currentUser.name);
-  const rec = getRecords().find(r => r.date === today && r.name === currentUser.name);
-  const hasCheckedIn = rec && rec.status !== 'leave';
-
-  if (!hasCheckedIn) {
-    el.innerHTML = `<div class="card" style="text-align:center;padding:2rem">
-      <div style="font-size:2rem;margin-bottom:10px">⏳</div>
-      <div style="font-size:15px;font-weight:600;color:var(--text)">Check in first</div>
-      <div style="font-size:13px;color:var(--text-3);margin-top:4px">Complete your attendance check-in before filling in the EOD report.</div>
-    </div>`;
-    return;
-  }
-
-  const sub = document.getElementById('eodScreenSub');
-  if (sub) sub.textContent = existing ? 'Submitted — you can update anytime' : 'Complete before clocking out';
-
-  const myTodayFiles = getFileEntries().filter(f => f.owner === currentUser.name && f.updatedAt === today && f.active !== false);
-  const myTodayTasks = getOtherTasks().filter(t => t.owner === currentUser.name && t.date === today);
-  const pf = (field, fallback='') => existing ? (existing[field] ?? fallback) : fallback;
-
-  // Broker concern chips
-  const BROKER_POS = ['Clear instructions','Responsive','Supportive','Good feedback','Easy to work with'];
-  const BROKER_NEG = ['Raised complaint','Unclear brief','Unreasonable expectation','Slow to respond','Changed requirements','Rude or dismissive'];
-  const existingBCTags = pf('brokerConcernTags', []);
-
-  const moodVal = pf('mood','');
-  const moods = [{v:'tough',e:'😔',l:'Tough day'},{v:'ok',e:'😐',l:'OK'},{v:'good',e:'😊',l:'Good day'}];
-
-  el.innerHTML = `<form onsubmit="submitEODv2(event)">
-
-    ${myTodayFiles.length > 0 || myTodayTasks.length > 0 ? `
-    <div class="card" style="margin-bottom:1rem">
-      ${myTodayFiles.length > 0 ? `
-        <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">📁 Files worked on today</div>
-        ${myTodayFiles.map(f => {
-          const sc = FILE_STATUS_COLORS[f.status]||{bg:'#F3F4F6',color:'#374151'};
-          return `<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border)">
-            <span style="font-size:13px;color:var(--text)">${esc(f.client)}</span>
-            <div style="display:flex;gap:6px;align-items:center">
-              ${f.fileBlocker?`<span style="font-size:11px;color:var(--danger)">🔴 ${esc(f.fileBlocker)}</span>`:''}
-              <span style="background:${sc.bg};color:${sc.color};border-radius:50px;padding:2px 8px;font-size:11px;font-weight:600">${esc(f.status)}</span>
-            </div>
-          </div>`;
-        }).join('')}` : ''}
-      ${myTodayTasks.length > 0 ? `
-        <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin:${myTodayFiles.length>0?'10px':0} 0 8px">📌 Other tasks today</div>
-        ${myTodayTasks.map(t=>`<div style="font-size:12px;color:var(--text-2);padding:3px 0">• ${esc(t.type)}: ${esc(t.desc)} (${t.duration<60?t.duration+'min':Math.floor(t.duration/60)+'h'})</div>`).join('')}` : ''}
-    </div>` : ''}
-
-    <div class="card" style="margin-bottom:1rem">
-      <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">How was your day?</div>
-      <div style="display:flex;gap:8px;margin-bottom:14px">
-        ${moods.map(m=>`<button type="button" onclick="selectEODMood('${m.v}')" id="eodMood_${m.v}"
-          style="flex:1;padding:10px 4px;border-radius:var(--radius-sm);border:1.5px solid ${moodVal===m.v?'var(--brand)':'var(--border)'};
-          background:${moodVal===m.v?'var(--brand-light)':'var(--surface-2)'};color:${moodVal===m.v?'var(--brand)':'var(--text-2)'};
-          font-size:13px;font-weight:${moodVal===m.v?'700':'400'};cursor:pointer;text-align:center">
-          <div style="font-size:22px">${m.e}</div><div style="font-size:11px;margin-top:2px">${m.l}</div>
-        </button>`).join('')}
-      </div>
-      <input type="hidden" id="eod_mood" value="${esc(moodVal)}"/>
-
-      <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">How confident are you today's work is 100% accurate?</div>
-      <div style="display:flex;gap:6px;margin-bottom:4px">
-        ${[1,2,3,4,5].map(n => {
-          const sel = existing && existing.confidence === n;
-          const colors = {1:'#B91C1C',2:'#D97706',3:'#B45309',4:'#16A34A',5:'#15803D'};
-          const labels = {1:'Very low',2:'Low',3:'OK',4:'High',5:'Very high'};
-          return `<button type="button" onclick="selectEODConfidence(${n})" id="eodConf_${n}"
-            style="flex:1;padding:8px 4px;border-radius:var(--radius-sm);border:1.5px solid ${sel?colors[n]:'var(--border)'};
-            background:${sel?'#F0FDF4':'var(--surface-2)'};color:${sel?colors[n]:'var(--text-3)'};
-            font-size:13px;font-weight:${sel?'700':'400'};cursor:pointer;text-align:center">
-            <div style="font-size:17px;font-weight:700">${n}</div>
-            <div style="font-size:9px;margin-top:2px">${labels[n]}</div>
-          </button>`;
-        }).join('')}
-      </div>
-      <input type="hidden" id="eod_confidence" value="${pf('confidence','')}"/>
-
-      <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin:12px 0 6px">Daily checklist completed?</div>
-      <div style="display:flex;gap:8px;margin-bottom:4px">
-        ${['Yes','Partially','No'].map(v=>{
-          const sel = pf('checklist','') === v;
-          const col = v==='Yes'?'var(--success)':v==='Partially'?'var(--warn)':'var(--danger)';
-          const bg  = v==='Yes'?'var(--success-light)':v==='Partially'?'var(--warn-light)':'var(--danger-light)';
-          return `<button type="button" onclick="selectEODChecklist('${v}')" id="eodCL_${v}"
-            style="flex:1;padding:9px;border-radius:var(--radius-sm);border:1.5px solid ${sel?col:'var(--border)'};
-            background:${sel?bg:'var(--surface-2)'};color:${sel?col:'var(--text-2)'};
-            font-size:13px;font-weight:${sel?'700':'400'};cursor:pointer">${v}</button>`;
-        }).join('')}
-      </div>
-      <input type="hidden" id="eod_checklist" value="${pf('checklist','')}"/>
-    </div>
-
-    <div class="card" style="margin-bottom:1rem">
-      <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Blockers & broker</div>
-
-      <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:6px">Waiting on: <span style="font-size:11px;color:var(--text-3);font-weight:400">select all that apply</span></div>
-      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px" id="eodBlockerChips">
-        ${['Broker','Client','Bank / Lender','Nobody — no blockers'].map(b => {
-          const sel = existing && (existing.blockers||[]).includes(b);
-          return `<button type="button" onclick="toggleEODChip(this,'blocker')" data-val="${esc(b)}"
-            style="padding:5px 12px;border-radius:50px;border:1.5px solid ${sel?'var(--brand)':'var(--border)'};
-            background:${sel?'var(--brand-light)':'var(--surface-2)'};color:${sel?'var(--brand)':'var(--text-2)'};
-            font-size:12px;font-weight:${sel?'700':'400'};cursor:pointer">${sel?'✓ ':''}${esc(b)}</button>`;
-        }).join('')}
-      </div>
-      <textarea id="eod_blockerDetail" placeholder="What's missing? How many follow-ups done?"
-        style="width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:14px;color:var(--text);background:var(--surface-2);outline:none;resize:none;min-height:52px;line-height:1.5;margin-bottom:12px">${esc(pf('blockerDetail'))}</textarea>
-
-      <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:6px">Broker interaction today: <span style="font-size:11px;color:var(--text-3);font-weight:400">select all that apply</span></div>
-      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px" id="eodBCChips">
-        ${[...BROKER_POS.map(t=>({t,pos:true})),...BROKER_NEG.map(t=>({t,pos:false}))].map(({t,pos})=>{
-          const sel = existingBCTags.includes(t);
-          const col = pos?'var(--success)':'var(--danger)';
-          const bg  = pos?'var(--success-light)':'var(--danger-light)';
-          return `<button type="button" onclick="toggleEODChip(this,'bc')" data-val="${esc(t)}"
-            style="padding:5px 12px;border-radius:50px;border:1.5px solid ${sel?col:'var(--border)'};
-            background:${sel?bg:'var(--surface-2)'};color:${sel?col:'var(--text-2)'};
-            font-size:12px;font-weight:${sel?'700':'400'};cursor:pointer">${sel?'✓ ':''}${esc(t)}</button>`;
-        }).join('')}
-        <button type="button" onclick="toggleEODChip(this,'bc')" data-val="No broker interaction today"
-          style="padding:5px 12px;border-radius:50px;border:1.5px solid ${existingBCTags.includes('No broker interaction today')?'var(--text-3)':'var(--border)'};
-          background:${existingBCTags.includes('No broker interaction today')?'var(--surface-2)':'var(--surface-2)'};color:var(--text-2);
-          font-size:12px;cursor:pointer">No broker interaction today</button>
-      </div>
-      <textarea id="eod_brokerConcernDetail" placeholder="Add any detail about broker interaction…"
-        style="width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:14px;color:var(--text);background:var(--surface-2);outline:none;resize:none;min-height:52px;line-height:1.5">${esc(pf('brokerConcernDetail'))}</textarea>
-    </div>
-
-    <div class="card" style="margin-bottom:1rem">
-      <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Wrap-up</div>
-
-      <div class="field">
-        <label>Challenges faced today?</label>
-        <div style="display:flex;gap:8px;margin-top:6px;margin-bottom:6px">
-          ${['yes','no'].map(v=>{
-            const sel = pf('challenges','') === v;
-            const col = v==='yes'?'var(--warn)':'var(--success)';
-            const bg  = v==='yes'?'var(--warn-light)':'var(--success-light)';
-            return `<button type="button" onclick="selectEODBool('challenges','${v}',this)" id="eodCH_${v}"
-              style="flex:1;padding:9px;border-radius:var(--radius-sm);border:1.5px solid ${sel?col:'var(--border)'};
-              background:${sel?bg:'var(--surface-2)'};color:${sel?col:'var(--text-2)'};
-              font-size:14px;font-weight:${sel?'700':'400'};cursor:pointer">${v==='yes'?'Yes':'No'}</button>`;
-          }).join('')}
-        </div>
-        <input type="hidden" id="eod_challenges" value="${pf('challenges','')}"/>
-        <div id="eodCHDetail_wrap" style="display:${pf('challenges','')==='yes'?'block':'none'}">
-          <textarea id="eod_challengeDetail" placeholder="Briefly describe the challenge…"
-            style="width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:14px;color:var(--text);background:var(--surface-2);outline:none;resize:none;min-height:52px;line-height:1.5">${esc(pf('challengeDetail'))}</textarea>
-        </div>
-      </div>
-
-      <div class="field">
-        <label>Training or other support needed from Team Lead?</label>
-        <div style="display:flex;gap:8px;margin-top:6px;margin-bottom:6px">
-          ${['yes','no'].map(v=>{
-            const sel = pf('supportNeeded','') === v;
-            const col = v==='yes'?'var(--brand)':'var(--success)';
-            const bg  = v==='yes'?'var(--brand-light)':'var(--success-light)';
-            return `<button type="button" onclick="selectEODBool('supportNeeded','${v}',this)" id="eodSN_${v}"
-              style="flex:1;padding:9px;border-radius:var(--radius-sm);border:1.5px solid ${sel?col:'var(--border)'};
-              background:${sel?bg:'var(--surface-2)'};color:${sel?col:'var(--text-2)'};
-              font-size:14px;font-weight:${sel?'700':'400'};cursor:pointer">${v==='yes'?'Yes':'No'}</button>`;
-          }).join('')}
-        </div>
-        <input type="hidden" id="eod_supportNeeded" value="${pf('supportNeeded','')}"/>
-        <div id="eodSNDetail_wrap" style="display:${pf('supportNeeded','')==='yes'?'block':'none'}">
-          <textarea id="eod_supportDetail" placeholder="e.g. Need help with Infynity, training on compliance…"
-            style="width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:14px;color:var(--text);background:var(--surface-2);outline:none;resize:none;min-height:52px;line-height:1.5">${esc(pf('supportDetail'))}</textarea>
-        </div>
-      </div>
-
-      <div class="field">
-        <label>First priority for tomorrow</label>
-        <input type="text" id="eod_tomorrow" value="${esc(pf('tomorrow',''))}" placeholder="e.g. Follow up ANZ vals for Johnson file, call Shaji re: docs"/>
-      </div>
-
-      <div class="field" style="margin-bottom:0">
-        <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
-          <input type="checkbox" id="eod_handover" ${pf('handover',false)?'checked':''} style="width:18px;height:18px;cursor:pointer"/>
-          <span>I'm off tomorrow — TL please review my files</span>
-        </label>
-      </div>
-    </div>
-
-    <div class="field">
-      <label>Anything else? <span style="color:var(--text-3);font-weight:400">(optional)</span></label>
-      <textarea id="eod_notes" placeholder="Learnings, observations, handover notes…"
-        style="width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:14px;color:var(--text);background:var(--surface-2);outline:none;resize:none;min-height:52px;line-height:1.5">${esc(pf('notes'))}</textarea>
-    </div>
-
-    <div id="eodSubmitErr" style="color:var(--danger);font-size:13px;margin-bottom:8px;display:none"></div>
-    <button type="submit" class="btn-primary" style="width:100%;padding:14px;font-size:16px;margin-bottom:4px">
-      ${existing ? 'Update EOD report' : 'Submit EOD report'}
-    </button>
-    ${existing ? `<div style="text-align:center;font-size:12px;color:var(--text-3);margin-top:4px">Last submitted: ${esc(fmtDate(existing.submittedAt||existing.date))}</div>` : ''}
-  </form>`;
-};
-
-// ── New EOD interaction helpers ────────────────────────────────────────────
-function selectEODMood(v) {
-  document.getElementById('eod_mood').value = v;
-  ['tough','ok','good'].forEach(m => {
-    const btn = document.getElementById('eodMood_'+m);
-    if (!btn) return;
-    const sel = m === v;
-    btn.style.border = sel?'1.5px solid var(--brand)':'1.5px solid var(--border)';
-    btn.style.background = sel?'var(--brand-light)':'var(--surface-2)';
-    btn.style.color = sel?'var(--brand)':'var(--text-2)';
-    btn.style.fontWeight = sel?'700':'400';
-  });
-}
-
-function selectEODChecklist(v) {
-  document.getElementById('eod_checklist').value = v;
-  const cols = {Yes:'var(--success)',Partially:'var(--warn)',No:'var(--danger)'};
-  const bgs  = {Yes:'var(--success-light)',Partially:'var(--warn-light)',No:'var(--danger-light)'};
-  ['Yes','Partially','No'].forEach(k => {
-    const btn = document.getElementById('eodCL_'+k);
-    if (!btn) return;
-    const sel = k === v;
-    btn.style.border = sel?'1.5px solid '+cols[k]:'1.5px solid var(--border)';
-    btn.style.background = sel?bgs[k]:'var(--surface-2)';
-    btn.style.color = sel?cols[k]:'var(--text-2)';
-    btn.style.fontWeight = sel?'700':'400';
-  });
-}
-
-function selectEODBool(field, val, btn) {
-  document.getElementById('eod_'+field).value = val;
-  const parent = btn.parentElement;
-  const yesCol = {challenges:'var(--warn)',supportNeeded:'var(--brand)'}[field]||'var(--brand)';
-  const yesBg  = {challenges:'var(--warn-light)',supportNeeded:'var(--brand-light)'}[field]||'var(--brand-light)';
-  parent.querySelectorAll('button').forEach(b => {
-    const isThis = b===btn;
-    const isYes = b.textContent.trim()==='Yes';
-    if (isThis) {
-      b.style.border = `1.5px solid ${isYes?yesCol:'var(--success)'}`;
-      b.style.background = isYes?yesBg:'var(--success-light)';
-      b.style.color = isYes?yesCol:'var(--success)';
-      b.style.fontWeight = '700';
-    } else {
-      b.style.border = '1.5px solid var(--border)';
-      b.style.background = 'var(--surface-2)';
-      b.style.color = 'var(--text-2)';
-      b.style.fontWeight = '400';
-    }
-  });
-  const wrapMap = {challenges:'eodCHDetail_wrap',supportNeeded:'eodSNDetail_wrap'};
-  const wrap = document.getElementById(wrapMap[field]);
-  if (wrap) wrap.style.display = val==='yes'?'block':'none';
-}
-
-// ── New submitEOD ──────────────────────────────────────────────────────────
-function submitEODv2(e) {
-  e.preventDefault();
-  const errEl = document.getElementById('eodSubmitErr');
-
-  const blockers = Array.from(document.querySelectorAll('#eodBlockerChips button'))
-    .filter(b => b.style.fontWeight==='700').map(b=>b.dataset.val);
-  const bcTags = Array.from(document.querySelectorAll('#eodBCChips button'))
-    .filter(b => b.style.fontWeight==='700').map(b=>b.dataset.val);
-  const confidence = parseInt(document.getElementById('eod_confidence')?.value||'0');
-  const mood = document.getElementById('eod_mood')?.value||'';
-  const checklist = document.getElementById('eod_checklist')?.value||'';
-  const challenges = document.getElementById('eod_challenges')?.value||'';
-  const supportNeeded = document.getElementById('eod_supportNeeded')?.value||'';
-
-  const errors = [];
-  if (!mood) errors.push('Select how your day was.');
-  if (blockers.length===0) errors.push('Select at least one blocker option.');
-  if (bcTags.length===0) errors.push('Select at least one broker interaction option.');
-  if (!confidence) errors.push('Rate your confidence (1–5).');
-  if (!checklist) errors.push('Answer the checklist question.');
-  if (!challenges) errors.push('Answer the challenges question.');
-  if (challenges==='yes' && !document.getElementById('eod_challengeDetail')?.value.trim())
-    errors.push('Describe the challenge.');
-  if (!supportNeeded) errors.push('Answer the support needed question.');
-
-  if (errors.length>0) {
-    errEl.style.display='block';
-    errEl.innerHTML='⚠️ '+errors.join('<br>⚠️ ');
-    errEl.scrollIntoView({behavior:'smooth',block:'nearest'});
-    return;
-  }
-  errEl.style.display='none';
-
-  const report = {
-    id: genFileId(),
-    name: currentUser.name,
-    role: currentUser.role,
-    date: today,
-    submittedAt: new Date().toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit',hour12:true}),
-    submittedTs: Date.now(),
-    mood,
-    checklist,
-    blockers,
-    blockerDetail: document.getElementById('eod_blockerDetail')?.value.trim()||'',
-    brokerConcernTags: bcTags,
-    brokerConcernDetail: document.getElementById('eod_brokerConcernDetail')?.value.trim()||'',
-    confidence,
-    challenges,
-    challengeDetail: document.getElementById('eod_challengeDetail')?.value.trim()||'',
-    supportNeeded,
-    supportDetail: document.getElementById('eod_supportDetail')?.value.trim()||'',
-    tomorrow: document.getElementById('eod_tomorrow')?.value.trim()||'',
-    handover: document.getElementById('eod_handover')?.checked||false,
-    notes: document.getElementById('eod_notes')?.value.trim()||'',
-    linkedFileIds: getFileEntries().filter(f=>f.owner===currentUser.name&&f.updatedAt===today&&f.active!==false).map(f=>f.id),
-    otherTaskIds: getOtherTasks().filter(t=>t.owner===currentUser.name&&t.date===today).map(t=>t.id),
-  };
-
-  const all = getEODReports().filter(r=>!(r.name===currentUser.name&&r.date===today));
-  all.push(report);
-  saveEODReports(all);
-  spSyncEOD(report).catch(()=>{});
-  showToast('✓ EOD report submitted!','ok');
-  updateEODPromptCard();
-  window.renderEODScreen();
-}
-
-// Patch submitEOD to call new version (old one is bypassed by form onsubmit override)
-window.submitEOD = submitEODv2;
-
-// ── Patch renderEODSummary for new fields ─────────────────────────────────
-const _origRenderEODSummary = window.renderEODSummary;
-window.renderEODSummary = function(el, teamNames, date) {
-  date = date||today;
-  const reports = getEODReports().filter(r=>r.date===date&&teamNames.includes(r.name));
-  const staff = getStaff().filter(s=>EOD_ROLES.includes(s.role)&&teamNames.includes(s.name));
-  const submitted = new Set(reports.map(r=>r.name));
-  const missing = staff.filter(s=>!submitted.has(s.name));
-  const lowConf = reports.filter(r=>r.confidence<=2);
-  const brokerNeg = reports.filter(r=>(r.brokerConcernTags||[]).some(t=>
-    ['Raised complaint','Unclear brief','Unreasonable expectation','Slow to respond','Changed requirements','Rude or dismissive'].includes(t)));
-  const supportFlags = reports.filter(r=>r.supportNeeded==='yes');
-  const handoverFlags = reports.filter(r=>r.handover);
-  const moodEmoji = {tough:'😔',ok:'😐',good:'😊'};
-
-  el.innerHTML = `
-    <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">📋 EOD Reports — ${esc(date)}</div>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px">
-      <div style="background:${missing.length>0?'var(--danger-light)':'var(--success-light)'};border-radius:var(--radius-sm);padding:8px;text-align:center">
-        <div style="font-size:20px;font-weight:700;color:${missing.length>0?'var(--danger)':'var(--success)'}">${reports.length}/${staff.length}</div>
-        <div style="font-size:10px;color:var(--text-3)">Submitted</div>
-      </div>
-      <div style="background:${lowConf.length>0?'var(--danger-light)':'var(--surface-2)'};border-radius:var(--radius-sm);padding:8px;text-align:center">
-        <div style="font-size:20px;font-weight:700;color:${lowConf.length>0?'var(--danger)':'var(--text-3)'}">${lowConf.length}</div>
-        <div style="font-size:10px;color:var(--text-3)">Low conf.</div>
-      </div>
-      <div style="background:${brokerNeg.length>0?'#FEF3C7':'var(--surface-2)'};border-radius:var(--radius-sm);padding:8px;text-align:center">
-        <div style="font-size:20px;font-weight:700;color:${brokerNeg.length>0?'#92400E':'var(--text-3)'}">${brokerNeg.length}</div>
-        <div style="font-size:10px;color:var(--text-3)">Broker issues</div>
-      </div>
-    </div>
-    ${handoverFlags.length>0?`<div style="background:#EDE9FE;border-radius:var(--radius-sm);padding:8px 12px;font-size:12px;color:#5B21B6;margin-bottom:8px;font-weight:600">🔄 Off tomorrow: ${handoverFlags.map(r=>esc(r.name.split(' ')[0])).join(', ')} — review their files</div>`:''}
-    ${missing.length>0?`<div style="background:var(--danger-light);border-radius:var(--radius-sm);padding:8px 12px;font-size:12px;color:var(--danger);margin-bottom:8px">⏳ Not submitted: ${missing.map(s=>esc(s.name.split(' ')[0])).join(', ')}</div>`:''}
-    ${reports.map(r => {
-      const confColor = r.confidence>=4?'var(--success)':r.confidence>=3?'var(--warn)':'var(--danger)';
-      const negTags = (r.brokerConcernTags||[]).filter(t=>['Raised complaint','Unclear brief','Unreasonable expectation','Slow to respond','Changed requirements','Rude or dismissive'].includes(t));
-      const posTags = (r.brokerConcernTags||[]).filter(t=>['Clear instructions','Responsive','Supportive','Good feedback','Easy to work with'].includes(t));
-      const flags = [];
-      if (r.confidence<=2) flags.push('<span style="background:var(--danger-light);color:var(--danger);border-radius:4px;padding:1px 6px;font-size:11px;font-weight:600">Low confidence</span>');
-      if (negTags.length>0) flags.push('<span style="background:#FEF3C7;color:#92400E;border-radius:4px;padding:1px 6px;font-size:11px;font-weight:600">Broker issue</span>');
-      if (r.supportNeeded==='yes') flags.push('<span style="background:var(--brand-light);color:var(--brand);border-radius:4px;padding:1px 6px;font-size:11px;font-weight:600">Needs support</span>');
-      if (r.handover) flags.push('<span style="background:#EDE9FE;color:#5B21B6;border-radius:4px;padding:1px 6px;font-size:11px;font-weight:600">Off tomorrow</span>');
-      return `<div style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:8px">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
-          <div style="font-size:13px;font-weight:700;color:var(--text)">${esc(r.name.split(' ')[0])} ${moodEmoji[r.mood]||''} <span style="font-size:11px;color:var(--text-3)">· ${esc(fmtDate(r.submittedAt||''))}</span></div>
-          <div style="display:flex;align-items:center;gap:6px">
-            <span style="font-size:15px;font-weight:700;color:${confColor}">${r.confidence}/5</span>
-            <span style="font-size:12px;color:var(--text-3)">${r.checklist||''}</span>
+  // Checklist viewer button
+  const allFiles = typeof getFileEntries==='function' ? getFileEntries() : [];
+  const atOrPastReady = ['Ready to Submit',...(typeof STAGES_AFTER_READY!=='undefined'?STAGES_AFTER_READY:[])];
+  const teamFiles = allFiles.filter(f=>myTeamNames.includes(f.owner)&&atOrPastReady.includes(f.status));
+  if (teamFiles.length > 0) {
+    const clDiv = document.createElement('div');
+    clDiv.className = 'card'; clDiv.style.marginTop = '12px';
+    const byPerson = {};
+    teamFiles.forEach(f=>{
+      if(!byPerson[f.owner]) byPerson[f.owner]={submitted:[],pending:[]};
+      if(f.checklistSubmitted) byPerson[f.owner].submitted.push(f);
+      else byPerson[f.owner].pending.push(f);
+    });
+    clDiv.innerHTML = `
+      <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">✅ Submission checklist</div>
+      ${Object.entries(byPerson).map(([name,{submitted,pending}])=>`
+        <div style="padding:7px 0;border-bottom:0.5px solid var(--border)">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <span style="font-size:13px;font-weight:600">${esc(name.split(' ')[0])}</span>
+            <span style="font-size:12px;color:${pending.length?'var(--danger)':'var(--success)'};font-weight:600">${submitted.length} done${pending.length?' · '+pending.length+' pending':''}</span>
           </div>
+          ${pending.length?`<div style="font-size:12px;color:var(--danger)">${pending.map(f=>esc(f.client)).join(', ')}</div>`:''}
+        </div>`).join('')}`;
+    myteamEl.appendChild(clDiv);
+  }
+
+  const allSubmitted = allFiles.filter(f=>myTeamNames.includes(f.owner)&&f.checklistSubmitted).length;
+  const btnDiv = document.createElement('div');
+  btnDiv.className = 'card'; btnDiv.style.marginTop = '12px';
+  btnDiv.innerHTML = `<button onclick="openChecklistViewer()" style="width:100%;padding:10px;border:1.5px solid var(--brand);border-radius:var(--radius-sm);background:var(--brand-light);color:var(--brand);font-size:13px;font-weight:600;cursor:pointer">
+    📋 View checklist responses${allSubmitted?' ('+allSubmitted+' submitted)':''}
+  </button>`;
+  myteamEl.appendChild(btnDiv);
+};
+
+function renderMyTeamEOD(myTeamNames) {
+  const el = document.getElementById('myTeamEODBlock');
+  if (!el) return;
+  const todayStr = new Date().toISOString().split('T')[0];
+
+  // Date range from period
+  let from = todayStr, to = todayStr;
+  if (_myTeamEODPeriod === 'yesterday') {
+    const y=new Date(); y.setDate(y.getDate()-1); from=to=y.toISOString().split('T')[0];
+  } else if (_myTeamEODPeriod === 'week') {
+    const w=new Date(); w.setDate(w.getDate()-w.getDay()+1); from=w.toISOString().split('T')[0];
+  } else if (_myTeamEODPeriod === 'month') {
+    from=todayStr.slice(0,7)+'-01';
+  } else if (_myTeamEODPeriod === '30d') {
+    const d=new Date(); d.setDate(d.getDate()-30); from=d.toISOString().split('T')[0];
+  } else if (_myTeamEODPeriod === '90d') {
+    const d=new Date(); d.setDate(d.getDate()-90); from=d.toISOString().split('T')[0];
+  } else if (_myTeamEODPeriod === 'custom') {
+    from=_myTeamEODFromDt||todayStr; to=_myTeamEODToDt||todayStr;
+  }
+
+  const isToday = _myTeamEODPeriod === 'today';
+  const allReports = getEODReports().filter(r=>{
+    if(!myTeamNames.includes(r.name)) return false;
+    if(isToday) return r.date===from && (r.status==='submitted'||r.status==='draft');
+    return r.status==='submitted' && r.date>=from && r.date<=to;
+  });
+  const viewNames = _myTeamEODPerson ? [_myTeamEODPerson] : myTeamNames;
+  const reports = allReports.filter(r=>viewNames.includes(r.name));
+
+  // Summary counts
+  const submittedReports = reports.filter(r=>r.status==='submitted');
+  const draftReports     = reports.filter(r=>r.status==='draft');
+  const uniqueSubmitters = [...new Set(submittedReports.map(r=>r.name))];
+  const uniqueDrafters   = [...new Set(draftReports.map(r=>r.name))].filter(n=>!uniqueSubmitters.includes(n));
+  const supportCount = submittedReports.filter(r=>r.supportNeeded==='yes').length;
+  const notSubmitted = isToday ? viewNames.filter(n=>!reports.find(r=>r.name===n&&r.date===todayStr)) : [];
+
+  const periodBtns = [
+    ['today','Today'],['yesterday','Yesterday'],['week','This week'],
+    ['month','This month'],['30d','Last 30d'],['90d','Last 90d'],['custom','📅 Custom']
+  ].map(([v,l])=>`<button onclick="_myTeamEODPeriod='${v}';renderMyTeamEOD(${JSON.stringify(myTeamNames)})"
+    style="font-size:12px;padding:5px 10px;border-radius:50px;border:1.5px solid ${_myTeamEODPeriod===v?'var(--brand)':'var(--border)'};background:${_myTeamEODPeriod===v?'var(--brand-light)':'var(--surface-2)'};color:${_myTeamEODPeriod===v?'var(--brand)':'var(--text-2)'};cursor:pointer;font-weight:${_myTeamEODPeriod===v?'700':'400'};white-space:nowrap">${l}</button>`).join('');
+
+  const personBtns = ['', ...myTeamNames].map(n=>`<button onclick="_myTeamEODPerson='${n.replace(/'/g,"\\'")}';renderMyTeamEOD(${JSON.stringify(myTeamNames)})"
+    style="font-size:12px;padding:5px 10px;border-radius:50px;border:1.5px solid ${_myTeamEODPerson===n?'var(--brand)':'var(--border)'};background:${_myTeamEODPerson===n?'var(--brand-light)':'var(--surface-2)'};color:${_myTeamEODPerson===n?'var(--brand)':'var(--text-2)'};cursor:pointer;font-weight:${_myTeamEODPerson===n?'700':'400'};white-space:nowrap">${n?esc(n.split(' ')[0]):'All staff'}</button>`).join('');
+
+  // Per-member rows
+  const memberRows = viewNames.map(name => {
+    const memberReports = reports.filter(r=>r.name===name);
+    const todayReport = memberReports.find(r=>r.date===todayStr);
+    const todaySubmitted = todayReport?.status==='submitted';
+    const todayDraft     = todayReport?.status==='draft';
+    const isExpanded = _myTeamExpanded.has(name);
+    const allRecs = typeof getRecords==='function' ? getRecords() : [];
+    const todayRec = allRecs.find(r=>r.name===name&&r.date===todayStr);
+    const checkedIn = todayRec && todayRec.status!=='leave';
+    const eodBadge = !todayReport
+      ? '<span style="font-size:11px;background:#FEE2E2;color:#991B1B;border-radius:4px;padding:2px 7px;font-weight:600">No EOD</span>'
+      : todaySubmitted
+        ? '<span style="font-size:11px;background:#D1FAE5;color:#065F46;border-radius:4px;padding:2px 7px;font-weight:600">✓ Submitted</span>'
+        : '<span style="font-size:11px;background:#F3F4F6;color:#6B7280;border-radius:4px;padding:2px 7px;font-weight:600">📝 Draft</span>';
+    const ciStatus = isToday ? (checkedIn
+      ? '<span style="font-size:11px;color:var(--success)">✓ In</span>'
+      : '<span style="font-size:11px;color:var(--danger)">Not in</span>') : '';
+    const supportFlag = memberReports.filter(r=>r.supportNeeded==='yes').length
+      ? `<span style="font-size:11px;background:#FEF3C7;color:#92400E;border-radius:4px;padding:2px 7px;font-weight:600">🙋 ${memberReports.filter(r=>r.supportNeeded==='yes').length} support</span>` : '';
+
+    const header = `<div style="display:flex;align-items:center;gap:8px;padding:8px 0;cursor:pointer;border-bottom:0.5px solid var(--border)" onclick="myTeamToggleMember('${name.replace(/'/g,"\\'")}',${JSON.stringify(myTeamNames)})">
+      <span style="font-size:13px;font-weight:600;flex:1">${esc(name.split(' ')[0])}</span>
+      ${ciStatus}${eodBadge}${supportFlag}
+      <span style="font-size:14px;color:var(--text-3)">${isExpanded?'▴':'▾'}</span>
+    </div>`;
+
+    if (!isExpanded) return header;
+
+    const fmt = v=>{if(!v)return'—';const[h,m]=v.split(':');const ap=+h<12?'AM':'PM';return(+h%12||12)+':'+m+' '+ap;};
+    const taskHTML = memberReports.length ? memberReports.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(r=>{
+      const isT = r.date===todayStr;
+      const isDraft = r.status==='draft';
+      return `<div style="padding:6px 0;border-bottom:0.5px solid var(--border)">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+          <span style="font-size:11px;font-weight:600;color:var(--text-3)">${isT?'Today':fmtDate(r.date)}</span>
+          ${isDraft?'<span style="font-size:10px;background:#F3F4F6;color:#6B7280;border-radius:4px;padding:1px 5px">draft</span>':''}
         </div>
-        ${flags.length>0?`<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px">${flags.join('')}</div>`:''}
-        ${(r.blockers||[]).length>0&&!r.blockers.includes('Nobody — no blockers')?`<div style="font-size:12px;color:var(--danger)">🔴 Blocked: ${r.blockers.map(b=>esc(b)).join(', ')}${r.blockerDetail?' — '+esc(r.blockerDetail):''}</div>`:''}
-        ${negTags.length>0?`<div style="font-size:12px;color:#92400E">📣 Broker: ${negTags.map(t=>esc(t)).join(', ')}${r.brokerConcernDetail?' — '+esc(r.brokerConcernDetail):''}</div>`:''}
-        ${posTags.length>0?`<div style="font-size:12px;color:var(--success)">👍 ${posTags.map(t=>esc(t)).join(', ')}</div>`:''}
-        ${r.challengeDetail?`<div style="font-size:12px;color:var(--text-2)">⚠️ ${esc(r.challengeDetail)}</div>`:''}
-        ${r.supportDetail?`<div style="font-size:12px;color:var(--brand)">🙋 ${esc(r.supportDetail)}</div>`:''}
-        ${r.tomorrow?`<div style="font-size:12px;color:var(--text-3)">→ Tomorrow: ${esc(r.tomorrow)}</div>`:''}
-        ${r.notes?`<div style="font-size:12px;color:var(--text-3);font-style:italic">"${esc(r.notes)}"</div>`:''}
+        ${(r.tasks||[]).map(t=>`<div style="display:flex;gap:8px;font-size:12px;padding:2px 0;color:var(--text-2)">
+          <span style="flex:1;font-weight:500">${esc(t.type||'—')}${t.subType?' · '+esc(t.subType):''}</span>
+          <span style="color:var(--text-3)">${fmt(t.startTime)} → ${fmt(t.endTime)}</span>
+        </div>`).join('')}
+        ${r.firstPriority?`<div style="font-size:11px;background:#EDE9FE;color:#5B21B6;border-radius:4px;padding:4px 8px;margin-top:4px">📌 Priority: ${esc(r.firstPriority)}</div>`:''}
+        ${r.supportNeeded==='yes'?`<div style="font-size:11px;color:#92400E;margin-top:3px">🙋 ${esc(r.supportDetail||'Support needed')}</div>`:''}
+        ${r.challenges==='yes'?`<div style="font-size:11px;color:var(--danger);margin-top:2px">⚠ ${esc(r.challengeDetail||'Challenge flagged')}</div>`:''}
       </div>`;
-    }).join('')}`;
-};
+    }).join('') : '<div style="font-size:12px;color:var(--text-3);padding:6px 0">No EOD reports in this period.</div>';
 
-
-// ══════════════════════════════════════════════════════════════════════════
-// ── PERFORMANCE SYSTEM (Team Lead only) ───────────────────────────────────
-// ══════════════════════════════════════════════════════════════════════════
-
-// ── Core: get N days ago as YYYY-MM-DD ────────────────────────────────────
-function daysAgoStr(n) {
-  const d = new Date();
-  d.setDate(d.getDate() - n);
-  return d.toISOString().split('T')[0];
-}
-
-function dateRange(days) {
-  const dates = [];
-  for (let i = days - 1; i >= 0; i--) dates.push(daysAgoStr(i));
-  return dates;
-}
-
-// ── Broker complaint tags (negative) ─────────────────────────────────────
-const BROKER_COMPLAINT_TAGS = [
-  'Raised complaint','Unclear brief','Unreasonable expectation',
-  'Slow to respond','Changed requirements','Rude or dismissive'
-];
-
-// ══════════════════════════════════════════════════════════════════════════
-// ── ANALYTICS ENGINE ──────────────────────────────────────────────────────
-// ══════════════════════════════════════════════════════════════════════════
-
-function calcPersonPerformance(name, days) {
-  const from = daysAgoStr(days);
-  const eodAll = getEODReports().filter(r => r.name === name && r.date >= from && r.date <= today);
-  const filesAll = getFileEntries().filter(f => f.owner === name);
-  const otherTasksAll = getOtherTasks().filter(t => t.owner === name && t.date >= from);
-
-  // ── EOD metrics ──────────────────────────────────────────────────────
-  const eodCount = eodAll.length;
-  const workDays = days; // approximate
-  const submissionRate = workDays > 0 ? Math.round((eodCount / workDays) * 100) : 0;
-
-  // Average confidence
-  const confScores = eodAll.filter(r => r.confidence).map(r => r.confidence);
-  const avgConf = confScores.length > 0
-    ? (confScores.reduce((a,b)=>a+b,0) / confScores.length).toFixed(1)
-    : null;
-
-  // Consecutive low confidence (≤2) ending at most recent report
-  const sortedEOD = [...eodAll].sort((a,b) => a.date.localeCompare(b.date));
-  let consecLowConf = 0;
-  for (let i = sortedEOD.length - 1; i >= 0; i--) {
-    if ((sortedEOD[i].confidence||0) <= 2) consecLowConf++;
-    else break;
-  }
-
-  // Checklist completion
-  const clYes = eodAll.filter(r => r.checklist === 'Yes').length;
-  const clPartial = eodAll.filter(r => r.checklist === 'Partially').length;
-  const clNo = eodAll.filter(r => r.checklist === 'No').length;
-  const clRate = eodCount > 0 ? Math.round((clYes / eodCount) * 100) : null;
-
-  // Broker complaints
-  const brokerComplaints = eodAll.filter(r =>
-    (r.brokerConcernTags||[]).some(t => BROKER_COMPLAINT_TAGS.includes(t))
-  );
-  const brokerComplaintCount = brokerComplaints.length;
-
-  // Mood distribution
-  const moodCounts = {tough:0, ok:0, good:0};
-  eodAll.forEach(r => { if (r.mood && moodCounts[r.mood] !== undefined) moodCounts[r.mood]++; });
-
-  // Support requests
-  const supportCount = eodAll.filter(r => r.supportNeeded === 'yes').length;
-
-  // Same blocker repeating (3+ times)
-  const blockerFreq = {};
-  eodAll.forEach(r => (r.blockers||[]).forEach(b => {
-    if (b !== 'Nobody — no blockers') blockerFreq[b] = (blockerFreq[b]||0) + 1;
-  }));
-  const repeatedBlockers = Object.entries(blockerFreq).filter(([,c]) => c >= 3).map(([b,c]) => ({b,c}));
-
-  // ── File metrics ──────────────────────────────────────────────────────
-  const activeFiles = filesAll.filter(f => f.active !== false && f.status !== 'Settlement');
-  const staleFiles = activeFiles.filter(f => {
-    const daysSince = (Date.now() - (f.updatedTs||0)) / 86400000;
-    return daysSince >= 3;
-  });
-  const settledFiles = filesAll.filter(f => f.status === 'Settlement' || f.active === false);
-  const settledInPeriod = settledFiles.filter(f => f.settledAt >= from);
-
-  // Loan volume in period
-  const volumeInPeriod = settledInPeriod
-    .filter(f => f.loanAmount)
-    .reduce((sum,f) => sum + (f.loanAmount||0), 0);
-
-  // Stage regressions — count files that went backward
-  const stageOrder = ['Data Collection','Pre-Qualification','Application Start','Pending Info',
-    'Submitted to Lender','MIR','Conditionally Approved','Unconditionally Approved','Loan Documents','Settlement'];
-  let regressionCount = 0;
-  filesAll.forEach(f => {
-    const hist = f.stageHistory || [];
-    for (let i = 1; i < hist.length; i++) {
-      const prevIdx = stageOrder.indexOf(hist[i-1].stage);
-      const currIdx = stageOrder.indexOf(hist[i].stage);
-      if (prevIdx > 0 && currIdx >= 0 && currIdx < prevIdx) regressionCount++;
-    }
-  });
-
-  // One-touch approvals
-  const oneTouchCount = filesAll.filter(f => {
-    const hist = f.stageHistory || [];
-    const subIdx = hist.findLastIndex(h => h.stage === 'Submitted to Lender');
-    const unconIdx = hist.findLastIndex(h => h.stage === 'Unconditionally Approved');
-    if (subIdx < 0 || unconIdx <= subIdx) return false;
-    return hist.slice(subIdx+1, unconIdx).length === 0;
-  }).length;
-
-  // Avg time from creation to Unconditionally Approved
-  const approvalTimes = filesAll
-    .filter(f => f.unconditionalAt && f.createdAt)
-    .map(f => {
-      const d = (new Date(f.unconditionalAt) - new Date(f.createdAt)) / 86400000;
-      return d >= 0 ? d : null;
-    }).filter(d => d !== null);
-  const avgApprovalDays = approvalTimes.length > 0
-    ? (approvalTimes.reduce((a,b)=>a+b,0)/approvalTimes.length).toFixed(1)
-    : null;
-
-  // ── Alert flags ────────────────────────────────────────────────────────
-  const alerts = [];
-  if (consecLowConf >= 3)
-    alerts.push({ level:'red', msg: `Low confidence for ${consecLowConf} consecutive days` });
-  if (brokerComplaintCount >= 1)
-    alerts.push({ level:'amber', msg: `${brokerComplaintCount} broker complaint${brokerComplaintCount>1?'s':''} in this period` });
-  if (clRate !== null && clRate < 50)
-    alerts.push({ level:'amber', msg: `Checklist completed only ${clRate}% of days` });
-  if (staleFiles.length >= 3)
-    alerts.push({ level:'amber', msg: `${staleFiles.length} stale files not updated in 3+ days` });
-  if (repeatedBlockers.length > 0)
-    alerts.push({ level:'amber', msg: `Same blocker repeating: ${repeatedBlockers.map(({b,c})=>b+' ('+c+'×)').join(', ')}` });
-  if (avgConf !== null && parseFloat(avgConf) <= 2.5 && confScores.length >= 3)
-    alerts.push({ level:'amber', msg: `Average confidence only ${avgConf}/5` });
-  if (moodCounts.tough >= 4 && eodCount >= 5)
-    alerts.push({ level:'amber', msg: `${moodCounts.tough} tough day reports — may need a check-in` });
-
-  // ── Traffic light ─────────────────────────────────────────────────────
-  const redCount = alerts.filter(a => a.level==='red').length;
-  const amberCount = alerts.filter(a => a.level==='amber').length;
-  const pulse = redCount > 0 ? 'red' : amberCount >= 2 ? 'amber' : amberCount === 1 ? 'amber' : 'green';
-
-  return {
-    name, eodCount, submissionRate, avgConf, consecLowConf,
-    clRate, clYes, clPartial, clNo,
-    brokerComplaintCount, brokerComplaints,
-    moodCounts, supportCount, repeatedBlockers,
-    activeFiles: activeFiles.length, staleFiles: staleFiles.length,
-    settledInPeriod: settledInPeriod.length, volumeInPeriod,
-    regressionCount, oneTouchCount, avgApprovalDays,
-    alerts, pulse, days,
-  };
-}
-
-// ══════════════════════════════════════════════════════════════════════════
-// ── OPTION A: Performance Pulse card on My Team screen ────────────────────
-// ══════════════════════════════════════════════════════════════════════════
-
-function renderPerformancePulse(containerEl, teamNames) {
-  const pulseData = teamNames
-    .map(name => calcPersonPerformance(name, 7))
-    .sort((a,b) => {
-      const order = {red:0, amber:1, green:2};
-      return order[a.pulse] - order[b.pulse];
-    });
-
-  const redCount = pulseData.filter(p => p.pulse==='red').length;
-  const amberCount = pulseData.filter(p => p.pulse==='amber').length;
-
-  const div = document.createElement('div');
-  div.className = 'card';
-  div.style.marginTop = '1rem';
-  div.innerHTML = `
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-      <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px">📊 Performance Pulse — last 7 days</div>
-      <button onclick="document.querySelectorAll('.nav-tab').forEach(b=>b.classList.remove('active'));Array.from(document.querySelectorAll('.nav-tab')).find(b=>b.textContent.includes('Performance'))?.classList.add('active');renderPerformanceScreen();showScreen('performance')"
-        style="font-size:11px;padding:3px 10px;border-radius:50px;border:1.5px solid var(--border);background:transparent;cursor:pointer;color:var(--text-2)">Full report →</button>
-    </div>
-    ${redCount>0||amberCount>0?`<div style="background:${redCount>0?'var(--danger-light)':'#FFFBEB'};border-radius:var(--radius-sm);padding:8px 12px;font-size:12px;color:${redCount>0?'var(--danger)':'#92400E'};margin-bottom:10px;font-weight:600">
-      ${redCount>0?`🔴 ${redCount} person${redCount>1?'s':''} need${redCount>1?'':'s'} attention`:''}
-      ${amberCount>0?`${redCount>0?' · ':''}⚠️ ${amberCount} person${amberCount>1?'s':''} to watch`:''}
-    </div>`:''}
-    <div style="display:flex;flex-direction:column;gap:6px">
-      ${pulseData.map(p => {
-        const pulseColor = p.pulse==='red'?'var(--danger)':p.pulse==='amber'?'#D97706':'var(--success)';
-        const pulseBg = p.pulse==='red'?'var(--danger-light)':p.pulse==='amber'?'#FEF3C7':'var(--success-light)';
-        const pulseIcon = p.pulse==='red'?'🔴':p.pulse==='amber'?'⚠️':'🟢';
-        return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:${pulseBg};border-radius:var(--radius-sm)">
-          <div style="flex:1">
-            <div style="font-size:13px;font-weight:600;color:var(--text)">${pulseIcon} ${esc(p.name)}</div>
-            ${p.alerts.length>0?`<div style="font-size:11px;color:${pulseColor};margin-top:2px">${p.alerts[0].msg}${p.alerts.length>1?' +more':''}</div>`:'<div style="font-size:11px;color:var(--success)">On track</div>'}
-          </div>
-          <div style="text-align:right;flex-shrink:0">
-            ${p.avgConf!==null?`<div style="font-size:13px;font-weight:700;color:${parseFloat(p.avgConf)>=4?'var(--success)':parseFloat(p.avgConf)>=3?'#D97706':'var(--danger)'}">${p.avgConf}/5</div>`:''}
-            <div style="font-size:10px;color:var(--text-3)">${p.eodCount} EODs</div>
-          </div>
-        </div>`;
-      }).join('')}
-    </div>`;
-  containerEl.appendChild(div);
-}
-
-// ══════════════════════════════════════════════════════════════════════════
-// ── OPTION B+C: Full Performance Screen ───────────────────────────────────
-// ══════════════════════════════════════════════════════════════════════════
-
-let _perfDays = 7;
-let _myTeamNames = []; // shared for My Team filter functions
-
-
-// ── Broker Management Screen ──────────────────────────────────────────────
-var _bmBrokerListOpen    = false;
-var _bmAssignOpen        = false;
-let _bmAssignView        = 'staff';
-let _bmAssignStaffFilter = '';
-let _bmAssignRoleFilter  = '';
-let _bmAssignBrkFilter   = '';
-var _bmCRMSkillsOpen     = false;
-let _bmCRMSkillsView     = 'staff';
-let _bmCRMStaffFilter    = '';
-let _bmCRMRoleFilter     = '';
-let _bmCRMFilter         = '';
-
-// ── Broker data ────────────────────────────────────────────────────────────
-let _brokers = [];
-let _brokerAssignments = [];
-let _crmOptions = [];
-let _staffCRMs = [];
-
-async function loadBrokers() {
-  try {
-    const res = await spGet(SP_API+"('Brokers')/items?$select=Id,Title&$top=500");
-    if (res?.value) { _brokers = res.value.map(r=>({id:r.Id,name:r.Title})); return; }
-  } catch(e){}
-  _brokers = LS.get('ci_brokers') || [];
-}
-
-async function loadBrokerAssignments() {
-  try {
-    const res = await spGet(SP_API+"('BrokerAssignments')/items?$select=Id,Title,BrokerName&$top=1000");
-    if (res?.value) { _brokerAssignments = res.value.map(r=>({id:r.Id,staffName:r.Title,brokerName:r.BrokerName})); return; }
-  } catch(e){}
-  _brokerAssignments = LS.get('ci_brokerassign') || [];
-}
-
-async function loadCRMOptions() {
-  try {
-    const res = await spGet(SP_API+"('CRMOptions')/items?$select=Id,Title&$top=200");
-    if (res?.value) { _crmOptions = res.value.map(r=>({id:r.Id,name:r.Title})); return; }
-  } catch(e){}
-  _crmOptions = LS.get('ci_crmoptions') || [];
-}
-
-async function loadStaffCRMs() {
-  try {
-    const res = await spGet(SP_API+"('StaffCRMs')/items?$select=Id,Title,CRMList&$top=500");
-    if (res?.value) { _staffCRMs = res.value.map(r=>({id:r.Id,staffName:r.Title,crms:JSON.parse(r.CRMList||'[]')})); return; }
-  } catch(e){}
-  _staffCRMs = LS.get('ci_staffcrms') || [];
-}
-
-function getBrokersForStaff(staffName) {
-  return _brokerAssignments.filter(a=>a.staffName===staffName).map(a=>a.brokerName);
-}
-
-function getCRMsForStaff(staffName) {
-  return _staffCRMs.find(s=>s.staffName===staffName)?.crms || [];
-}
-
-async function assignBrokerToStaff() {
-  const staffName = document.getElementById('bmStaffSel')?.value;
-  const brokerName = document.getElementById('bmBrokerSel')?.value;
-  if (!staffName||!brokerName) { showToast('Select staff and broker.','err'); return; }
-  if (_brokerAssignments.find(a=>a.staffName===staffName&&a.brokerName===brokerName)) { showToast('Already assigned.','err'); return; }
-  const res = await spPost(SP_API+"('BrokerAssignments')/items", {Title:staffName, BrokerName:brokerName});
-  if (res) { await loadBrokerAssignments(); renderBrokerMgmtScreen(); showToast('Broker assigned ✓','ok'); }
-}
-
-async function removeBrokerAssignment(id) {
-  if (!id) return;
-  try {
-    await spDelete(SP_API+`('BrokerAssignments')/items(${id})`);
-    await loadBrokerAssignments(); renderBrokerMgmtScreen(); showToast('Assignment removed.','ok');
-  } catch(e) { showToast('Failed to remove.','err'); }
-}
-
-async function addBroker() {
-  const input = document.getElementById('bmNewBroker');
-  const name = input?.value.trim();
-  if (!name) return;
-  const res = await spPost(SP_API+"('Brokers')/items", {Title:name});
-  if (res) { if(input)input.value=''; await loadBrokers(); renderBrokerMgmtScreen(); showToast('Broker added ✓','ok'); }
-}
-
-async function deleteBroker(id) {
-  try {
-    await spDelete(SP_API+`('Brokers')/items(${id})`);
-    await loadBrokers(); renderBrokerMgmtScreen(); showToast('Broker removed.','ok');
-  } catch(e) { showToast('Failed to remove.','err'); }
-}
-
-async function addCRMOption() {
-  const input = document.getElementById('bmNewCRM');
-  const name = input?.value.trim();
-  if (!name) return;
-  const res = await spPost(SP_API+"('CRMOptions')/items", {Title:name});
-  if (res) { if(input)input.value=''; await loadCRMOptions(); renderBrokerMgmtScreen(); showToast('CRM added ✓','ok'); }
-}
-
-async function deleteCRMOption(id) {
-  try {
-    await spDelete(SP_API+`('CRMOptions')/items(${id})`);
-    await loadCRMOptions(); renderBrokerMgmtScreen(); showToast('CRM removed.','ok');
-  } catch(e) { showToast('Failed to remove.','err'); }
-}
-
-async function toggleStaffCRM(staffName, crmName) {
-  const existing = _staffCRMs.find(s=>s.staffName===staffName);
-  let crms = existing?.crms ? [...existing.crms] : [];
-  if (crms.includes(crmName)) crms = crms.filter(c=>c!==crmName);
-  else crms.push(crmName);
-  const payload = {Title:staffName, CRMList:JSON.stringify(crms)};
-  try {
-    if (existing) await spPatch(SP_API+`('StaffCRMs')/items(${existing.id})`, payload);
-    else await spPost(SP_API+"('StaffCRMs')/items", payload);
-    await loadStaffCRMs(); renderBrokerMgmtScreen();
-  } catch(e) { showToast('Failed to save CRM.','err'); }
-}
-
-async function renderBrokerMgmtScreen() {
-  const el = document.getElementById('brokerMgmtContent');
-  if (!el) return;
-  el.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--text-3)">Loading…</div>';
-  try {
-    await Promise.all([
-      loadBrokers().catch(()=>{}),
-      loadBrokerAssignments().catch(()=>{}),
-      loadCRMOptions().catch(()=>{}),
-      loadStaffCRMs().catch(()=>{}),
-    ]);
-    el.innerHTML = '';
-
-    // Ops manager — read-only unassigned view
-    if (isOpsManager()) { el.appendChild(bmUnassignedCard()); return; }
-
-    if (isSuperAdmin()) el.appendChild(bmBrokerListCard());
-    el.appendChild(bmAssignCard());
-    if (isSuperAdmin()) el.appendChild(bmCRMOptionsCard());
-    el.appendChild(bmCRMSkillsCard());
-  } catch(e) {
-    el.innerHTML = `<div class="card" style="text-align:center;padding:2rem">
-      <div style="font-size:1.5rem">⚠️</div>
-      <div style="font-weight:600;color:var(--danger);margin-top:8px">Error loading</div>
-      <div style="font-size:13px;color:var(--text-3);margin-top:4px">${esc(e.message||'')}</div>
-      <button onclick="renderBrokerMgmtScreen()" style="margin-top:12px;padding:8px 16px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface-2);cursor:pointer;font-size:13px">↺ Retry</button>
-    </div>`;
-  }
-}
-
-// ── helpers ────────────────────────────────────────────────────────────────
-function bmViewStaff() {
-  const all = getStaff().filter(s=>['analyst','teamlead','trainee'].includes(s.role));
-  if (isSuperAdmin()) return all;
-  const team = getTeamForTL(currentUser.name);
-  return all.filter(s=>team.includes(s.name));
-}
-function bmSectionHeader(label, count, openVar, toggleFn) {
-  return `<div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer" onclick="${toggleFn}()">
-    <div>
-      <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px">${label}</div>
-      <div style="font-size:13px;color:var(--text-2);margin-top:2px">${count}</div>
-    </div>
-    <span style="font-size:18px;color:var(--text-3)" id="${openVar}Icon">${window[openVar]?'▴':'▾'}</span>
-  </div>`;
-}
-function bmToggleSection(openVar, bodyId) {
-  window[openVar] = !window[openVar];
-  const body = document.getElementById(bodyId);
-  const icon = document.getElementById(openVar+'Icon');
-  if (body) body.style.display = window[openVar] ? 'block' : 'none';
-  if (icon) icon.textContent = window[openVar] ? '▴' : '▾';
-}
-function bmToggleBtn(label, active) {
-  return `style="padding:5px 14px;border-radius:50px;font-size:12px;border:1.5px solid ${active?'var(--brand)':'var(--border)'};
-    background:${active?'var(--brand-light)':'var(--surface-2)'};color:${active?'var(--brand)':'var(--text-2)'};
-    font-weight:${active?'700':'400'};cursor:pointer"`;
-}
-
-// ── OPS MANAGER — Unassigned analysts/trainees view ───────────────────────
-var _bmOpsRoleFilter   = '';
-var _bmOpsNameFilter   = '';
-var _bmOpsTeamFilter   = '';
-var _bmOpsTenureFilter = '';
-
-function bmUnassignedCard() {
-  const card = document.createElement('div');
-  card.className = 'card';
-
-  const allStaff    = getStaff().filter(s => ['analyst','trainee'].includes(s.role));
-  const unassigned  = allStaff.filter(s => getBrokersForStaff(s.name).length === 0);
-  const tls         = getStaff().filter(s => s.role === 'teamlead');
-  const teams       = tls.map(tl => ({ name: tl.name, label: tl.name.split(' ')[0]+"'s team" }));
-
-  const showTenure  = _bmOpsRoleFilter !== 'analyst';
-
-  card.innerHTML = `
-    <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">🏦 Unassigned Staff</div>
-    <p style="font-size:13px;color:var(--text-2);margin-bottom:14px">${unassigned.length} of ${allStaff.length} analysts/trainees have no broker assigned.</p>
-
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:${showTenure?'8px':'14px'}">
-      <select onchange="_bmOpsRoleFilter=this.value;bmRefreshOps()"
-        style="font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)">
-        <option value="">All roles</option>
-        <option value="analyst" ${_bmOpsRoleFilter==='analyst'?'selected':''}>Analyst</option>
-        <option value="trainee" ${_bmOpsRoleFilter==='trainee'?'selected':''}>Trainee</option>
-      </select>
-      <select onchange="_bmOpsNameFilter=this.value;bmRefreshOps()"
-        style="font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)">
-        <option value="">All names</option>
-        ${unassigned.map(s=>`<option value="${esc(s.name)}" ${s.name===_bmOpsNameFilter?'selected':''}>${esc(s.name)}</option>`).join('')}
-      </select>
-      <select onchange="_bmOpsTeamFilter=this.value;bmRefreshOps()"
-        style="font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)">
-        <option value="">All teams</option>
-        ${teams.map(t=>`<option value="${esc(t.name)}" ${t.name===_bmOpsTeamFilter?'selected':''}>${esc(t.label)}</option>`).join('')}
-      </select>
-      ${showTenure ? `
-      <select onchange="_bmOpsTenureFilter=this.value;bmRefreshOps()"
-        style="font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)">
-        <option value="">Any tenure</option>
-        <option value="30" ${_bmOpsTenureFilter==='30'?'selected':''}>1+ month</option>
-        <option value="45" ${_bmOpsTenureFilter==='45'?'selected':''}>45+ days</option>
-        <option value="60" ${_bmOpsTenureFilter==='60'?'selected':''}>2+ months</option>
-        <option value="90" ${_bmOpsTenureFilter==='90'?'selected':''}>3+ months</option>
-      </select>` : '<div></div>'}
-    </div>
-
-    <div id="bmOpsContent">${bmOpsContent()}</div>`;
-
-  return card;
-}
-
-function bmRefreshOps() {
-  const el = document.getElementById('bmOpsContent');
-  if (el) el.innerHTML = bmOpsContent();
-  // Show/hide tenure filter based on role selection
-  const showTenure = _bmOpsRoleFilter !== 'analyst';
-  const tenureSels = document.querySelectorAll('#brokerMgmtContent select');
-  // Rebuild card for tenure filter visibility
-  renderBrokerMgmtScreen();
-}
-
-function bmTenureDays(joinDate) {
-  if (!joinDate) return null;
-  const join = new Date(joinDate);
-  if (isNaN(join)) return null;
-  return Math.floor((Date.now() - join.getTime()) / 86400000);
-}
-
-function bmTenureLabel(days) {
-  if (days === null) return null;
-  const months = Math.floor(days / 30);
-  const rem    = days % 30;
-  if (months === 0) return `${days} day${days!==1?'s':''}`;
-  if (rem === 0)    return `${months} month${months!==1?'s':''}`;
-  return `${months} month${months!==1?'s':''} ${rem} day${rem!==1?'s':''}`;
-}
-
-function bmOpsContent() {
-  const allStaff   = getStaff().filter(s => ['analyst','trainee'].includes(s.role));
-  const unassigned = allStaff.filter(s => getBrokersForStaff(s.name).length === 0);
-  const showTenure = _bmOpsRoleFilter !== 'analyst';
-
-  let filtered = unassigned;
-  if (_bmOpsRoleFilter) filtered = filtered.filter(s => s.role === _bmOpsRoleFilter);
-  if (_bmOpsNameFilter) filtered = filtered.filter(s => s.name === _bmOpsNameFilter);
-  if (_bmOpsTeamFilter) {
-    const teamMembers = getTeamForTL(_bmOpsTeamFilter);
-    filtered = filtered.filter(s => teamMembers.includes(s.name));
-  }
-  if (_bmOpsTenureFilter && showTenure) {
-    const minDays = parseInt(_bmOpsTenureFilter);
-    filtered = filtered.filter(s => {
-      const days = bmTenureDays(s.joinDate);
-      return days !== null && days >= minDays;
-    });
-  }
-
-  if (!filtered.length) {
-    return '<div style="text-align:center;padding:1.5rem;color:var(--success);font-size:14px;font-weight:600">✓ No unassigned staff matching filters</div>';
-  }
-
-  return filtered.map(s => {
-    const crms  = getCRMsForStaff(s.name);
-    const tl    = getStaff().find(t => t.role==='teamlead' && getTeamForTL(t.name).includes(s.name));
-    const days  = bmTenureDays(s.joinDate);
-    const isTrainee = s.role === 'trainee';
-
-    return `<div style="padding:10px 0;border-bottom:1px solid var(--border)">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;flex-wrap:wrap">
-        <span style="font-size:14px;font-weight:600;flex:1">${esc(s.name)}</span>
-        <span style="font-size:11px;background:var(--surface-2);border-radius:4px;padding:2px 7px;color:var(--text-3)">${esc(ROLE_LABEL[s.role]||s.role)}</span>
-        ${tl?`<span style="font-size:11px;color:var(--text-3)">👥 ${esc(tl.name.split(' ')[0])}'s team</span>`:'<span style="font-size:11px;color:var(--danger)">No team</span>'}
-        ${isTrainee && days !== null ? `<span style="font-size:11px;background:#EDE9FE;color:#5B21B6;border-radius:4px;padding:2px 7px;font-weight:600">📅 ${bmTenureLabel(days)}</span>` : ''}
-      </div>
-      ${isTrainee && s.joinDate ? `<div style="font-size:11px;color:var(--text-3);margin-bottom:5px">Started ${esc(s.joinDate)}</div>` : ''}
-      <div style="display:flex;flex-wrap:wrap;gap:4px">
-        ${crms.length
-          ? crms.map(c=>`<span style="font-size:11px;background:var(--brand-light);color:var(--brand);border-radius:50px;padding:2px 9px;font-weight:500">${esc(c)}</span>`).join('')
-          : '<span style="font-size:11px;color:var(--text-3);font-style:italic">No CRM skills recorded</span>'}
-      </div>
-    </div>`;
+    return header + `<div style="padding:8px 0 4px;margin-left:8px;padding-left:12px;border-left:2px solid var(--border)">${taskHTML}</div>`;
   }).join('');
-}
 
-// ── 1. BROKER LIST ─────────────────────────────────────────────────────────
-function bmBrokerListCard() {
-  const c = document.createElement('div');
-  c.className = 'card'; c.style.marginBottom = '1rem';
-  c.innerHTML = `
-    ${bmSectionHeader('🏦 Broker List', _brokers.length+' brokers', '_bmBrokerListOpen', 'bmToggleBrokerList')}
-    <div style="margin-top:12px">
-      <div style="display:flex;gap:8px">
-        <input type="text" id="bmNewBroker" placeholder="New broker name…"
-          style="flex:1;font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)"
-          onkeydown="if(event.key==='Enter'){addBroker();event.preventDefault()}"/>
-        <button onclick="addBroker()" style="padding:7px 16px;border-radius:var(--radius-sm);border:none;background:var(--brand);color:#fff;font-size:13px;font-weight:600;cursor:pointer">+ Add</button>
+  el.innerHTML = `
+    <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">📋 EOD Reports</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">${periodBtns}</div>
+    ${_myTeamEODPeriod==='custom'?`<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
+      <input type="date" value="${_myTeamEODFromDt}" onchange="_myTeamEODFromDt=this.value;renderMyTeamEOD(${JSON.stringify(myTeamNames)})"
+        style="font-size:13px;padding:5px 8px;border:1.5px solid var(--border);border-radius:var(--radius-sm)"/>
+      <span style="font-size:12px;color:var(--text-3)">to</span>
+      <input type="date" value="${_myTeamEODToDt}" onchange="_myTeamEODToDt=this.value;renderMyTeamEOD(${JSON.stringify(myTeamNames)})"
+        style="font-size:13px;padding:5px 8px;border:1.5px solid var(--border);border-radius:var(--radius-sm)"/>
+    </div>`:''}
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">${personBtns}</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr${isToday&&uniqueDrafters.length?' 1fr':''}${supportCount?' 1fr':'1fr'};gap:8px;margin-bottom:12px">
+      <div style="background:${uniqueSubmitters.length===viewNames.length?'#D1FAE5':'#FEF3C7'};border-radius:var(--radius-sm);padding:10px;text-align:center">
+        <div style="font-size:20px;font-weight:700;color:${uniqueSubmitters.length===viewNames.length?'#065F46':'#92400E'}">${uniqueSubmitters.length}/${viewNames.length}</div>
+        <div style="font-size:11px;color:${uniqueSubmitters.length===viewNames.length?'#065F46':'#92400E'};margin-top:2px">Submitted</div>
+      </div>
+      ${isToday&&uniqueDrafters.length?`<div style="background:#F3F4F6;border-radius:var(--radius-sm);padding:10px;text-align:center">
+        <div style="font-size:20px;font-weight:700;color:#6B7280">${uniqueDrafters.length}</div>
+        <div style="font-size:11px;color:#6B7280;margin-top:2px">In progress</div>
+      </div>`:''}
+      <div style="background:${supportCount>0?'#FEF3C7':'var(--surface-2)'};border-radius:var(--radius-sm);padding:10px;text-align:center">
+        <div style="font-size:20px;font-weight:700;color:${supportCount>0?'#92400E':'var(--text-3)'}">${supportCount}</div>
+        <div style="font-size:11px;color:${supportCount>0?'#92400E':'var(--text-3)'};margin-top:2px">Need support</div>
       </div>
     </div>
-    <div id="bmBrokerListBody" style="display:${_bmBrokerListOpen?'block':'none'};margin-top:12px">
-      ${bmBrokerListBody()}
-    </div>`;
-  return c;
-}
-function bmBrokerListBody() {
-  const sorted = [..._brokers].sort((a,b)=>a.name.localeCompare(b.name));
-  if (!sorted.length) return '<div style="font-size:13px;color:var(--text-3);padding:8px 0">No brokers yet.</div>';
-  const letters = [...new Set(sorted.map(b=>b.name[0]?.toUpperCase()))].sort();
-  let html = `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px">
-    ${letters.map(l=>`<button onclick="document.getElementById('bml_${l}')?.scrollIntoView({behavior:'smooth',block:'nearest'})"
-      style="padding:2px 8px;border-radius:4px;border:1px solid var(--border);background:var(--surface-2);font-size:12px;font-weight:600;cursor:pointer;color:var(--brand)">${l}</button>`).join('')}
-  </div><div style="max-height:300px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius-sm)">`;
-  let last = '';
-  sorted.forEach(b=>{
-    const L = b.name[0]?.toUpperCase();
-    if (L!==last) { html+=`<div id="bml_${L}" style="font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;padding:6px 10px 2px;background:var(--surface-2);border-bottom:1px solid var(--border)">${L}</div>`; last=L; }
-    html+=`<div style="display:flex;align-items:center;padding:7px 10px;border-bottom:1px solid var(--border)">
-      <span style="flex:1;font-size:13px">${esc(b.name)}</span>
-      <button onclick="deleteBroker(${b.id})" style="font-size:11px;padding:2px 8px;border-radius:4px;border:1px solid var(--danger);color:var(--danger);background:transparent;cursor:pointer">Remove</button>
-    </div>`;
-  });
-  return html+'</div>';
-}
-function bmToggleBrokerList() { bmToggleSection('_bmBrokerListOpen','bmBrokerListBody'); }
-
-// ── 2. BROKER ASSIGNMENTS ─────────────────────────────────────────────────
-function bmAssignCard() {
-  const c = document.createElement('div');
-  c.className = 'card'; c.style.marginBottom = '1rem';
-  const staff  = bmViewStaff();
-  const roles  = [...new Set(staff.map(s=>s.role))].sort();
-  const sa     = isSuperAdmin();
-
-  c.innerHTML = `
-    ${bmSectionHeader('👥 Broker Assignments',
-      `${_brokerAssignments.length} assignment${_brokerAssignments.length!==1?'s':''}`,
-      '_bmAssignOpen', 'bmToggleAssign')}
-    <div id="bmAssignBody" style="display:${_bmAssignOpen?'block':'none'};margin-top:14px">
-      <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
-        <button onclick="bmSetAssignView('staff')" ${bmToggleBtn('By staff', _bmAssignView==='staff')}>By staff</button>
-        <button onclick="bmSetAssignView('broker')" ${bmToggleBtn('By broker', _bmAssignView==='broker')}>By broker</button>
-      </div>
-      ${_bmAssignView==='staff' ? `
-        <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
-          <select id="bmAssignStaffSel" onchange="_bmAssignStaffFilter=this.value;bmRefreshAssignContent()"
-            style="flex:1;font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)">
-            <option value="">All staff</option>
-            ${staff.map(s=>`<option value="${esc(s.name)}" ${s.name===_bmAssignStaffFilter?'selected':''}>${esc(s.name)}</option>`).join('')}
-          </select>
-          <select id="bmAssignRoleSel" onchange="_bmAssignRoleFilter=this.value;bmRefreshAssignContent()"
-            style="font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)">
-            <option value="">All roles</option>
-            ${roles.map(r=>`<option value="${r}" ${r===_bmAssignRoleFilter?'selected':''}>${esc(ROLE_LABEL[r]||r)}</option>`).join('')}
-          </select>
-        </div>` : `
-        <div style="display:flex;gap:8px;margin-bottom:12px">
-          <select id="bmAssignBrkSel" onchange="_bmAssignBrkFilter=this.value;bmRefreshAssignContent()"
-            style="flex:1;font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)">
-            <option value="">All brokers</option>
-            ${[..._brokers].sort((a,b)=>a.name.localeCompare(b.name)).map(b=>`<option value="${esc(b.name)}" ${b.name===_bmAssignBrkFilter?'selected':''}>${esc(b.name)}</option>`).join('')}
-          </select>
-        </div>`}
-      <div id="bmAssignContent">${bmAssignContent()}</div>
-    </div>`;
-  return c;
-}
-function bmToggleAssign() { bmToggleSection('_bmAssignOpen','bmAssignBody'); }
-function bmSetAssignView(v) {
-  _bmAssignView=v; _bmAssignStaffFilter=''; _bmAssignRoleFilter=''; _bmAssignBrkFilter='';
-  const el = document.getElementById('bmAssignBody');
-  if (el) el.innerHTML = bmBuildAssignInner();
-}
-function bmBuildAssignInner() {
-  const staff = bmViewStaff();
-  const roles = [...new Set(staff.map(s=>s.role))].sort();
-  const sa = isSuperAdmin();
-  return `
-    <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
-      <button onclick="bmSetAssignView('staff')" ${bmToggleBtn('By staff', _bmAssignView==='staff')}>By staff</button>
-      <button onclick="bmSetAssignView('broker')" ${bmToggleBtn('By broker', _bmAssignView==='broker')}>By broker</button>
-    </div>
-    ${_bmAssignView==='staff' ? `
-      <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
-        <select onchange="_bmAssignStaffFilter=this.value;bmRefreshAssignContent()"
-          style="flex:1;font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)">
-          <option value="">All staff</option>
-          ${staff.map(s=>`<option value="${esc(s.name)}" ${s.name===_bmAssignStaffFilter?'selected':''}>${esc(s.name)}</option>`).join('')}
-        </select>
-        <select onchange="_bmAssignRoleFilter=this.value;bmRefreshAssignContent()"
-          style="font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)">
-          <option value="">All roles</option>
-          ${roles.map(r=>`<option value="${r}" ${r===_bmAssignRoleFilter?'selected':''}>${esc(ROLE_LABEL[r]||r)}</option>`).join('')}
-        </select>
-      </div>` : `
-      <div style="display:flex;gap:8px;margin-bottom:12px">
-        <select onchange="_bmAssignBrkFilter=this.value;bmRefreshAssignContent()"
-          style="flex:1;font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)">
-          <option value="">All brokers</option>
-          ${[..._brokers].sort((a,b)=>a.name.localeCompare(b.name)).map(b=>`<option value="${esc(b.name)}" ${b.name===_bmAssignBrkFilter?'selected':''}>${esc(b.name)}</option>`).join('')}
-        </select>
-      </div>`}
-    <div id="bmAssignContent">${bmAssignContent()}</div>`;
-}
-function bmRefreshAssignContent() {
-  const el = document.getElementById('bmAssignContent');
-  if (el) el.innerHTML = bmAssignContent();
-}
-function bmAssignContent() {
-  const sa    = isSuperAdmin();
-  const staff = bmViewStaff();
-  if (_bmAssignView === 'staff') {
-    let filtered = staff;
-    if (_bmAssignStaffFilter) filtered = filtered.filter(s=>s.name===_bmAssignStaffFilter);
-    if (_bmAssignRoleFilter)  filtered = filtered.filter(s=>s.role===_bmAssignRoleFilter);
-    if (!filtered.length) return '<div style="font-size:13px;color:var(--text-3)">No staff found.</div>';
-    return filtered.map(s=>{
-      const brokers  = getBrokersForStaff(s.name);
-      const assigned = _brokerAssignments.filter(a=>a.staffName===s.name);
-      const avail    = _brokers.filter(b=>!brokers.includes(b.name));
-      return `<div style="padding:10px 0;border-bottom:1px solid var(--border)">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:7px">
-          <span style="font-size:13px;font-weight:600;flex:1">${esc(s.name)}</span>
-          <span style="font-size:11px;background:var(--surface-2);border-radius:4px;padding:2px 7px;color:var(--text-3)">${esc(ROLE_LABEL[s.role]||s.role)}</span>
-        </div>
-        <div style="display:flex;flex-wrap:wrap;gap:5px;align-items:center">
-          ${brokers.map(b=>{const a=assigned.find(x=>x.brokerName===b);return `
-            <span style="display:inline-flex;align-items:center;gap:3px;background:var(--brand-light);border:1px solid var(--brand);border-radius:50px;padding:4px 10px;font-size:12px;color:var(--brand);font-weight:500">
-              ${esc(b)}
-              ${sa&&a?`<button onclick="bmRemoveAssign(${a.id})" style="background:transparent;border:none;color:var(--brand);cursor:pointer;font-size:15px;line-height:1;padding:0 0 0 4px;font-weight:700">×</button>`:''}
-            </span>`}).join('')}
-          ${!brokers.length?'<span style="font-size:12px;color:var(--text-3);font-style:italic">No broker assigned</span>':''}
-          ${sa&&avail.length?`<select onchange="bmAddAssign('${s.name.replace(/'/g,"\\'")}',this.value,this)"
-            style="font-size:12px;padding:4px 8px;border:1.5px dashed var(--border);border-radius:50px;background:var(--surface-2);color:var(--text-2);cursor:pointer">
-            <option value="">+ Add broker</option>
-            ${avail.map(b=>`<option value="${esc(b.name)}">${esc(b.name)}</option>`).join('')}
-          </select>`:''}
-        </div>
-      </div>`;
-    }).join('');
-  } else {
-    let brokers = [..._brokers].sort((a,b)=>a.name.localeCompare(b.name));
-    if (_bmAssignBrkFilter) brokers = brokers.filter(b=>b.name===_bmAssignBrkFilter);
-    if (!brokers.length) return '<div style="font-size:13px;color:var(--text-3)">No brokers found.</div>';
-    return brokers.map(broker=>{
-      const assigned     = _brokerAssignments.filter(a=>a.brokerName===broker.name);
-      const assignedNames= new Set(assigned.map(a=>a.staffName));
-      return `<div style="padding:10px 0;border-bottom:1px solid var(--border)">
-        <div style="font-size:13px;font-weight:600;margin-bottom:7px">${esc(broker.name)} <span style="font-size:11px;color:var(--text-3);font-weight:400">${assigned.length} assigned</span></div>
-        <div style="display:flex;flex-wrap:wrap;gap:5px">
-          ${staff.map(s=>{
-            const sel=assignedNames.has(s.name);
-            const a=assigned.find(x=>x.staffName===s.name);
-            return `<button onclick="${sa?`bmToggleAssign2('${broker.name.replace(/'/g,"\\'")}','${s.name.replace(/'/g,"\\'")}',${a?a.id:'null'})`:''}"
-              style="padding:4px 12px;border-radius:50px;border:1.5px solid ${sel?'var(--brand)':'var(--border)'};
-              background:${sel?'var(--brand-light)':'var(--surface-2)'};color:${sel?'var(--brand)':'var(--text-2)'};
-              font-size:12px;font-weight:${sel?'600':'400'};cursor:${sa?'pointer':'default'}">
-              ${sel?'✓ ':''}${esc(s.name.split(' ')[0])}
-            </button>`;
-          }).join('')}
-        </div>
-      </div>`;
-    }).join('');
-  }
-}
-async function bmRemoveAssign(id) {
-  await spDelete(SP_API+`('BrokerAssignments')/items(${id})`);
-  await loadBrokerAssignments(); bmRefreshAssignContent(); showToast('Removed ✓','ok');
-}
-async function bmAddAssign(staffName, brokerName, sel) {
-  if (!brokerName) return; if (sel) sel.value='';
-  const res = await spPost(SP_API+"('BrokerAssignments')/items",{Title:staffName,BrokerName:brokerName});
-  if (res) { await loadBrokerAssignments(); bmRefreshAssignContent(); showToast(staffName.split(' ')[0]+' → '+brokerName+' ✓','ok'); }
-}
-async function bmToggleAssign2(brokerName, staffName, existingId) {
-  if (existingId && existingId!=='null' && existingId!==null) {
-    await spDelete(SP_API+`('BrokerAssignments')/items(${existingId})`);
-    await loadBrokerAssignments(); bmRefreshAssignContent(); showToast('Removed ✓','ok');
-  } else {
-    const res = await spPost(SP_API+"('BrokerAssignments')/items",{Title:staffName,BrokerName:brokerName});
-    if (res) { await loadBrokerAssignments(); bmRefreshAssignContent(); showToast(staffName.split(' ')[0]+' → '+brokerName+' ✓','ok'); }
-  }
+    ${notSubmitted.length?`<div style="font-size:12px;color:var(--danger);margin-bottom:10px">⏳ Not submitted: ${notSubmitted.map(n=>esc(n.split(' ')[0])).join(', ')}</div>`:''}
+    <div>${memberRows}</div>`;
 }
 
-// ── 3. CRM OPTIONS ─────────────────────────────────────────────────────────
-function bmCRMOptionsCard() {
-  const c = document.createElement('div');
-  c.className = 'card'; c.style.marginBottom = '1rem';
-  c.innerHTML = `
-    <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">💻 CRM Options</div>
-    <div style="display:flex;gap:8px;margin-bottom:12px">
-      <input type="text" id="bmNewCRM" placeholder="Add CRM name…"
-        style="flex:1;font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)"
-        onkeydown="if(event.key==='Enter'){addCRMOption();event.preventDefault()}"/>
-      <button onclick="addCRMOption()" style="padding:7px 16px;border-radius:var(--radius-sm);border:none;background:var(--brand);color:#fff;font-size:13px;font-weight:600;cursor:pointer">+ Add</button>
-    </div>
-    <div style="display:flex;flex-wrap:wrap;gap:7px">
-      ${!_crmOptions.length?'<span style="font-size:13px;color:var(--text-3)">No CRM options yet.</span>':
-        _crmOptions.map(c=>`<span style="display:inline-flex;align-items:center;gap:4px;background:var(--surface-2);border:1.5px solid var(--border);border-radius:50px;padding:5px 12px">
-          <span style="font-size:13px;font-weight:500">${esc(c.name)}</span>
-          <button onclick="deleteCRMOption(${c.id})" style="background:transparent;border:none;color:var(--text-3);cursor:pointer;font-size:16px;line-height:1;padding:0 0 0 4px">×</button>
-        </span>`).join('')}
-    </div>`;
-  return c;
+function myTeamToggleMember(name, teamNames) {
+  if (_myTeamExpanded.has(name)) _myTeamExpanded.delete(name);
+  else _myTeamExpanded.add(name);
+  renderMyTeamEOD(teamNames);
 }
-
-// ── 4. CRM SKILLS ─────────────────────────────────────────────────────────
-function bmCRMSkillsCard() {
-  const c = document.createElement('div');
-  c.className = 'card';
-  const staff  = bmViewStaff();
-  const roles  = [...new Set(staff.map(s=>s.role))].sort();
-  const sa     = isSuperAdmin();
-  const totalAssigned = staff.filter(s=>getCRMsForStaff(s.name).length>0).length;
-
-  c.innerHTML = `
-    ${bmSectionHeader('🧑‍💻 CRM Skills',
-      `${totalAssigned} of ${staff.length} staff have CRM skills`,
-      '_bmCRMSkillsOpen', 'bmToggleCRMSkills')}
-    <div id="bmCRMSkillsBody" style="display:${_bmCRMSkillsOpen?'block':'none'};margin-top:14px">
-      ${bmCRMSkillsInner()}
-    </div>`;
-  return c;
-}
-function bmToggleCRMSkills() { bmToggleSection('_bmCRMSkillsOpen','bmCRMSkillsBody'); }
-
-function bmCRMSkillsInner() {
-  const staff = bmViewStaff();
-  const roles = [...new Set(staff.map(s=>s.role))].sort();
-  const sa    = isSuperAdmin();
-  return `
-    <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
-      <button onclick="bmSetCRMView('staff')" ${bmToggleBtn('By staff',_bmCRMSkillsView==='staff')}>By staff</button>
-      <button onclick="bmSetCRMView('crm')" ${bmToggleBtn('By CRM',_bmCRMSkillsView==='crm')}>By CRM</button>
-    </div>
-    ${_bmCRMSkillsView==='staff'?`
-      <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
-        <select onchange="_bmCRMStaffFilter=this.value;bmRefreshCRM()"
-          style="flex:1;font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)">
-          <option value="">All staff</option>
-          ${staff.map(s=>`<option value="${esc(s.name)}" ${s.name===_bmCRMStaffFilter?'selected':''}>${esc(s.name)}</option>`).join('')}
-        </select>
-        <select onchange="_bmCRMRoleFilter=this.value;bmRefreshCRM()"
-          style="font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)">
-          <option value="">All roles</option>
-          ${roles.map(r=>`<option value="${r}" ${r===_bmCRMRoleFilter?'selected':''}>${esc(ROLE_LABEL[r]||r)}</option>`).join('')}
-        </select>
-      </div>`:
-    `<div style="display:flex;gap:8px;margin-bottom:12px">
-        <select onchange="_bmCRMFilter=this.value;bmRefreshCRM()"
-          style="flex:1;font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)">
-          <option value="">All CRMs</option>
-          ${_crmOptions.map(c=>`<option value="${esc(c.name)}" ${c.name===_bmCRMFilter?'selected':''}>${esc(c.name)}</option>`).join('')}
-        </select>
-      </div>`}
-    <div id="bmCRMContent">${bmCRMContent()}</div>`;
-}
-function bmSetCRMView(v) {
-  _bmCRMSkillsView=v; _bmCRMStaffFilter=''; _bmCRMRoleFilter=''; _bmCRMFilter='';
-  const el = document.getElementById('bmCRMSkillsBody');
-  if (el) el.innerHTML = bmCRMSkillsInner();
-}
-function bmRefreshCRM() {
-  const el = document.getElementById('bmCRMContent');
-  if (el) el.innerHTML = bmCRMContent();
-}
-function bmCRMContent() {
-  const sa    = isSuperAdmin();
-  const staff = bmViewStaff();
-  if (_bmCRMSkillsView === 'staff') {
-    let filtered = staff;
-    if (_bmCRMStaffFilter) filtered = filtered.filter(s=>s.name===_bmCRMStaffFilter);
-    if (_bmCRMRoleFilter)  filtered = filtered.filter(s=>s.role===_bmCRMRoleFilter);
-    if (!filtered.length) return '<div style="font-size:13px;color:var(--text-3)">No staff found.</div>';
-    return filtered.map(s=>{
-      const skills = getCRMsForStaff(s.name);
-      return `<div style="padding:10px 0;border-bottom:1px solid var(--border)">
-        <div style="font-size:13px;font-weight:600;margin-bottom:6px">
-          ${esc(s.name)} <span style="font-size:11px;color:var(--text-3);font-weight:400">${esc(ROLE_LABEL[s.role]||s.role)}</span>
-        </div>
-        <div style="display:flex;flex-wrap:wrap;gap:5px">
-          ${!_crmOptions.length?'<span style="font-size:12px;color:var(--text-3)">No CRM options set up</span>':
-            _crmOptions.map(c=>{const sel=skills.includes(c.name);return `
-            <button ${sa?`onclick="bmToggleCRMSkill2('${s.name.replace(/'/g,"\\'")}','${esc(c.name)}')"`:''} 
-              style="padding:4px 12px;border-radius:50px;border:1.5px solid ${sel?'var(--brand)':'var(--border)'};
-              background:${sel?'var(--brand-light)':'var(--surface-2)'};color:${sel?'var(--brand)':'var(--text-2)'};
-              font-size:12px;font-weight:${sel?'600':'400'};cursor:${sa?'pointer':'default'}">
-              ${sel?'✓ ':''}${esc(c.name)}
-            </button>`;}).join('')}
-        </div>
-      </div>`;
-    }).join('');
-  } else {
-    let crms = _crmOptions;
-    if (_bmCRMFilter) crms = crms.filter(c=>c.name===_bmCRMFilter);
-    if (!crms.length) return '<div style="font-size:13px;color:var(--text-3)">No CRMs found.</div>';
-    return crms.map(crm=>{
-      const knowers = staff.filter(s=>getCRMsForStaff(s.name).includes(crm.name));
-      return `<div style="padding:10px 0;border-bottom:1px solid var(--border)">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-          <span style="font-size:13px;font-weight:600;flex:1">${esc(crm.name)}</span>
-          <span style="font-size:12px;background:${knowers.length?'var(--success-light)':'var(--surface-2)'};
-            color:${knowers.length?'var(--success)':'var(--text-3)'};border-radius:50px;padding:2px 10px;font-weight:600">
-            ${knowers.length} staff
-          </span>
-        </div>
-        <div style="display:flex;flex-wrap:wrap;gap:5px">
-          ${staff.map(s=>{const sel=knowers.some(k=>k.name===s.name);return `
-            <button ${sa?`onclick="bmToggleCRMSkill2('${s.name.replace(/'/g,"\\'")}','${esc(crm.name)}')"`:''} 
-              style="padding:4px 12px;border-radius:50px;border:1.5px solid ${sel?'var(--brand)':'var(--border)'};
-              background:${sel?'var(--brand-light)':'var(--surface-2)'};color:${sel?'var(--brand)':'var(--text-2)'};
-              font-size:12px;font-weight:${sel?'600':'400'};cursor:${sa?'pointer':'default'}">
-              ${sel?'✓ ':''}${esc(s.name.split(' ')[0])}
-            </button>`;}).join('')}
-        </div>
-      </div>`;
-    }).join('');
-  }
-}
-async function bmToggleCRMSkill2(staffName, crmName) {
-  const cur = getCRMsForStaff(staffName);
-  const nw  = cur.includes(crmName)?cur.filter(c=>c!==crmName):[...cur,crmName];
-  await saveStaffCRMSP(staffName, nw);
-  bmRefreshCRM();
-  showToast(staffName.split(' ')[0]+' — '+crmName+' updated ✓','ok');
-}
-
-function isBrokerMgmtActive() {
-  return document.getElementById('screen-brokermgmt')?.classList.contains('active');
-}
-
-
-// ── Checklist Viewer Modal ─────────────────────────────────────────────────
-let _clvPage = 0;
-let _clvFilters = { analyst:'', broker:'', client:'', from:'', to:'' };
-
-function openChecklistViewer() {
-  _clvPage = 0;
-  _clvFilters = { analyst:'', broker:'', client:'', from:'', to:'' };
-  const existing = document.getElementById('clvModal');
-  if (existing) existing.remove();
-
-  const isTL = isTeamLead();
-  const myTeam = isTL ? getTeamForTL(currentUser.name) : [];
-  const allFiles = getFileEntries();
-  const atOrPastReady = ['Ready to Submit', ...STAGES_AFTER_READY];
-
-  // Scope: TL sees team, analyst sees own
-  let scopedFiles = isTL
-    ? allFiles.filter(f => myTeam.includes(f.owner) && atOrPastReady.includes(f.status))
-    : allFiles.filter(f => f.owner === currentUser.name && atOrPastReady.includes(f.status));
-
-  const analysts  = [...new Set(scopedFiles.map(f => f.owner))].sort();
-  const brokers   = [...new Set(scopedFiles.map(f => f.broker).filter(Boolean))].sort();
-
-  const modal = document.createElement('div');
-  modal.id = 'clvModal';
-  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:1rem;overflow-y:auto';
-
-  modal.innerHTML = `
-    <div style="background:var(--surface);border-radius:var(--radius);padding:1.25rem;width:100%;max-width:720px;min-height:60vh">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-        <div style="font-size:16px;font-weight:700">📋 Checklist Responses</div>
-        <button onclick="document.getElementById('clvModal').remove()" style="background:transparent;border:none;font-size:22px;cursor:pointer;color:var(--text-3)">×</button>
-      </div>
-
-      <div style="display:grid;grid-template-columns:${isTL?'1fr 1fr':'1fr'} 1fr;gap:8px;margin-bottom:8px">
-        ${isTL?`<select id="clvAnalyst" onchange="_clvFilters.analyst=this.value;_clvPage=0;clvRender()"
-          style="font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)">
-          <option value="">All analysts</option>
-          ${analysts.map(a=>`<option value="${esc(a)}">${esc(a)}</option>`).join('')}
-        </select>`:''}
-        <select id="clvBroker" onchange="_clvFilters.broker=this.value;_clvPage=0;clvRender()"
-          style="font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)">
-          <option value="">All brokers</option>
-          ${brokers.map(b=>`<option value="${esc(b)}">${esc(b)}</option>`).join('')}
-        </select>
-        <input type="text" id="clvClient" placeholder="🔍 Search client name…"
-          oninput="_clvFilters.client=this.value;_clvPage=0;clvRender()"
-          style="font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)"/>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
-        <div style="display:flex;align-items:center;gap:6px">
-          <span style="font-size:12px;color:var(--text-3);white-space:nowrap">From</span>
-          <input type="date" id="clvFrom" onchange="_clvFilters.from=this.value;_clvPage=0;clvRender()"
-            style="flex:1;font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)"/>
-        </div>
-        <div style="display:flex;align-items:center;gap:6px">
-          <span style="font-size:12px;color:var(--text-3);white-space:nowrap">To</span>
-          <input type="date" id="clvTo" onchange="_clvFilters.to=this.value;_clvPage=0;clvRender()"
-            style="flex:1;font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)"/>
-        </div>
-      </div>
-
-      <div id="clvResults"></div>
-      <div id="clvPager" style="display:flex;justify-content:center;gap:8px;margin-top:12px"></div>
-    </div>`;
-
-  document.body.appendChild(modal);
-  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
-
-  // Store scoped files for rendering
-  modal._scopedFiles = scopedFiles;
-  modal._isTL = isTL;
-  clvRender();
-}
-
-function clvGetFiltered() {
-  const modal = document.getElementById('clvModal');
-  if (!modal) return [];
-  const atOrPastReady = ['Ready to Submit', ...STAGES_AFTER_READY];
-  return (modal._scopedFiles || [])
-    .filter(f => f.checklistSubmitted)
-    .filter(f => !_clvFilters.analyst || f.owner === _clvFilters.analyst)
-    .filter(f => !_clvFilters.broker || f.broker === _clvFilters.broker)
-    .filter(f => !_clvFilters.client || (f.client||'').toLowerCase().includes(_clvFilters.client.toLowerCase()))
-    .filter(f => !_clvFilters.from || (f.checklistDate && f.checklistDate >= _clvFilters.from))
-    .filter(f => !_clvFilters.to   || (f.checklistDate && f.checklistDate <= _clvFilters.to))
-    .sort((a,b) => (b.checklistDate||'').localeCompare(a.checklistDate||''));
-}
-
-function clvRender() {
-  const resultsEl = document.getElementById('clvResults');
-  const pagerEl   = document.getElementById('clvPager');
-  if (!resultsEl) return;
-
-  const flatItems = [];
-  SUBMISSION_CHECKLIST.forEach(sec => sec.items.forEach(item => flatItems.push({section:sec.section, item})));
-
-  const filtered = clvGetFiltered();
-  const total    = filtered.length;
-  const perPage  = 10;
-  const pages    = Math.ceil(total / perPage);
-  const page     = _clvPage;
-  const slice    = filtered.slice(page * perPage, (page + 1) * perPage);
-
-  if (!total) {
-    resultsEl.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--text-3);font-size:14px">No submitted checklists match your filters.</div>';
-    pagerEl.innerHTML = '';
-    return;
-  }
-
-  resultsEl.innerHTML = `
-    <div style="font-size:12px;color:var(--text-3);margin-bottom:8px">${total} result${total!==1?'s':''} · showing ${page*perPage+1}–${Math.min((page+1)*perPage, total)}</div>
-    ${slice.map(f => {
-      const answers   = f.checklist || [];
-      const allPassed = answers.length && answers.every(a => a === true);
-      const failCount = answers.filter(a => a === false).length;
-      const id = 'clv_' + esc(f.id);
-      return `<div style="border:1.5px solid var(--border);border-radius:var(--radius-sm);margin-bottom:8px;overflow:hidden">
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--surface-2);cursor:pointer"
-          onclick="var b=document.getElementById('${id}');b.style.display=b.style.display==='none'?'block':'none';this.querySelector('.clv-arr').textContent=b.style.display==='none'?'▾':'▴'">
-          <div>
-            <div style="font-size:14px;font-weight:600">${esc(f.client||'Unnamed')}</div>
-            <div style="font-size:11px;color:var(--text-3);margin-top:2px">
-              ${esc(f.owner||'')}${f.broker?' · '+esc(f.broker):''}${f.checklistDate?' · '+esc(f.checklistDate):''}
-            </div>
-          </div>
-          <div style="display:flex;align-items:center;gap:8px">
-            <span style="font-size:11px;background:${allPassed?'#D1FAE5':'#FEF3C7'};color:${allPassed?'#065F46':'#92400E'};border-radius:4px;padding:2px 8px;font-weight:600">
-              ${allPassed?'✓ All clear':failCount+' not confirmed'}
-            </span>
-            <span class="clv-arr" style="color:var(--text-3);font-size:16px">▾</span>
-          </div>
-        </div>
-        <div id="${id}" style="display:none;padding:12px 14px">
-          ${flatItems.map((fi,i) => {
-            const sec = i===0 || flatItems[i-1].section!==fi.section;
-            const ans = answers[i];
-            return (sec?`<div style="font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;padding:8px 0 4px;${i>0?'border-top:1px solid var(--border);margin-top:4px':''}">${esc(fi.section)}</div>`:'') +
-              `<div style="display:flex;align-items:flex-start;gap:8px;padding:4px 0;border-bottom:0.5px solid var(--border)">
-                <span style="font-size:14px;min-width:18px;${ans?'color:var(--success)':'color:var(--danger)'}">${ans?'✓':'✗'}</span>
-                <span style="font-size:12px;color:${ans?'var(--text)':'var(--danger)'};${ans?'':'font-weight:500'}">${esc(fi.item)}</span>
-              </div>`;
-          }).join('')}
-        </div>
-      </div>`;
-    }).join('')}`;
-
-  // Pagination
-  if (pages > 1) {
-    pagerEl.innerHTML = [
-      page > 0 ? `<button onclick="_clvPage=${page-1};clvRender()" style="padding:5px 14px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:var(--surface-2);cursor:pointer;font-size:13px">← Prev</button>` : '',
-      `<span style="font-size:13px;color:var(--text-3);padding:5px 10px">Page ${page+1} of ${pages}</span>`,
-      page < pages-1 ? `<button onclick="_clvPage=${page+1};clvRender()" style="padding:5px 14px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:var(--surface-2);cursor:pointer;font-size:13px">Next →</button>` : ''
-    ].join('');
-  } else {
-    pagerEl.innerHTML = '';
-  }
-}
-
-// ══════════════════════════════════════════════════════════════════════════
-// ── PERFORMANCE TAB — dashboard rebuild ──────────────────────────────────
-// ══════════════════════════════════════════════════════════════════════════
-
-let _perfPeriod     = '7';
-let _perfCustomFrom = '';
-let _perfCustomTo   = '';
-let _perfAnalystFlt = '';
-let _perfTeamFlt    = '';
-let _perfCharts     = {};
-
-const EOD_BENCHMARKS = {
-  'CRM App':   {'Single':120,'Multiple':240},
-  'AOL App':   {'Single':30,'Complex':60},
-  'Valuation': {'Single':10,'Multiple':20},
-  'Pricing':   {'Simple':10,'Complex':20},
-  'Servicing': {'Simple':20,'Complex':40},
-  'Calls':     {'Broker':60,'Customer':30,'Lender':60,'Others':20},
-  'Emails':    {'Broker':30,'Customer':60,'Lender':30,'Others':20},
-};
 const TASK_COLORS = ['#378ADD','#5DCAA5','#EF9F27','#D85A30','#7F77DD','#D4537E','#639922','#888780','#F59E0B'];
 
 function perfGetDates() {
@@ -12548,143 +11061,6 @@ function setPerfDays(days, btn) {
 
 
 // ── Patch renderMyTeam — collapsible members + rebuilt performance pulse ──
-const _origRenderMyTeamPerf = window.renderMyTeam;
-const _myTeamExpanded = new Set();
-
-window.renderMyTeam = function() {
-  if (_origRenderMyTeamPerf) _origRenderMyTeamPerf.apply(this, arguments);
-  if (!isTeamLead()) return;
-  const myteamEl = document.getElementById('myteamContent');
-  if (!myteamEl) return;
-  const myTeamNames = getTeamForTL(currentUser.name);
-  if (!myTeamNames.length) return;
-
-  const todayStr = new Date().toISOString().split('T')[0];
-  const yest = new Date(); yest.setDate(yest.getDate()-1);
-  const yesterdayStr = yest.toISOString().split('T')[0];
-  const allEODs = typeof getEODReports==='function' ? getEODReports() : [];
-  const allRecs = typeof getRecords==='function' ? getRecords() : [];
-
-  // ── Performance pulse — rebuilt for new EOD ────────────────────────────
-  const pulseDiv = document.createElement('div');
-  pulseDiv.className = 'card';
-  pulseDiv.style.marginTop = '12px';
-
-  const memberRows = myTeamNames.map(name => {
-    const todayEOD = allEODs.find(r=>r.name===name&&r.date===todayStr);
-    const yesterdayEOD = allEODs.find(r=>r.name===name&&r.date===yesterdayStr&&r.status==='submitted');
-    const todayRec = allRecs.find(r=>r.name===name&&r.date===todayStr);
-    const checkedIn = todayRec && todayRec.status!=='leave';
-    const expanded = _myTeamExpanded.has(name);
-
-    const eodBadge = !todayEOD ? '<span style="font-size:11px;background:#FEE2E2;color:#991B1B;border-radius:4px;padding:2px 7px;font-weight:600">No EOD</span>'
-      : todayEOD.status==='submitted' ? '<span style="font-size:11px;background:#D1FAE5;color:#065F46;border-radius:4px;padding:2px 7px;font-weight:600">✓ EOD</span>'
-      : '<span style="font-size:11px;background:#F3F4F6;color:#6B7280;border-radius:4px;padding:2px 7px;font-weight:600">Draft</span>';
-
-    const ciStatus = checkedIn
-      ? '<span style="font-size:11px;color:var(--success)">✓ In</span>'
-      : '<span style="font-size:11px;color:var(--danger)">Not in</span>';
-
-    const supportFlag = todayEOD?.supportNeeded==='yes'
-      ? '<span style="font-size:11px;background:#FEF3C7;color:#92400E;border-radius:4px;padding:2px 7px;font-weight:600">🙋 Support</span>' : '';
-
-    // Over-benchmark tasks today
-    const todayTasks = todayEOD?.tasks||[];
-    const overToday = todayTasks.filter(t=>{
-      const bench=typeof EOD_BENCHMARKS!=='undefined'?EOD_BENCHMARKS[t.type]?.[t.subType||'']:null;
-      const mins=typeof perfTaskMins==='function'?perfTaskMins(t):0;
-      return bench&&mins>bench;
-    });
-    const overBadge = overToday.length
-      ? `<span style="font-size:11px;background:#FEE2E2;color:#991B1B;border-radius:4px;padding:2px 7px;font-weight:600">⚠ ${overToday.length} over</span>` : '';
-
-    const header = `<div style="display:flex;align-items:center;gap:8px;padding:8px 0;cursor:pointer" onclick="myTeamToggleMember('${name.replace(/'/g,"\'")}')" >
-      <span style="font-size:13px;font-weight:600;flex:1">${esc(name.split(' ')[0])}</span>
-      ${ciStatus}
-      ${eodBadge}
-      ${supportFlag}
-      ${overBadge}
-      <span style="font-size:14px;color:var(--text-3)">${expanded?'▴':'▾'}</span>
-    </div>`;
-
-    if (!expanded) return `<div style="border-bottom:0.5px solid var(--border)">${header}</div>`;
-
-    // Expanded detail
-    const priority = yesterdayEOD?.firstPriority;
-    const todayTasksHTML = todayTasks.length
-      ? todayTasks.map(t=>{
-          const fmt=v=>{if(!v)return '—';const[h,m]=v.split(':');const ap=+h<12?'AM':'PM';return(+h%12||12)+':'+m+' '+ap;};
-          const bench=typeof EOD_BENCHMARKS!=='undefined'?EOD_BENCHMARKS[t.type]?.[t.subType||'']:null;
-          const mins=typeof perfTaskMins==='function'?perfTaskMins(t):0;
-          const over=bench&&mins>bench;
-          return `<div style="display:flex;gap:8px;font-size:12px;padding:3px 0;${over?'color:var(--danger)':'color:var(--text-2)'}">
-            <span style="flex:1;font-weight:500">${esc(t.type||'—')}${t.subType?' · '+esc(t.subType):''}</span>
-            <span>${fmt(t.startTime)} → ${fmt(t.endTime)}</span>
-            ${over?`<span style="font-weight:600">⚠</span>`:''}
-          </div>`;
-        }).join('')
-      : '<div style="font-size:12px;color:var(--text-3)">No tasks logged today</div>';
-
-    const detail = `<div style="padding:8px 0 12px;border-left:2px solid var(--border);margin-left:8px;padding-left:12px;margin-bottom:4px">
-      ${priority?`<div style="font-size:12px;background:#EDE9FE;color:#5B21B6;border-radius:var(--radius-sm);padding:6px 10px;margin-bottom:8px">
-        <span style="font-weight:600">📌 Priority today: </span>${esc(priority)}
-      </div>`:''}
-      <div style="font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Today's tasks</div>
-      ${todayTasksHTML}
-      ${todayEOD?.challenges==='yes'?`<div style="font-size:12px;color:var(--danger);margin-top:6px">⚠ Challenge: ${esc(todayEOD.challengeDetail||'flagged')}</div>`:''}
-      ${todayEOD?.supportNeeded==='yes'?`<div style="font-size:12px;color:#92400E;margin-top:4px">🙋 Support: ${esc(todayEOD.supportDetail||'needed')}</div>`:''}
-    </div>`;
-
-    return `<div style="border-bottom:0.5px solid var(--border)">${header}${detail}</div>`;
-  }).join('');
-
-  pulseDiv.innerHTML = `
-    <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">📊 Team — today</div>
-    ${memberRows}`;
-  myteamEl.appendChild(pulseDiv);
-
-  // ── EOD summary card (existing) ────────────────────────────────────────
-  const eodSumDiv = document.createElement('div');
-  eodSumDiv.className = 'card';
-  eodSumDiv.style.marginTop = '12px';
-  renderEODSummary(eodSumDiv, myTeamNames, todayStr);
-  myteamEl.appendChild(eodSumDiv);
-
-  // ── Checklist status (existing) ────────────────────────────────────────
-  const allFiles = typeof getFileEntries==='function' ? getFileEntries() : [];
-  const atOrPastReady = ['Ready to Submit',...(typeof STAGES_AFTER_READY!=='undefined'?STAGES_AFTER_READY:[])];
-  const teamFiles = allFiles.filter(f=>myTeamNames.includes(f.owner)&&atOrPastReady.includes(f.status));
-  if (teamFiles.length>0) {
-    const clDiv=document.createElement('div');
-    clDiv.className='card'; clDiv.style.marginTop='12px';
-    const byPerson={};
-    teamFiles.forEach(f=>{
-      if(!byPerson[f.owner]) byPerson[f.owner]={submitted:[],pending:[]};
-      if(f.checklistSubmitted) byPerson[f.owner].submitted.push(f);
-      else byPerson[f.owner].pending.push(f);
-    });
-    clDiv.innerHTML=`
-      <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">✅ Submission checklist status</div>
-      ${Object.entries(byPerson).map(([name,{submitted,pending}])=>`
-        <div style="padding:7px 0;border-bottom:0.5px solid var(--border)">
-          <div style="display:flex;align-items:center;justify-content:space-between">
-            <span style="font-size:13px;font-weight:600">${esc(name.split(' ')[0])}</span>
-            <span style="font-size:12px;color:${pending.length?'var(--danger)':'var(--success)'};font-weight:600">${submitted.length} done${pending.length?' · '+pending.length+' pending':''}</span>
-          </div>
-          ${pending.length?`<div style="font-size:12px;color:var(--danger)">Pending: ${pending.map(f=>esc(f.client)).join(', ')}</div>`:''}
-        </div>`).join('')}`;
-    myteamEl.appendChild(clDiv);
-  }
-
-  // ── Checklist viewer button ────────────────────────────────────────────
-  const allSubmitted = allFiles.filter(f=>myTeamNames.includes(f.owner)&&f.checklistSubmitted).length;
-  const btnDiv=document.createElement('div');
-  btnDiv.className='card'; btnDiv.style.marginTop='12px';
-  btnDiv.innerHTML=`<button onclick="openChecklistViewer()" style="width:100%;padding:10px;border:1.5px solid var(--brand);border-radius:var(--radius-sm);background:var(--brand-light);color:var(--brand);font-size:13px;font-weight:600;cursor:pointer">
-    📋 View checklist responses${allSubmitted?' ('+allSubmitted+' submitted)':''}
-  </button>`;
-  myteamEl.appendChild(btnDiv);
-};
 
 function myTeamToggleMember(name) {
   if (_myTeamExpanded.has(name)) _myTeamExpanded.delete(name);
