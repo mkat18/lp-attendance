@@ -1704,6 +1704,7 @@ function spToStaff(item) {
     phone: item.Phone||'',
     email: item.Email||'',
     address: item.Address||'',
+    flexibleSchedule: item.FlexibleSchedule === 'true' || item.FlexibleSchedule === true,
     ec1Name: item.EmergencyContact1Name||'',
     ec1Phone: item.EmergencyContact1Phone||'',
     ec1Relation: item.EmergencyContact1Relation||'',
@@ -1982,6 +1983,21 @@ const DASHBOARD_ROLES = ['manager','hr','teamlead','assistant']; // see dashboar
 const ADMIN_ROLES = ['manager','superadmin']; // see admin panel
 
 function isOpsManager()    { return currentUser&&(_realRole||currentUser.role)==='opsmanager'; }
+function isFlexible(name) {
+  return !!getStaff().find(s => s.name === name)?.flexibleSchedule;
+}
+
+async function toggleFlexibleSchedule(name) {
+  const staff = getStaff();
+  const idx = staff.findIndex(s => s.name === name);
+  if (idx < 0) return;
+  staff[idx].flexibleSchedule = !staff[idx].flexibleSchedule;
+  saveStaff(staff);
+  await spSaveStaffMember(staff[idx]);
+  showToast(name.split(' ')[0] + (staff[idx].flexibleSchedule ? ' set to flexible schedule ✓' : ' set to fixed schedule ✓'), 'ok');
+  renderAdmin();
+}
+
 function isSuperAdmin()    { 
   if (_previewRole) return false; // during preview, act as preview role only
   return currentUser&&(_realRole||currentUser.role)==='superadmin'; 
@@ -3601,9 +3617,9 @@ function renderMetrics() {
   const workingToday   = todayRecs.filter(r=>r.status==='office'||r.status==='wfh').map(r=>r.name);
   const availableNames = workingToday.filter(n=>!onBreakNames.includes(n));
 
-  // Late clock in — across range
+  // Late clock in — across range (exclude flexible schedule staff)
   const lateStaff = allStaff.filter(s=>{
-    if (!s.startTime) return false;
+    if (!s.startTime || s.flexibleSchedule) return false;
     return allRecs.some(r=>{
       if (r.name!==s.name||!r.clockIn) return false;
       const scheduledMs=new Date(r.date+'T'+s.startTime+':00').getTime();
@@ -3611,9 +3627,9 @@ function renderMetrics() {
     });
   });
 
-  // Early clock out — across range
+  // Early clock out — across range (exclude flexible schedule staff)
   const earlyStaff = allStaff.filter(s=>{
-    if (!s.endTime) return false;
+    if (!s.endTime || s.flexibleSchedule) return false;
     return allRecs.some(r=>{
       if (r.name!==s.name||!r.clockOut) return false;
       const scheduledEndMs=new Date(r.date+'T'+s.endTime+':00').getTime();
@@ -4023,6 +4039,8 @@ function renderMissing() {
   const date=getTabDate();
   const fn=document.getElementById('filterName').value.trim();
   const allStaff=getStaff().filter(s=>s.role!=='superadmin');
+  // For late/early calculations, exclude flexible schedule staff
+  const schedStaff=allStaff.filter(s=>!s.flexibleSchedule);
   const dayRecs=getRecords().filter(r=>r.date===date);
   const submitted=new Set(dayRecs.map(r=>r.name));
   const now=new Date();
@@ -4047,7 +4065,7 @@ function renderMissing() {
   });
 
   // Late clock in
-  const lateIn=allStaff.filter(s=>{
+  const lateIn=schedStaff.filter(s=>{
     if(!s.startTime) return false;
     if(fn&&!s.name === fn) return false;
     const rec=dayRecs.find(r=>r.name===s.name);
@@ -4057,7 +4075,7 @@ function renderMissing() {
   });
 
   // Early clock out
-  const earlyOut=allStaff.filter(s=>{
+  const earlyOut=schedStaff.filter(s=>{
     if(!s.endTime) return false;
     if(fn&&!s.name === fn) return false;
     const rec=dayRecs.find(r=>r.name===s.name);
@@ -4141,7 +4159,7 @@ function renderLateTab() {
   const from = document.getElementById('fromDate').value;
   const to   = document.getElementById('toDate').value;
   const fn   = document.getElementById('filterName').value.trim();
-  const allStaff = getStaff().filter(s=>s.role!=='superadmin'&&s.startTime);
+  const allStaff = getStaff().filter(s=>s.role!=='superadmin'&&s.startTime&&!s.flexibleSchedule);
   const allRecs  = getRecords().filter(r=>r.date>=from&&r.date<=to);
   const singleDay = from===to;
 
@@ -4188,7 +4206,7 @@ function renderEarlyTab() {
   const from = document.getElementById('fromDate').value;
   const to   = document.getElementById('toDate').value;
   const fn   = document.getElementById('filterName').value.trim();
-  const allStaff = getStaff().filter(s=>s.role!=='superadmin'&&s.endTime);
+  const allStaff = getStaff().filter(s=>s.role!=='superadmin'&&s.endTime&&!s.flexibleSchedule);
   const allRecs  = getRecords().filter(r=>r.date>=from&&r.date<=to);
   const singleDay = from===to;
 
@@ -4235,7 +4253,8 @@ function renderSuspiciousTab() {
   const from = document.getElementById('fromDate').value;
   const to   = document.getElementById('toDate').value;
   const fn   = document.getElementById('filterName').value.trim();
-  const allRecs = getRecords().filter(r=>r.date>=from&&r.date<=to&&r.msAccount);
+  const flexNames = new Set(getStaff().filter(s=>s.flexibleSchedule).map(s=>s.name));
+  const allRecs = getRecords().filter(r=>r.date>=from&&r.date<=to&&r.msAccount&&!flexNames.has(r.name));
   const singleDay = from===to;
 
   const rows = allRecs.filter(r=>{
@@ -6360,7 +6379,7 @@ function renderAllStaffCards(staff) {
               <button onclick="cancelEditName('${sname}')" style="font-size:12px;padding:4px 8px;border-radius:var(--radius-sm);background:var(--border);color:var(--text-1);border:none;cursor:pointer;margin-left:2px">Cancel</button>
             </div>
             <div class="staff-pin-status" style="color:${pinColor}">${pinStatus}</div>
-            <div style="font-size:11px;color:var(--text-3);margin-top:2px">🕐 ${schedule}${s.office?` &nbsp;📍 ${s.office}`:''}</div>
+            <div style="font-size:11px;color:var(--text-3);margin-top:2px">🕐 ${schedule}${s.office?` &nbsp;📍 ${s.office}`:''}${s.flexibleSchedule?' &nbsp;<span style="color:var(--brand);font-weight:600">⚡ Flex</span>':''}</div>
             <div style="font-size:11px;color:var(--text-3);margin-top:1px">${s.joinDate?'📅 '+calcTenureLabel(s.joinDate):''}</div>
             <div style="font-size:11px;color:var(--text-3);margin-top:1px">${s.role==='trainee'?(s.assignedBroker?'🎯 Broker: '+esc(s.assignedBroker):'⚠️ No broker assigned yet'):''}${s.role==='analyst'&&s.assignedBroker?'🎯 Broker: '+esc(s.assignedBroker):''}</div>
           </div>
@@ -6371,7 +6390,7 @@ function renderAllStaffCards(staff) {
             ${canManageTeam?`<button class="btn-sm" style="background:#FEF3C7;color:#92400E;border-color:#FDE68A" onclick="openManageTeam('${sname}')">👥 Manage Team</button>`:''}
             ${canAssignBroker?`<button class="btn-sm" style="background:#FFF7ED;color:#C2410C;border-color:#FED7AA" onclick="openAssignBrokerModal('${sname}')">🎯 Assign broker</button>`:''}
             ${canEditScheduleThis?`<button class="btn-sm" onclick="editScheduleByName('${sname}')">Schedule & Office</button>`:''}
-            ${canResetThis?`<button class="btn-sm" onclick="resetPinByName('${sname}')">Reset PIN</button>`:''}
+            ${sa?`<button class="btn-sm" onclick="toggleFlexibleSchedule('${sname}')" style="background:${s.flexibleSchedule?'var(--brand-light)':'var(--surface-2)'};color:${s.flexibleSchedule?'var(--brand)':'var(--text-2)'};border-color:${s.flexibleSchedule?'var(--brand)':'var(--border)'}">⚡ ${s.flexibleSchedule?'Flex ON':'Flex OFF'}</button>`:''}            ${canResetThis?`<button class="btn-sm" onclick="resetPinByName('${sname}')">Reset PIN</button>`:''}
             ${canDeleteThis?`<button class="btn-sm btn-danger" onclick="removePersonByName('${sname}')">Remove</button>`:''}
           </div>
         </div>`;
@@ -7501,6 +7520,7 @@ async function spSaveStaffMember(s) {
     EmergencyContact2Name: String(s.ec2Name||''),
     EmergencyContact2Phone: String(s.ec2Phone||''),
     EmergencyContact2Relation: String(s.ec2Relation||''),
+    FlexibleSchedule: s.flexibleSchedule ? 'true' : 'false',
   };
   // Address is Multiple lines of text — add separately only if set
   if (s.address) payload.Address = String(s.address);
