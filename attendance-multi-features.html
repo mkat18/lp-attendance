@@ -3466,9 +3466,10 @@ function tapCard(key, row) {
     rows = allRecs.filter(r => r.status!=='leave'&&!r.hasPhoto).map(r => personRow(r.name, 'No selfie', 'var(--danger)'));
     title = 'No selfie'; emptyMsg = 'All selfies captured ✓';
   } else if (key === 'eod') {
-    const eodRpts = getEODReports().filter(r => r.date === date);
+    const eodRpts   = getEODReports().filter(r => r.date === date);
     const submitted = new Set(eodRpts.map(r => r.name));
-    const eligible = allStaff.filter(s => ['analyst','trainee','teamlead'].includes(s.role));
+    const onLeave   = new Set(allRecs.filter(r => r.date===date && r.status==='leave').map(r => r.name));
+    const eligible  = allStaff.filter(s => roleHasEOD(s.role) && !onLeave.has(s.name));
     rows = eligible.map(s => personRow(s.name, submitted.has(s.name)?'✓ Submitted':'Not yet', submitted.has(s.name)?'var(--success)':'var(--danger)'));
     title = 'EOD reports'; emptyMsg = 'No eligible staff';
   } else if (key === 'absence') {
@@ -3642,8 +3643,9 @@ function renderMetrics() {
   // ── Compute data needed for Row 3 ──────────────────────────────────────
   const patterns     = isManager()||isSuperAdmin() ? detectAbsencePatterns() : [];
   const eodRpts      = isManager()||isSuperAdmin() ? getEODReports().filter(r=>r.date===date) : [];
-  const eodEligible  = allStaff.filter(s=>roleHasEOD(s.role));
-  const eodCount     = eodRpts.length;
+  const onLeaveNames = new Set(allRecs.filter(r=>r.date===date&&r.status==='leave').map(r=>r.name));
+  const eodEligible  = allStaff.filter(s=>roleHasEOD(s.role) && !onLeaveNames.has(s.name));
+  const eodCount     = eodRpts.filter(r=>eodEligible.some(s=>s.name===r.name)).length;
   const eodTotal     = eodEligible.length;
   const eodMissing   = eodTotal - eodCount;
   const coverage     = typeof getCoverageForDate==='function' ? getCoverageForDate(date) : {};
