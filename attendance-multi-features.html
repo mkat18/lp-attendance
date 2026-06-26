@@ -11496,48 +11496,52 @@ function renderEODTaskList() {
   }
 
   const selStyle = 'font-size:13px;padding:6px 8px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);cursor:pointer;width:100%';
+  const lblStyle = 'font-size:10px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px';
 
   el.innerHTML = _eodTasks.map((t, i) => {
-    const subOpts = EOD_TASK_TYPES[t.type] || [];
-    const hasSubTask = subOpts.length > 0;
+    const subOpts  = EOD_TASK_TYPES[t.type] || [];
+    const hasSub   = subOpts.length > 0;
+    // columns: task | [subtask] | start | end | notes | ×
+    const cols = hasSub ? '2fr 1fr 1fr 1fr 2fr auto' : '2fr 1fr 1fr 2fr auto';
     return `
     <div style="background:var(--surface-2);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:8px">
-      <div style="display:grid;grid-template-columns:2fr ${hasSubTask?'1fr':''} auto;gap:8px;align-items:end;margin-bottom:8px">
+      <div style="display:grid;grid-template-columns:${cols};gap:8px;align-items:end">
         <div>
-          <div style="font-size:10px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px">Task type</div>
+          <div style="${lblStyle}">Task</div>
           <select onchange="updateEODTaskType(${i},this.value)" style="${selStyle}">
             <option value="">— select —</option>
             ${EOD_TASK_KEYS.map(ty=>`<option value="${esc(ty)}" ${t.type===ty?'selected':''}>${esc(ty)}</option>`).join('')}
           </select>
         </div>
-        ${hasSubTask ? `
+        ${hasSub ? `
         <div>
-          <div style="font-size:10px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px">Sub-task</div>
+          <div style="${lblStyle}">Sub-task</div>
           <select onchange="updateEODTask(${i},'subType',this.value)" style="${selStyle}">
             <option value="">— select —</option>
             ${subOpts.map(s=>`<option value="${esc(s)}" ${t.subType===s?'selected':''}>${esc(s)}</option>`).join('')}
           </select>
         </div>` : ''}
-        <button type="button" onclick="removeEODTask(${i})"
-          style="background:transparent;border:none;color:var(--text-3);font-size:18px;cursor:pointer;padding:0 4px;line-height:1;margin-bottom:3px">✕</button>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
         <div>
-          <div style="font-size:10px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px">Start time</div>
+          <div style="${lblStyle}">Start time</div>
           <select onchange="updateEODTask(${i},'startTime',this.value)" style="${selStyle}">
-            ${generateTimeOptions(t.startTime||'', 'start')}
+            ${generateTimeOptions(t.startTime||'','start')}
           </select>
         </div>
         <div>
-          <div style="font-size:10px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px">End time</div>
+          <div style="${lblStyle}">End time</div>
           <select onchange="updateEODTaskEnd(${i},this.value)" style="${selStyle}">
-            ${generateTimeOptions(t.endTime||'', 'end')}
+            ${generateTimeOptions(t.endTime||'','end')}
           </select>
         </div>
+        <div>
+          <div style="${lblStyle}">Notes</div>
+          <input type="text" value="${esc(t.notes||'')}" onchange="updateEODTask(${i},'notes',this.value)"
+            placeholder="Optional…"
+            style="font-size:13px;padding:6px 8px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);width:100%"/>
+        </div>
+        <button type="button" onclick="removeEODTask(${i})"
+          style="background:transparent;border:none;color:var(--text-3);font-size:18px;cursor:pointer;padding:0 2px;line-height:1;margin-bottom:4px">✕</button>
       </div>
-      <textarea rows="2" onchange="updateEODTask(${i},'notes',this.value)"
-        placeholder="Notes (optional)"
-        style="width:100%;font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);resize:none;background:var(--surface);color:var(--text)">${esc(t.notes||'')}</textarea>
     </div>`;
   }).join('');
 }
