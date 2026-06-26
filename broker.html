@@ -803,8 +803,9 @@ tr.flagged-row:hover td { background: #FFEAEA; }
       <button class="tab" id="mftab-analytics" onclick="switchMyFilesTab('analytics',this)">📊 My stats</button>
       <button class="tab" id="mftab-archive" onclick="switchMyFilesTab('archive',this)">Archive</button>
     </div>
-    <div style="margin-bottom:12px">
+    <div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap">
       <button onclick="openFileModal(null)" class="btn-primary" style="font-size:13px;padding:10px 18px">+ Add / update a file</button>
+      <button onclick="openChecklistViewer()" style="font-size:13px;padding:10px 18px;border:1.5px solid var(--brand);border-radius:var(--radius-sm);background:var(--brand-light);color:var(--brand);font-weight:600;cursor:pointer">📋 My checklist responses</button>
     </div>
     <div id="mfLookupBar" style="display:none;gap:8px;margin-bottom:8px;flex-wrap:wrap">
       <select id="mfLookupOwner" onchange="renderMyFilesScreen()" style="flex:1;font-size:13px;padding:7px 10px;border-radius:var(--radius-sm);border:1.5px solid var(--border)"><option value="">All staff</option></select>
@@ -11552,6 +11553,165 @@ function isBrokerMgmtActive() {
 }
 
 
+// ── Checklist Viewer Modal ─────────────────────────────────────────────────
+let _clvPage = 0;
+let _clvFilters = { analyst:'', broker:'', client:'', from:'', to:'' };
+
+function openChecklistViewer() {
+  _clvPage = 0;
+  _clvFilters = { analyst:'', broker:'', client:'', from:'', to:'' };
+  const existing = document.getElementById('clvModal');
+  if (existing) existing.remove();
+
+  const isTL = isTeamLead();
+  const myTeam = isTL ? getTeamForTL(currentUser.name) : [];
+  const allFiles = getFileEntries();
+  const atOrPastReady = ['Ready to Submit', ...STAGES_AFTER_READY];
+
+  // Scope: TL sees team, analyst sees own
+  let scopedFiles = isTL
+    ? allFiles.filter(f => myTeam.includes(f.owner) && atOrPastReady.includes(f.status))
+    : allFiles.filter(f => f.owner === currentUser.name && atOrPastReady.includes(f.status));
+
+  const analysts  = [...new Set(scopedFiles.map(f => f.owner))].sort();
+  const brokers   = [...new Set(scopedFiles.map(f => f.broker).filter(Boolean))].sort();
+
+  const modal = document.createElement('div');
+  modal.id = 'clvModal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:1rem;overflow-y:auto';
+
+  modal.innerHTML = `
+    <div style="background:var(--surface);border-radius:var(--radius);padding:1.25rem;width:100%;max-width:720px;min-height:60vh">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <div style="font-size:16px;font-weight:700">📋 Checklist Responses</div>
+        <button onclick="document.getElementById('clvModal').remove()" style="background:transparent;border:none;font-size:22px;cursor:pointer;color:var(--text-3)">×</button>
+      </div>
+
+      <div style="display:grid;grid-template-columns:${isTL?'1fr 1fr':'1fr'} 1fr;gap:8px;margin-bottom:8px">
+        ${isTL?`<select id="clvAnalyst" onchange="_clvFilters.analyst=this.value;_clvPage=0;clvRender()"
+          style="font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)">
+          <option value="">All analysts</option>
+          ${analysts.map(a=>`<option value="${esc(a)}">${esc(a)}</option>`).join('')}
+        </select>`:''}
+        <select id="clvBroker" onchange="_clvFilters.broker=this.value;_clvPage=0;clvRender()"
+          style="font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)">
+          <option value="">All brokers</option>
+          ${brokers.map(b=>`<option value="${esc(b)}">${esc(b)}</option>`).join('')}
+        </select>
+        <input type="text" id="clvClient" placeholder="🔍 Search client name…"
+          oninput="_clvFilters.client=this.value;_clvPage=0;clvRender()"
+          style="font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)"/>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
+        <div style="display:flex;align-items:center;gap:6px">
+          <span style="font-size:12px;color:var(--text-3);white-space:nowrap">From</span>
+          <input type="date" id="clvFrom" onchange="_clvFilters.from=this.value;_clvPage=0;clvRender()"
+            style="flex:1;font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)"/>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <span style="font-size:12px;color:var(--text-3);white-space:nowrap">To</span>
+          <input type="date" id="clvTo" onchange="_clvFilters.to=this.value;_clvPage=0;clvRender()"
+            style="flex:1;font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)"/>
+        </div>
+      </div>
+
+      <div id="clvResults"></div>
+      <div id="clvPager" style="display:flex;justify-content:center;gap:8px;margin-top:12px"></div>
+    </div>`;
+
+  document.body.appendChild(modal);
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+
+  // Store scoped files for rendering
+  modal._scopedFiles = scopedFiles;
+  modal._isTL = isTL;
+  clvRender();
+}
+
+function clvGetFiltered() {
+  const modal = document.getElementById('clvModal');
+  if (!modal) return [];
+  const atOrPastReady = ['Ready to Submit', ...STAGES_AFTER_READY];
+  return (modal._scopedFiles || [])
+    .filter(f => f.checklistSubmitted)
+    .filter(f => !_clvFilters.analyst || f.owner === _clvFilters.analyst)
+    .filter(f => !_clvFilters.broker || f.broker === _clvFilters.broker)
+    .filter(f => !_clvFilters.client || (f.client||'').toLowerCase().includes(_clvFilters.client.toLowerCase()))
+    .filter(f => !_clvFilters.from || (f.checklistDate && f.checklistDate >= _clvFilters.from))
+    .filter(f => !_clvFilters.to   || (f.checklistDate && f.checklistDate <= _clvFilters.to))
+    .sort((a,b) => (b.checklistDate||'').localeCompare(a.checklistDate||''));
+}
+
+function clvRender() {
+  const resultsEl = document.getElementById('clvResults');
+  const pagerEl   = document.getElementById('clvPager');
+  if (!resultsEl) return;
+
+  const flatItems = [];
+  SUBMISSION_CHECKLIST.forEach(sec => sec.items.forEach(item => flatItems.push({section:sec.section, item})));
+
+  const filtered = clvGetFiltered();
+  const total    = filtered.length;
+  const perPage  = 10;
+  const pages    = Math.ceil(total / perPage);
+  const page     = _clvPage;
+  const slice    = filtered.slice(page * perPage, (page + 1) * perPage);
+
+  if (!total) {
+    resultsEl.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--text-3);font-size:14px">No submitted checklists match your filters.</div>';
+    pagerEl.innerHTML = '';
+    return;
+  }
+
+  resultsEl.innerHTML = `
+    <div style="font-size:12px;color:var(--text-3);margin-bottom:8px">${total} result${total!==1?'s':''} · showing ${page*perPage+1}–${Math.min((page+1)*perPage, total)}</div>
+    ${slice.map(f => {
+      const answers   = f.checklist || [];
+      const allPassed = answers.length && answers.every(a => a === true);
+      const failCount = answers.filter(a => a === false).length;
+      const id = 'clv_' + esc(f.id);
+      return `<div style="border:1.5px solid var(--border);border-radius:var(--radius-sm);margin-bottom:8px;overflow:hidden">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--surface-2);cursor:pointer"
+          onclick="var b=document.getElementById('${id}');b.style.display=b.style.display==='none'?'block':'none';this.querySelector('.clv-arr').textContent=b.style.display==='none'?'▾':'▴'">
+          <div>
+            <div style="font-size:14px;font-weight:600">${esc(f.client||'Unnamed')}</div>
+            <div style="font-size:11px;color:var(--text-3);margin-top:2px">
+              ${esc(f.owner||'')}${f.broker?' · '+esc(f.broker):''}${f.checklistDate?' · '+esc(f.checklistDate):''}
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:11px;background:${allPassed?'#D1FAE5':'#FEF3C7'};color:${allPassed?'#065F46':'#92400E'};border-radius:4px;padding:2px 8px;font-weight:600">
+              ${allPassed?'✓ All clear':failCount+' not confirmed'}
+            </span>
+            <span class="clv-arr" style="color:var(--text-3);font-size:16px">▾</span>
+          </div>
+        </div>
+        <div id="${id}" style="display:none;padding:12px 14px">
+          ${flatItems.map((fi,i) => {
+            const sec = i===0 || flatItems[i-1].section!==fi.section;
+            const ans = answers[i];
+            return (sec?`<div style="font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;padding:8px 0 4px;${i>0?'border-top:1px solid var(--border);margin-top:4px':''}">${esc(fi.section)}</div>`:'') +
+              `<div style="display:flex;align-items:flex-start;gap:8px;padding:4px 0;border-bottom:0.5px solid var(--border)">
+                <span style="font-size:14px;min-width:18px;${ans?'color:var(--success)':'color:var(--danger)'}">${ans?'✓':'✗'}</span>
+                <span style="font-size:12px;color:${ans?'var(--text)':'var(--danger)'};${ans?'':'font-weight:500'}">${esc(fi.item)}</span>
+              </div>`;
+          }).join('')}
+        </div>
+      </div>`;
+    }).join('')}`;
+
+  // Pagination
+  if (pages > 1) {
+    pagerEl.innerHTML = [
+      page > 0 ? `<button onclick="_clvPage=${page-1};clvRender()" style="padding:5px 14px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:var(--surface-2);cursor:pointer;font-size:13px">← Prev</button>` : '',
+      `<span style="font-size:13px;color:var(--text-3);padding:5px 10px">Page ${page+1} of ${pages}</span>`,
+      page < pages-1 ? `<button onclick="_clvPage=${page+1};clvRender()" style="padding:5px 14px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:var(--surface-2);cursor:pointer;font-size:13px">Next →</button>` : ''
+    ].join('');
+  } else {
+    pagerEl.innerHTML = '';
+  }
+}
+
 function renderPerformanceScreen() {
   const el = document.getElementById('perfContent');
   if (!el) return;
@@ -12110,6 +12270,18 @@ window.renderMyTeam = function() {
           </div>`:''}
         </div>`).join('')}`;
     myteamEl.appendChild(clDiv);
+
+
+    // ── Checklist detail button ────────────────────────────────────────────
+    const submittedCount2 = teamFiles.filter(f => f.checklistSubmitted).length;
+    if (submittedCount2 > 0) {
+      const btnDiv = document.createElement('div');
+      btnDiv.style.marginTop = '10px';
+      btnDiv.innerHTML = `<button onclick="openChecklistViewer()" style="width:100%;padding:10px;border:1.5px solid var(--brand);border-radius:var(--radius-sm);background:var(--brand-light);color:var(--brand);font-size:13px;font-weight:600;cursor:pointer">
+        📋 View checklist responses (${submittedCount2} submitted)
+      </button>`;
+      myteamEl.appendChild(btnDiv);
+    }
   }
 };
 
