@@ -7192,11 +7192,11 @@ let _coverageLoaded = false;
 
 async function loadCoverageFromSP() {
   try {
-    const res = await spGet(SP_API+"('CoverageAssignments')/items?$select=Id,Title,CoverDate,CoverName,IsNCR,AssignedBy,AssignedAt&$top=500");
+    const res = await spGet(SP_API+"('CoverageAssignments')/items?$select=Id,Title,CoverDate,CoverName,AssignedBy,AssignedAt&$top=500");
     if (res?.value) {
       _coverageSP = res.value.map(r=>({
         id:r.Id, absenteeName:r.Title, date:r.CoverDate,
-        coverName:r.CoverName||'', isNCR:r.IsNCR||false,
+        coverName:r.CoverName||'', isNCR:r.CoverName==='_ncr',
         assignedBy:r.AssignedBy||'', assignedAt:r.AssignedAt||''
       }));
       _coverageLoaded = true; return;
@@ -7216,14 +7216,21 @@ function getCoverageForDate(date) {
 
 async function saveCoverageToSP(absenteeName, date, coverName, isNCR) {
   const existing = _coverageSP.find(r=>r.absenteeName===absenteeName&&r.date===date);
-  const payload = {Title:absenteeName, CoverDate:date, CoverName:isNCR?'':coverName, IsNCR:isNCR||false, AssignedBy:currentUser?.name||'', AssignedAt:new Date().toISOString()};
+  const spCoverName = isNCR ? '_ncr' : coverName;
+  const payload = {
+    Title: absenteeName,
+    CoverDate: date,
+    CoverName: spCoverName,
+    AssignedBy: currentUser?.name||'',
+    AssignedAt: new Date().toISOString()
+  };
   try {
     if (existing) {
       await spPatch(SP_API+`('CoverageAssignments')/items(${existing.id})`, payload);
-      Object.assign(existing, {coverName:payload.CoverName, isNCR:payload.IsNCR, assignedBy:payload.AssignedBy, assignedAt:payload.AssignedAt});
+      Object.assign(existing, {coverName:spCoverName, isNCR, assignedBy:payload.AssignedBy, assignedAt:payload.AssignedAt});
     } else {
       const res = await spPost(SP_API+"('CoverageAssignments')/items", payload);
-      _coverageSP.push({id:res?.d?.Id||res?.ID||res?.id, absenteeName, date, coverName:payload.CoverName, isNCR:payload.IsNCR, assignedBy:payload.AssignedBy, assignedAt:payload.AssignedAt});
+      _coverageSP.push({id:res?.d?.Id||res?.ID||res?.id, absenteeName, date, coverName:spCoverName, isNCR, assignedBy:payload.AssignedBy, assignedAt:payload.AssignedAt});
     }
     LS.set('ci_coverage_sp', _coverageSP);
     return true;
