@@ -11048,11 +11048,27 @@ function renderEODScreen() {
 
     <!-- ── TASKS ────────────────────────────────────── -->
     <div class="card" style="margin-bottom:1rem">
-      <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">📋 Tasks today</div>
-      <div id="eodTaskList"></div>
-      <button type="button" onclick="addEODTask()"
-        style="width:100%;padding:10px;border:1.5px dashed var(--border);border-radius:var(--radius-sm);background:transparent;color:var(--text-3);font-size:13px;cursor:pointer;margin-top:4px">
-        + Add task
+      <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer" onclick="toggleEODTasksPanel()">
+        <div>
+          <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px">📋 Tasks today</div>
+          <div id="eodTaskSummary" style="font-size:13px;color:var(--text-2);margin-top:4px">${
+            (existing?.tasks?.length)
+              ? existing.tasks.length + ' task' + (existing.tasks.length!==1?'s':'') + ' — ' +
+                existing.tasks.slice(0,3).map(t=>t.type||'Untitled').join(', ') +
+                (existing.tasks.length>3?' +more':'')
+              : 'No tasks added yet'
+          }</div>
+        </div>
+        <span id="eodTasksToggleIcon" style="font-size:18px;color:var(--text-3);transition:transform .2s">▾</span>
+      </div>
+      <div id="eodTasksPanel" style="display:none;margin-top:12px">
+        <div id="eodTaskList"></div>
+        <button type="button" onclick="addEODTask()"
+          style="width:100%;padding:10px;border:1.5px dashed var(--border);border-radius:var(--radius-sm);background:transparent;color:var(--text-3);font-size:13px;cursor:pointer;margin-top:4px">
+          + Add task
+        </button>
+      </div>
+    </div>
       </button>
     </div>
 
@@ -11118,8 +11134,8 @@ function renderEODScreen() {
     ${existing ? `<div style="text-align:center;font-size:12px;color:var(--text-3);margin-top:8px">Last submitted: ${esc(fmtDate(existing.submittedAt||existing.date))}</div>` : ''}
   </form>`;
 
-  // Render task list now that the DOM is ready
-  renderEODTaskList();
+  // Render task summary (panel starts collapsed — expands on click)
+  updateEODTaskSummary();
 
   // Init EOD download section
   const dlDate = document.getElementById('eodDownloadDate');
@@ -11222,18 +11238,46 @@ const EOD_TASK_TYPES = [
   'Manual App','Servicing','Other File Tasks','Emails','Calls','Other Tasks','Team Meeting'
 ];
 
+function toggleEODTasksPanel() {
+  const panel = document.getElementById('eodTasksPanel');
+  const icon  = document.getElementById('eodTasksToggleIcon');
+  if (!panel) return;
+  const open = panel.style.display !== 'none';
+  panel.style.display = open ? 'none' : 'block';
+  if (icon) icon.textContent = open ? '▾' : '▴';
+  if (!open) renderEODTaskList(); // render tasks when expanding
+}
+
+function updateEODTaskSummary() {
+  const el = document.getElementById('eodTaskSummary');
+  if (!el) return;
+  if (!_eodTasks.length) { el.textContent = 'No tasks added yet'; return; }
+  el.textContent = _eodTasks.length + ' task' + (_eodTasks.length!==1?'s':'') + ' — ' +
+    _eodTasks.slice(0,3).map(t=>t.type||'Untitled').join(', ') +
+    (_eodTasks.length>3?' +more':'');
+}
+
 function addEODTask() {
   _eodTasks.push({type:'', startTime:'', endTime:'', notes:''});
+  // Auto-expand panel when adding first task
+  const panel = document.getElementById('eodTasksPanel');
+  const icon  = document.getElementById('eodTasksToggleIcon');
+  if (panel && panel.style.display === 'none') {
+    panel.style.display = 'block';
+    if (icon) icon.textContent = '▴';
+  }
   renderEODTaskList();
+  updateEODTaskSummary();
 }
 
 function removeEODTask(idx) {
   _eodTasks.splice(idx, 1);
   renderEODTaskList();
+  updateEODTaskSummary();
 }
 
 function updateEODTask(idx, field, value) {
-  if (_eodTasks[idx]) _eodTasks[idx][field] = value;
+  if (_eodTasks[idx]) { _eodTasks[idx][field] = value; updateEODTaskSummary(); }
 }
 
 function generateTimeOptions(selected, placeholder) {
