@@ -11118,6 +11118,112 @@ let _bmCRMStaffFilter    = '';
 let _bmCRMRoleFilter     = '';
 let _bmCRMFilter         = '';
 
+// ── Broker data ────────────────────────────────────────────────────────────
+let _brokers = [];
+let _brokerAssignments = [];
+let _crmOptions = [];
+let _staffCRMs = [];
+
+async function loadBrokers() {
+  try {
+    const res = await spGet(SP_API+"('Brokers')/items?$select=Id,Title&$top=500");
+    if (res?.value) { _brokers = res.value.map(r=>({id:r.Id,name:r.Title})); return; }
+  } catch(e){}
+  _brokers = LS.get('ci_brokers') || [];
+}
+
+async function loadBrokerAssignments() {
+  try {
+    const res = await spGet(SP_API+"('BrokerAssignments')/items?$select=Id,Title,BrokerName&$top=1000");
+    if (res?.value) { _brokerAssignments = res.value.map(r=>({id:r.Id,staffName:r.Title,brokerName:r.BrokerName})); return; }
+  } catch(e){}
+  _brokerAssignments = LS.get('ci_brokerassign') || [];
+}
+
+async function loadCRMOptions() {
+  try {
+    const res = await spGet(SP_API+"('CRMOptions')/items?$select=Id,Title&$top=200");
+    if (res?.value) { _crmOptions = res.value.map(r=>({id:r.Id,name:r.Title})); return; }
+  } catch(e){}
+  _crmOptions = LS.get('ci_crmoptions') || [];
+}
+
+async function loadStaffCRMs() {
+  try {
+    const res = await spGet(SP_API+"('StaffCRMs')/items?$select=Id,Title,CRMList&$top=500");
+    if (res?.value) { _staffCRMs = res.value.map(r=>({id:r.Id,staffName:r.Title,crms:JSON.parse(r.CRMList||'[]')})); return; }
+  } catch(e){}
+  _staffCRMs = LS.get('ci_staffcrms') || [];
+}
+
+function getBrokersForStaff(staffName) {
+  return _brokerAssignments.filter(a=>a.staffName===staffName).map(a=>a.brokerName);
+}
+
+function getCRMsForStaff(staffName) {
+  return _staffCRMs.find(s=>s.staffName===staffName)?.crms || [];
+}
+
+async function assignBrokerToStaff() {
+  const staffName = document.getElementById('bmStaffSel')?.value;
+  const brokerName = document.getElementById('bmBrokerSel')?.value;
+  if (!staffName||!brokerName) { showToast('Select staff and broker.','err'); return; }
+  if (_brokerAssignments.find(a=>a.staffName===staffName&&a.brokerName===brokerName)) { showToast('Already assigned.','err'); return; }
+  const res = await spPost(SP_API+"('BrokerAssignments')/items", {Title:staffName, BrokerName:brokerName});
+  if (res) { await loadBrokerAssignments(); renderBrokerMgmtScreen(); showToast('Broker assigned ✓','ok'); }
+}
+
+async function removeBrokerAssignment(id) {
+  if (!id) return;
+  try {
+    await spDelete(SP_API+`('BrokerAssignments')/items(${id})`);
+    await loadBrokerAssignments(); renderBrokerMgmtScreen(); showToast('Assignment removed.','ok');
+  } catch(e) { showToast('Failed to remove.','err'); }
+}
+
+async function addBroker() {
+  const input = document.getElementById('bmNewBroker');
+  const name = input?.value.trim();
+  if (!name) return;
+  const res = await spPost(SP_API+"('Brokers')/items", {Title:name});
+  if (res) { if(input)input.value=''; await loadBrokers(); renderBrokerMgmtScreen(); showToast('Broker added ✓','ok'); }
+}
+
+async function deleteBroker(id) {
+  try {
+    await spDelete(SP_API+`('Brokers')/items(${id})`);
+    await loadBrokers(); renderBrokerMgmtScreen(); showToast('Broker removed.','ok');
+  } catch(e) { showToast('Failed to remove.','err'); }
+}
+
+async function addCRMOption() {
+  const input = document.getElementById('bmNewCRM');
+  const name = input?.value.trim();
+  if (!name) return;
+  const res = await spPost(SP_API+"('CRMOptions')/items", {Title:name});
+  if (res) { if(input)input.value=''; await loadCRMOptions(); renderBrokerMgmtScreen(); showToast('CRM added ✓','ok'); }
+}
+
+async function deleteCRMOption(id) {
+  try {
+    await spDelete(SP_API+`('CRMOptions')/items(${id})`);
+    await loadCRMOptions(); renderBrokerMgmtScreen(); showToast('CRM removed.','ok');
+  } catch(e) { showToast('Failed to remove.','err'); }
+}
+
+async function toggleStaffCRM(staffName, crmName) {
+  const existing = _staffCRMs.find(s=>s.staffName===staffName);
+  let crms = existing?.crms ? [...existing.crms] : [];
+  if (crms.includes(crmName)) crms = crms.filter(c=>c!==crmName);
+  else crms.push(crmName);
+  const payload = {Title:staffName, CRMList:JSON.stringify(crms)};
+  try {
+    if (existing) await spPatch(SP_API+`('StaffCRMs')/items(${existing.id})`, payload);
+    else await spPost(SP_API+"('StaffCRMs')/items", payload);
+    await loadStaffCRMs(); renderBrokerMgmtScreen();
+  } catch(e) { showToast('Failed to save CRM.','err'); }
+}
+
 async function renderBrokerMgmtScreen() {
   const el = document.getElementById('brokerMgmtContent');
   if (!el) return;
