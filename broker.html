@@ -2499,7 +2499,6 @@ function handlePin() {
 async function loginAs(member) {
   currentUser={name:member.name, role:member.role};
   sessionStorage.setItem('lp_session', JSON.stringify({name:member.name, role:member.role}));
-  try { localStorage.setItem('lp_session_cross', JSON.stringify({name:member.name, role:member.role})); } catch(e) {}
   buildNav();
 
   // Restore last tab the user was on, otherwise go to default
@@ -5763,8 +5762,16 @@ async function onMsLogin(account) {
   requestGeo();
   await loadFromSharePoint().catch(()=>{});
   autoSaveMsEmail(account).catch(()=>{});
-  // Restore session from sessionStorage or cross-tab localStorage
-  const saved = sessionStorage.getItem('lp_session') || localStorage.getItem('lp_session_cross');
+  // Restore session — check sessionStorage first, then URL param (from portal nav only)
+  const urlParams = new URLSearchParams(window.location.search);
+  const fromPortal = urlParams.get('_from') === 'portal';
+  const urlUser = urlParams.get('_u');
+  const urlRole = urlParams.get('_r');
+  if (fromPortal && urlUser) {
+    // Clean URL so refreshing doesn't re-use the param
+    window.history.replaceState({}, '', window.location.pathname);
+  }
+  const saved = sessionStorage.getItem('lp_session') || (fromPortal && urlUser ? JSON.stringify({name:urlUser, role:urlRole}) : null);
   if (saved) {
     try {
       const sess = JSON.parse(saved);

@@ -757,6 +757,8 @@ function getGreeting() {
 }
 
 function renderPortal(userName, role) {
+  window.currentPortalUser = userName;
+  window.currentPortalRole = role;
   document.getElementById('portalUserName').textContent = userName;
   document.getElementById('portalGreeting').textContent = getGreeting() + ', ' + userName.split(' ')[0];
   document.getElementById('portalDate').textContent = new Date().toLocaleDateString('en-AU', {
@@ -781,7 +783,7 @@ function renderPortal(userName, role) {
     return `
       <a href="${appUrl}" class="app-card${isLive ? '' : ' disabled'}"
          style="--card-accent:${app.accent};--icon-bg:${app.iconBg}"
-         ${isLive ? 'target="_self"' : 'onclick="return false"'}>
+         ${isLive ? `onclick="this.href='${app.url}?_from=portal&_u='+encodeURIComponent(currentPortalUser||'')+'&_r='+encodeURIComponent(currentPortalRole||'')"` : 'onclick="return false"'}>
         <span class="app-badge${isLive ? '' : ' soon'}">${app.badge}</span>
         <div class="app-icon">${app.icon}</div>
         <div>
