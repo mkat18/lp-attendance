@@ -1170,6 +1170,25 @@ function applyPermissionVisibility() {
     });
   } catch(e) {}
 }
+const EOD_TASK_TYPES = {
+  'CRM App':                 ['Single','Multiple'],
+  'AOL App':                 ['Single','Complex'],
+  'Valuation':               ['Single','Multiple'],
+  'Pricing':                 ['Simple','Complex'],
+  'Servicing':               ['Simple','Complex'],
+  'Calls':                   ['Broker','Customer','Lender','Others'],
+  'Emails':                  ['Broker','Customer','Lender','Others'],
+  'Professional Development':[]
+};
+const EOD_BENCHMARKS = {
+  'CRM App':   {'Single':120,'Multiple':240},
+  'AOL App':   {'Single':30,'Complex':60},
+  'Valuation': {'Single':10,'Multiple':20},
+  'Pricing':   {'Simple':10,'Complex':20},
+  'Servicing': {'Simple':20,'Complex':40},
+  'Calls':     {'Broker':60,'Customer':30,'Lender':60,'Others':20},
+  'Emails':    {'Broker':30,'Customer':60,'Lender':30,'Others':20},
+};
 // ════════════════════════════════════════════════════════════════════════════
 // CONFIG — edit this block to customise the app without touching anything else
 // ════════════════════════════════════════════════════════════════════════════
@@ -7225,20 +7244,14 @@ function getCoverageForDate(date) {
 async function saveCoverageToSP(absenteeName, date, coverName, isNCR) {
   const existing = _coverageSP.find(r=>r.absenteeName===absenteeName&&r.date===date);
   const spCoverName = isNCR ? '_ncr' : coverName;
-  const payload = {
-    Title: absenteeName,
-    CoverDate: date,
-    CoverName: spCoverName,
-    AssignedBy: currentUser?.name||'',
-    AssignedAt: new Date().toISOString()
-  };
+  const payload = {Title:absenteeName, CoverDate:date, CoverName:spCoverName};
   try {
     if (existing) {
       await spPatch(SP_API+`('CoverageAssignments')/items(${existing.id})`, payload);
-      Object.assign(existing, {coverName:spCoverName, isNCR, assignedBy:payload.AssignedBy, assignedAt:payload.AssignedAt});
+      Object.assign(existing, {coverName:spCoverName, isNCR});
     } else {
       const res = await spPost(SP_API+"('CoverageAssignments')/items", payload);
-      _coverageSP.push({id:res?.d?.Id||res?.ID||res?.id, absenteeName, date, coverName:spCoverName, isNCR, assignedBy:payload.AssignedBy, assignedAt:payload.AssignedAt});
+      _coverageSP.push({id:res?.d?.Id||res?.ID||res?.id, absenteeName, date, coverName:spCoverName, isNCR});
     }
     LS.set('ci_coverage_sp', _coverageSP);
     return true;
