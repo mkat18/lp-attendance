@@ -7226,10 +7226,10 @@ let _coverageLoaded = false;
 
 async function loadCoverageFromSP() {
   try {
-    const res = await spGet(SP_API+"('CoverageAssignments')/items?$select=Id,Title,CoverDate,CoverName&$top=500");
+    const res = await spGet(SP_API+"('CoverageAssignments')/items?$select=Id,Title,Date,CoverName&$top=500");
     if (res?.value) {
       _coverageSP = res.value.map(r=>({
-        id:r.Id, absenteeName:r.Title, date:r.CoverDate,
+        id:r.Id, absenteeName:r.Title, date:r.Date,
         coverName:r.CoverName||'', isNCR:r.CoverName==='_ncr',
         assignedBy:'', assignedAt:''
       }));
@@ -7251,7 +7251,7 @@ function getCoverageForDate(date) {
 async function saveCoverageToSP(absenteeName, date, coverName, isNCR) {
   const existing = _coverageSP.find(r=>r.absenteeName===absenteeName&&r.date===date);
   const spCoverName = isNCR ? '_ncr' : coverName;
-  const payload = {Title:absenteeName, CoverDate:date, CoverName:spCoverName};
+  const payload = {Title:absenteeName, Date:date, CoverName:spCoverName};
   try {
     if (existing) {
       await spPatch(SP_API+`('CoverageAssignments')/items(${existing.id})`, payload);
@@ -7970,6 +7970,17 @@ function toggleNoteHistory(id) {
   const open = el.style.display !== 'none';
   el.style.display = open ? 'none' : 'block';
   if (icon) icon.textContent = open ? '▶' : '▼';
+}
+
+function populateBrokerDropdown(selectedBroker) {
+  const sel = document.getElementById('fm_broker');
+  if (!sel) return;
+  const staffBrokers = currentUser ? getBrokersForStaff(currentUser.name) : [];
+  const allBrokers = _brokers.map(b=>b.name);
+  // Show brokers assigned to this staff member, or all brokers for TL/SA
+  const brokers = (isTeamLead()||isSuperAdmin()||isOpsManager()) ? allBrokers : staffBrokers.length ? staffBrokers : allBrokers;
+  sel.innerHTML = '<option value="">— select broker —</option>' +
+    brokers.map(b=>`<option value="${esc(b)}" ${b===selectedBroker?'selected':''}>${esc(b)}</option>`).join('');
 }
 
 function openFileModal(fileId) {
@@ -9588,26 +9599,6 @@ async function uploadSelectedAttachments() {
   // Refresh existing attachments display
   const entryForDisplay = { attachments };
   renderExistingAttachments(entryForDisplay);
-}
-
-// Patch renderExistingAttachments to show remove buttons
-function renderExistingAttachments(entry) {
-  const el = document.getElementById('fm_existingAttachments');
-  if (!el) return;
-  const attachments = (window._pendingAttachments || entry.attachments || []);
-  if (attachments.length === 0) { el.innerHTML = ''; return; }
-  const now = Date.now();
-  const valid = attachments.filter(a => a.expiresAt > now);
-  if (valid.length === 0) {
-    el.innerHTML = '<div style="font-size:11px;color:var(--text-3)">Previous attachments have expired.</div>';
-    return;
-  }
-  el.innerHTML = valid.map((a, i) => `
-    <div style="display:flex;align-items:center;justify-content:space-between;background:var(--surface-2);border-radius:var(--radius-sm);padding:6px 10px;margin-bottom:4px;font-size:12px">
-      <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">📎 ${esc(a.name)}</span>
-      <span style="color:var(--text-3);margin:0 8px;white-space:nowrap">exp ${new Date(a.expiresAt).toLocaleDateString('en-AU',{day:'numeric',month:'short'})}</span>
-      <button onclick="removeAttachmentByIndex(${i})" style="background:var(--danger-light);color:var(--danger);border:none;border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer;flex-shrink:0">✕</button>
-    </div>`).join('');
 }
 
 function removeAttachmentByIndex(idx) {
@@ -11338,7 +11329,8 @@ function perfOpenModal(type, taskKey, analyst) {
   const sessions=analyst?(s?.sessions||[]).filter(x=>x.name===analyst):(s?.sessions||[]);
   const avg=sessions.length?Math.round(sessions.reduce((a,b)=>a+b.mins,0)/sessions.length):null;
   const maxM=Math.max(...sessions.map(x=>x.mins),bench||0)*1.15||240;
-  const close=`<button onclick="perfRenderView(${JSON.stringify(names)},'${from}','${to}',document.getElementById('perfContent')._metrics)" style="font-size:12px;padding:4px 12px;border-radius:50px;border:1.5px solid var(--border);background:var(--surface-2);cursor:pointer;margin-bottom:12px">← Back</button>`;
+  window._perfModalNames = names;
+  const close=`<button onclick="perfRenderView(window._perfModalNames,'${from}','${to}',document.getElementById('perfContent')._metrics)" style="font-size:12px;padding:4px 12px;border-radius:50px;border:1.5px solid var(--border);background:var(--surface-2);cursor:pointer;margin-bottom:12px">← Back</button>`;
   c.innerHTML=`${close}
     <div style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:1rem 1.25rem">
       <div style="font-size:15px;font-weight:700;margin-bottom:2px">${esc(dType)}${dSub?' · <span style="color:var(--text-3);font-weight:400">'+esc(dSub)+'</span>':''}</div>
