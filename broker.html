@@ -1157,6 +1157,19 @@ async function pushAllStaffToSharePoint() {
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script>
+// ── Global state (declared early so always available) ─────────────────────
+var _perfPeriod='7', _perfCustomFrom='', _perfCustomTo='';
+var _perfAnalystFlt='', _perfTeamFlt='', _perfCharts={};
+var _perfView='issues', _perfDetailName='', _perfSortKey='over';
+var _perfSortDir=-1, _perfExpandedRow='', _perfOpenCard='';
+function applyPermissionVisibility() {
+  try {
+    document.querySelectorAll('[data-role-hide]').forEach(function(el) {
+      var roles=(el.getAttribute('data-role-hide')||'').split(',');
+      if(window.currentUser&&roles.includes(window.currentUser.role))el.style.display='none';
+    });
+  } catch(e) {}
+}
 // ════════════════════════════════════════════════════════════════════════════
 // CONFIG — edit this block to customise the app without touching anything else
 // ════════════════════════════════════════════════════════════════════════════
@@ -10755,29 +10768,6 @@ function myTeamToggleMember(name, teamNames) {
   if (_myTeamExpanded.has(name)) _myTeamExpanded.delete(name);
   else _myTeamExpanded.add(name);
   renderMyTeamEOD(teamNames);
-}
-// ── Performance state ──────────────────────────────────────────────────────
-let _perfPeriod      = '7';
-let _perfCustomFrom  = '';
-let _perfCustomTo    = '';
-let _perfAnalystFlt  = '';
-let _perfTeamFlt     = '';
-let _perfCharts      = {};
-let _perfView        = 'issues';
-let _perfDetailName  = '';
-let _perfSortKey     = 'over';
-let _perfSortDir     = -1;
-let _perfExpandedRow = '';
-let _perfOpenCard    = '';
-
-// ── applyPermissionVisibility (stub — full version in permissions editor) ──
-function applyPermissionVisibility() {
-  const sa = isSuperAdmin(), tl = isTeamLead(), om = isOpsManager();
-  // Hide/show nav elements by role as needed
-  document.querySelectorAll('[data-role-hide]').forEach(el => {
-    const roles = (el.getAttribute('data-role-hide')||'').split(',');
-    if (currentUser && roles.includes(currentUser.role)) el.style.display='none';
-  });
 }
 
 const TASK_COLORS = ['#378ADD','#5DCAA5','#EF9F27','#D85A30','#7F77DD','#D4537E','#639922','#888780','#F59E0B'];
