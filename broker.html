@@ -10658,6 +10658,7 @@ window.renderMyTeam = function() {
 };
 
 function renderMyTeamEOD(myTeamNames) {
+  window._myTeamNames = myTeamNames; // store globally to avoid JSON in onclick attrs
   const el = document.getElementById('myTeamEODBlock');
   if (!el) return;
   const todayStr = new Date().toISOString().split('T')[0];
@@ -10698,10 +10699,10 @@ function renderMyTeamEOD(myTeamNames) {
   const periodBtns = [
     ['today','Today'],['yesterday','Yesterday'],['week','This week'],
     ['month','This month'],['30d','Last 30d'],['90d','Last 90d'],['custom','📅 Custom']
-  ].map(([v,l])=>`<button onclick="_myTeamEODPeriod='${v}';renderMyTeamEOD(${JSON.stringify(myTeamNames)})"
+  ].map(([v,l])=>`<button onclick="_myTeamEODPeriod='${v}';renderMyTeamEOD(${_myTeamNames})"
     style="font-size:12px;padding:5px 10px;border-radius:50px;border:1.5px solid ${_myTeamEODPeriod===v?'var(--brand)':'var(--border)'};background:${_myTeamEODPeriod===v?'var(--brand-light)':'var(--surface-2)'};color:${_myTeamEODPeriod===v?'var(--brand)':'var(--text-2)'};cursor:pointer;font-weight:${_myTeamEODPeriod===v?'700':'400'};white-space:nowrap">${l}</button>`).join('');
 
-  const personBtns = ['', ...myTeamNames].map(n=>`<button onclick="_myTeamEODPerson='${n.replace(/'/g,"\\'")}';renderMyTeamEOD(${JSON.stringify(myTeamNames)})"
+  const personBtns = ['', ...myTeamNames].map(n=>`<button onclick="_myTeamEODPerson='${n.replace(/'/g,"\\'")}';renderMyTeamEOD(${_myTeamNames})"
     style="font-size:12px;padding:5px 10px;border-radius:50px;border:1.5px solid ${_myTeamEODPerson===n?'var(--brand)':'var(--border)'};background:${_myTeamEODPerson===n?'var(--brand-light)':'var(--surface-2)'};color:${_myTeamEODPerson===n?'var(--brand)':'var(--text-2)'};cursor:pointer;font-weight:${_myTeamEODPerson===n?'700':'400'};white-space:nowrap">${n?esc(n.split(' ')[0]):'All staff'}</button>`).join('');
 
   // Per-member rows
@@ -10725,7 +10726,7 @@ function renderMyTeamEOD(myTeamNames) {
     const supportFlag = memberReports.filter(r=>r.supportNeeded==='yes').length
       ? `<span style="font-size:11px;background:#FEF3C7;color:#92400E;border-radius:4px;padding:2px 7px;font-weight:600">🙋 ${memberReports.filter(r=>r.supportNeeded==='yes').length} support</span>` : '';
 
-    const header = `<div style="display:flex;align-items:center;gap:8px;padding:8px 0;cursor:pointer;border-bottom:0.5px solid var(--border)" onclick="myTeamToggleMember('${name.replace(/'/g,"\\'")}',${JSON.stringify(myTeamNames)})">
+    const header = `<div style="display:flex;align-items:center;gap:8px;padding:8px 0;cursor:pointer;border-bottom:0.5px solid var(--border)" onclick="myTeamToggleMember('${name.replace(/'/g,"\\'")}',${_myTeamNames})">
       <span style="font-size:13px;font-weight:600;flex:1">${esc(name.split(' ')[0])}</span>
       ${ciStatus}${eodBadge}${supportFlag}
       <span style="font-size:14px;color:var(--text-3)">${isExpanded?'▴':'▾'}</span>
@@ -10759,10 +10760,10 @@ function renderMyTeamEOD(myTeamNames) {
     <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">📋 EOD Reports</div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">${periodBtns}</div>
     ${_myTeamEODPeriod==='custom'?`<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
-      <input type="date" value="${_myTeamEODFromDt}" onchange="_myTeamEODFromDt=this.value;renderMyTeamEOD(${JSON.stringify(myTeamNames)})"
+      <input type="date" value="${_myTeamEODFromDt}" onchange="_myTeamEODFromDt=this.value;renderMyTeamEOD(${_myTeamNames})"
         style="font-size:13px;padding:5px 8px;border:1.5px solid var(--border);border-radius:var(--radius-sm)"/>
       <span style="font-size:12px;color:var(--text-3)">to</span>
-      <input type="date" value="${_myTeamEODToDt}" onchange="_myTeamEODToDt=this.value;renderMyTeamEOD(${JSON.stringify(myTeamNames)})"
+      <input type="date" value="${_myTeamEODToDt}" onchange="_myTeamEODToDt=this.value;renderMyTeamEOD(${_myTeamNames})"
         style="font-size:13px;padding:5px 8px;border:1.5px solid var(--border);border-radius:var(--radius-sm)"/>
     </div>`:''}
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">${personBtns}</div>
@@ -10785,6 +10786,7 @@ function renderMyTeamEOD(myTeamNames) {
 }
 
 function myTeamToggleMember(name, teamNames) {
+  teamNames = teamNames || window._myTeamNames || [];
   if (_myTeamExpanded.has(name)) _myTeamExpanded.delete(name);
   else _myTeamExpanded.add(name);
   renderMyTeamEOD(teamNames);
@@ -11373,6 +11375,90 @@ function myTeamToggleMember(name) {
   if (_myTeamExpanded.has(name)) _myTeamExpanded.delete(name);
   else _myTeamExpanded.add(name);
   renderMyTeam();
+
+// ── Checklist Viewer ───────────────────────────────────────────────────────
+let _clvAnalyst='', _clvBroker='', _clvSearch='', _clvFrom='', _clvTo='', _clvPage=0;
+const CLV_PER_PAGE = 10;
+
+function openChecklistViewer() {
+  _clvAnalyst=''; _clvBroker=''; _clvSearch=''; _clvFrom=''; _clvTo=''; _clvPage=0;
+  const modal = document.createElement('div');
+  modal.id = 'clvModal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:1rem;overflow-y:auto';
+  modal.innerHTML = `<div style="background:var(--surface);border-radius:var(--radius);padding:1.25rem;width:100%;max-width:700px;margin:auto">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <div style="font-size:15px;font-weight:700">\u{1F4CB} Checklist responses</div>
+      <button onclick="document.getElementById('clvModal').remove()" style="background:transparent;border:none;font-size:22px;cursor:pointer;color:var(--text-3)">\u00D7</button>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+      ${isTeamLead()||isSuperAdmin()||isOpsManager()?`<select onchange="_clvAnalyst=this.value;_clvPage=0;clvRender()" style="font-size:13px;padding:6px 8px;border:1.5px solid var(--border);border-radius:var(--radius-sm)">
+        <option value="">All analysts</option>
+        ${getStaff().filter(s=>['analyst','trainee','teamlead'].includes(s.role)).map(s=>`<option value="${esc(s.name)}">${esc(s.name)}</option>`).join('')}
+      </select>`:''}
+      <input type="text" placeholder="Search client..." oninput="_clvSearch=this.value;_clvPage=0;clvRender()" style="flex:1;min-width:120px;font-size:13px;padding:6px 8px;border:1.5px solid var(--border);border-radius:var(--radius-sm)"/>
+      <input type="date" onchange="_clvFrom=this.value;_clvPage=0;clvRender()" style="font-size:13px;padding:6px 8px;border:1.5px solid var(--border);border-radius:var(--radius-sm)"/>
+      <input type="date" onchange="_clvTo=this.value;_clvPage=0;clvRender()" style="font-size:13px;padding:6px 8px;border:1.5px solid var(--border);border-radius:var(--radius-sm)"/>
+    </div>
+    <div id="clvBody"></div>
+  </div>`;
+  modal.addEventListener('click', e=>{ if(e.target===modal) modal.remove(); });
+  document.body.appendChild(modal);
+  clvRender();
+}
+
+function clvGetFiltered() {
+  const files = getFileEntries().filter(f=>f.checklistSubmitted);
+  const tl = isTeamLead(), sa = isSuperAdmin(), om = isOpsManager();
+  const myTeam = tl ? getTeamForTL(currentUser.name) : [];
+  return files.filter(f=>{
+    if(!sa && !om && !tl && f.owner !== currentUser.name) return false;
+    if(tl && !sa && !om && !myTeam.includes(f.owner) && f.owner !== currentUser.name) return false;
+    if(_clvAnalyst && f.owner !== _clvAnalyst) return false;
+    if(_clvSearch && !(f.client||'').toLowerCase().includes(_clvSearch.toLowerCase())) return false;
+    if(_clvFrom && (f.checklistDate||'') < _clvFrom) return false;
+    if(_clvTo && (f.checklistDate||'') > _clvTo) return false;
+    return true;
+  }).sort((a,b)=>(b.checklistDate||'').localeCompare(a.checklistDate||''));
+}
+
+function clvToggle(el){var d=el.nextElementSibling;d.style.display=d.style.display==="none"?"block":"none";}
+function clvRender() {
+  const el = document.getElementById('clvBody');
+  if (!el) return;
+  const all = clvGetFiltered();
+  const total = all.length;
+  const page = all.slice(_clvPage*CLV_PER_PAGE, (_clvPage+1)*CLV_PER_PAGE);
+  if (!total) { el.innerHTML='<div style="font-size:13px;color:var(--text-3);padding:12px 0">No checklist responses found.</div>'; return; }
+  let html = '';
+  page.forEach(f => {
+    let clHtml = '';
+    if (f.checklist) {
+      Object.entries(f.checklist).forEach(([section,items]) => {
+        clHtml += '<div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin:8px 0 4px">'+esc(section)+'</div>';
+        Object.entries(items).forEach(([item,val]) => {
+          clHtml += '<div style="display:flex;align-items:center;gap:8px;padding:3px 0;font-size:12px">'
+            +'<span style="color:'+(val?'#065F46':'#991B1B')+';font-size:14px">'+(val?'\u2713':'\u2717')+'</span>'
+            +'<span>'+esc(item)+'</span></div>';
+        });
+      });
+    } else { clHtml = '<div style="font-size:12px;color:var(--text-3)">No checklist data.</div>'; }
+    html += '<div style="border:1.5px solid var(--border);border-radius:var(--radius-sm);margin-bottom:8px;overflow:hidden">'
+      +'<div style="display:flex;align-items:center;gap:8px;padding:10px 12px;cursor:pointer;background:var(--surface-2)" onclick="clvToggle(this)">'
+      +'<div style="flex:1"><div style="font-size:13px;font-weight:600">'+esc(f.client)+'</div>'
+      +'<div style="font-size:11px;color:var(--text-3)">'+esc(f.owner)+' \u00b7 '+esc(fmtDate(f.checklistDate||''))+' \u00b7 '+esc(f.status)+'</div></div>'
+      +'<span style="font-size:12px;background:#D1FAE5;color:#065F46;border-radius:50px;padding:2px 8px;font-weight:600">\u2713 Submitted</span>'
+      +'<span style="font-size:14px;color:var(--text-3)">\u25be</span></div>'
+      +'<div style="display:none;padding:10px 12px">'+clHtml+'</div></div>';
+  });
+  html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px">'
+    +'<span style="font-size:12px;color:var(--text-3)">'+total+' response'+(total!==1?'s':'')+'</span>'
+    +'<div style="display:flex;gap:6px">'
+    +(_clvPage>0?'<button onclick="_clvPage--;clvRender()" style="font-size:12px;padding:4px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface-2);cursor:pointer">Prev</button>':'')
+    +((_clvPage+1)*CLV_PER_PAGE<total?'<button onclick="_clvPage++;clvRender()" style="font-size:12px;padding:4px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface-2);cursor:pointer">Next</button>':'')
+    +'</div></div>';
+  el.innerHTML = html;
+}
+
 }
 
 
