@@ -11368,10 +11368,6 @@ function setPerfDays(days, btn) {
 
 // ── Patch renderMyTeam — collapsible members + rebuilt performance pulse ──
 
-function myTeamToggleMember(name) {
-  if (_myTeamExpanded.has(name)) _myTeamExpanded.delete(name);
-  else _myTeamExpanded.add(name);
-  renderMyTeam();
 
 // ── Checklist Viewer ───────────────────────────────────────────────────────
 let _clvAnalyst='', _clvBroker='', _clvSearch='', _clvFrom='', _clvTo='', _clvPage=0;
@@ -11392,7 +11388,7 @@ function openChecklistViewer() {
   modal.innerHTML =
     '<div style="background:var(--surface);border-radius:var(--radius);padding:1.25rem;width:100%;max-width:700px;margin:auto">'
     +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">'
-    +'<div style="font-size:15px;font-weight:700">\U0001F4CB Checklist responses</div>'
+    +'<div style="font-size:15px;font-weight:700">📋 Checklist responses</div>'
     +'<button onclick="document.getElementById(\'clvModal\').remove()" style="background:transparent;border:none;font-size:22px;cursor:pointer;color:var(--text-3)">\u00D7</button>'
     +'</div>'
     +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">'
@@ -11462,7 +11458,6 @@ function clvRender() {
   el.innerHTML = html;
 }
 
-}
 
 
 </script>
