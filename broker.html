@@ -8981,6 +8981,7 @@ function bmAvToggle(key) {
         +'<select onchange="setBrokerType('+b.id+',this.value)" style="font-size:12px;padding:3px 8px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface-2)">'
         +typeOptions.replace('value="'+esc(b.type||'')+'"','value="'+esc(b.type||'')+'" selected')
         +'</select>'
+        +'<button onclick="deleteBroker('+b.id+')" style="font-size:12px;padding:3px 10px;border-radius:var(--radius-sm);border:1.5px solid var(--danger);color:var(--danger);background:transparent;cursor:pointer">Remove</button>'
         +'</div>'
         +(analysts.length?'<div style="font-size:11px;color:var(--text-3);margin-top:4px">\u{1F464} '+analysts.join(', ')+'</div>':'')
         +'</div>';
