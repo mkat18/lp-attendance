@@ -11722,17 +11722,17 @@ function renderPerformanceScreen() {
     ${mkCard('flags',m.supportCount,'Support flags','this period',m.supportCount>0?'var(--danger)':'var(--text-3)')}
   </div>`;
 
-  const chartsRow=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
-    <div style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:12px">
+  const chartsRow=`<div style="display:flex;gap:10px;margin-bottom:16px">
+    <div style="flex:1;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:12px;min-width:0">
       <div style="font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Time distribution</div>
       <div style="display:flex;gap:10px;align-items:center">
         <canvas id="perf-pie" width="135" height="135" style="width:135px;height:135px;flex-shrink:0"></canvas>
         <div id="perf-pie-legend" style="flex:1;min-width:0"></div>
       </div>
     </div>
-    <div style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:12px">
+    <div style="flex:1;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:12px;min-width:0">
       <div style="font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Benchmark trend <span style="font-weight:400;color:var(--text-3)">— red line = 80% target</span></div>
-      <canvas id="perf-trend" height="135"></canvas>
+      <canvas id="perf-trend" height="135" style="width:100%"></canvas>
     </div>
   </div>`;
 
