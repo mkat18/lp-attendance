@@ -8081,10 +8081,17 @@ function openFileModal(fileId) {
   if (isTL) {
     ownerField.style.display = 'block';
     const myTeam = getTeamForTL(currentUser.name);
-    const staff = getStaff().filter(s => myTeam.includes(s.name) || s.name === currentUser.name);
-    ownerSel.innerHTML = staff.map(s =>
-      `<option value="${esc(s.name)}">${esc(s.name)}</option>`
-    ).join('');
+    // Also include anyone assigned as cover for a team member today
+    const todayCoverage = getCoverageForDate(today);
+    const coverNames = myTeam
+      .map(name => todayCoverage[name])
+      .filter(c => c && c !== '_ncr');
+    const allCandidates = new Set([...myTeam, currentUser.name, ...coverNames]);
+    const staff = getStaff().filter(s => allCandidates.has(s.name));
+    ownerSel.innerHTML = staff.map(s => {
+      const isCover = coverNames.includes(s.name) && !myTeam.includes(s.name);
+      return `<option value="${esc(s.name)}">${esc(s.name)}${isCover?' (cover)':''}</option>`;
+    }).join('');
   } else {
     ownerField.style.display = 'none';
   }
