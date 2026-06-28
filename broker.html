@@ -10989,10 +10989,17 @@ function renderMyTeamEOD(myTeamNames) {
           <span style="font-size:11px;font-weight:600;color:var(--text-3)">${isT?'Today':fmtDate(r.date)}</span>
           ${isDraft?'<span style="font-size:10px;background:#F3F4F6;color:#6B7280;border-radius:4px;padding:1px 5px">draft</span>':''}
         </div>
-        ${(r.tasks||[]).map(t=>`<div style="display:flex;gap:8px;font-size:12px;padding:2px 0;color:var(--text-2)">
-          <span style="flex:1;font-weight:500">${esc(t.type||'—')}${t.subType?' · '+esc(t.subType):''}</span>
-          <span style="color:var(--text-3)">${fmt(t.startTime)} → ${fmt(t.endTime)}</span>
-        </div>`).join('')}
+        ${(r.tasks||[]).map(t=>{
+          const fmt2 = v=>{if(!v)return'—';const[h,m]=v.split(':');const ap=+h<12?'AM':'PM';return(+h%12||12)+':'+m+' '+ap;};
+          const hasSub = t.subType;
+          return `<div style="background:var(--surface-2);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:8px 10px;margin-bottom:6px">
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+              <span style="font-size:12px;font-weight:600;flex:1">${esc(t.type||'—')}${hasSub?' <span style="font-weight:400;color:var(--text-3)">· '+esc(t.subType)+'</span>':''}</span>
+              <span style="font-size:11px;color:var(--text-3);white-space:nowrap">${fmt2(t.startTime)} → ${fmt2(t.endTime)}</span>
+            </div>
+            ${t.notes?`<div style="font-size:11px;color:var(--text-2);margin-top:4px;padding-top:4px;border-top:0.5px solid var(--border)">${esc(t.notes)}</div>`:''}
+          </div>`;
+        }).join('')}
         ${r.firstPriority?`<div style="font-size:11px;background:#EDE9FE;color:#5B21B6;border-radius:4px;padding:4px 8px;margin-top:4px">📌 Priority: ${esc(r.firstPriority)}</div>`:''}
         ${r.supportNeeded==='yes'?`<div style="font-size:11px;color:#92400E;margin-top:3px">🙋 ${esc(r.supportDetail||'Support needed')}</div>`:''}
         ${r.challenges==='yes'?`<div style="font-size:11px;color:var(--danger);margin-top:2px">⚠ ${esc(r.challengeDetail||'Challenge flagged')}</div>`:''}
