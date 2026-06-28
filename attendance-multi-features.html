@@ -11256,7 +11256,7 @@ function renderEODScreen() {
         <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px">📋 Tasks today</div>
         <span id="eodTasksToggleIcon" style="font-size:12px;color:var(--text-3)">▾ tap to edit</span>
       </div>
-      <button type="button" onclick="addEODTask()"
+      <button type="button" onclick="${isOpsManager()?'addOMEODTask()':'addEODTask()'}"
         style="width:100%;padding:10px;border:1.5px dashed var(--brand);border-radius:var(--radius-sm);background:var(--brand-light);color:var(--brand);font-size:13px;font-weight:600;cursor:pointer;margin-bottom:10px">
         + Add task
       </button>
@@ -11273,6 +11273,7 @@ function renderEODScreen() {
     <div class="card" style="margin-bottom:1rem">
       <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px">Wrap-up</div>
 
+      ${!isOpsManager() ? `
       <div class="field">
         <label>Challenges faced today?</label>
         <div style="display:flex;gap:8px;margin-top:6px;margin-bottom:8px">
@@ -11290,10 +11291,10 @@ function renderEODScreen() {
           <textarea id="eod_challengeDetail" placeholder="Briefly describe the challenge…"
             style="width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:14px;color:var(--text);background:var(--surface-2);outline:none;resize:none;min-height:60px;line-height:1.5">${esc(pf('challengeDetail'))}</textarea>
         </div>
-      </div>
+      </div>` : ''}
 
       <div class="field">
-        <label>Training or other support needed from Team Lead?</label>
+        <label>${isOpsManager() ? 'Support needed?' : 'Training or other support needed from Team Lead?'}</label>
         <div style="display:flex;gap:8px;margin-top:6px;margin-bottom:8px">
           <button type="button" onclick="setEODYN('supportNeeded','yes',this)" id="eodSN_yes"
             style="flex:1;padding:9px;border-radius:var(--radius-sm);border:1.5px solid ${pf('supportNeeded')==='yes'?'var(--brand)':'var(--border)'};
@@ -11311,6 +11312,7 @@ function renderEODScreen() {
         </div>
       </div>
 
+      ${!isOpsManager() ? `
       <div class="field">
         <label>First priority for tomorrow</label>
         <textarea id="eod_firstPriority" placeholder="What's the most important thing to tackle first tomorrow?"
@@ -11321,7 +11323,7 @@ function renderEODScreen() {
         <label>Anything else to note? <span style="color:var(--text-3);font-weight:400">(optional)</span></label>
         <textarea id="eod_notes" placeholder="Any learning, observation or handover note…"
           style="width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:14px;color:var(--text);background:var(--surface-2);outline:none;resize:none;min-height:60px;line-height:1.5">${esc(pf('notes'))}</textarea>
-      </div>
+      </div>` : ''}
     </div>
 
     <div id="eodSubmitErr" style="color:var(--danger);font-size:13px;margin-bottom:8px;display:none"></div>
@@ -11436,6 +11438,17 @@ function downloadEOD(format) {
 
 // ── EOD Task management ───────────────────────────────────────────────────
 let _eodTasks = [];
+const OM_EOD_TASK_TYPES = [
+  'Absentee co-ordination',
+  'Training',
+  'Assessment',
+  'Analyst Allocation interview',
+  'Broker Allocation',
+  'Broker Remediation',
+  'Staff Remediation',
+  'Other Task'
+];
+
 const EOD_TASK_TYPES = {
   'CRM App':                 ['Single','Multiple'],
   'AOL App':                 ['Single','Complex'],
@@ -11600,6 +11613,67 @@ function confirmAddEODTask() {
 function cancelAddEODTask() {
   const form = document.getElementById('eodAddForm');
   if (form) { form.style.display = 'none'; form.innerHTML = ''; }
+}
+
+// ── Ops Manager EOD ───────────────────────────────────────────────────────
+
+function addOMEODTask() {
+  const panel = document.getElementById('eodTasksPanel');
+  if (panel && panel.style.display === 'none') {
+    panel.style.display = 'block';
+    const icon = document.getElementById('eodTasksToggleIcon');
+    if (icon) icon.textContent = '▴ collapse';
+  }
+  const form = document.getElementById('eodAddForm');
+  if (!form) return;
+  form.style.display = 'block';
+  const timeOpts = generateTimeOptions('','time');
+  const taskOpts = OM_EOD_TASK_TYPES.map(t=>`<option value="${t}">${t}</option>`).join('');
+  form.innerHTML = `
+    <div style="display:grid;grid-template-columns:1.8fr 0.8fr 0.8fr 2.5fr auto;gap:8px;align-items:end;margin-bottom:8px">
+      <div>
+        <div style="font-size:10px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px">Task</div>
+        <select id="omAddType" style="font-size:13px;padding:6px 8px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);width:100%">
+          <option value="">— select —</option>${taskOpts}
+        </select>
+      </div>
+      <div>
+        <div style="font-size:10px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px">Start</div>
+        <select id="omAddStart" style="font-size:13px;padding:6px 8px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);width:100%">${generateTimeOptions('','Start time')}</select>
+      </div>
+      <div>
+        <div style="font-size:10px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px">End</div>
+        <select id="omAddEnd" style="font-size:13px;padding:6px 8px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);width:100%">${generateTimeOptions('','End time')}</select>
+      </div>
+      <div>
+        <div style="font-size:10px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px">Notes</div>
+        <input type="text" id="omAddNotes" placeholder="Notes…" style="font-size:13px;padding:6px 8px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);width:100%;box-sizing:border-box"/>
+      </div>
+      <div style="padding-bottom:1px">
+        <button type="button" onclick="confirmOMEODTask()" style="padding:6px 14px;border-radius:var(--radius-sm);border:none;background:var(--brand);color:#fff;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap">+ Add</button>
+      </div>
+    </div>
+    <div id="omAddErr" style="display:none;font-size:12px;color:var(--danger);margin-top:4px"></div>`;
+}
+
+function confirmOMEODTask() {
+  const type  = document.getElementById('omAddType')?.value;
+  const start = document.getElementById('omAddStart')?.value;
+  const end   = document.getElementById('omAddEnd')?.value;
+  const notes = document.getElementById('omAddNotes')?.value.trim();
+  const errEl = document.getElementById('omAddErr');
+  const errors = [];
+  if (!type)  errors.push('Select a task type.');
+  if (!start) errors.push('Select a start time.');
+  if (!end)   errors.push('Select an end time.');
+  if (start && end && end <= start) errors.push('End must be after start.');
+  if (errors.length) { if(errEl){errEl.style.display='block';errEl.textContent=errors.join(' ');} return; }
+  _eodTasks.push({ type, subType:'', startTime:start, endTime:end, notes });
+  const form = document.getElementById('eodAddForm');
+  if (form) { form.style.display='none'; form.innerHTML=''; }
+  renderEODTaskList();
+  updateEODTaskSummary();
+  autoSaveEODDraft();
 }
 
 function removeEODTask(idx) {
@@ -11789,6 +11863,7 @@ async function saveDraftEOD() {
 }
 
 function buildEODReport(status) {
+  const om = isOpsManager();
   return {
     id: genFileId(),
     name: currentUser.name,
@@ -11799,25 +11874,26 @@ function buildEODReport(status) {
     submittedTs: status === 'submitted' ? Date.now() : null,
     draftSavedAt: new Date().toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit',hour12:true}),
     tasks: JSON.parse(JSON.stringify(_eodTasks)),
-    challenges:      document.getElementById('eod_challenges')?.value||'',
-    challengeDetail: document.getElementById('eod_challengeDetail')?.value.trim()||'',
+    challenges:      om ? '' : (document.getElementById('eod_challenges')?.value||''),
+    challengeDetail: om ? '' : (document.getElementById('eod_challengeDetail')?.value.trim()||''),
     supportNeeded:   document.getElementById('eod_supportNeeded')?.value||'',
     supportDetail:   document.getElementById('eod_supportDetail')?.value.trim()||'',
-    firstPriority:   document.getElementById('eod_firstPriority')?.value.trim()||'',
-    notes:           document.getElementById('eod_notes')?.value.trim()||'',
+    firstPriority:   om ? '' : (document.getElementById('eod_firstPriority')?.value.trim()||''),
+    notes:           om ? '' : (document.getElementById('eod_notes')?.value.trim()||''),
   };
 }
 
 function submitEOD(e) {
   e.preventDefault();
   const errEl = document.getElementById('eodSubmitErr');
+  const om = isOpsManager();
 
   const challenges    = document.getElementById('eod_challenges')?.value||'';
   const supportNeeded = document.getElementById('eod_supportNeeded')?.value||'';
 
   const errors = [];
-  if (!challenges) errors.push('Answer the challenges question.');
-  if (challenges === 'yes' && !document.getElementById('eod_challengeDetail')?.value.trim())
+  if (!om && !challenges) errors.push('Answer the challenges question.');
+  if (!om && challenges === 'yes' && !document.getElementById('eod_challengeDetail')?.value.trim())
     errors.push('Describe the challenge briefly.');
   if (!supportNeeded) errors.push('Answer the support needed question.');
 
