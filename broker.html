@@ -8661,11 +8661,11 @@ async function renderBrokerMgmtScreen() {
       +'</div>';
   };
 
-  const avHtml = '<div class="bm-av-grid" style="display:grid;grid-template-columns:'+(om?'1fr 1fr':'repeat(4,1fr)')+';gap:8px;margin-bottom:4px">'
+  const avHtml = '<div class="bm-av-grid" style="display:grid;grid-template-columns:'+(om?'1fr 1fr':'repeat(3,1fr)')+';gap:8px;margin-bottom:4px">'
     +'<div data-avkey="none" onclick="bmAvToggle(this.dataset.avkey)" style="background:#D1FAE5;border-radius:var(--radius-sm);padding:10px 8px;text-align:center;cursor:pointer"><div style="font-size:20px;font-weight:700;color:#065F46">'+countNone+'</div><div style="font-size:11px;color:#065F46;margin-top:2px">Available</div></div>'
     +'<div data-avkey="partial" onclick="bmAvToggle(this.dataset.avkey)" style="background:#FEF3C7;border-radius:var(--radius-sm);padding:10px 8px;text-align:center;cursor:pointer"><div style="font-size:20px;font-weight:700;color:#92400E">'+countPart+'</div><div style="font-size:11px;color:#92400E;margin-top:2px">Part time</div></div>'
     +(!om?'<div data-avkey="full" onclick="bmAvToggle(this.dataset.avkey)" style="background:#FEE2E2;border-radius:var(--radius-sm);padding:10px 8px;text-align:center;cursor:pointer"><div style="font-size:20px;font-weight:700;color:#991B1B">'+countFull+'</div><div style="font-size:11px;color:#991B1B;margin-top:2px">Full</div></div>':'')
-    +(!om?'<div data-avkey="other" onclick="bmAvToggle(this.dataset.avkey)" style="background:var(--surface-2);border-radius:var(--radius-sm);padding:10px 8px;text-align:center;cursor:pointer"><div style="font-size:20px;font-weight:700;color:var(--text-3)">'+countOther+'</div><div style="font-size:11px;color:var(--text-3);margin-top:2px">Other</div></div>':'')
+    
     +'</div>'
     +'<div id="bm-exp-avail" style="display:none;background:var(--surface-2);border:1.5px solid var(--brand);border-radius:var(--radius-sm);padding:10px 12px;margin-top:4px;margin-bottom:8px"></div>'
     +'<div style="display:flex;gap:0;border-bottom:1.5px solid var(--border);margin-bottom:10px">'
