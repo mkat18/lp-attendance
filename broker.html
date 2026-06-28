@@ -3201,8 +3201,8 @@ function renderMetrics() {
       if (!['analyst','teamlead'].includes(role)) return '';
       const myFiles = getFileEntries().filter(f => 
         role === 'superadmin' || role === 'hrmanager' ? true :
-        role === 'teamlead' ? (getTeamForTL(currentUser.name).includes(f.owner) || f.owner === currentUser.name) :
-        f.owner === currentUser.name
+        role === 'teamlead' ? (getTeamForTL(currentUser.name).includes(f.owner) || f.owner === currentUser.name || (f.coverAssignee && getTeamForTL(currentUser.name).includes(f.coverAssignee))) :
+        (f.owner === currentUser.name || f.coverAssignee === currentUser.name)
       );
       const atOrPastReady3 = ['Ready to Submit', ...STAGES_AFTER_READY];
       const pending = myFiles.filter(f => !f.checklistSubmitted && atOrPastReady3.includes(f.status));
@@ -8240,7 +8240,10 @@ async function saveFileEntry() {
 
   const entry = {
     id: fileId,
-    owner,
+    // When TL reassigns to someone else, use cover pattern to preserve original owner's visibility
+    owner: (isTL && existing && existing.owner !== owner) ? existing.owner : owner,
+    coverAssignee: (isTL && existing && existing.owner !== owner) ? owner : (existing ? existing.coverAssignee : null),
+    coverOriginalOwner: (isTL && existing && existing.owner !== owner) ? (existing.coverOriginalOwner || existing.owner) : (existing ? existing.coverOriginalOwner : null),
     client,
     broker,
     appType: document.getElementById('fm_type').value,
