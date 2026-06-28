@@ -11726,7 +11726,7 @@ function renderPerformanceScreen() {
     <div style="flex:1;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:12px;min-width:0">
       <div style="font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Time distribution</div>
       <div style="display:flex;gap:12px;align-items:center">
-        <div style="width:160px;height:160px;flex-shrink:0;position:relative">
+        <div style="flex:1;min-height:180px;position:relative">
           <canvas id="perf-pie"></canvas>
         </div>
         <div id="perf-pie-legend" style="flex:1;min-width:0"></div>
@@ -11734,7 +11734,7 @@ function renderPerformanceScreen() {
     </div>
     <div style="flex:1;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:12px;min-width:0">
       <div style="font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Benchmark trend <span style="font-weight:400;color:var(--text-3)">— red line = 80% target</span></div>
-      <div style="height:160px;position:relative">
+      <div style="min-height:180px;position:relative">
         <canvas id="perf-trend"></canvas>
       </div>
     </div>
