@@ -2175,7 +2175,7 @@ function buildNav() {
   let tabs = [];
   const r = currentUser.role;
   if (r === 'superadmin') {
-    tabs = [['files','All Files'],['brokermgmt','🏦 Brokers'],['profile','My Details']];
+    tabs = [['files','All Files'],['brokermgmt','🏦 Brokers'],['performance','📊 Performance'],['profile','My Details']];
   } else if (r === 'hrmanager') {
     tabs = [['profile','My Details']];
   } else {
