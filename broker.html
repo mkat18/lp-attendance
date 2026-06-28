@@ -8534,8 +8534,22 @@ async function addBroker() {
 }
 
 async function deleteBroker(id) {
-  try{await spDelete(SP_API+`('Brokers')/items(${id})`);await loadBrokers();renderBrokerMgmtScreen();showToast('Broker removed.','ok');}
+  try{await spDelete(SP_API+`('Brokers')/items(${id})`);await loadBrokers();renderBrokerMgmtScreen();showToast('Client removed.','ok');}
   catch(e){showToast('Failed to remove.','err');}
+}
+
+async function setBrokerType(id, typeName) {
+  const broker = _brokers.find(b=>b.id===id);
+  if (!broker) return;
+  const ok = await spPatch(SP_API+`('Brokers')/items(${id})`, {BrokerType: typeName});
+  if (ok) {
+    broker.type = typeName;
+    LS.set('ci_brokers', _brokers);
+    showToast('Type updated \u2713','ok');
+    renderBrokerMgmtScreen();
+  } else {
+    showToast('Failed to update type.','err');
+  }
 }
 
 async function addCRMOption() {
@@ -8955,9 +8969,22 @@ function bmAvToggle(key) {
     contentEl.innerHTML = _brokers.map(b=>'<div style="font-size:12px;padding:4px 0;border-bottom:0.5px solid var(--border);display:flex;justify-content:space-between"><span>'+esc(b.name)+'</span><span style="color:var(--text-3)">'+esc(b.type||'')+'</span></div>').join('') || '<div style="font-size:12px;color:var(--text-3)">No clients.</div>';
   } else if (key.startsWith('type_')) {
     const typeName = key.slice(5);
-    titleEl.textContent = typeName;
+    titleEl.textContent = typeName + (typeName==='Unassigned'?' — set a type to move them':' — '+(_brokers.filter(b=>(b.type||'Unassigned')===typeName).length)+' clients');
     const group = _brokers.filter(b=>(b.type||'Unassigned')===typeName);
-    contentEl.innerHTML = group.map(b=>'<div style="font-size:13px;padding:5px 0;border-bottom:0.5px solid var(--border)">'+esc(b.name)+'</div>').join('') || '<div style="font-size:12px;color:var(--text-3)">No clients of this type.</div>';
+    const typeOptions = '<option value="">No type</option>'
+      +_brokerTypes.filter(t=>t.id>0).map(t=>'<option value="'+esc(t.name)+'">'+esc(t.name)+'</option>').join('');
+    contentEl.innerHTML = group.map(b=>{
+      const analysts = _brokerAssignments.filter(a=>a.brokerName===b.name).map(a=>a.staffName);
+      return '<div style="padding:8px 0;border-bottom:0.5px solid var(--border)">'
+        +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
+        +'<span style="font-size:13px;font-weight:500;flex:1">'+esc(b.name)+'</span>'
+        +'<select onchange="setBrokerType('+b.id+',this.value)" style="font-size:12px;padding:3px 8px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface-2)">'
+        +typeOptions.replace('value="'+esc(b.type||'')+'"','value="'+esc(b.type||'')+'" selected')
+        +'</select>'
+        +'</div>'
+        +(analysts.length?'<div style="font-size:11px;color:var(--text-3);margin-top:4px">\u{1F464} '+analysts.join(', ')+'</div>':'')
+        +'</div>';
+    }).join('') || '<div style="font-size:12px;color:var(--text-3)">No clients of this type.</div>';
   } else {
     // Availability cards: none/partial/full/other
     const labels = {none:'Available',partial:'Part time',full:'Fully allocated',other:'Other'};
