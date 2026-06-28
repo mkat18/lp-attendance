@@ -8385,6 +8385,22 @@ async function loadBrokerAssignments() {
   _brokerAssignments = LS.get('ci_brokerassign') || [];
 }
 
+async function loadCRMOptions() {
+  try {
+    const res = await spGet(SP_API+"('CRMOptions')/items?$select=Id,Title&$top=200");
+    if (res?.value) { _crmOptions = res.value.map(r=>({id:r.Id,name:r.Title})); LS.set('ci_crmoptions',_crmOptions); return; }
+  } catch(e){}
+  _crmOptions = LS.get('ci_crmoptions') || [];
+}
+
+async function loadStaffCRMs() {
+  try {
+    const res = await spGet(SP_API+"('StaffCRMs')/items?$select=Id,Title,CRMList&$top=500");
+    if (res?.value) { _staffCRMs = res.value.map(r=>({id:r.Id,staffName:r.Title,crms:JSON.parse(r.CRMList||'[]')})); LS.set('ci_staffcrms',_staffCRMs); return; }
+  } catch(e){}
+  _staffCRMs = LS.get('ci_staffcrms') || [];
+}
+
 function getBrokersForStaff(staffName) {
   return _brokerAssignments.filter(a=>a.staffName===staffName).map(a=>a.brokerName);
 }
