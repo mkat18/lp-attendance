@@ -8379,11 +8379,17 @@ const BROKER_TYPE_DEFAULTS = ['Broker AU','Broker NZ','Financial Planner AU','Fi
 async function loadBrokerTypes() {
   try {
     const res = await spGet(SP_API+"('BrokerTypes')/items?$select=Id,Title&$top=200");
-    if (res?.value?.length) { _brokerTypes = res.value.map(r=>({id:r.Id,name:r.Title})); LS.set('ci_brokertypes',_brokerTypes); return; }
+    if (res?.value) {
+      const spTypes = res.value.map(r=>({id:r.Id,name:r.Title}));
+      const spNames = spTypes.map(t=>t.name);
+      const missing = BROKER_TYPE_DEFAULTS.filter(n=>!spNames.includes(n)).map((n,i)=>({id:-(i+1),name:n}));
+      _brokerTypes = [...spTypes, ...missing];
+      LS.set('ci_brokertypes',_brokerTypes);
+      return;
+    }
   } catch(e){ console.warn('loadBrokerTypes SP error:',e); }
   const cached = LS.get('ci_brokertypes');
   if (cached?.length) { _brokerTypes = cached; return; }
-  // Fallback: use defaults so UI always has types to show
   _brokerTypes = BROKER_TYPE_DEFAULTS.map((n,i)=>({id:-(i+1),name:n}));
 }
 
@@ -8543,11 +8549,15 @@ async function toggleStaffCRM(staffName, crmName) {
   let crms=existing?.crms?[...existing.crms]:[];
   if(crms.includes(crmName)) crms=crms.filter(c=>c!==crmName); else crms.push(crmName);
   const payload={Title:staffName,CRMList:JSON.stringify(crms)};
+  // Update memory immediately for instant UI feedback
+  if(existing) existing.crms=crms; else _staffCRMs.push({id:null,staffName,crms});
+  LS.set('ci_staffcrms',_staffCRMs);
   try{
-    if(existing) await spPatch(SP_API+`('StaffCRMs')/items(${existing.id})`,payload);
-    else await spPostDirect(SP_API+"('StaffCRMs')/items",payload);
-    await loadStaffCRMs();
-  }catch(e){showToast('Failed to save CRM.','err');}
+    let ok;
+    if(existing?.id) ok = await spPatch(SP_API+`('StaffCRMs')/items(${existing.id})`,payload);
+    else { const res=await spPostDirect(SP_API+"('StaffCRMs')/items",payload); ok=!!res; if(res&&existing) existing.id=res?.d?.Id||res?.Id||res?.id; }
+    if(!ok) showToast('Failed to save CRM skill to SharePoint.','err');
+  }catch(e){showToast('Failed to save CRM skill.','err');}
 }
 
 // ── Broker Management Screen ───────────────────────────────────────────────
