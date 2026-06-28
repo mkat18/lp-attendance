@@ -1162,6 +1162,7 @@ var _perfPeriod='7', _perfCustomFrom='', _perfCustomTo='';
 var _perfAnalystFlt='', _perfTeamFlt='', _perfCharts={};
 var _perfView='issues', _perfDetailName='', _perfSortKey='over';
 var _perfSortDir=-1, _perfExpandedRow='', _perfOpenCard='';
+var _filesFilterStaff='', _filesTLFilter='';
 function applyPermissionVisibility() {
   try {
     document.querySelectorAll('[data-role-hide]').forEach(function(el) {
@@ -8808,63 +8809,62 @@ function renderFilesScreen() {
   const el = document.getElementById('filesContent');
   if (!el) return;
 
-  // Show/hide superadmin filter bar and update title
   const adminFilters = document.getElementById('filesAdminFilters');
   const titleEl = document.getElementById('filesScreenTitle');
-  const subEl = document.getElementById('filesScreenSub');
+  const subEl   = document.getElementById('filesScreenSub');
+
   if (isSuperAdmin()) {
     if (adminFilters) {
       adminFilters.style.display = 'block';
-      // Populate staff dropdown
       const staffSel = document.getElementById('filesFilterStaff');
       if (staffSel && staffSel.options.length <= 1) {
         const names = getStaff().filter(s=>s.role!=='superadmin').map(s=>s.name).sort();
-        staffSel.innerHTML = '<option value="">All staff</option>' + names.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('');
+        staffSel.innerHTML = '<option value="">All staff</option>'
+          + names.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('');
+        if (_filesFilterStaff) staffSel.value = _filesFilterStaff;
       }
     }
-    if (titleEl) titleEl.textContent = '📁 All Files';
-    if (subEl) subEl.textContent = 'Every client file across all staff';
+    if (titleEl) titleEl.textContent = '\u{1F4C1} All Files';
+    if (subEl)   subEl.textContent   = 'Every client file across all staff';
   } else {
     if (adminFilters) adminFilters.style.display = 'none';
   }
 
   let allFiles, teamAndSelf;
   if (currentUser.role === 'hrmanager') { el.innerHTML = '<div class="card">Files not available for HR Manager.</div>'; return; }
+
   if (isSuperAdmin()) {
     allFiles = getFileEntries();
     teamAndSelf = getStaff().map(s => s.name);
-    // Apply superadmin filters
     const filterFrom   = document.getElementById('filesFilterFrom')?.value||'';
     const filterTo     = document.getElementById('filesFilterTo')?.value||'';
     const filterStaff  = document.getElementById('filesFilterStaff')?.value||'';
     const filterBroker = (document.getElementById('filesFilterBroker')?.value||'').toLowerCase().trim();
-    if (filterFrom)   allFiles = allFiles.filter(f => (f.updatedAt||f.date||'') >= filterFrom);
-    if (filterTo)     allFiles = allFiles.filter(f => (f.updatedAt||f.date||'') <= filterTo);
-    if (filterStaff)  allFiles = allFiles.filter(f => f.owner === filterStaff);
-    if (filterBroker) allFiles = allFiles.filter(f => (f.broker||'').toLowerCase().includes(filterBroker));
+    _filesFilterStaff = filterStaff;
+    if (filterFrom)   allFiles = allFiles.filter(f=>(f.updatedAt||f.date||'')>=filterFrom);
+    if (filterTo)     allFiles = allFiles.filter(f=>(f.updatedAt||f.date||'')<=filterTo);
+    if (filterStaff)  allFiles = allFiles.filter(f=>f.owner===filterStaff);
+    if (filterBroker) allFiles = allFiles.filter(f=>(f.broker||'').toLowerCase().includes(filterBroker));
+
   } else if (isTeamLead()) {
     const myTeam = getTeamForTL(currentUser.name);
     teamAndSelf = [...myTeam, currentUser.name];
-    allFiles = getFileEntries().filter(f => teamAndSelf.includes(f.owner));
-    // Show team member filter only in analytics tab
+    allFiles = getFileEntries().filter(f=>teamAndSelf.includes(f.owner));
     const tlFilter = document.getElementById('filesTLFilter');
-    const tlSel = document.getElementById('filesTLMemberFilter');
+    const tlSel    = document.getElementById('filesTLMemberFilter');
     if (tlFilter && tlSel) {
-      if (_activeFilesTab === 'analytics') {
-        tlFilter.style.display = 'block';
-        if (tlSel.options.length <= 1) {
-          tlSel.innerHTML = '<option value="">All team members</option>' +
-            teamAndSelf.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
-        }
-        const picked = tlSel.value;
-        if (picked) allFiles = allFiles.filter(f => f.owner === picked);
-      } else {
-        tlFilter.style.display = 'none';
+      tlFilter.style.display = 'block';
+      if (tlSel.options.length <= 1) {
+        tlSel.innerHTML = '<option value="">All team members</option>'
+          + teamAndSelf.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('');
+        if (_filesTLFilter) tlSel.value = _filesTLFilter;
       }
+      _filesTLFilter = tlSel.value;
+      if (_filesTLFilter) allFiles = allFiles.filter(f=>f.owner===_filesTLFilter);
     }
   } else {
     teamAndSelf = [currentUser.name];
-    allFiles = getFileEntries().filter(f => f.owner === currentUser.name);
+    allFiles = getFileEntries().filter(f=>f.owner===currentUser.name);
   }
 
   const searchQ = (document.getElementById('filesSearch')?.value||'').toLowerCase().trim();
@@ -10893,8 +10893,18 @@ window.renderMyTeam = function() {
   myteamEl.appendChild(btnDiv);
 };
 
+async function refreshMyTeamEOD() {
+  const el = document.getElementById('myTeamEODBlock');
+  if (el) {
+    const btn = el.querySelector('button');
+    if (btn) { btn.textContent = '↺ Loading…'; btn.disabled = true; }
+  }
+  await loadEODFromSP().catch(()=>{});
+  renderMyTeamEOD(window._myTeamNames);
+}
+
 function renderMyTeamEOD(myTeamNames) {
-  window._myTeamNames = myTeamNames; // store globally to avoid JSON in onclick attrs
+  window._myTeamNames = myTeamNames;
   const el = document.getElementById('myTeamEODBlock');
   if (!el) return;
   const todayStr = new Date().toISOString().split('T')[0];
@@ -10993,7 +11003,10 @@ function renderMyTeamEOD(myTeamNames) {
   }).join('');
 
   el.innerHTML = `
-    <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">📋 EOD Reports</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px">📋 EOD Reports</div>
+      <button onclick="refreshMyTeamEOD()" style="font-size:11px;padding:3px 10px;border-radius:50px;border:1.5px solid var(--border);background:var(--surface-2);cursor:pointer;color:var(--text-2)">↺ Refresh</button>
+    </div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">${periodBtns}</div>
     ${_myTeamEODPeriod==='custom'?`<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
       <input type="date" value="${_myTeamEODFromDt}" onchange="_myTeamEODFromDt=this.value;renderMyTeamEOD(window._myTeamNames)"
