@@ -11150,6 +11150,7 @@ function updateEODPromptCard() {
 // ── EOD Screen ────────────────────────────────────────────────────────────
 let _saEodCard = '';
 let _saEodPiePeriod = 'today';
+let _saEodPieName = '';
 let _saEodPieFrom = '';
 let _saEodPieTo = '';
 let _saEodPieChart = null;
@@ -11208,6 +11209,12 @@ function renderSAEODScreen() {
   const isCustomPie = _saEodPiePeriod === 'custom';
   const pieSection = `<div class="card" style="margin-bottom:12px">
     <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Time distribution</div>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
+      <select id="saEodPieName" onchange="_saEodPieName=this.value;saEodDrawPie()" style="flex:1;font-size:13px;padding:6px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)">
+        <option value="">All staff</option>
+        ${getStaff().filter(s=>roleHasEOD(s.role)).map(s=>`<option value="${esc(s.name)}"${_saEodPieName===s.name?' selected':''}>${esc(s.name)}</option>`).join('')}
+      </select>
+    </div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:${isCustomPie?'8':'12'}px">
       ${['today','7d','30d','60d','90d','custom'].map(p=>{
         const lbl={today:'Today','7d':'7 days','30d':'30 days','60d':'60 days','90d':'90 days',custom:'Custom'}[p];
@@ -11329,7 +11336,7 @@ function saEodDrawPie() {
   if (_saEodPieChart) { try{_saEodPieChart.destroy();}catch(e){} _saEodPieChart=null; }
 
   const {from, to} = saEodPieDates();
-  const allRpts = getEODReports().filter(r => r.date >= from && r.date <= to && r.status === 'submitted');
+  const allRpts = getEODReports().filter(r => r.date >= from && r.date <= to && r.status === 'submitted' && (!_saEodPieName || r.name === _saEodPieName));
 
   // Aggregate task minutes
   const taskMins = {};
