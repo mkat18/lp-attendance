@@ -8634,8 +8634,8 @@ async function renderBrokerMgmtScreen() {
           +'</div>';}).join('')
       :'<div style="font-size:13px;color:var(--text-3)">No CRM skills configured.</div>')+'</div>';
 
-  if (om && !sa) { bmSection('availability','Analyst availability',avHtml,true); return; }
-  bmSection('availability','Analyst availability',avHtml,true);
+  if (om && !sa) { bmSection('availability','Analyst availability',avHtml,true); }
+  else { bmSection('availability','Analyst availability',avHtml,true); }
 
   // ── CLIENT LIST (SA only) ─────────────────────────────────────────────
   if (sa) {
