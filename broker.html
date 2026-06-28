@@ -8523,11 +8523,11 @@ async function toggleStaffCRM(staffName, crmName) {
 async function renderBrokerMgmtScreen() {
   const el = document.getElementById('brokerMgmtContent');
   if (!el) return;
-  el.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--text-3)">Loading\u2026</div>';
+  el.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--text-secondary)">Loading\u2026</div>';
   try {
     await Promise.all([loadBrokers(),loadBrokerAssignments(),loadCRMOptions(),loadStaffCRMs(),loadBrokerTypes()]);
   } catch(e) {
-    el.innerHTML = '<div class="card" style="text-align:center;padding:2rem"><div style="font-size:1.5rem">\u26a0\ufe0f</div><div style="font-weight:600;color:var(--danger);margin-top:8px">Error loading</div><button onclick="renderBrokerMgmtScreen()" style="margin-top:12px;padding:8px 16px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface-2);cursor:pointer;font-size:13px">\u21ba Retry</button></div>';
+    el.innerHTML = '<div style="text-align:center;padding:2rem"><div style="font-size:1.5rem">\u26a0\ufe0f</div><div style="color:var(--text-danger);margin-top:8px">Error loading</div><button onclick="renderBrokerMgmtScreen()" style="margin-top:12px">Retry</button></div>';
     return;
   }
   const sa=isSuperAdmin(), om=isOpsManager(), tl=isTeamLead();
@@ -8536,14 +8536,13 @@ async function renderBrokerMgmtScreen() {
   const viewStaff = (sa||om) ? allStaff : allStaff.filter(s=>myTeam.includes(s.name));
   el.innerHTML = '';
 
-  // ── Helpers ───────────────────────────────────────────────────────────
   function bmSection(id, title, contentHtml, defaultOpen) {
     if (defaultOpen===undefined) defaultOpen=true;
     const sec = document.createElement('div');
-    sec.className = 'card'; sec.style.marginBottom = '10px';
-    sec.innerHTML = '<div onclick="bmToggle(\''+id+'\')" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding-bottom:6px;margin-bottom:'+(defaultOpen?'8':'0')+'px;border-bottom:'+(defaultOpen?'0.5px solid var(--border)':'none')+'">'
-      +'<div style="font-size:13px;font-weight:700;color:var(--text)">'+title+'</div>'
-      +'<span id="bm-arr-'+id+'" style="font-size:14px;color:var(--text-3)">'+(defaultOpen?'\u25b4':'\u25be')+'</span>'
+    sec.style.cssText = 'background:var(--surface-2);border:0.5px solid var(--border);border-radius:12px;padding:1rem 1.25rem;margin-bottom:12px';
+    sec.innerHTML = '<div onclick="bmToggle(\''+id+'\')" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;margin-bottom:'+(defaultOpen?'12':'0')+'px" id="bm-hdr-'+id+'">'
+      +'<span style="font-size:12px;font-weight:500;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px">'+title+'</span>'
+      +'<i class="ti ti-chevron-'+(defaultOpen?'up':'down')+'" id="bm-arr-'+id+'" style="font-size:16px;color:var(--text-muted)" aria-hidden="true"></i>'
       +'</div>'
       +'<div id="bm-body-'+id+'" style="display:'+(defaultOpen?'block':'none')+'">'+contentHtml+'</div>';
     el.appendChild(sec);
@@ -8560,236 +8559,232 @@ async function renderBrokerMgmtScreen() {
   }
 
   function availLabel(av) {
-    if (av==='none')       return {dot:'#22C55E', text:'Fully available'};
-    if (av==='partial-am') return {dot:'#F59E0B', text:'Free AM'};
-    if (av==='partial-pm') return {dot:'#F59E0B', text:'Free PM'};
-    if (av==='other')      return {dot:'#94A3B8', text:'Other industry'};
-    return {dot:'#EF4444', text:'Fully allocated'};
+    if (av==='none')       return {dot:'var(--text-success)', text:'Free all day', bg:'var(--bg-success)'};
+    if (av==='partial-am') return {dot:'var(--text-warning)', text:'Free AM', bg:'var(--bg-warning)'};
+    if (av==='partial-pm') return {dot:'var(--text-warning)', text:'Free PM', bg:'var(--bg-warning)'};
+    if (av==='other')      return {dot:'var(--text-muted)', text:'Other', bg:'var(--surface-1)'};
+    return {dot:'var(--text-danger)', text:'Fully allocated', bg:'var(--bg-danger)'};
   }
 
-  function personCard(s, showAvail) {
-    const crms = getCRMsForStaff(s.name);
-    const ten = tenureStr(s);
-    const assigns = getAssignmentsForStaff(s.name);
-    const av = staffAvailability(s.name);
-    const avl = availLabel(av);
-    return '<div style="padding:10px 0;border-bottom:0.5px solid var(--border)">'
-      +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:'+(crms.length||assigns.length?'6':'0')+'px">'
-      +'<span style="font-size:13px;font-weight:600;flex:1">'+esc(s.name)+'</span>'
-      +'<span style="font-size:11px;color:var(--text-3)">'+esc(ROLE_LABEL[s.role]||s.role)+'</span>'
-      +(ten?'<span style="font-size:11px;background:var(--surface-2);border-radius:50px;padding:2px 8px;color:var(--text-3)">\u231b '+ten+'</span>':'')
-      +(showAvail?'<span style="font-size:11px;border-radius:50px;padding:2px 8px;background:'+avl.dot+'22;color:'+avl.dot+';font-weight:600">\u25cf '+avl.text+'</span>':'')
-      +'</div>'
-      +(assigns.length?'<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:'+(crms.length?'4':'0')+'px">'
-        +assigns.map(a=>'<span style="font-size:11px;background:var(--brand-light);color:var(--brand);border-radius:50px;padding:2px 9px;font-weight:500">'+esc(a.brokerName)+' \u00b7 '+esc(a.type||'FT')+'</span>').join('')
-        +'</div>':'')
-      +(crms.length?'<div style="display:flex;flex-wrap:wrap;gap:4px">'
-        +crms.map(c=>'<span style="font-size:11px;background:#EDE9FE;color:#5B21B6;border-radius:50px;padding:2px 8px">'+esc(c)+'</span>').join('')+'</div>':'')
-      +'</div>';
-  }
-
-  // ── OPS MANAGER VIEW ─────────────────────────────────────────────────
-  if (om && !sa) {
-    // Coverage is rendered into coverSection-brokermgmt separately by goTab
-    // Analyst availability — only show available + partial
-    const available = viewStaff.filter(s=>['none','partial-am','partial-pm'].includes(staffAvailability(s.name)));
-    const countNone = viewStaff.filter(s=>staffAvailability(s.name)==='none').length;
-    const countPart = viewStaff.filter(s=>['partial-am','partial-pm'].includes(staffAvailability(s.name))).length;
-    const countFull = viewStaff.filter(s=>staffAvailability(s.name)==='full').length;
-    const countOther= viewStaff.filter(s=>staffAvailability(s.name)==='other').length;
-
-    const summaryHtml = '<div class="bm-av-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:4px">'
-      +'<div data-avkey="none" onclick="bmAvToggle(this.dataset.avkey)" style="background:#D1FAE5;border-radius:var(--radius-sm);padding:10px;text-align:center;cursor:pointer'+(_bmAvCard==='none'?';outline:2px solid var(--brand)':'')+'"><div style="font-size:18px;font-weight:700;color:#065F46">'+countNone+'</div><div style="font-size:11px;color:#065F46;margin-top:2px">Available</div></div>'
-      +'<div data-avkey="partial" onclick="bmAvToggle(this.dataset.avkey)" style="background:#FEF9C3;border-radius:var(--radius-sm);padding:10px;text-align:center;cursor:pointer'+(_bmAvCard==='partial'?';outline:2px solid var(--brand)':'')+'"><div style="font-size:18px;font-weight:700;color:#92400E">'+countPart+'</div><div style="font-size:11px;color:#92400E;margin-top:2px">Part time</div></div>'
-      +'<div data-avkey="full" onclick="bmAvToggle(this.dataset.avkey)" style="background:#FEE2E2;border-radius:var(--radius-sm);padding:10px;text-align:center;cursor:pointer'+(_bmAvCard==='full'?';outline:2px solid var(--brand)':'')+'"><div style="font-size:18px;font-weight:700;color:#991B1B">'+countFull+'</div><div style="font-size:11px;color:#991B1B;margin-top:2px">Fully allocated</div></div>'
-      +'<div data-avkey="other" onclick="bmAvToggle(this.dataset.avkey)" style="background:var(--surface-2);border-radius:var(--radius-sm);padding:10px;text-align:center;cursor:pointer'+(_bmAvCard==='other'?';outline:2px solid var(--brand)':'')+'"><div style="font-size:18px;font-weight:700;color:var(--text-3)">'+countOther+'</div><div style="font-size:11px;color:var(--text-3);margin-top:2px">Other</div></div>'
-      +'</div>'
-
-      +'<div class="bm-av-expand" style="background:var(--surface-2);border:1.5px solid var(--brand);border-radius:var(--radius-sm);padding:10px 12px;display:none;margin-top:4px;margin-bottom:8px"></div>';
-
-    const filterBar = '<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">'
-      +'<button id="ab-filter-analyst" onclick="bmAbFilter(\'analyst\')" style="font-size:12px;padding:4px 12px;border-radius:50px;border:1.5px solid var(--brand);background:var(--brand-light);color:var(--brand);cursor:pointer;font-weight:600">By analyst</button>'
-      +'<button id="ab-filter-crm" onclick="bmAbFilter(\'crm\')" style="font-size:12px;padding:4px 12px;border-radius:50px;border:1.5px solid var(--border);background:var(--surface-2);color:var(--text-2);cursor:pointer">By CRM skill</button>'
-      +'</div>';
-
-    const byAnalyst = '<div id="ab-by-analyst">'
-      +(available.length ? available.map(s=>personCard(s,true)).join('')
-        : '<div style="font-size:13px;color:var(--danger);padding:8px 0">No analysts currently available.</div>')
-      +'</div>';
-
-    const byCRM = '<div id="ab-by-crm" style="display:none">'
-      +(_crmOptions.length ? _crmOptions.map(crm=>{
-          const avWithCRM = available.filter(s=>getCRMsForStaff(s.name).includes(crm.name));
-          return '<div style="padding:10px 0;border-bottom:0.5px solid var(--border)">'
-            +'<div style="font-size:13px;font-weight:600;margin-bottom:6px">'+esc(crm.name)+'</div>'
-            +(avWithCRM.length ? avWithCRM.map(s=>{
-                const av=staffAvailability(s.name); const avl=availLabel(av); const ten=tenureStr(s);
-                return '<div style="display:flex;align-items:center;gap:6px;padding:4px 0">'
-                  +'<span style="flex:1;font-size:12px">'+esc(s.name)+'</span>'
-                  +(ten?'<span style="font-size:11px;color:var(--text-3)">\u231b '+ten+'</span>':'')
-                  +'<span style="font-size:11px;border-radius:50px;padding:2px 8px;background:'+avl.dot+'22;color:'+avl.dot+';font-weight:600">'+avl.text+'</span>'
-                  +'</div>';}).join('')
-              : '<div style="font-size:12px;color:var(--text-3)">No available analysts with this skill.</div>')
-            +'</div>';}).join('')
-        : '<div style="font-size:13px;color:var(--text-3)">No CRM skills configured.</div>')
-      +'</div>';
-
-    bmSection('availability', '\ud83d\udcca Analyst availability', summaryHtml+filterBar+byAnalyst+byCRM, true);
-    return;
-  }
-
-  // ── SA / TL VIEW ──────────────────────────────────────────────────────
-
-  // Analyst availability
+  // ── AVAILABILITY SECTION ───────────────────────────────────────────────
   const countNone  = viewStaff.filter(s=>staffAvailability(s.name)==='none').length;
   const countPart  = viewStaff.filter(s=>['partial-am','partial-pm'].includes(staffAvailability(s.name))).length;
   const countFull  = viewStaff.filter(s=>staffAvailability(s.name)==='full').length;
   const countOther = viewStaff.filter(s=>staffAvailability(s.name)==='other').length;
 
-  const availSummary = sa ? ('<div class="bm-av-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:4px">'
-    +'<div data-avkey="none" onclick="bmAvToggle(this.dataset.avkey)" style="background:#D1FAE5;border-radius:var(--radius-sm);padding:8px;text-align:center;cursor:pointer'+(_bmAvCard==='none'?';outline:2px solid var(--brand)':'')+'"><div style="font-size:16px;font-weight:700;color:#065F46">'+countNone+'</div><div style="font-size:11px;color:#065F46">Available</div></div>'
-    +'<div data-avkey="partial" onclick="bmAvToggle(this.dataset.avkey)" style="background:#FEF9C3;border-radius:var(--radius-sm);padding:8px;text-align:center;cursor:pointer'+(_bmAvCard==='partial'?';outline:2px solid var(--brand)':'')+'"><div style="font-size:16px;font-weight:700;color:#92400E">'+countPart+'</div><div style="font-size:11px;color:#92400E">Part time</div></div>'
-    +'<div data-avkey="full" onclick="bmAvToggle(this.dataset.avkey)" style="background:#FEE2E2;border-radius:var(--radius-sm);padding:8px;text-align:center;cursor:pointer'+(_bmAvCard==='full'?';outline:2px solid var(--brand)':'')+'"><div style="font-size:16px;font-weight:700;color:#991B1B">'+countFull+'</div><div style="font-size:11px;color:#991B1B">Full</div></div>'
-    +'<div data-avkey="other" onclick="bmAvToggle(this.dataset.avkey)" style="background:var(--surface-2);border-radius:var(--radius-sm);padding:8px;text-align:center;cursor:pointer'+(_bmAvCard==='other'?';outline:2px solid var(--brand)':'')+'"><div style="font-size:16px;font-weight:700;color:var(--text-3)">'+countOther+'</div><div style="font-size:11px;color:var(--text-3)">Other</div></div>'
+  const avCards = '<div class="bm-av-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:4px">'
+    +'<div data-avkey="none" onclick="bmAvToggle(this.dataset.avkey)" style="background:var(--bg-success);border:0.5px solid var(--border-success);border-radius:var(--radius);padding:10px 8px;text-align:center;cursor:pointer"><div style="font-size:20px;font-weight:500;color:var(--text-success)">'+countNone+'</div><div style="font-size:11px;color:var(--text-success);margin-top:2px">Available</div></div>'
+    +'<div data-avkey="partial" onclick="bmAvToggle(this.dataset.avkey)" style="background:var(--bg-warning);border:0.5px solid var(--border-warning);border-radius:var(--radius);padding:10px 8px;text-align:center;cursor:pointer"><div style="font-size:20px;font-weight:500;color:var(--text-warning)">'+countPart+'</div><div style="font-size:11px;color:var(--text-warning);margin-top:2px">Part time</div></div>'
+    +'<div data-avkey="full" onclick="bmAvToggle(this.dataset.avkey)" style="background:var(--bg-danger);border:0.5px solid var(--border-danger);border-radius:var(--radius);padding:10px 8px;text-align:center;cursor:pointer"><div style="font-size:20px;font-weight:500;color:var(--text-danger)">'+countFull+'</div><div style="font-size:11px;color:var(--text-danger);margin-top:2px">Full</div></div>'
+    +'<div data-avkey="other" onclick="bmAvToggle(this.dataset.avkey)" style="background:var(--surface-1);border:0.5px solid var(--border);border-radius:var(--radius);padding:10px 8px;text-align:center;cursor:pointer"><div style="font-size:20px;font-weight:500;color:var(--text-muted)">'+countOther+'</div><div style="font-size:11px;color:var(--text-muted);margin-top:2px">Other</div></div>'
     +'</div>'
-
-    +'<div class="bm-av-expand" style="background:var(--surface-2);border:1.5px solid var(--brand);border-radius:var(--radius-sm);padding:10px 12px;display:none;margin-top:4px;margin-bottom:8px"></div>') : '';
-
-  const availAnalyst = '<div id="ab-by-analyst">'+viewStaff.map(s=>personCard(s,true)).join('')+'</div>';
-  const availCRM = '<div id="ab-by-crm" style="display:none">'
-    +(_crmOptions.length ? _crmOptions.map(crm=>{
-        const withCRM = viewStaff.filter(s=>getCRMsForStaff(s.name).includes(crm.name));
-        return '<div style="padding:10px 0;border-bottom:0.5px solid var(--border)">'
-          +'<div style="font-size:13px;font-weight:600;margin-bottom:6px">'+esc(crm.name)+'</div>'
-          +withCRM.map(s=>{
-            const av=staffAvailability(s.name); const avl=availLabel(av); const ten=tenureStr(s);
-            return '<div style="display:flex;align-items:center;gap:6px;padding:4px 0">'
-              +'<span style="flex:1;font-size:12px">'+esc(s.name)+'</span>'
-              +(ten?'<span style="font-size:11px;color:var(--text-3)">\u231b '+ten+'</span>':'')
-              +'<span style="font-size:11px;border-radius:50px;padding:2px 8px;background:'+avl.dot+'22;color:'+avl.dot+';font-weight:600">'+avl.text+'</span>'
-              +'</div>';}).join('')
+    +'<div class="bm-av-expand" style="display:none;background:var(--surface-1);border:0.5px solid var(--border-accent);border-radius:var(--radius);padding:10px 12px;margin-top:4px;margin-bottom:8px"></div>'
+    +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">'
+    +'<button id="ab-filter-analyst" onclick="bmAbFilter(\'analyst\')" style="font-size:11px;padding:3px 10px;border-radius:99px">By analyst</button>'
+    +'<button id="ab-filter-crm" onclick="bmAbFilter(\'crm\')" style="font-size:11px;padding:3px 10px;border-radius:99px">By CRM skill</button>'
+    +'</div>'
+    +'<div id="ab-by-analyst">'+viewStaff.map(s=>{
+        const ten=tenureStr(s);const av=staffAvailability(s.name);const avl=availLabel(av);
+        const assigns=getAssignmentsForStaff(s.name);const crms=getCRMsForStaff(s.name);
+        return '<div style="padding:8px 0;border-bottom:0.5px solid var(--border)">'
+          +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">'
+          +'<span style="font-size:13px;font-weight:500;flex:1;color:var(--text-primary)">'+esc(s.name)+'</span>'
+          +'<span style="font-size:11px;color:var(--text-muted)">'+(ten?ten+' · ':'')+esc(ROLE_LABEL[s.role]||s.role)+'</span>'
+          +'<span style="font-size:11px;padding:2px 8px;border-radius:99px;background:'+avl.bg+';color:'+avl.dot+'">'+avl.text+'</span>'
+          +'</div>'
+          +(assigns.length?'<div style="font-size:11px;color:var(--text-secondary);margin-bottom:2px">'+assigns.map(a=>esc(a.brokerName)+' \u00b7 '+(a.type||'FT')).join(', ')+'</div>':'')
+          +(crms.length?'<div style="display:flex;gap:4px;flex-wrap:wrap">'+crms.map(c=>'<span style="font-size:11px;background:var(--bg-success);color:var(--text-success);padding:1px 7px;border-radius:99px">'+esc(c)+'</span>').join('')+'</div>':'')
+          +'</div>';
+      }).join('')+'</div>'
+    +'<div id="ab-by-crm" style="display:none">'+(_crmOptions.length?_crmOptions.map(crm=>{
+        const withCRM=viewStaff.filter(s=>getCRMsForStaff(s.name).includes(crm.name));
+        return '<div style="padding:8px 0;border-bottom:0.5px solid var(--border)">'
+          +'<div style="font-size:12px;font-weight:500;color:var(--text-primary);margin-bottom:4px">'+esc(crm.name)+'</div>'
+          +(withCRM.length?withCRM.map(s=>{const ten=tenureStr(s);const av=staffAvailability(s.name);const avl=availLabel(av);
+            return '<div style="display:flex;align-items:center;gap:6px;padding:3px 0"><span style="flex:1;font-size:12px;color:var(--text-primary)">'+esc(s.name)+'</span>'+(ten?'<span style="font-size:11px;color:var(--text-muted)">'+ten+'</span>':'')+'<span style="font-size:11px;padding:2px 7px;border-radius:99px;background:'+avl.bg+';color:'+avl.dot+'">'+avl.text+'</span></div>';
+          }).join(''):'<div style="font-size:12px;color:var(--text-muted)">No analysts with this skill.</div>')
           +'</div>';}).join('')
-      : '<div style="font-size:13px;color:var(--text-3)">No CRM skills configured.</div>')
-    +'</div>';
+      :'<div style="font-size:13px;color:var(--text-muted)">No CRM skills configured.</div>')+'</div>';
 
-  const filterBar2 = '<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">'
-    +'<button id="ab-filter-analyst" onclick="bmAbFilter(\'analyst\')" style="font-size:12px;padding:4px 12px;border-radius:50px;border:1.5px solid var(--brand);background:var(--brand-light);color:var(--brand);cursor:pointer;font-weight:600">By analyst</button>'
-    +'<button id="ab-filter-crm" onclick="bmAbFilter(\'crm\')" style="font-size:12px;padding:4px 12px;border-radius:50px;border:1.5px solid var(--border);background:var(--surface-2);color:var(--text-2);cursor:pointer">By CRM skill</button>'
-    +'</div>';
-  bmSection('availability', '\ud83d\udcca Analyst availability', availSummary+filterBar2+availAnalyst+availCRM, true);
+  if (om && !sa) {
+    bmSection('availability', 'Analyst availability', avCards, true);
+    return;
+  }
+  bmSection('availability', 'Analyst availability', avCards, true);
 
-  // Broker List + Types (SA only)
+  // ── CLIENT LIST ────────────────────────────────────────────────────────
   if (sa) {
-    const typeCounts = {};
-    _brokers.forEach(b=>{ const t=b.type||'Unassigned'; typeCounts[t]=(typeCounts[t]||0)+1; });
+    // Build type counts from _brokerTypes (show all types, even 0)
     const byType = {};
     _brokers.forEach(b=>{ const t=b.type||'Unassigned'; if(!byType[t])byType[t]=[]; byType[t].push(b); });
+    const typeList = _brokerTypes.length ? _brokerTypes : [];
 
-    // Headcount + type cards
-    const typeCardColors = ['#EDE9FE','#DBEAFE','#D1FAE5','#FEF3C7','#FCE7F3','#E0F2FE','#FEF9C3','#FEE2E2','#E8F5E9','#FFF3E0','#F3E8FF','#E0F7FA'];
-    const typeCardTextColors = ['#5B21B6','#1D4ED8','#065F46','#92400E','#9D174D','#0369A1','#78350F','#991B1B','#1B5E20','#E65100','#6B21A8','#006064'];
-    const typeEntries = Object.entries(typeCounts).sort((a,b)=>b[1]-a[1]);
+    const clTitle = 'Client list <span style="font-size:12px;font-weight:400;color:var(--text-muted)">'+_brokers.length+' clients \u00b7 '+allStaff.length+' staff</span>';
 
-    const typeCardsHtml = '<div class="bm-av-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:6px">'
-      +typeEntries.map(([t,c],i)=>{
-        const bg = typeCardColors[i % typeCardColors.length];
-        const col = typeCardTextColors[i % typeCardTextColors.length];
-        const key = 'type_'+t;
-        const act = _bmAvCard===key;
-        return '<div data-avkey="'+esc(key)+'" onclick="bmAvToggle(this.dataset.avkey)" style="background:'+bg+';border-radius:var(--radius-sm);padding:8px 6px;text-align:center;cursor:pointer'+(act?';outline:2px solid var(--brand)':'')+'">'
-          +'<div style="font-size:18px;font-weight:700;color:'+col+'">'+c+'</div>'
-          +'<div style="font-size:10px;color:'+col+';margin-top:2px;line-height:1.3">'+esc(t)+'</div>'
+    const typeGrid = '<div class="bm-av-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:4px">'
+      +typeList.map(t=>{
+        const cnt=(byType[t.name]||[]).length;
+        return '<div data-avkey="type_'+esc(t.name)+'" onclick="bmAvToggle(this.dataset.avkey)" style="background:var(--surface-1);border:0.5px solid var(--border);border-radius:var(--radius);padding:10px 8px;text-align:center;cursor:pointer">'
+          +'<div style="font-size:20px;font-weight:500;color:'+(cnt?'var(--text-primary)':'var(--text-muted)')+'">'+cnt+'</div>'
+          +'<div style="font-size:11px;color:'+(cnt?'var(--text-secondary)':'var(--text-muted)')+';margin-top:2px">'+esc(t.name)+'</div>'
           +'</div>';}).join('')
+      +(byType['Unassigned']?'<div data-avkey="type_Unassigned" onclick="bmAvToggle(this.dataset.avkey)" style="background:var(--surface-1);border:0.5px solid var(--border);border-radius:var(--radius);padding:10px 8px;text-align:center;cursor:pointer">'
+        +'<div style="font-size:20px;font-weight:500;color:var(--text-warning)">'+(byType['Unassigned']||[]).length+'</div>'
+        +'<div style="font-size:11px;color:var(--text-warning);margin-top:2px">Unassigned</div></div>':'')
       +'</div>'
-      +'<div class="bm-av-expand" style="background:var(--surface-2);border:1.5px solid var(--brand);border-radius:var(--radius-sm);padding:10px 12px;display:none;margin-top:4px;margin-bottom:8px"></div>';
-
-    const headcountHtml = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">'
-      +'<div data-avkey="staff" onclick="bmAvToggle(this.dataset.avkey)" style="background:var(--brand-light);border-radius:var(--radius-sm);padding:10px;text-align:center;cursor:pointer'+(_bmAvCard==='staff'?';outline:2px solid var(--brand)':'')+'">'
-      +'<div style="font-size:22px;font-weight:700;color:var(--brand)">'+allStaff.length+'</div><div style="font-size:11px;color:var(--brand);margin-top:2px">Total staff</div></div>'
-      +'<div data-avkey="clients" onclick="bmAvToggle(this.dataset.avkey)" style="background:#F0FDF4;border-radius:var(--radius-sm);padding:10px;text-align:center;cursor:pointer'+(_bmAvCard==='clients'?';outline:2px solid var(--brand)':'')+'">'
-      +'<div style="font-size:22px;font-weight:700;color:#065F46">'+_brokers.length+'</div><div style="font-size:11px;color:#065F46;margin-top:2px">Total clients</div></div>'
-      +'</div>'
-      +'<div class="bm-av-expand" style="background:var(--surface-2);border:1.5px solid var(--brand);border-radius:var(--radius-sm);padding:10px 12px;display:none;margin-top:4px;margin-bottom:8px"></div>'
-      +'<div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">By type</div>'
-      +typeCardsHtml
-      +'<div style="border-top:1px solid var(--border);margin:10px 0"></div>';
-
-    const blHtml = headcountHtml
-      +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">'
-      +'<input type="text" id="bmNewBroker" placeholder="Client name…" style="flex:2;min-width:120px;font-size:13px;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)" onkeydown="if(event.key===\"Enter\"){addBroker();event.preventDefault()}"/>'
-      +'<select id="bmNewBrokerType" style="flex:1;min-width:120px;font-size:13px;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)">'
-      +'<option value="">\u2014 type \u2014</option>'
-      +_brokerTypes.map(t=>'<option value="'+esc(t.name)+'">'+esc(t.name)+'</option>').join('')
-      +'</select>'
-      +'<button onclick="addBroker()" style="padding:8px 14px;border-radius:var(--radius-sm);border:none;background:var(--brand);color:#fff;font-size:13px;font-weight:600;cursor:pointer">+ Add</button>'
-      +'</div>'
-      +(!_brokers.length?'<div style="font-size:13px;color:var(--text-3)">No clients added yet.</div>'
-        :Object.entries(byType).sort((a,b)=>a[0].localeCompare(b[0])).map(([type,brokers])=>
-          '<div style="margin-bottom:10px"><div style="font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">'+esc(type)+'</div>'
-          +brokers.map(b=>'<div style="display:flex;align-items:center;padding:7px 0;border-bottom:0.5px solid var(--border)"><span style="flex:1;font-size:13px;font-weight:500">'+esc(b.name)+'</span><button onclick="deleteBroker('+b.id+')" style="font-size:12px;padding:3px 10px;border-radius:4px;border:1px solid var(--danger);color:var(--danger);background:transparent;cursor:pointer">Remove</button></div>').join('')
-          +'</div>').join(''));
-    bmSection('brokerlist', '\ud83c\udfe6 Client list', blHtml, false);
-
-    const btHtml = '<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">'
-      +'<input type="text" id="bmNewBrokerTypeOpt" placeholder="New type…" style="flex:1;font-size:13px;padding:6px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)" onkeydown="if(event.key===\"Enter\"){addBrokerType();event.preventDefault()}"/>'
-      +'<button onclick="addBrokerType()" style="padding:6px 14px;border-radius:var(--radius-sm);border:none;background:var(--brand);color:#fff;font-size:13px;font-weight:600;cursor:pointer">+ Add</button>'
-      +'</div><div style="display:flex;flex-wrap:wrap;gap:6px">'
-      +(!_brokerTypes.length?'<span style="font-size:13px;color:var(--text-3)">No types yet.</span>'
-        :_brokerTypes.map(t=>'<div style="display:flex;align-items:center;gap:4px;background:var(--surface-2);border:1.5px solid var(--border);border-radius:50px;padding:3px 10px"><span style="font-size:12px">'+esc(t.name)+'</span><button onclick="deleteBrokerType('+t.id+')" style="background:transparent;border:none;color:var(--text-3);cursor:pointer;font-size:15px;line-height:1;padding:0 0 0 3px">\u00d7</button></div>').join(''))
+      +'<div class="bm-av-expand" style="display:none;background:var(--surface-1);border:0.5px solid var(--border-accent);border-radius:var(--radius);padding:10px 12px;margin-top:4px;margin-bottom:10px"></div>'
+      +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:0">'
+      +'<input type="text" id="bmNewBroker" placeholder="Client name\u2026" style="flex:2;min-width:120px;font-size:13px" onkeydown="if(event.key===&quot;Enter&quot;){addBroker();}"/>'
+      +'<select id="bmNewBrokerType" style="flex:1;min-width:100px;font-size:13px"><option value="">Type</option>'
+      +_brokerTypes.map(t=>'<option value="'+esc(t.name)+'">'+esc(t.name)+'</option>').join('')+'</select>'
+      +'<button onclick="addBroker()" style="font-size:13px;white-space:nowrap">Add client</button>'
       +'</div>';
-    bmSection('brokertypes', '\ud83c\udfe7 Client types', btHtml, false);
+
+    bmSection('brokerlist', clTitle, typeGrid, false);
+
+    // Client types management
+    const btHtml = '<div style="display:flex;gap:8px;margin-bottom:10px">'
+      +'<input type="text" id="bmNewBrokerTypeOpt" placeholder="New type\u2026" style="flex:1;font-size:13px" onkeydown="if(event.key===&quot;Enter&quot;){addBrokerType();}"/>'
+      +'<button onclick="addBrokerType()" style="font-size:13px">Add type</button>'
+      +'</div>'
+      +'<div style="display:flex;flex-wrap:wrap;gap:6px">'
+      +(_brokerTypes.length?_brokerTypes.map(t=>'<div style="display:flex;align-items:center;gap:4px;border:0.5px solid var(--border);border-radius:99px;padding:3px 10px">'
+        +'<span style="font-size:12px;color:var(--text-primary)">'+esc(t.name)+'</span>'
+        +'<i class="ti ti-x" onclick="deleteBrokerType('+t.id+')" style="font-size:12px;color:var(--text-muted);cursor:pointer" aria-hidden="true"></i>'
+        +'</div>').join(''):'<span style="font-size:13px;color:var(--text-muted)">No types yet.</span>')
+      +'</div>';
+    bmSection('brokertypes', 'Client types', btHtml, false);
   }
-  // Broker Assignments
-  let baHtml = '';
-  if (sa) {
-    baHtml += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--border)">'
-      +'<select id="bmStaffSel" style="flex:1;min-width:140px;font-size:13px;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)"><option value="">— staff —</option>'
-      +allStaff.map(s=>'<option value="'+esc(s.name)+'">'+esc(s.name)+'</option>').join('')+'</select>'
-      +'<select id="bmBrokerSel" style="flex:1;min-width:140px;font-size:13px;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)"><option value="">— broker —</option>'
+
+  // ── BROKER ASSIGNMENTS ────────────────────────────────────────────────
+  const baSearchId = 'ba-search';
+  let baHtml = '<input type="text" id="'+baSearchId+'" placeholder="Search by name\u2026" style="width:100%;font-size:13px;margin-bottom:10px" oninput="bmFilterRows(this.value,\'ba-row\')">'
+    +'<div style="border-top:0.5px solid var(--border)">';
+
+  viewStaff.forEach(s=>{
+    const ten=tenureStr(s);
+    const assigns=getAssignmentsForStaff(s.name);
+    const safeId = s.name.replace(/[^a-z0-9]/gi,'_');
+    baHtml += '<div class="ba-row" data-name="'+esc(s.name.toLowerCase())+'" style="padding:10px 0;border-bottom:0.5px solid var(--border)">'
+      +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'
+      +'<span style="font-size:13px;font-weight:500;flex:1;color:var(--text-primary)">'+esc(s.name)+'</span>'
+      +'<span style="font-size:11px;color:var(--text-muted)">'+(ten?ten+' \u00b7 ':'')+esc(ROLE_LABEL[s.role]||s.role)+'</span>'
+      +'</div>'
+      +'<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">'
+      +(assigns.length?assigns.map(a=>'<span style="font-size:12px;background:var(--bg-accent);color:var(--text-accent);padding:3px 10px;border-radius:99px;display:inline-flex;align-items:center;gap:4px">'+esc(a.brokerName)+' \u00b7 '+esc(a.type||'FT')+'<i class="ti ti-x" onclick="removeBrokerAssignment('+a.id+')" style="font-size:11px;cursor:pointer;margin-left:2px" aria-hidden="true"></i></span>').join('')
+        :'<span style="font-size:12px;color:var(--text-danger)">No broker assigned</span>')
+      +'<span onclick="bmToggleAssignForm(\''+safeId+'\')" style="font-size:12px;color:var(--text-muted);padding:3px 10px;border:0.5px dashed var(--border-strong);border-radius:99px;cursor:pointer">+ Assign</span>'
+      +'</div>'
+      +'<div id="ba-form-'+safeId+'" style="display:none;margin-top:8px;display:none">'
+      +'<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">'
+      +'<select id="ba-broker-'+safeId+'" style="flex:1;min-width:120px;font-size:13px"><option value="">Select broker</option>'
       +_brokers.map(b=>'<option value="'+esc(b.name)+'">'+esc(b.name)+'</option>').join('')+'</select>'
-      +'<select id="bmAssignType" style="font-size:13px;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)">'
-      +'<option value="FT">FT</option><option value="PT AM">PT AM</option><option value="PT PM">PT PM</option><option value="Other">Other</option>'
-      +'</select>'
-      +'<button onclick="assignBrokerToStaff()" style="padding:8px 16px;border-radius:var(--radius-sm);border:none;background:var(--brand);color:#fff;font-size:13px;font-weight:600;cursor:pointer">Assign</button>'
+      +'<select id="ba-type-'+safeId+'" style="font-size:13px;width:90px"><option value="FT">FT</option><option value="PT AM">PT AM</option><option value="PT PM">PT PM</option><option value="Other">Other</option></select>'
+      +'<button onclick="bmSaveAssign(\''+safeId+'\',\''+esc(s.name)+'\')" style="font-size:13px">Save</button>'
+      +'<button onclick="document.getElementById(\'ba-form-'+safeId+'\').style.display=\'none\'" style="font-size:13px">Cancel</button>'
+      +'</div></div>'
       +'</div>';
-  }
-  baHtml += viewStaff.map(s=>personCard(s,false)).join('');
-  bmSection('assignments', '\ud83d\udc65 Broker assignments', baHtml, true);
+  });
+  baHtml += '</div>';
+  bmSection('assignments', 'Broker assignments', baHtml, true);
 
-  // CRM Options (SA only)
-  if (sa) {
-    const coHtml = '<div style="display:flex;gap:8px;margin-bottom:12px">'
-      +'<input type="text" id="bmNewCRM" placeholder="CRM name\u2026" style="flex:1;font-size:13px;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)" onkeydown="if(event.key===\'Enter\'){addCRMOption();event.preventDefault()}"/>'
-      +'<button onclick="addCRMOption()" style="padding:8px 16px;border-radius:var(--radius-sm);border:none;background:var(--brand);color:#fff;font-size:13px;font-weight:600;cursor:pointer">+ Add</button>'
-      +'</div><div style="display:flex;flex-wrap:wrap;gap:6px">'
-      +(!_crmOptions.length?'<span style="font-size:13px;color:var(--text-3)">No CRMs yet.</span>'
-        :_crmOptions.map(c=>'<div style="display:flex;align-items:center;gap:4px;background:var(--surface-2);border:1.5px solid var(--border);border-radius:50px;padding:4px 12px"><span style="font-size:13px">'+esc(c.name)+'</span><button onclick="deleteCRMOption('+c.id+')" style="background:transparent;border:none;color:var(--text-3);cursor:pointer;font-size:16px;line-height:1;padding:0 0 0 4px">\u00d7</button></div>').join(''))
+  // ── CRM OPTIONS (SA only) ─────────────────────────────────────────────
+  if (sa && _crmOptions.length >= 0) {
+    const coHtml = '<div style="display:flex;gap:8px;margin-bottom:10px">'
+      +'<input type="text" id="bmNewCRM" placeholder="CRM name\u2026" style="flex:1;font-size:13px" onkeydown="if(event.key===&quot;Enter&quot;){addCRMOption();}"/>'
+      +'<button onclick="addCRMOption()" style="font-size:13px">Add CRM</button>'
+      +'</div>'
+      +'<div style="display:flex;flex-wrap:wrap;gap:6px">'
+      +(!_crmOptions.length?'<span style="font-size:13px;color:var(--text-muted)">No CRMs yet.</span>'
+        :_crmOptions.map(c=>'<div style="display:flex;align-items:center;gap:4px;border:0.5px solid var(--border);border-radius:99px;padding:3px 10px">'
+          +'<span style="font-size:12px;color:var(--text-primary)">'+esc(c.name)+'</span>'
+          +'<i class="ti ti-x" onclick="deleteCRMOption('+c.id+')" style="font-size:12px;color:var(--text-muted);cursor:pointer" aria-hidden="true"></i>'
+          +'</div>').join(''))
       +'</div>';
-    bmSection('crmoptions', '\ud83d\udcbb CRM options', coHtml, false);
+    bmSection('crmoptions', 'CRM options', coHtml, false);
   }
 
-  // CRM Skills
+  // ── CRM SKILLS ────────────────────────────────────────────────────────
   if (_crmOptions.length) {
-    const csHtml = viewStaff.map(s=>{
-      const staffCRMs=getCRMsForStaff(s.name);
-      const ten=tenureStr(s);
-      return '<div style="padding:10px 0;border-bottom:1px solid var(--border)">'
-        +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">'
-        +'<span style="font-size:13px;font-weight:600;flex:1">'+esc(s.name)+'</span>'
-        +'<span style="font-size:11px;color:var(--text-3)">'+esc(ROLE_LABEL[s.role]||s.role)+'</span>'
-        +(ten?'<span style="font-size:11px;background:var(--surface-2);border-radius:50px;padding:2px 8px;color:var(--text-3)">\u231b '+ten+'</span>':'')
-        +'</div><div style="display:flex;flex-wrap:wrap;gap:6px">'
+    let csHtml = '<input type="text" id="cs-search" placeholder="Search by name or skill\u2026" style="width:100%;font-size:13px;margin-bottom:10px" oninput="bmFilterRows(this.value,\'cs-row\')">'
+      +'<div style="border-top:0.5px solid var(--border)">';
+
+    viewStaff.forEach(s=>{
+      const staffCRMs = getCRMsForStaff(s.name);
+      const ten = tenureStr(s);
+      const skillText = staffCRMs.join(' ').toLowerCase();
+      csHtml += '<div class="cs-row" data-name="'+esc(s.name.toLowerCase())+'" data-skills="'+esc(skillText)+'" style="padding:10px 0;border-bottom:0.5px solid var(--border)">'
+        +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'
+        +'<span style="font-size:13px;font-weight:500;flex:1;color:var(--text-primary)">'+esc(s.name)+'</span>'
+        +(ten?'<span style="font-size:11px;color:var(--text-muted)">'+ten+'</span>':'')
+        +'</div>'
+        +'<div style="display:flex;flex-wrap:wrap;gap:6px">'
         +_crmOptions.map(c=>{
-          const sel=staffCRMs.includes(c.name);
-          return '<button type="button" onclick="'+(sa?'toggleStaffCRM(\''+s.name.replace(/'/g,"\\'")+'\',\''+esc(c.name)+'\')':'')+'"'
-            +' style="font-size:12px;padding:4px 12px;border-radius:50px;border:1.5px solid '+(sel?'var(--brand)':'var(--border)')+';'
-            +'background:'+(sel?'var(--brand-light)':'var(--surface-2)')+';color:'+(sel?'var(--brand)':'var(--text-3)')+';cursor:'+(sa?'pointer':'default')+';font-weight:'+(sel?'600':'400')+'">'
-            +(sel?'\u2713 ':'')+esc(c.name)+'</button>';}).join('')
+          const sel = staffCRMs.includes(c.name);
+          if (!sa) {
+            return sel ? '<span style="font-size:12px;background:var(--bg-success);color:var(--text-success);padding:3px 10px;border-radius:99px;display:inline-flex;align-items:center;gap:4px"><i class="ti ti-check" style="font-size:11px" aria-hidden="true"></i>'+esc(c.name)+'</span>'
+              : '<span style="font-size:12px;background:var(--surface-1);color:var(--text-muted);padding:3px 10px;border-radius:99px;border:0.5px solid var(--border)">'+esc(c.name)+'</span>';
+          }
+          return '<span data-staff="'+esc(s.name)+'" data-crm="'+esc(c.name)+'" onclick="bmCRMToggle(this)" style="font-size:12px;padding:3px 10px;border-radius:99px;cursor:pointer;display:inline-flex;align-items:center;gap:4px;'+(sel?'background:var(--bg-success);color:var(--text-success)':'background:var(--surface-1);color:var(--text-muted);border:0.5px solid var(--border)')+'"><i class="ti '+(sel?'ti-check':'ti-circle')+'\" style=\"font-size:11px" aria-hidden="true"></i>'+esc(c.name)+'</span>';
+        }).join('')
         +'</div></div>';
-    }).join('');
-    bmSection('crmskills', '\ud83e\uddd1\u200d\ud83d\udcbb CRM skills', csHtml, !tl);
+    });
+    csHtml += '</div>';
+    bmSection('crmskills', 'CRM skills', csHtml, !tl);
   }
 }
+
+function bmToggle(id) {
+  const body=document.getElementById('bm-body-'+id);
+  const arr=document.getElementById('bm-arr-'+id);
+  const hdr=document.getElementById('bm-hdr-'+id);
+  if (!body) return;
+  const open=body.style.display!=='none';
+  body.style.display=open?'none':'block';
+  if (arr) { arr.className='ti '+(open?'ti-chevron-down':'ti-chevron-up'); }
+  if (hdr) hdr.style.marginBottom=open?'0':'12px';
+}
+
+function bmToggleAssignForm(safeId) {
+  const el=document.getElementById('ba-form-'+safeId);
+  if (el) el.style.display = el.style.display==='none'||!el.style.display?'block':'none';
+}
+
+async function bmSaveAssign(safeId, staffName) {
+  const brokerEl=document.getElementById('ba-broker-'+safeId);
+  const typeEl=document.getElementById('ba-type-'+safeId);
+  const brokerName=brokerEl?.value;
+  const assignType=typeEl?.value||'FT';
+  if(!brokerName){showToast('Select a broker.','err');return;}
+  if(_brokerAssignments.some(a=>a.staffName===staffName&&a.brokerName===brokerName)){showToast('Already assigned.','err');return;}
+  const res=await spPostDirect(SP_API+"('BrokerAssignments')/items",{Title:staffName,BrokerName:brokerName,AssignmentType:assignType});
+  if(res){await loadBrokerAssignments();renderBrokerMgmtScreen();showToast('Assigned \u2713','ok');}
+}
+
+function bmFilterRows(q, cls) {
+  const term = q.toLowerCase().trim();
+  document.querySelectorAll('.'+cls).forEach(row=>{
+    const name = row.dataset.name||'';
+    const skills = row.dataset.skills||'';
+    row.style.display = (!term||name.includes(term)||skills.includes(term)) ? '' : 'none';
+  });
+}
+
+async function bmCRMToggle(el) {
+  const staffName = el.dataset.staff;
+  const crmName = el.dataset.crm;
+  if (!staffName||!crmName) return;
+  await toggleStaffCRM(staffName, crmName);
+  // Update chip in place
+  const staffCRMs = getCRMsForStaff(staffName);
+  const sel = staffCRMs.includes(crmName);
+  el.style.background = sel ? 'var(--bg-success)' : 'var(--surface-1)';
+  el.style.color = sel ? 'var(--text-success)' : 'var(--text-muted)';
+  el.style.border = sel ? 'none' : '0.5px solid var(--border)';
+  el.querySelector('i').className = 'ti '+(sel?'ti-check':'ti-circle');
+}
+
+
 
 function bmAvToggle(key) {
   // Toggle same card off
