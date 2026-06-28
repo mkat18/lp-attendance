@@ -6204,6 +6204,7 @@ async function loadFromSharePoint() {
         loadBrokerAssignments(),
         loadCRMOptions(),
         loadStaffCRMs(),
+        loadBrokerTypes(),
         loadCoverageFromSP(),
       ]).catch(e => console.warn('Some SP loads failed:', e));
       if (_roles.length) EDITABLE_ROLES = _roles.map(r => r.title).filter(r => r !== 'superadmin');
@@ -8370,15 +8371,41 @@ function clearFilesFilters() {
 // ── BROKER DATA LOADING ───────────────────────────────────────────────────
 // ══════════════════════════════════════════════════════════════════════════
 let _brokers = [];
+let _brokerTypes = [];
+
+async function loadBrokerTypes() {
+  try {
+    const res = await spGet(SP_API+"('BrokerTypes')/items?$select=Id,Title&$top=200");
+    if (res?.value) { _brokerTypes = res.value.map(r=>({id:r.Id,name:r.Title})); LS.set('ci_brokertypes',_brokerTypes); return; }
+  } catch(e){}
+  _brokerTypes = LS.get('ci_brokertypes') || [];
+}
+
+async function addBrokerType() {
+  const input=document.getElementById('bmNewBrokerTypeOpt'); const name=input?.value.trim();
+  if(!name) return;
+  const res=await spPostDirect(SP_API+"('BrokerTypes')/items",{Title:name});
+  if(res){if(input)input.value='';await loadBrokerTypes();renderBrokerMgmtScreen();showToast('Type added ✓','ok');}
+}
+
+async function deleteBrokerType(id) {
+  try{await spDelete(SP_API+`('BrokerTypes')/items(${id})`);await loadBrokerTypes();renderBrokerMgmtScreen();showToast('Type removed.','ok');}
+  catch(e){showToast('Failed to remove.','err');}
+}
 let _brokerAssignments = [];
 let _crmOptions = [];
 let _staffCRMs = [];
 
 async function loadBrokers() {
   try {
-    const res = await spGet(SP_API+"('Brokers')/items?$select=Id,Title&$top=500");
-    if (res?.value) { _brokers = res.value.map(r=>({id:r.Id,name:r.Title})); LS.set('ci_brokers',_brokers); return; }
-  } catch(e){}
+    const res = await spGet(SP_API+"('Brokers')/items?$select=Id,Title,BrokerType&$top=500");
+    if (res?.value) { _brokers = res.value.map(r=>({id:r.Id,name:r.Title,type:r.BrokerType||''})); LS.set('ci_brokers',_brokers); return; }
+  } catch(e){
+    try {
+      const res2 = await spGet(SP_API+"('Brokers')/items?$select=Id,Title&$top=500");
+      if (res2?.value) { _brokers = res2.value.map(r=>({id:r.Id,name:r.Title,type:''})); LS.set('ci_brokers',_brokers); return; }
+    } catch(e2){}
+  }
   _brokers = LS.get('ci_brokers') || [];
 }
 
@@ -8455,8 +8482,9 @@ async function removeBrokerAssignment(id) {
 
 async function addBroker() {
   const input=document.getElementById('bmNewBroker');const name=input?.value.trim();
+  const typeEl=document.getElementById('bmNewBrokerType');const type=typeEl?.value||'';
   if(!name) return;
-  const res=await spPostDirect(SP_API+"('Brokers')/items",{Title:name});
+  const res=await spPostDirect(SP_API+"('Brokers')/items",{Title:name,BrokerType:type});
   if(res){if(input)input.value='';await loadBrokers();renderBrokerMgmtScreen();showToast('Broker added ✓','ok');}
 }
 
@@ -8495,7 +8523,7 @@ async function renderBrokerMgmtScreen() {
   if (!el) return;
   el.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--text-3)">Loading\u2026</div>';
   try {
-    await Promise.all([loadBrokers(),loadBrokerAssignments(),loadCRMOptions(),loadStaffCRMs()]);
+    await Promise.all([loadBrokers(),loadBrokerAssignments(),loadCRMOptions(),loadStaffCRMs(),loadBrokerTypes()]);
   } catch(e) {
     el.innerHTML = '<div class="card" style="text-align:center;padding:2rem"><div style="font-size:1.5rem">\u26a0\ufe0f</div><div style="font-weight:600;color:var(--danger);margin-top:8px">Error loading</div><button onclick="renderBrokerMgmtScreen()" style="margin-top:12px;padding:8px 16px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface-2);cursor:pointer;font-size:13px">\u21ba Retry</button></div>';
     return;
@@ -8644,17 +8672,47 @@ async function renderBrokerMgmtScreen() {
     +'</div>';
   bmSection('availability', '\ud83d\udcca Analyst availability', availSummary+filterBar2+availAnalyst+availCRM, true);
 
-  // Broker List (SA only)
+  // Broker List + Types (SA only)
   if (sa) {
-    const blHtml = '<div style="display:flex;gap:8px;margin-bottom:12px">'
-      +'<input type="text" id="bmNewBroker" placeholder="Broker name\u2026" style="flex:1;font-size:13px;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)" onkeydown="if(event.key===\'Enter\'){addBroker();event.preventDefault()}"/>'
-      +'<button onclick="addBroker()" style="padding:8px 16px;border-radius:var(--radius-sm);border:none;background:var(--brand);color:#fff;font-size:13px;font-weight:600;cursor:pointer">+ Add</button>'
-      +'</div>'
-      +(!_brokers.length?'<div style="font-size:13px;color:var(--text-3)">No brokers added yet.</div>'
-        :_brokers.map(b=>'<div style="display:flex;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)"><span style="flex:1;font-size:14px;font-weight:500">'+esc(b.name)+'</span><button onclick="deleteBroker('+b.id+')" style="font-size:12px;padding:3px 10px;border-radius:4px;border:1px solid var(--danger);color:var(--danger);background:transparent;cursor:pointer">Remove</button></div>').join(''));
-    bmSection('brokerlist', '\ud83c\udfe6 Broker list', blHtml, false);
-  }
+    const typeCounts = {};
+    _brokers.forEach(b=>{ const t=b.type||'Unassigned'; typeCounts[t]=(typeCounts[t]||0)+1; });
 
+    const headcountHtml = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--border)">'
+      +'<div style="background:var(--brand-light);border-radius:var(--radius-sm);padding:10px;text-align:center"><div style="font-size:22px;font-weight:700;color:var(--brand)">'+allStaff.length+'</div><div style="font-size:11px;color:var(--brand);margin-top:2px">Total staff</div></div>'
+      +'<div style="background:#F0FDF4;border-radius:var(--radius-sm);padding:10px;text-align:center"><div style="font-size:22px;font-weight:700;color:#065F46">'+_brokers.length+'</div><div style="font-size:11px;color:#065F46;margin-top:2px">Total clients</div></div>'
+      +'</div>'
+      +(Object.keys(typeCounts).length ? '<div style="margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--border)">'
+        +Object.entries(typeCounts).sort((a,b)=>b[1]-a[1]).map(([t,c])=>'<div style="display:flex;align-items:center;justify-content:space-between;padding:4px 0;font-size:12px"><span style="color:var(--text-2)">'+esc(t)+'</span><span style="font-weight:600;background:var(--surface-2);border-radius:50px;padding:1px 8px">'+c+'</span></div>').join('')
+        +'</div>' : '');
+
+    const byType = {};
+    _brokers.forEach(b=>{ const t=b.type||'Unassigned'; if(!byType[t])byType[t]=[]; byType[t].push(b); });
+
+    const blHtml = headcountHtml
+      +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">'
+      +'<input type="text" id="bmNewBroker" placeholder="Client name…" style="flex:2;min-width:120px;font-size:13px;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)" onkeydown="if(event.key===\"Enter\"){addBroker();event.preventDefault()}"/>'
+      +'<select id="bmNewBrokerType" style="flex:1;min-width:120px;font-size:13px;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)">'
+      +'<option value="">\u2014 type \u2014</option>'
+      +_brokerTypes.map(t=>'<option value="'+esc(t.name)+'">'+esc(t.name)+'</option>').join('')
+      +'</select>'
+      +'<button onclick="addBroker()" style="padding:8px 14px;border-radius:var(--radius-sm);border:none;background:var(--brand);color:#fff;font-size:13px;font-weight:600;cursor:pointer">+ Add</button>'
+      +'</div>'
+      +(!_brokers.length?'<div style="font-size:13px;color:var(--text-3)">No clients added yet.</div>'
+        :Object.entries(byType).sort((a,b)=>a[0].localeCompare(b[0])).map(([type,brokers])=>
+          '<div style="margin-bottom:10px"><div style="font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">'+esc(type)+'</div>'
+          +brokers.map(b=>'<div style="display:flex;align-items:center;padding:7px 0;border-bottom:0.5px solid var(--border)"><span style="flex:1;font-size:13px;font-weight:500">'+esc(b.name)+'</span><button onclick="deleteBroker('+b.id+')" style="font-size:12px;padding:3px 10px;border-radius:4px;border:1px solid var(--danger);color:var(--danger);background:transparent;cursor:pointer">Remove</button></div>').join('')
+          +'</div>').join(''));
+    bmSection('brokerlist', '\ud83c\udfe6 Client list', blHtml, false);
+
+    const btHtml = '<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">'
+      +'<input type="text" id="bmNewBrokerTypeOpt" placeholder="New type…" style="flex:1;font-size:13px;padding:6px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)" onkeydown="if(event.key===\"Enter\"){addBrokerType();event.preventDefault()}"/>'
+      +'<button onclick="addBrokerType()" style="padding:6px 14px;border-radius:var(--radius-sm);border:none;background:var(--brand);color:#fff;font-size:13px;font-weight:600;cursor:pointer">+ Add</button>'
+      +'</div><div style="display:flex;flex-wrap:wrap;gap:6px">'
+      +(!_brokerTypes.length?'<span style="font-size:13px;color:var(--text-3)">No types yet.</span>'
+        :_brokerTypes.map(t=>'<div style="display:flex;align-items:center;gap:4px;background:var(--surface-2);border:1.5px solid var(--border);border-radius:50px;padding:3px 10px"><span style="font-size:12px">'+esc(t.name)+'</span><button onclick="deleteBrokerType('+t.id+')" style="background:transparent;border:none;color:var(--text-3);cursor:pointer;font-size:15px;line-height:1;padding:0 0 0 3px">\u00d7</button></div>').join(''))
+      +'</div>';
+    bmSection('brokertypes', '\ud83c\udfe7 Client types', btHtml, false);
+  }
   // Broker Assignments
   let baHtml = '';
   if (sa) {
