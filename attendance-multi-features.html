@@ -2038,30 +2038,71 @@ function canEditRecords(){ return isSuperAdmin() || canDo('canEditRecords'); }
 // Stores real role, temporarily overrides for rendering
 let _previewRole = null;
 let _realRole = null;
+let _realName = null;
 
 function startPreview(role) {
   const realRole = _realRole || (currentUser && currentUser.role);
   if (!role || realRole !== 'superadmin') return;
   _previewRole = role;
   _realRole = currentUser.role;
+  _realName = null; // role-only preview, keep SA name
   currentUser.role = role;
   buildNav();
-  // Show what this role sees first
   if (role === 'hrmanager') { loadDashboard(); showScreen('dashboard'); }
   else { initCheckin(); showScreen('checkin'); }
   const firstTab = document.querySelector('.nav-tab');
   if (firstTab) firstTab.classList.add('active');
 }
 
+function startPreviewAsPerson(name) {
+  const realRole = _realRole || (currentUser && currentUser.role);
+  if (!name || realRole !== 'superadmin') return;
+  const staff = getStaff();
+  const member = staff.find(s => s.name === name);
+  if (!member) return;
+  _realRole = currentUser.role;
+  _realName = currentUser.name;
+  _previewRole = member.role;
+  currentUser.role = member.role;
+  currentUser.name = member.name;
+  buildNav();
+  initCheckin(); showScreen('checkin');
+  const firstTab = document.querySelector('.nav-tab');
+  if (firstTab) firstTab.classList.add('active');
+  // Clear search input
+  const inp = document.getElementById('previewPersonInput');
+  const res = document.getElementById('previewPersonResults');
+  if (inp) inp.value = '';
+  if (res) res.style.display = 'none';
+}
+
 function exitPreview() {
   if (!_realRole) return;
   currentUser.role = _realRole;
+  if (_realName) currentUser.name = _realName;
   _previewRole = null;
   _realRole = null;
+  _realName = null;
   buildNav();
   loadDashboard(); showScreen('dashboard');
   const firstTab = document.querySelector('.nav-tab');
   if (firstTab) firstTab.classList.add('active');
+}
+
+function previewPersonSearch(q) {
+  const res = document.getElementById('previewPersonResults');
+  if (!res) return;
+  const term = q.trim().toLowerCase();
+  if (!term) { res.style.display = 'none'; return; }
+  const matches = getStaff()
+    .filter(s => s.role !== 'superadmin' && s.name.toLowerCase().includes(term))
+    .slice(0, 8);
+  if (!matches.length) { res.style.display = 'none'; return; }
+  res.innerHTML = matches.map(s =>
+    `<div onclick="startPreviewAsPerson('${esc(s.name)}')" style="padding:7px 12px;cursor:pointer;font-size:13px;border-bottom:0.5px solid var(--border);display:flex;justify-content:space-between;align-items:center" onmouseover="this.style.background='var(--surface-2)'" onmouseout="this.style.background=''">`
+    + `<span>${esc(s.name)}</span><span style="font-size:11px;color:var(--text-3)">${esc(ROLE_LABEL[s.role]||s.role)}</span></div>`
+  ).join('');
+  res.style.display = 'block';
 }
 
 
@@ -2570,16 +2611,21 @@ function buildNav() {
     tabs = ALL_TABS_DEF.filter(([key]) => hasTab(key));
     if (!tabs.length) tabs = [['checkin','Check in'],['profile','My Details']];
   }
-  const viewAsDropdown = (!_previewRole && (_realRole==='superadmin' || currentUser.role==='superadmin'))
+  const isSA = !_previewRole && (_realRole==='superadmin' || currentUser.role==='superadmin');
+  const viewAsDropdown = isSA
     ? '<select class="nav-select" onchange="startPreview(this.value)">' + buildViewAsOptions() + '</select>'
+      + '<div style="position:relative;display:inline-block">'
+      + '<input id="previewPersonInput" type="text" placeholder="Person…" oninput="previewPersonSearch(this.value)" onblur="setTimeout(()=>{const r=document.getElementById(\'previewPersonResults\');if(r)r.style.display=\'none\'},200)" style="font-size:12px;padding:5px 10px;border:1px solid rgba(255,255,255,0.2);border-radius:4px;background:rgba(255,255,255,0.1);color:#fff;width:120px;outline:none" placeholder="Search person…"/>'
+      + '<div id="previewPersonResults" style="display:none;position:absolute;top:100%;right:0;min-width:220px;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius-sm);box-shadow:0 4px 12px rgba(0,0,0,.12);z-index:999;max-height:280px;overflow-y:auto;margin-top:4px"></div>'
+      + '</div>'
     : '';
   const exitBtn = _previewRole
-    ? '<button onclick="exitPreview()" style="font-size:12px;padding:5px 14px;background:#F59E0B;color:#000;border:none;border-radius:4px;cursor:pointer;font-weight:700;margin-left:4px">\u2715 Exit preview</button>'
+    ? `<button onclick="exitPreview()" style="font-size:12px;padding:5px 14px;background:#F59E0B;color:#000;border:none;border-radius:4px;cursor:pointer;font-weight:700;margin-left:4px">\u2715 Exit preview${_realName?' ('+currentUser.name.split(' ')[0]+')':''}</button>`
     : '<button class="logout-btn" onclick="logout()">Sign out</button>';
   nav.innerHTML = `
     <div class="nav-tabs">${tabs.map(([k,l])=>`<button class="nav-tab" data-tab="${k}" onclick="goTab('${k}',this)">${l}</button>`).join('')}</div>
     ${viewAsDropdown}
-    <span class="nav-user">${esc(currentUser.name.split(' ')[0])} <span style="font-size:10px;opacity:0.7">${_previewRole ? 'Previewing as '+_previewRole : (ROLE_LABEL[currentUser.role]||'')}</span></span>
+    <span class="nav-user">${esc(currentUser.name.split(' ')[0])} <span style="font-size:10px;opacity:0.7">${_previewRole ? (_realName?'Viewing as '+esc(currentUser.name.split(' ')[0]):'Previewing as '+_previewRole) : (ROLE_LABEL[currentUser.role]||'')}</span></span>
     ${exitBtn}
     <button class="app-switcher-btn" onclick="toggleAppSwitcher(event)" title="Switch app">⊞</button>
     <button class="hamburger-btn" id="hamburgerBtn" onclick="toggleMobileMenu()" aria-label="Menu">&#9776;</button>`;
@@ -11301,6 +11347,22 @@ function renderSAEODScreen() {
 
   // Draw pie
   setTimeout(() => saEodDrawPie(), 50);
+
+  // Init download section for SA
+  const dlDate = document.getElementById('eodDownloadDate');
+  if (dlDate && !dlDate.value) dlDate.value = today;
+  const personWrap = document.getElementById('eodDownloadPersonWrap');
+  const personSel  = document.getElementById('eodDownloadPerson');
+  if (personWrap && personSel && !personSel.dataset.built) {
+    personSel.dataset.built = '1';
+    personWrap.style.display = 'block';
+    const eodStaff = getStaff().filter(s => roleHasEOD(s.role));
+    personSel.innerHTML = '<option value="">— select person —</option>'
+      + eodStaff.map(s=>`<option value="${esc(s.name)}">${esc(s.name)}</option>`).join('');
+    dlDate?.addEventListener('change', previewEODDownload);
+    personSel.addEventListener('change', previewEODDownload);
+  }
+  previewEODDownload();
 }
 
 function saEodCardToggle(key) {
@@ -11610,11 +11672,17 @@ function renderEODScreen() {
 
   const personWrap = document.getElementById('eodDownloadPersonWrap');
   const personSel  = document.getElementById('eodDownloadPerson');
-  if (isTeamLead() && personSel) {
+  if ((isTeamLead() || isSuperAdmin() || isHRManager()) && personSel) {
     personWrap.style.display = 'block';
-    const myTeam = getTeamForTL(currentUser.name);
-    personSel.innerHTML = `<option value="${currentUser.name}">${currentUser.name} (me)</option>` +
-      myTeam.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
+    const eodStaff = getStaff().filter(s => roleHasEOD(s.role));
+    if (isTeamLead()) {
+      const myTeam = getTeamForTL(currentUser.name);
+      personSel.innerHTML = `<option value="${currentUser.name}">${currentUser.name} (me)</option>`
+        + myTeam.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('');
+    } else {
+      personSel.innerHTML = '<option value="">— select person —</option>'
+        + eodStaff.map(s=>`<option value="${esc(s.name)}">${esc(s.name)}</option>`).join('');
+    }
     personSel.addEventListener('change', previewEODDownload);
   }
   previewEODDownload();
@@ -11623,11 +11691,13 @@ function renderEODScreen() {
 function previewEODDownload() {
   const date = document.getElementById('eodDownloadDate')?.value || today;
   const personSel = document.getElementById('eodDownloadPerson');
-  const name = (isTeamLead() && personSel) ? (personSel.value || currentUser.name) : currentUser.name;
-  const eod = getEODReports().find(r => r.name === name && r.date === date);
+  const useSel = (isTeamLead() || isSuperAdmin() || isHRManager()) && personSel;
+  const name = useSel ? personSel.value : currentUser.name;
+  const eod = name ? getEODReports().find(r => r.name === name && r.date === date) : null;
   const prev = document.getElementById('eodDownloadPreview');
   if (!prev) return;
-  if (!eod) { prev.innerHTML = `<em>No EOD report found for ${name} on ${fmtDate(date)}</em>`; return; }
+  if (!name) { prev.innerHTML = '<em>Select a person to preview.</em>'; return; }
+  if (!eod) { prev.innerHTML = `<em>No EOD report found for ${esc(name)} on ${fmtDate(date)}</em>`; return; }
   prev.innerHTML = `<div style="font-size:13px;color:var(--success);font-weight:600">✓ Report found — submitted at ${esc(eod.submittedAt||'')}</div>
     <div style="font-size:12px;color:var(--text-3);margin-top:4px">${(eod.tasks||[]).length} tasks logged</div>`;
 }
@@ -11635,7 +11705,9 @@ function previewEODDownload() {
 function downloadEOD(format) {
   const date = document.getElementById('eodDownloadDate')?.value || today;
   const personSel = document.getElementById('eodDownloadPerson');
-  const name = (isTeamLead() && personSel) ? (personSel.value || currentUser.name) : currentUser.name;
+  const useSel = (isTeamLead() || isSuperAdmin() || isHRManager()) && personSel;
+  const name = useSel ? personSel.value : currentUser.name;
+  if (!name) { showToast('Select a person first.', 'err'); return; }
   const eod = getEODReports().find(r => r.name === name && r.date === date);
   if (!eod) { showToast('No EOD report found for that date.', 'err'); return; }
 
