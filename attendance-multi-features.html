@@ -2122,6 +2122,8 @@ const DEFAULT_PERMISSIONS = {
 };
 
 // Live permissions cache
+// Version hash — update this whenever DEFAULT_PERMISSIONS changes
+const PERMS_VERSION = '2df9bab9';
 let _permissions = JSON.parse(JSON.stringify(DEFAULT_PERMISSIONS));
 let _lastSavedPermissions = null; // for undo
 let _undoTimer = null;
@@ -2138,7 +2140,6 @@ async function loadPermissions() {
     if (data?.value?.length) {
       for (const item of data.value) {
         const rawTitle = (item.Title || '').toLowerCase();
-        // Only load attendance-specific permissions
         if (!rawTitle.startsWith('attendance_')) continue;
         const role = rawTitle.replace('attendance_', '');
         if (role && item.Permissions) {
@@ -2149,11 +2150,22 @@ async function loadPermissions() {
         }
       }
       LS.set('ci_permissions', _permissions);
+      LS.set('ci_permissions_ver', PERMS_VERSION);
       setTimeout(() => { buildNav(); applyPermissionVisibility(); }, 100);
     }
   } catch(e) {
-    const cached = LS.get('ci_permissions');
-    if (cached) _permissions = cached;
+    // Only use cache if it matches current version
+    const cachedVer = LS.get('ci_permissions_ver');
+    if (cachedVer === PERMS_VERSION) {
+      const cached = LS.get('ci_permissions');
+      if (cached) _permissions = cached;
+    } else {
+      // Stale cache — clear it and use fresh defaults
+      LS.set('ci_permissions', null);
+      LS.set('ci_permissions_ver', PERMS_VERSION);
+      _permissions = JSON.parse(JSON.stringify(DEFAULT_PERMISSIONS));
+      console.warn('Permissions cache cleared — version mismatch. Using defaults.');
+    }
     console.warn('loadPermissions failed:', e);
   }
 }
@@ -2220,6 +2232,7 @@ async function saveRolePermissions(role, perms) {
   }
   _permissions[role] = perms;
   LS.set('ci_permissions', _permissions);
+  LS.set('ci_permissions_ver', PERMS_VERSION);
   return true;
 }
 
