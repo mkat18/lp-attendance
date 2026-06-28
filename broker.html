@@ -7234,13 +7234,16 @@ async function loadCoverageFromSP() {
     const res = await spGet(SP_API+"('CoverageAssignments')/items?$select=Id,Title,Date,CoverName&$top=500");
     if (res?.value) {
       _coverageSP = res.value.map(r=>({
-        id:r.Id, absenteeName:r.Title, date:r.Date,
+        id:r.Id, absenteeName:r.Title,
+        date:(r.Date||'').slice(0,10), // trim datetime to date-only
         coverName:r.CoverName||'', isNCR:r.CoverName==='_ncr',
         assignedBy:'', assignedAt:''
       }));
-      _coverageLoaded = true; return;
+      _coverageLoaded = true;
+      LS.set('ci_coverage_sp', _coverageSP);
+      return;
     }
-  } catch(e){}
+  } catch(e){ console.warn('loadCoverageFromSP error:', e); }
   _coverageSP = LS.get('ci_coverage_sp') || [];
   _coverageLoaded = true;
 }
@@ -7256,23 +7259,30 @@ function getCoverageForDate(date) {
 async function saveCoverageToSP(absenteeName, date, coverName, isNCR) {
   const existing = _coverageSP.find(r=>r.absenteeName===absenteeName&&r.date===date);
   const spCoverName = isNCR ? '_ncr' : coverName;
-  const payload = {Title:absenteeName, Date:date, CoverName:spCoverName};
+  // Send date as ISO datetime for SP Date column type
+  const spDate = date.length===10 ? date+'T00:00:00Z' : date;
+  const payload = {Title:absenteeName, Date:spDate, CoverName:spCoverName};
   try {
     if (existing) {
       await spPatch(SP_API+`('CoverageAssignments')/items(${existing.id})`, payload);
       Object.assign(existing, {coverName:spCoverName, isNCR});
     } else {
       const res = await spPost(SP_API+"('CoverageAssignments')/items", payload);
-      _coverageSP.push({id:res?.d?.Id||res?.ID||res?.id, absenteeName, date, coverName:spCoverName, isNCR});
+      const newId = res?.d?.Id||res?.ID||res?.id||res?.['odata.id']?.match(/\((\d+)\)/)?.[1];
+      _coverageSP.push({id:newId, absenteeName, date, coverName:spCoverName, isNCR});
     }
     LS.set('ci_coverage_sp', _coverageSP);
     return true;
-  } catch(e) { showToast('Failed to save coverage.','err'); return false; }
+  } catch(e) {
+    console.error('saveCoverageToSP error:', e);
+    showToast('Failed to save coverage — check console.','err');
+    return false;
+  }
 }
 
 async function removeCoverageFromSP(absenteeName, date) {
   const existing = _coverageSP.find(r=>r.absenteeName===absenteeName&&r.date===date);
-  if (!existing) return true;
+  if (!existing?.id) return true;
   try {
     await spDelete(SP_API+`('CoverageAssignments')/items(${existing.id})`);
     _coverageSP = _coverageSP.filter(r=>!(r.absenteeName===absenteeName&&r.date===date));
