@@ -8691,7 +8691,8 @@ async function renderBrokerMgmtScreen() {
     bmSection('brokertypes','Client types',btHtml,false);
   }
 
-  // ── BROKER ASSIGNMENTS ────────────────────────────────────────────────
+  // ── BROKER ASSIGNMENTS (SA and TL only) ──────────────────────────────
+  if (!om || sa) {
   let baHtml='<input type="text" placeholder="Search by name\u2026" style="width:100%;font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);margin-bottom:10px" oninput="bmFilterRows(this.value,\'ba-row\')">'
     +'<div style="border-top:0.5px solid var(--border)">';
 
@@ -8722,6 +8723,7 @@ async function renderBrokerMgmtScreen() {
   });
   baHtml+='</div>';
   bmSection('assignments','Broker assignments',baHtml,true);
+  } // end !om
 
   // ── CRM OPTIONS (SA only) ─────────────────────────────────────────────
   if (sa) {
