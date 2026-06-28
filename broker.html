@@ -8636,6 +8636,9 @@ async function renderBrokerMgmtScreen() {
   const countFull=viewStaff.filter(s=>staffAvailability(s.name)==='full').length;
   const countOther=viewStaff.filter(s=>staffAvailability(s.name)==='other').length;
 
+  // Ops Manager only sees available/partial staff — filter out fully allocated and Other
+  const avViewStaff = om ? viewStaff.filter(s=>['none','partial-am','partial-pm'].includes(staffAvailability(s.name))) : viewStaff;
+
   const avPersonCard = s => {
     const ten=tenureStr(s); const av=staffAvailability(s.name);
     const avl={none:{bg:'#D1FAE5',col:'#065F46',txt:'Free all day'},
@@ -8666,9 +8669,9 @@ async function renderBrokerMgmtScreen() {
     +'<button id="ab-filter-analyst" onclick="bmAbFilter(\'analyst\')" style="font-size:12px;padding:4px 12px;border-radius:50px;border:1.5px solid var(--brand);background:var(--brand-light);color:var(--brand);cursor:pointer;font-weight:600">By analyst</button>'
     +'<button id="ab-filter-crm" onclick="bmAbFilter(\'crm\')" style="font-size:12px;padding:4px 12px;border-radius:50px;border:1.5px solid var(--border);background:var(--surface-2);color:var(--text-2);cursor:pointer">By CRM skill</button>'
     +'</div>'
-    +'<div id="ab-by-analyst">'+viewStaff.map(avPersonCard).join('')+'</div>'
+    +'<div id="ab-by-analyst">'+avViewStaff.map(avPersonCard).join('')+'</div>'
     +'<div id="ab-by-crm" style="display:none">'+(_crmOptions.length?_crmOptions.map(crm=>{
-        const withCRM=viewStaff.filter(s=>getCRMsForStaff(s.name).includes(crm.name));
+        const withCRM=avViewStaff.filter(s=>getCRMsForStaff(s.name).includes(crm.name));
         return '<div style="padding:8px 0;border-bottom:0.5px solid var(--border)">'
           +'<div style="font-size:12px;font-weight:600;margin-bottom:4px">'+esc(crm.name)+'</div>'
           +(withCRM.length?withCRM.map(s=>{const ten=tenureStr(s);const av=staffAvailability(s.name);const avl={none:'#065F46','partial-am':'#92400E','partial-pm':'#92400E',full:'#991B1B',other:'var(--text-3)'}[av]||'var(--text-3)';return '<div style="display:flex;align-items:center;gap:6px;padding:3px 0"><span style="flex:1;font-size:12px">'+esc(s.name)+'</span>'+(ten?'<span style="font-size:11px;color:var(--text-3)">'+ten+'</span>':'')+'</div>';}).join('')
@@ -8773,7 +8776,7 @@ async function renderBrokerMgmtScreen() {
 
   // ── CRM SKILLS ────────────────────────────────────────────────────────
   if (_crmOptions.length) {
-    const csScope = om ? viewStaff.filter(s=>['none','partial-am','partial-pm'].includes(staffAvailability(s.name))) : viewStaff;
+    const csScope = om ? avViewStaff : viewStaff;
     let csHtml='<input type="text" placeholder="Search by name\u2026" style="width:100%;font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);margin-bottom:10px" oninput="bmFilterRows(this.value,\'cs-row\')">'
       +'<div style="border-top:0.5px solid var(--border)">';
 
