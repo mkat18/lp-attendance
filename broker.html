@@ -8663,10 +8663,10 @@ async function renderBrokerMgmtScreen() {
     +'<div data-avkey="partial" onclick="bmAvToggle(this.dataset.avkey)" style="background:#FEF3C7;border-radius:var(--radius-sm);padding:10px 8px;text-align:center;cursor:pointer"><div style="font-size:20px;font-weight:700;color:#92400E">'+countPart+'</div><div style="font-size:11px;color:#92400E;margin-top:2px">Part time</div></div>'
     +(!om?'<div data-avkey="full" onclick="bmAvToggle(this.dataset.avkey)" style="background:#FEE2E2;border-radius:var(--radius-sm);padding:10px 8px;text-align:center;cursor:pointer"><div style="font-size:20px;font-weight:700;color:#991B1B">'+countFull+'</div><div style="font-size:11px;color:#991B1B;margin-top:2px">Full</div></div>':'')
     +(!om?'<div data-avkey="other" onclick="bmAvToggle(this.dataset.avkey)" style="background:var(--surface-2);border-radius:var(--radius-sm);padding:10px 8px;text-align:center;cursor:pointer"><div style="font-size:20px;font-weight:700;color:var(--text-3)">'+countOther+'</div><div style="font-size:11px;color:var(--text-3);margin-top:2px">Other</div></div>':'')
-    +'<div class="bm-av-expand" style="display:none;background:var(--surface-2);border:1.5px solid var(--brand);border-radius:var(--radius-sm);padding:10px 12px;margin-top:4px;margin-bottom:8px"></div>'
-    +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">'
-    +'<button id="ab-filter-analyst" onclick="bmAbFilter(\'analyst\')" style="font-size:12px;padding:4px 12px;border-radius:50px;border:1.5px solid var(--brand);background:var(--brand-light);color:var(--brand);cursor:pointer;font-weight:600">By analyst</button>'
-    +'<button id="ab-filter-crm" onclick="bmAbFilter(\'crm\')" style="font-size:12px;padding:4px 12px;border-radius:50px;border:1.5px solid var(--border);background:var(--surface-2);color:var(--text-2);cursor:pointer">By CRM skill</button>'
+    +'</div>'
+    +'<div style="display:flex;gap:0;border-bottom:1.5px solid var(--border);margin-bottom:10px">'
+    +'<button id="ab-filter-analyst" onclick="bmAbFilter(\'analyst\')" style="font-size:12px;padding:6px 14px;border:none;background:transparent;color:var(--brand);cursor:pointer;font-weight:600;border-bottom:2px solid var(--brand);margin-bottom:-1.5px">By analyst</button>'
+    +'<button id="ab-filter-crm" onclick="bmAbFilter(\'crm\')" style="font-size:12px;padding:6px 14px;border:none;background:transparent;color:var(--text-3);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1.5px">By CRM skill</button>'
     +'</div>'
     +'<div id="ab-by-analyst">'+avViewStaff.map(avPersonCard).join('')+'</div>'
     +'<div id="ab-by-crm" style="display:none">'+(_crmOptions.length?_crmOptions.map(crm=>{
@@ -9047,8 +9047,8 @@ function bmAbFilter(mode) {
   const btnC=document.getElementById('ab-filter-crm');
   if(byA) byA.style.display=mode==='analyst'?'block':'none';
   if(byCRM) byCRM.style.display=mode==='crm'?'block':'none';
-  if(btnA) { btnA.style.borderColor=mode==='analyst'?'var(--brand)':'var(--border)'; btnA.style.background=mode==='analyst'?'var(--brand-light)':'var(--surface)'; btnA.style.color=mode==='analyst'?'var(--brand)':'var(--text-2)'; btnA.style.fontWeight=mode==='analyst'?'600':'400'; }
-  if(btnC) { btnC.style.borderColor=mode==='crm'?'var(--brand)':'var(--border)'; btnC.style.background=mode==='crm'?'var(--brand-light)':'var(--surface)'; btnC.style.color=mode==='crm'?'var(--brand)':'var(--text-2)'; btnC.style.fontWeight=mode==='crm'?'600':'400'; }
+  if(btnA){btnA.style.color=mode==='analyst'?'var(--brand)':'var(--text-3)';btnA.style.fontWeight=mode==='analyst'?'600':'400';btnA.style.borderBottom=mode==='analyst'?'2px solid var(--brand)':'2px solid transparent';}
+  if(btnC){btnC.style.color=mode==='crm'?'var(--brand)':'var(--text-3)';btnC.style.fontWeight=mode==='crm'?'600':'400';btnC.style.borderBottom=mode==='crm'?'2px solid var(--brand)':'2px solid transparent';}
 }
 
 
