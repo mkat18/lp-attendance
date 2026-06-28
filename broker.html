@@ -8449,66 +8449,188 @@ async function toggleStaffCRM(staffName, crmName) {
 async function renderBrokerMgmtScreen() {
   const el = document.getElementById('brokerMgmtContent');
   if (!el) return;
-  el.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--text-3)">Loading…</div>';
+  el.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--text-3)">Loading\u2026</div>';
   try {
     await Promise.all([loadBrokers(),loadBrokerAssignments(),loadCRMOptions(),loadStaffCRMs()]);
   } catch(e) {
-    el.innerHTML = `<div class="card" style="text-align:center;padding:2rem">
-      <div style="font-size:1.5rem">⚠️</div>
-      <div style="font-weight:600;color:var(--danger);margin-top:8px">Error loading</div>
-      <div style="font-size:13px;color:var(--text-3);margin-top:4px">${esc(e.message||'')}</div>
-      <button onclick="renderBrokerMgmtScreen()" style="margin-top:12px;padding:8px 16px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface-2);cursor:pointer;font-size:13px">↺ Retry</button>
-    </div>`; return;
+    el.innerHTML = '<div class="card" style="text-align:center;padding:2rem"><div style="font-size:1.5rem">\u26a0\ufe0f</div><div style="font-weight:600;color:var(--danger);margin-top:8px">Error loading</div><button onclick="renderBrokerMgmtScreen()" style="margin-top:12px;padding:8px 16px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface-2);cursor:pointer;font-size:13px">\u21ba Retry</button></div>';
+    return;
   }
-  const sa=isSuperAdmin(),om=isOpsManager(),tl=isTeamLead();
-  const myTeam=tl?getTeamForTL(currentUser.name):[];
-  const allStaff=getStaff().filter(s=>['analyst','teamlead','trainee'].includes(s.role));
-  const viewStaff=(sa||om)?allStaff:allStaff.filter(s=>myTeam.includes(s.name));
-  el.innerHTML='';
+  const sa=isSuperAdmin(), om=isOpsManager(), tl=isTeamLead();
+  const myTeam = tl ? getTeamForTL(currentUser.name) : [];
+  const allStaff = getStaff().filter(s=>['analyst','teamlead','trainee'].includes(s.role));
+  const viewStaff = (sa||om) ? allStaff : allStaff.filter(s=>myTeam.includes(s.name));
+  el.innerHTML = '';
 
-  if(om&&!sa){
-    const card=document.createElement('div');card.className='card';
-    const unassigned=allStaff.filter(s=>!getBrokersForStaff(s.name).length);
-    card.innerHTML=`<div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">👤 Analysts without broker</div>
-      ${unassigned.length?unassigned.map(s=>`<div style="padding:8px 0;border-bottom:0.5px solid var(--border)"><div style="font-size:13px;font-weight:500">${esc(s.name)}</div><div style="font-size:11px;color:var(--text-3)">${esc(ROLE_LABEL[s.role]||s.role)}</div></div>`).join(''):'<div style="font-size:13px;color:var(--success)">✓ All analysts have broker assigned.</div>'}`;
-    el.appendChild(card);return;
-  }
-
-  if(sa){
-    const brokerCard=document.createElement('div');brokerCard.className='card';brokerCard.style.marginBottom='1rem';
-    brokerCard.innerHTML=`<div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">🏦 Broker List</div>
-      <div style="display:flex;gap:8px;margin-bottom:12px"><input type="text" id="bmNewBroker" placeholder="Broker name…" style="flex:1;font-size:13px;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)" onkeydown="if(event.key==='Enter'){addBroker();event.preventDefault()}"/>
-      <button onclick="addBroker()" style="padding:8px 16px;border-radius:var(--radius-sm);border:none;background:var(--brand);color:#fff;font-size:13px;font-weight:600;cursor:pointer">+ Add</button></div>
-      ${!_brokers.length?'<div style="font-size:13px;color:var(--text-3)">No brokers added yet.</div>':_brokers.map(b=>`<div style="display:flex;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)"><span style="flex:1;font-size:14px;font-weight:500">${esc(b.name)}</span><button onclick="deleteBroker(${b.id})" style="font-size:12px;padding:3px 10px;border-radius:4px;border:1px solid var(--danger);color:var(--danger);background:transparent;cursor:pointer">Remove</button></div>`).join('')}`;
-    el.appendChild(brokerCard);
+  function bmSection(id, title, contentHtml, defaultOpen=true) {
+    const sec = document.createElement('div');
+    sec.className = 'card'; sec.style.marginBottom = '10px';
+    sec.innerHTML = '<div onclick="bmToggle(\''+id+'\')" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:2px 0;margin-bottom:6px">'
+      +'<div style="font-size:13px;font-weight:700;color:var(--text)">'+title+'</div>'
+      +'<span id="bm-arr-'+id+'" style="font-size:14px;color:var(--text-3);transition:transform .2s">'+(defaultOpen?'\u25b4':'\u25be')+'</span>'
+      +'</div>'
+      +'<div id="bm-body-'+id+'" style="display:'+(defaultOpen?'block':'none')+'">'+contentHtml+'</div>';
+    el.appendChild(sec);
   }
 
-  const assignCard=document.createElement('div');assignCard.className='card';assignCard.style.marginBottom='1rem';
-  assignCard.innerHTML=`<div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">👥 Broker Assignments</div>
-    ${sa?`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--border)">
-      <select id="bmStaffSel" style="flex:1;font-size:13px;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)"><option value="">— select staff —</option>${allStaff.map(s=>`<option value="${esc(s.name)}">${esc(s.name)} (${esc(ROLE_LABEL[s.role]||s.role)})</option>`).join('')}</select>
-      <select id="bmBrokerSel" style="flex:1;font-size:13px;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)"><option value="">— select broker —</option>${_brokers.map(b=>`<option value="${esc(b.name)}">${esc(b.name)}</option>`).join('')}</select>
-      <button onclick="assignBrokerToStaff()" style="padding:8px 16px;border-radius:var(--radius-sm);border:none;background:var(--brand);color:#fff;font-size:13px;font-weight:600;cursor:pointer">Assign</button>
-    </div>`:''}
-    ${viewStaff.map(s=>{const brokers=getBrokersForStaff(s.name);return`<div style="padding:10px 0;border-bottom:1px solid var(--border)"><div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span style="font-size:13px;font-weight:600;flex:1">${esc(s.name)}</span><span style="font-size:11px;color:var(--text-3)">${esc(ROLE_LABEL[s.role]||s.role)}</span></div><div style="display:flex;flex-wrap:wrap;gap:6px">${brokers.length?brokers.map(b=>{const assign=_brokerAssignments.find(a=>a.staffName===s.name&&a.brokerName===b);return`<div style="display:flex;align-items:center;gap:4px;background:var(--brand-light);border:1px solid var(--brand);border-radius:50px;padding:3px 10px"><span style="font-size:12px;color:var(--brand);font-weight:500">${esc(b)}</span>${sa?`<button onclick="removeBrokerAssignment(${assign?.id})" style="background:transparent;border:none;color:var(--brand);cursor:pointer;font-size:14px;line-height:1;padding:0 0 0 2px">×</button>`:''}</div>`;}).join(''):'<span style="font-size:12px;color:var(--text-3)">No broker assigned</span>'}</div></div>`;}).join('')}`;
-  el.appendChild(assignCard);
-
-  if(sa){
-    const crmOptCard=document.createElement('div');crmOptCard.className='card';crmOptCard.style.marginBottom='1rem';
-    crmOptCard.innerHTML=`<div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">💻 CRM Options</div>
-      <div style="display:flex;gap:8px;margin-bottom:12px"><input type="text" id="bmNewCRM" placeholder="CRM name…" style="flex:1;font-size:13px;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)" onkeydown="if(event.key==='Enter'){addCRMOption();event.preventDefault()}"/>
-      <button onclick="addCRMOption()" style="padding:8px 16px;border-radius:var(--radius-sm);border:none;background:var(--brand);color:#fff;font-size:13px;font-weight:600;cursor:pointer">+ Add</button></div>
-      <div style="display:flex;flex-wrap:wrap;gap:6px">${!_crmOptions.length?'<span style="font-size:13px;color:var(--text-3)">No CRMs yet.</span>':_crmOptions.map(c=>`<div style="display:flex;align-items:center;gap:4px;background:var(--surface-2);border:1.5px solid var(--border);border-radius:50px;padding:4px 12px"><span style="font-size:13px">${esc(c.name)}</span><button onclick="deleteCRMOption(${c.id})" style="background:transparent;border:none;color:var(--text-3);cursor:pointer;font-size:16px;line-height:1;padding:0 0 0 4px">×</button></div>`).join('')}</div>`;
-    el.appendChild(crmOptCard);
+  function tenureStr(s) {
+    if (!s.joinDate) return '';
+    const t = calcTenure(s.joinDate);
+    if (!t) return '';
+    const parts = [];
+    if (t.years>0) parts.push(t.years+'y');
+    if (t.months>0) parts.push(t.months+'m');
+    return parts.length ? parts.join(' ') : '<1m';
   }
 
-  if(_crmOptions.length){
-    const crmAssignCard=document.createElement('div');crmAssignCard.className='card';
-    crmAssignCard.innerHTML=`<div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">🧑‍💻 CRM Skills</div>
-      ${viewStaff.map(s=>{const staffCRMs=getCRMsForStaff(s.name);return`<div style="padding:10px 0;border-bottom:1px solid var(--border)"><div style="font-size:13px;font-weight:600;margin-bottom:6px">${esc(s.name)} <span style="font-size:11px;color:var(--text-3);font-weight:400">${esc(ROLE_LABEL[s.role]||s.role)}</span></div><div style="display:flex;flex-wrap:wrap;gap:6px">${_crmOptions.map(c=>{const sel=staffCRMs.includes(c.name);return`<button type="button" onclick="${sa?`toggleStaffCRM('${s.name.replace(/'/g,"\\'")}','${esc(c.name)}')`:''}" style="font-size:12px;padding:4px 12px;border-radius:50px;border:1.5px solid ${sel?'var(--brand)':'var(--border)'};background:${sel?'var(--brand-light)':'var(--surface-2)'};color:${sel?'var(--brand)':'var(--text-3)'};cursor:${sa?'pointer':'default'};font-weight:${sel?'600':'400'}">${sel?'✓ ':''}${esc(c.name)}</button>`;}).join('')}</div></div>`;}).join('')}`;
-    el.appendChild(crmAssignCard);
+  // ── Analysts without broker ───────────────────────────────────────────
+  const unassigned = viewStaff.filter(s=>!getBrokersForStaff(s.name).length);
+  let abHtml = '<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">'
+    +'<button id="ab-filter-analyst" onclick="bmAbFilter(\'analyst\')" style="font-size:12px;padding:4px 12px;border-radius:50px;border:1.5px solid var(--brand);background:var(--brand-light);color:var(--brand);cursor:pointer;font-weight:600">By analyst</button>'
+    +'<button id="ab-filter-crm" onclick="bmAbFilter(\'crm\')" style="font-size:12px;padding:4px 12px;border-radius:50px;border:1.5px solid var(--border);background:var(--surface-2);color:var(--text-2);cursor:pointer">By CRM skill</button>'
+    +'</div>'
+    +'<div id="ab-by-analyst">'
+    +(unassigned.length ? unassigned.map(s=>{
+        const crms = getCRMsForStaff(s.name);
+        const ten = tenureStr(s);
+        return '<div style="padding:10px 0;border-bottom:0.5px solid var(--border)">'
+          +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
+          +'<span style="font-size:13px;font-weight:600;flex:1">'+esc(s.name)+'</span>'
+          +'<span style="font-size:11px;color:var(--text-3)">'+esc(ROLE_LABEL[s.role]||s.role)+'</span>'
+          +(ten?'<span style="font-size:11px;background:var(--surface-2);border-radius:50px;padding:2px 8px;color:var(--text-3)">\u231b '+ten+'</span>':'')
+          +'</div>'
+          +(crms.length?'<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px">'+crms.map(c=>'<span style="font-size:11px;background:#EDE9FE;color:#5B21B6;border-radius:50px;padding:2px 8px">'+esc(c)+'</span>').join('')+'</div>'
+            :'<div style="font-size:11px;color:var(--text-3);margin-top:4px">No CRM skills assigned</div>')
+          +'</div>';
+      }).join('')
+    : '<div style="font-size:13px;color:var(--success);">\u2713 All analysts have a broker assigned.</div>')
+    +'</div>'
+    +'<div id="ab-by-crm" style="display:none">'
+    +(_crmOptions.length ? _crmOptions.map(crm=>{
+        const withCRM = viewStaff.filter(s=>getCRMsForStaff(s.name).includes(crm.name));
+        const withoutCRM = unassigned.filter(s=>getCRMsForStaff(s.name).includes(crm.name));
+        return '<div style="padding:10px 0;border-bottom:0.5px solid var(--border)">'
+          +'<div style="font-size:13px;font-weight:600;margin-bottom:6px">'+esc(crm.name)+'</div>'
+          +(withoutCRM.length
+            ? withoutCRM.map(s=>{
+                const ten=tenureStr(s);
+                return '<div style="display:flex;align-items:center;gap:6px;padding:3px 0">'
+                  +'<span style="font-size:12px;flex:1">'+esc(s.name)+'</span>'
+                  +(ten?'<span style="font-size:11px;color:var(--text-3)">\u231b '+ten+'</span>':'')
+                  +'<span style="font-size:11px;background:#FEE2E2;color:#991B1B;border-radius:50px;padding:1px 7px">No broker</span>'
+                  +'</div>';}).join('')
+            : '<div style="font-size:12px;color:var(--success)">\u2713 All with this skill have a broker</div>')
+          +'</div>';
+      }).join('')
+    : '<div style="font-size:13px;color:var(--text-3)">No CRM skills configured.</div>')
+    +'</div>';
+  bmSection('unassigned', '\ud83d\udc64 Analysts without broker', abHtml, true);
+
+  // ── Broker List (SA only) ─────────────────────────────────────────────
+  if (sa) {
+    const blHtml = '<div style="display:flex;gap:8px;margin-bottom:12px">'
+      +'<input type="text" id="bmNewBroker" placeholder="Broker name\u2026" style="flex:1;font-size:13px;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)" onkeydown="if(event.key===\'Enter\'){addBroker();event.preventDefault()}"/>'
+      +'<button onclick="addBroker()" style="padding:8px 16px;border-radius:var(--radius-sm);border:none;background:var(--brand);color:#fff;font-size:13px;font-weight:600;cursor:pointer">+ Add</button>'
+      +'</div>'
+      +(!_brokers.length?'<div style="font-size:13px;color:var(--text-3)">No brokers added yet.</div>'
+        :_brokers.map(b=>'<div style="display:flex;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)">'
+          +'<span style="flex:1;font-size:14px;font-weight:500">'+esc(b.name)+'</span>'
+          +'<button onclick="deleteBroker('+b.id+')" style="font-size:12px;padding:3px 10px;border-radius:4px;border:1px solid var(--danger);color:var(--danger);background:transparent;cursor:pointer">Remove</button>'
+          +'</div>').join(''));
+    bmSection('brokerlist', '\ud83c\udfe6 Broker list', blHtml, false);
+  }
+
+  // ── Broker Assignments ────────────────────────────────────────────────
+  let baHtml = '';
+  if (sa) {
+    baHtml += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--border)">'
+      +'<select id="bmStaffSel" style="flex:1;font-size:13px;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)"><option value="">— select staff —</option>'
+      +allStaff.map(s=>'<option value="'+esc(s.name)+'">'+esc(s.name)+' ('+esc(ROLE_LABEL[s.role]||s.role)+')</option>').join('')
+      +'</select>'
+      +'<select id="bmBrokerSel" style="flex:1;font-size:13px;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)"><option value="">— select broker —</option>'
+      +_brokers.map(b=>'<option value="'+esc(b.name)+'">'+esc(b.name)+'</option>').join('')
+      +'</select>'
+      +'<button onclick="assignBrokerToStaff()" style="padding:8px 16px;border-radius:var(--radius-sm);border:none;background:var(--brand);color:#fff;font-size:13px;font-weight:600;cursor:pointer">Assign</button>'
+      +'</div>';
+  }
+  baHtml += viewStaff.map(s=>{
+    const brokers=getBrokersForStaff(s.name);
+    const ten=tenureStr(s);
+    return '<div style="padding:10px 0;border-bottom:1px solid var(--border)">'
+      +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px">'
+      +'<span style="font-size:13px;font-weight:600;flex:1">'+esc(s.name)+'</span>'
+      +'<span style="font-size:11px;color:var(--text-3)">'+esc(ROLE_LABEL[s.role]||s.role)+'</span>'
+      +(ten?'<span style="font-size:11px;background:var(--surface-2);border-radius:50px;padding:2px 8px;color:var(--text-3)">\u231b '+ten+'</span>':'')
+      +'</div>'
+      +'<div style="display:flex;flex-wrap:wrap;gap:6px">'
+      +(brokers.length ? brokers.map(b=>{
+        const assign=_brokerAssignments.find(a=>a.staffName===s.name&&a.brokerName===b);
+        return '<div style="display:flex;align-items:center;gap:4px;background:var(--brand-light);border:1px solid var(--brand);border-radius:50px;padding:3px 10px">'
+          +'<span style="font-size:12px;color:var(--brand);font-weight:500">'+esc(b)+'</span>'
+          +(sa?'<button onclick="removeBrokerAssignment('+(assign?.id)+')" style="background:transparent;border:none;color:var(--brand);cursor:pointer;font-size:14px;line-height:1;padding:0 0 0 2px">\u00d7</button>':'')
+          +'</div>';}).join('')
+        : '<span style="font-size:12px;color:var(--danger)">No broker assigned</span>')
+      +'</div></div>';
+  }).join('');
+  bmSection('assignments', '\ud83d\udc65 Broker assignments', baHtml, true);
+
+  // ── CRM Options (SA only) ─────────────────────────────────────────────
+  if (sa) {
+    const coHtml = '<div style="display:flex;gap:8px;margin-bottom:12px">'
+      +'<input type="text" id="bmNewCRM" placeholder="CRM name\u2026" style="flex:1;font-size:13px;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)" onkeydown="if(event.key===\'Enter\'){addCRMOption();event.preventDefault()}"/>'
+      +'<button onclick="addCRMOption()" style="padding:8px 16px;border-radius:var(--radius-sm);border:none;background:var(--brand);color:#fff;font-size:13px;font-weight:600;cursor:pointer">+ Add</button>'
+      +'</div>'
+      +'<div style="display:flex;flex-wrap:wrap;gap:6px">'
+      +(!_crmOptions.length?'<span style="font-size:13px;color:var(--text-3)">No CRMs yet.</span>'
+        :_crmOptions.map(c=>'<div style="display:flex;align-items:center;gap:4px;background:var(--surface-2);border:1.5px solid var(--border);border-radius:50px;padding:4px 12px">'
+          +'<span style="font-size:13px">'+esc(c.name)+'</span>'
+          +'<button onclick="deleteCRMOption('+c.id+')" style="background:transparent;border:none;color:var(--text-3);cursor:pointer;font-size:16px;line-height:1;padding:0 0 0 4px">\u00d7</button>'
+          +'</div>').join(''))
+      +'</div>';
+    bmSection('crmoptions', '\ud83d\udcbb CRM options', coHtml, false);
+  }
+
+  // ── CRM Skills ────────────────────────────────────────────────────────
+  if (_crmOptions.length) {
+    const csHtml = viewStaff.map(s=>{
+      const staffCRMs=getCRMsForStaff(s.name);
+      const ten=tenureStr(s);
+      return '<div style="padding:10px 0;border-bottom:1px solid var(--border)">'
+        +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">'
+        +'<span style="font-size:13px;font-weight:600;flex:1">'+esc(s.name)+'</span>'
+        +'<span style="font-size:11px;color:var(--text-3)">'+esc(ROLE_LABEL[s.role]||s.role)+'</span>'
+        +(ten?'<span style="font-size:11px;background:var(--surface-2);border-radius:50px;padding:2px 8px;color:var(--text-3)">\u231b '+ten+'</span>':'')
+        +'</div>'
+        +'<div style="display:flex;flex-wrap:wrap;gap:6px">'
+        +_crmOptions.map(c=>{
+          const sel=staffCRMs.includes(c.name);
+          return '<button type="button" onclick="'+(sa?'toggleStaffCRM(\''+s.name.replace(/'/g,"\\'")+"','"+esc(c.name)+"')":'')+'"'
+            +' style="font-size:12px;padding:4px 12px;border-radius:50px;border:1.5px solid '+(sel?'var(--brand)':'var(--border)')+';'
+            +'background:'+(sel?'var(--brand-light)':'var(--surface-2)')+';color:'+(sel?'var(--brand)':'var(--text-3)')+';'
+            +'cursor:'+(sa?'pointer':'default')+';font-weight:'+(sel?'600':'400')+'">'
+            +(sel?'\u2713 ':'')+esc(c.name)+'</button>';}).join('')
+        +'</div></div>';
+    }).join('');
+    bmSection('crmskills', '\ud83e\uddd1\u200d\ud83d\udcbb CRM skills', csHtml, true);
   }
 }
+
+function bmToggle(id) {
+  const body = document.getElementById('bm-body-'+id);
+  const arr  = document.getElementById('bm-arr-'+id);
+  if (!body) return;
+  const open = body.style.display !== 'none';
+  body.style.display = open ? 'none' : 'block';
+  if (arr) arr.textContent = open ? '\u25be' : '\u25b4';
+}
+
+function bmAbFilter(mode) {
+  document.getElementById('ab-by-analyst').style.display = mode==='analyst'?'block':'none';
+  document.getElementById('ab-by-crm').style.display     = mode==='crm'?'block':'none';
+  document.getElementById('ab-filter-analyst').style.cssText = 'font-size:12px;padding:4px 12px;border-radius:50px;cursor:pointer;font-weight:'+(mode==='analyst'?'600':'400')+';border:1.5px solid '+(mode==='analyst'?'var(--brand)':'var(--border)')+';background:'+(mode==='analyst'?'var(--brand-light)':'var(--surface-2)')+';color:'+(mode==='analyst'?'var(--brand)':'var(--text-2)');
+  document.getElementById('ab-filter-crm').style.cssText   = 'font-size:12px;padding:4px 12px;border-radius:50px;cursor:pointer;font-weight:'+(mode==='crm'?'600':'400')+';border:1.5px solid '+(mode==='crm'?'var(--brand)':'var(--border)')+';background:'+(mode==='crm'?'var(--brand-light)':'var(--surface-2)')+';color:'+(mode==='crm'?'var(--brand)':'var(--text-2)');
+}
+
 
 // ── Cover file assignment ──────────────────────────────────────────────────
 function openCoverFileModal(absenteeName) {
