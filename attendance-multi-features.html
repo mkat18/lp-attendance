@@ -11615,7 +11615,7 @@ function updateEODTask(idx, field, value) {
 
 function generateTimeOptions(selected, placeholder) {
   const times = [];
-  for (let h = 6; h <= 21; h++) {
+  for (let h = 0; h <= 21; h++) {
     for (let m = 0; m < 60; m += 5) {
       if (h === 21 && m > 0) break;
       const ampm = h < 12 ? 'AM' : 'PM';
