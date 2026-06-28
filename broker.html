@@ -8419,20 +8419,26 @@ async function addBrokerType() {
   if(!name) return;
   await ensureTypesInSP();
   const res=await spPostDirect(SP_API+"('BrokerTypes')/items",{Title:name});
-  if(res){if(input)input.value='';await loadBrokerTypes();renderBrokerMgmtScreen();showToast('Type added ✓','ok');}
+  if(res){
+    const newId=res?.d?.Id||res?.Id||res?.id||Date.now();
+    _brokerTypes.push({id:newId,name});
+    LS.set('ci_brokertypes',_brokerTypes);
+    if(input) input.value='';
+    // Refresh just the type cards section without scrolling to top
+    const brokListBody=document.getElementById('bm-body-brokerlist');
+    if(brokListBody) { const tmp=document.createElement('div'); brokListBody.innerHTML=''; renderBrokerMgmtScreen(); }
+    showToast('Type added ✓','ok');
+  }
 }
 
 async function deleteBrokerType(id) {
-  if (id<0) {
-    _brokerTypes=_brokerTypes.filter(t=>t.id!==id);
-    LS.set('ci_brokertypes',_brokerTypes);
-    renderBrokerMgmtScreen();
-    return;
-  }
-  try{await spDelete(SP_API+`('BrokerTypes')/items(${id})`);await loadBrokerTypes();renderBrokerMgmtScreen();showToast('Type removed.','ok');}
-  catch(e){showToast('Failed to remove.','err');}
+  _brokerTypes=_brokerTypes.filter(t=>t.id!==id);
+  LS.set('ci_brokertypes',_brokerTypes);
+  if(id>0) spDelete(SP_API+`('BrokerTypes')/items(${id})`).catch(()=>{});
+  const brokListBody=document.getElementById('bm-body-brokerlist');
+  if(brokListBody) renderBrokerMgmtScreen();
+  showToast('Type removed.','ok');
 }
-let _crmOptions = [];
 let _staffCRMs = [];
 
 async function loadBrokers() {
@@ -8754,7 +8760,7 @@ async function renderBrokerMgmtScreen() {
         +'<span style="font-size:13px;font-weight:600;flex:1">'+esc(s.name)+'</span>'
         +(ten?'<span style="font-size:11px;color:var(--text-3)">'+ten+'</span>':'')
         +'</div>'
-        +'<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">'
+        +'<div class="cs-chips" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">'
         +(staffCRMs.length?staffCRMs.map(c=>'<span style="font-size:12px;background:#EDE9FE;color:#5B21B6;padding:3px 10px;border-radius:50px;display:inline-flex;align-items:center;gap:4px">'+esc(c)
           +(sa?'<button data-staff="'+esc(s.name)+'" data-crm="'+esc(c)+'" onclick="bmCRMRemove(this)" style="background:transparent;border:none;color:#5B21B6;cursor:pointer;font-size:14px;line-height:1;padding:0 0 0 2px">\u00d7</button>':'')
           +'</span>').join('')
@@ -8807,18 +8813,47 @@ async function bmSaveAssign(sid, staffName) {
 }
 
 async function bmCRMAdd(sid, staffName) {
-  const sel=document.getElementById('cs-crm-'+sid);
-  const crmName=sel?.value;
-  if (!crmName) {showToast('Select a skill.','err');return;}
+  const sel = document.getElementById('cs-crm-'+sid);
+  const crmName = sel?.value;
+  if (!crmName) { showToast('Select a skill.','err'); return; }
   await toggleStaffCRM(staffName, crmName);
-  renderBrokerMgmtScreen();
+  // Update just this person's row in place
+  const row = sel?.closest('.cs-row');
+  if (row) {
+    const staffCRMs = getCRMsForStaff(staffName);
+    const unassigned = _crmOptions.filter(c=>!staffCRMs.includes(c.name));
+    const chipsDiv = row.querySelector('.cs-chips');
+    if (chipsDiv) {
+      chipsDiv.innerHTML = staffCRMs.map(c=>'<span style="font-size:12px;background:#EDE9FE;color:#5B21B6;padding:3px 10px;border-radius:50px;display:inline-flex;align-items:center;gap:4px">'+esc(c)+'<button data-staff="'+esc(staffName)+'" data-crm="'+esc(c)+'" onclick="bmCRMRemove(this)" style="background:transparent;border:none;color:#5B21B6;cursor:pointer;font-size:14px;line-height:1;padding:0 0 0 2px">\u00d7</button></span>').join('')
+        ||'<span style="font-size:12px;color:var(--text-3)">No skills assigned</span>';
+      // Update the + Add skill form with remaining unassigned options
+      const formSel = document.getElementById('cs-crm-'+sid);
+      if (formSel) {
+        formSel.innerHTML = '<option value="">Select skill\u2026</option>'+unassigned.map(c=>'<option value="'+esc(c.name)+'">'+esc(c.name)+'</option>').join('');
+      }
+      // Hide form if nothing left to add
+      const form = document.getElementById('cs-form-'+sid);
+      if (form && !unassigned.length) form.style.display='none';
+    }
+  }
+  showToast('Skill added \u2713','ok');
 }
 
 async function bmCRMRemove(btn) {
   const staffName=btn.dataset.staff; const crmName=btn.dataset.crm;
   if (!staffName||!crmName) return;
   await toggleStaffCRM(staffName, crmName);
-  renderBrokerMgmtScreen();
+  // Remove chip in place
+  btn.closest('span')?.remove();
+  // Refresh the Add skill dropdown for this row
+  const sid = staffName.replace(/[^a-z0-9]/gi,'_');
+  const formSel = document.getElementById('cs-crm-'+sid);
+  if (formSel) {
+    const staffCRMs = getCRMsForStaff(staffName);
+    const unassigned = _crmOptions.filter(c=>!staffCRMs.includes(c.name));
+    formSel.innerHTML = '<option value="">Select skill\u2026</option>'+unassigned.map(c=>'<option value="'+esc(c.name)+'">'+esc(c.name)+'</option>').join('');
+  }
+  showToast('Skill removed.','ok');
 }
 
 function bmFilterRows(q, cls) {
