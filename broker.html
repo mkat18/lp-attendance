@@ -1163,6 +1163,7 @@ var _perfAnalystFlt='', _perfTeamFlt='', _perfCharts={};
 var _perfView='issues', _perfDetailName='', _perfSortKey='over';
 var _perfSortDir=-1, _perfExpandedRow='', _perfOpenCard='';
 var _filesFilterStaff='', _filesTLFilter='';
+var _bmAvCard = ''; // availability card: 'none'|'partial'|'full'|'other'|''
 function applyPermissionVisibility() {
   try {
     document.querySelectorAll('[data-role-hide]').forEach(function(el) {
@@ -6205,6 +6206,7 @@ async function loadFromSharePoint() {
         loadCRMOptions(),
         loadStaffCRMs(),
         loadBrokerTypes(),
+        loadBrokerTypes(),
         loadCoverageFromSP(),
       ]).catch(e => console.warn('Some SP loads failed:', e));
       if (_roles.length) EDITABLE_ROLES = _roles.map(r => r.title).filter(r => r !== 'superadmin');
@@ -8596,12 +8598,23 @@ async function renderBrokerMgmtScreen() {
     const countFull = viewStaff.filter(s=>staffAvailability(s.name)==='full').length;
     const countOther= viewStaff.filter(s=>staffAvailability(s.name)==='other').length;
 
-    const summaryHtml = '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px">'
-      +'<div style="background:#D1FAE5;border-radius:var(--radius-sm);padding:10px;text-align:center"><div style="font-size:18px;font-weight:700;color:#065F46">'+countNone+'</div><div style="font-size:11px;color:#065F46;margin-top:2px">Available</div></div>'
-      +'<div style="background:#FEF9C3;border-radius:var(--radius-sm);padding:10px;text-align:center"><div style="font-size:18px;font-weight:700;color:#92400E">'+countPart+'</div><div style="font-size:11px;color:#92400E;margin-top:2px">Part time</div></div>'
-      +'<div style="background:#FEE2E2;border-radius:var(--radius-sm);padding:10px;text-align:center"><div style="font-size:18px;font-weight:700;color:#991B1B">'+countFull+'</div><div style="font-size:11px;color:#991B1B;margin-top:2px">Fully allocated</div></div>'
-      +'<div style="background:var(--surface-2);border-radius:var(--radius-sm);padding:10px;text-align:center"><div style="font-size:18px;font-weight:700;color:var(--text-3)">'+countOther+'</div><div style="font-size:11px;color:var(--text-3);margin-top:2px">Other</div></div>'
-      +'</div>';
+    const summaryHtml = '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:4px">'
+      +'<div onclick="bmAvToggle(\'none\')" style="background:#D1FAE5;border-radius:var(--radius-sm);padding:10px;text-align:center;cursor:pointer'+(_bmAvCard==='none'?';outline:2px solid var(--brand)':'')+'"><div style="font-size:18px;font-weight:700;color:#065F46">'+countNone+'</div><div style="font-size:11px;color:#065F46;margin-top:2px">Available</div></div>'
+      +'<div onclick="bmAvToggle(\'partial\')" style="background:#FEF9C3;border-radius:var(--radius-sm);padding:10px;text-align:center;cursor:pointer'+(_bmAvCard==='partial'?';outline:2px solid var(--brand)':'')+'"><div style="font-size:18px;font-weight:700;color:#92400E">'+countPart+'</div><div style="font-size:11px;color:#92400E;margin-top:2px">Part time</div></div>'
+      +'<div onclick="bmAvToggle(\'full\')" style="background:#FEE2E2;border-radius:var(--radius-sm);padding:10px;text-align:center;cursor:pointer'+(_bmAvCard==='full'?';outline:2px solid var(--brand)':'')+'"><div style="font-size:18px;font-weight:700;color:#991B1B">'+countFull+'</div><div style="font-size:11px;color:#991B1B;margin-top:2px">Fully allocated</div></div>'
+      +'<div onclick="bmAvToggle(\'other\')" style="background:var(--surface-2);border-radius:var(--radius-sm);padding:10px;text-align:center;cursor:pointer'+(_bmAvCard==='other'?';outline:2px solid var(--brand)':'')+'"><div style="font-size:18px;font-weight:700;color:var(--text-3)">'+countOther+'</div><div style="font-size:11px;color:var(--text-3);margin-top:2px">Other</div></div>'
+      +'</div>'
+
+      +(_bmAvCard&&['none','partial','full','other'].includes(_bmAvCard)?(function() {
+      var group=viewStaff.filter(function(s){return _bmAvCard==='none'?staffAvailability(s.name)==='none':_bmAvCard==='partial'?['partial-am','partial-pm'].includes(staffAvailability(s.name)):_bmAvCard==='full'?staffAvailability(s.name)==='full':staffAvailability(s.name)==='other';});
+      var titles={'none':'Available','partial':'Part time','full':'Fully allocated','other':'Other'};
+      return '<div style="background:var(--surface-2);border:1.5px solid var(--brand);border-radius:var(--radius-sm);padding:10px 12px;margin-top:4px;margin-bottom:8px">'
+        +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><span style="font-size:12px;font-weight:700;color:var(--brand)">'+titles[_bmAvCard]+'</span>'
+        +'<button onclick="_bmAvCard=\'\';renderBrokerMgmtScreen()" style="background:transparent;border:none;font-size:16px;cursor:pointer;color:var(--text-3)">&times;</button></div>'
+        +(group.length?group.map(function(s){var ten=tenureStr(s);var av=staffAvailability(s.name);var avl=availLabel(av);var assigns=getAssignmentsForStaff(s.name);
+          return '<div style="padding:6px 0;border-bottom:0.5px solid var(--border)"><div style="display:flex;align-items:center;gap:6px"><span style="font-size:12px;font-weight:600;flex:1">'+esc(s.name)+'</span>'+(ten?'<span style="font-size:11px;color:var(--text-3)">'+ten+'</span>':'')+'<span style="font-size:11px;border-radius:50px;padding:2px 7px;background:'+avl.dot+'22;color:'+avl.dot+';font-weight:600">'+avl.text+'</span></div>'+(assigns.length?'<div style="font-size:11px;color:var(--text-2);margin-top:3px">'+assigns.map(function(a){return esc(a.brokerName)+' - '+(a.type||'FT');}).join(', ')+'</div>':'')+'</div>';}).join(''):'<div style="font-size:12px;color:var(--text-3)">None in this category.</div>')
+        +'</div>';
+    })():'');
 
     const filterBar = '<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">'
       +'<button id="ab-filter-analyst" onclick="bmAbFilter(\'analyst\')" style="font-size:12px;padding:4px 12px;border-radius:50px;border:1.5px solid var(--brand);background:var(--brand-light);color:var(--brand);cursor:pointer;font-weight:600">By analyst</button>'
@@ -8642,12 +8655,23 @@ async function renderBrokerMgmtScreen() {
   const countFull  = viewStaff.filter(s=>staffAvailability(s.name)==='full').length;
   const countOther = viewStaff.filter(s=>staffAvailability(s.name)==='other').length;
 
-  const availSummary = sa ? '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px">'
-    +'<div style="background:#D1FAE5;border-radius:var(--radius-sm);padding:8px;text-align:center"><div style="font-size:16px;font-weight:700;color:#065F46">'+countNone+'</div><div style="font-size:11px;color:#065F46">Available</div></div>'
-    +'<div style="background:#FEF9C3;border-radius:var(--radius-sm);padding:8px;text-align:center"><div style="font-size:16px;font-weight:700;color:#92400E">'+countPart+'</div><div style="font-size:11px;color:#92400E">Part time</div></div>'
-    +'<div style="background:#FEE2E2;border-radius:var(--radius-sm);padding:8px;text-align:center"><div style="font-size:16px;font-weight:700;color:#991B1B">'+countFull+'</div><div style="font-size:11px;color:#991B1B">Full</div></div>'
-    +'<div style="background:var(--surface-2);border-radius:var(--radius-sm);padding:8px;text-align:center"><div style="font-size:16px;font-weight:700;color:var(--text-3)">'+countOther+'</div><div style="font-size:11px;color:var(--text-3)">Other</div></div>'
-    +'</div>' : '';
+  const availSummary = sa ? ('<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:4px">'
+    +'<div onclick="bmAvToggle(\'none\')" style="background:#D1FAE5;border-radius:var(--radius-sm);padding:8px;text-align:center;cursor:pointer'+(_bmAvCard==='none'?';outline:2px solid var(--brand)':'')+'"><div style="font-size:16px;font-weight:700;color:#065F46">'+countNone+'</div><div style="font-size:11px;color:#065F46">Available</div></div>'
+    +'<div onclick="bmAvToggle(\'partial\')" style="background:#FEF9C3;border-radius:var(--radius-sm);padding:8px;text-align:center;cursor:pointer'+(_bmAvCard==='partial'?';outline:2px solid var(--brand)':'')+'"><div style="font-size:16px;font-weight:700;color:#92400E">'+countPart+'</div><div style="font-size:11px;color:#92400E">Part time</div></div>'
+    +'<div onclick="bmAvToggle(\'full\')" style="background:#FEE2E2;border-radius:var(--radius-sm);padding:8px;text-align:center;cursor:pointer'+(_bmAvCard==='full'?';outline:2px solid var(--brand)':'')+'"><div style="font-size:16px;font-weight:700;color:#991B1B">'+countFull+'</div><div style="font-size:11px;color:#991B1B">Full</div></div>'
+    +'<div onclick="bmAvToggle(\'other\')" style="background:var(--surface-2);border-radius:var(--radius-sm);padding:8px;text-align:center;cursor:pointer'+(_bmAvCard==='other'?';outline:2px solid var(--brand)':'')+'"><div style="font-size:16px;font-weight:700;color:var(--text-3)">'+countOther+'</div><div style="font-size:11px;color:var(--text-3)">Other</div></div>'
+    +'</div>'
+
+    +(_bmAvCard&&['none','partial','full','other'].includes(_bmAvCard)?(function() {
+    var group=viewStaff.filter(function(s){return _bmAvCard==='none'?staffAvailability(s.name)==='none':_bmAvCard==='partial'?['partial-am','partial-pm'].includes(staffAvailability(s.name)):_bmAvCard==='full'?staffAvailability(s.name)==='full':staffAvailability(s.name)==='other';});
+    var titles={'none':'Available','partial':'Part time','full':'Fully allocated','other':'Other'};
+    return '<div style="background:var(--surface-2);border:1.5px solid var(--brand);border-radius:var(--radius-sm);padding:10px 12px;margin-top:4px;margin-bottom:8px">'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><span style="font-size:12px;font-weight:700;color:var(--brand)">'+titles[_bmAvCard]+'</span>'
+    +'<button onclick="_bmAvCard=\'\';renderBrokerMgmtScreen()" style="background:transparent;border:none;font-size:16px;cursor:pointer;color:var(--text-3)">&times;</button></div>'
+    +(group.length?group.map(function(s){var ten=tenureStr(s);var av=staffAvailability(s.name);var avl=availLabel(av);var assigns=getAssignmentsForStaff(s.name);
+      return '<div style="padding:6px 0;border-bottom:0.5px solid var(--border)"><div style="display:flex;align-items:center;gap:6px"><span style="font-size:12px;font-weight:600;flex:1">'+esc(s.name)+'</span>'+(ten?'<span style="font-size:11px;color:var(--text-3)">'+ten+'</span>':'')+'<span style="font-size:11px;border-radius:50px;padding:2px 7px;background:'+avl.dot+'22;color:'+avl.dot+';font-weight:600">'+avl.text+'</span></div>'+(assigns.length?'<div style="font-size:11px;color:var(--text-2);margin-top:3px">'+assigns.map(function(a){return esc(a.brokerName)+' - '+(a.type||'FT');}).join(', ')+'</div>':'')+'</div>';}).join(''):'<div style="font-size:12px;color:var(--text-3)">None in this category.</div>')
+    +'</div>';
+  })():'')) : '';
 
   const availAnalyst = '<div id="ab-by-analyst">'+viewStaff.map(s=>personCard(s,true)).join('')+'</div>';
   const availCRM = '<div id="ab-by-crm" style="display:none">'
@@ -8676,17 +8700,55 @@ async function renderBrokerMgmtScreen() {
   if (sa) {
     const typeCounts = {};
     _brokers.forEach(b=>{ const t=b.type||'Unassigned'; typeCounts[t]=(typeCounts[t]||0)+1; });
-
-    const headcountHtml = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--border)">'
-      +'<div style="background:var(--brand-light);border-radius:var(--radius-sm);padding:10px;text-align:center"><div style="font-size:22px;font-weight:700;color:var(--brand)">'+allStaff.length+'</div><div style="font-size:11px;color:var(--brand);margin-top:2px">Total staff</div></div>'
-      +'<div style="background:#F0FDF4;border-radius:var(--radius-sm);padding:10px;text-align:center"><div style="font-size:22px;font-weight:700;color:#065F46">'+_brokers.length+'</div><div style="font-size:11px;color:#065F46;margin-top:2px">Total clients</div></div>'
-      +'</div>'
-      +(Object.keys(typeCounts).length ? '<div style="margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--border)">'
-        +Object.entries(typeCounts).sort((a,b)=>b[1]-a[1]).map(([t,c])=>'<div style="display:flex;align-items:center;justify-content:space-between;padding:4px 0;font-size:12px"><span style="color:var(--text-2)">'+esc(t)+'</span><span style="font-weight:600;background:var(--surface-2);border-radius:50px;padding:1px 8px">'+c+'</span></div>').join('')
-        +'</div>' : '');
-
     const byType = {};
     _brokers.forEach(b=>{ const t=b.type||'Unassigned'; if(!byType[t])byType[t]=[]; byType[t].push(b); });
+
+    // Headcount + type cards
+    const typeCardColors = ['#EDE9FE','#DBEAFE','#D1FAE5','#FEF3C7','#FCE7F3','#E0F2FE','#FEF9C3','#FEE2E2','#E8F5E9','#FFF3E0','#F3E8FF','#E0F7FA'];
+    const typeCardTextColors = ['#5B21B6','#1D4ED8','#065F46','#92400E','#9D174D','#0369A1','#78350F','#991B1B','#1B5E20','#E65100','#6B21A8','#006064'];
+    const typeEntries = Object.entries(typeCounts).sort((a,b)=>b[1]-a[1]);
+
+    const typeCardsHtml = '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:6px">'
+      +typeEntries.map(([t,c],i)=>{
+        const bg = typeCardColors[i % typeCardColors.length];
+        const col = typeCardTextColors[i % typeCardTextColors.length];
+        const key = 'type_'+t;
+        const act = _bmAvCard===key;
+        return '<div data-avkey="'+esc(key)+'" onclick="bmAvToggle(this.dataset.avkey)" style="background:'+bg+';border-radius:var(--radius-sm);padding:8px 6px;text-align:center;cursor:pointer'+(act?';outline:2px solid var(--brand)':'')+'">'
+          +'<div style="font-size:18px;font-weight:700;color:'+col+'">'+c+'</div>'
+          +'<div style="font-size:10px;color:'+col+';margin-top:2px;line-height:1.3">'+esc(t)+'</div>'
+          +'</div>';}).join('')
+      +'</div>'
+      +(_bmAvCard&&_bmAvCard.startsWith('type_')?(function(){
+          const typeName=_bmAvCard.slice(5);
+          const group=byType[typeName]||[];
+          return '<div style="background:var(--surface-2);border:1.5px solid var(--brand);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:10px">'
+            +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'
+            +'<span style="font-size:12px;font-weight:700;color:var(--brand)">'+esc(typeName)+'</span>'
+            +'<button onclick="_bmAvCard=\'\';renderBrokerMgmtScreen()" style="background:transparent;border:none;font-size:16px;cursor:pointer;color:var(--text-3)">&times;</button></div>'
+            +group.map(function(b){return '<div style="font-size:13px;padding:5px 0;border-bottom:0.5px solid var(--border)">'+esc(b.name)+'</div>';}).join('')
+            +'</div>';
+        })():'');
+
+    const headcountHtml = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">'
+      +'<div onclick="bmAvToggle(\'staff\')" style="background:var(--brand-light);border-radius:var(--radius-sm);padding:10px;text-align:center;cursor:pointer'+(_bmAvCard==='staff'?';outline:2px solid var(--brand)':'')+'">'
+      +'<div style="font-size:22px;font-weight:700;color:var(--brand)">'+allStaff.length+'</div><div style="font-size:11px;color:var(--brand);margin-top:2px">Total staff</div></div>'
+      +'<div onclick="bmAvToggle(\'clients\')" style="background:#F0FDF4;border-radius:var(--radius-sm);padding:10px;text-align:center;cursor:pointer'+(_bmAvCard==='clients'?';outline:2px solid var(--brand)':'')+'">'
+      +'<div style="font-size:22px;font-weight:700;color:#065F46">'+_brokers.length+'</div><div style="font-size:11px;color:#065F46;margin-top:2px">Total clients</div></div>'
+      +'</div>'
+      +(_bmAvCard==='staff'?'<div style="background:var(--surface-2);border:1.5px solid var(--brand);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:10px">'
+        +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><span style="font-size:12px;font-weight:700;color:var(--brand)">All staff</span>'
+        +'<button onclick="_bmAvCard=\'\';renderBrokerMgmtScreen()" style="background:transparent;border:none;font-size:16px;cursor:pointer;color:var(--text-3)">&times;</button></div>'
+        +allStaff.map(s=>'<div style="font-size:12px;padding:3px 0;border-bottom:0.5px solid var(--border)">'+esc(s.name)+' <span style="color:var(--text-3)">'+esc(ROLE_LABEL[s.role]||s.role)+'</span></div>').join('')
+        +'</div>':'')
+      +(_bmAvCard==='clients'?'<div style="background:var(--surface-2);border:1.5px solid var(--brand);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:10px">'
+        +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><span style="font-size:12px;font-weight:700;color:var(--brand)">All clients</span>'
+        +'<button onclick="_bmAvCard=\'\';renderBrokerMgmtScreen()" style="background:transparent;border:none;font-size:16px;cursor:pointer;color:var(--text-3)">&times;</button></div>'
+        +_brokers.map(b=>'<div style="font-size:12px;padding:3px 0;border-bottom:0.5px solid var(--border)">'+esc(b.name)+(b.type?'<span style="color:var(--text-3)"> · '+esc(b.type)+'</span>':'')+'</div>').join('')
+        +'</div>':'')
+      +'<div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">By type</div>'
+      +typeCardsHtml
+      +'<div style="border-top:1px solid var(--border);margin:10px 0"></div>';
 
     const blHtml = headcountHtml
       +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">'
@@ -8763,6 +8825,11 @@ async function renderBrokerMgmtScreen() {
     }).join('');
     bmSection('crmskills', '\ud83e\uddd1\u200d\ud83d\udcbb CRM skills', csHtml, !tl);
   }
+}
+
+function bmAvToggle(card) {
+  _bmAvCard = _bmAvCard === card ? '' : card;
+  renderBrokerMgmtScreen();
 }
 
 function bmToggle(id) {
