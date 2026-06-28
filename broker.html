@@ -11665,19 +11665,16 @@ function renderPerformanceScreen() {
   </div>`;
 
   const chartsRow=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
-    <div>
-      <div id="psc-pie" onclick="perfToggleCard('pie')" style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:14px;cursor:pointer" onmouseover="this.style.borderColor='var(--brand)'" onmouseout="this.style.borderColor='var(--border)'">
-        <div style="font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Time distribution — click to expand</div>
-        <canvas id="perf-pie" height="140"></canvas>
+    <div style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:12px">
+      <div style="font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Time distribution</div>
+      <div style="display:flex;gap:10px;align-items:center">
+        <canvas id="perf-pie" style="max-width:90px;max-height:90px"></canvas>
+        <div id="perf-pie-legend" style="flex:1;min-width:0"></div>
       </div>
-      <div id="psd-pie" style="display:none;background:var(--surface);border:1.5px solid var(--brand);border-top:none;border-radius:0 0 var(--radius) var(--radius);padding:1rem"></div>
     </div>
-    <div>
-      <div id="psc-trend" onclick="perfToggleCard('trend')" style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:14px;cursor:pointer" onmouseover="this.style.borderColor='var(--brand)'" onmouseout="this.style.borderColor='var(--border)'">
-        <div style="font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Benchmark trend — click to expand</div>
-        <canvas id="perf-trend" height="140"></canvas>
-      </div>
-      <div id="psd-trend" style="display:none;background:var(--surface);border:1.5px solid var(--brand);border-top:none;border-radius:0 0 var(--radius) var(--radius);padding:1rem"></div>
+    <div style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:12px">
+      <div style="font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Benchmark trend <span style="font-weight:400;color:var(--text-3)">— red line = 80% target</span></div>
+      <canvas id="perf-trend" height="90"></canvas>
     </div>
   </div>`;
 
@@ -11871,14 +11868,18 @@ function perfDrawPie(dist) {
   if(!canvas) return;
   if(_perfCharts.pie) try{_perfCharts.pie.destroy();}catch(e){}
   const data=dist.filter(d=>d.mins>0);
+  const total=data.reduce((s,d)=>s+d.mins,0);
   _perfCharts.pie=new Chart(canvas,{
     type:'doughnut',
     data:{
       labels:data.map(d=>d.label),
       datasets:[{data:data.map(d=>Math.round(d.mins)),backgroundColor:TASK_COLORS.slice(0,data.length),borderWidth:2,borderColor:'var(--surface)'}]
     },
-    options:{plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>' '+ctx.label+': '+perfFmtMins(ctx.raw)}}},cutout:'62%',animation:{duration:400}}
+    options:{plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>' '+ctx.label+': '+perfFmtMins(ctx.raw)+' ('+Math.round(ctx.raw/total*100)+'%)'}}},cutout:'65%',animation:{duration:400}}
   });
+  // Build compact legend
+  const leg=document.getElementById('perf-pie-legend');
+  if(leg) leg.innerHTML=data.map((d,i)=>`<div style="display:flex;align-items:center;gap:5px;margin-bottom:3px"><span style="width:9px;height:9px;border-radius:2px;background:${TASK_COLORS[i]};flex-shrink:0;display:inline-block"></span><span style="font-size:11px;color:var(--text-2)">${d.label}</span><span style="font-size:11px;color:var(--text-3);margin-left:auto">${Math.round(d.mins/total*100)}%</span></div>`).join('');
 }
 
 function perfDrawTrend(trend) {
@@ -11892,13 +11893,13 @@ function perfDrawTrend(trend) {
     data:{
       labels,
       datasets:[
-        {label:'% on benchmark',data:vals,backgroundColor:vals.map(v=>v==null?'#E5E7EB':v>=80?'#34D399':v>=60?'#FCD34D':'#F87171'),borderRadius:3,borderSkipped:false},
+        {label:'% on benchmark',data:vals,backgroundColor:vals.map(v=>v==null?'#E5E7EB':v>=80?'#34D399':v>=60?'#FCD34D':'#F87171'),borderRadius:4,borderSkipped:false},
         {type:'line',label:'Target (80%)',data:Array(labels.length).fill(80),borderColor:'#F87171',borderWidth:1.5,borderDash:[4,3],pointRadius:0,fill:false,tension:0}
       ]
     },
     options:{
-      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+(ctx.raw!=null?Math.round(ctx.raw)+'%':'no data')}}},
-      scales:{y:{min:0,max:100,ticks:{callback:v=>v+'%',font:{size:10}},grid:{color:'rgba(0,0,0,0.05)'}},x:{ticks:{font:{size:10}},grid:{display:false}}},
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+(ctx.raw!=null?Math.round(ctx.raw)+'%':'no data')}},datalabels:{display:false}},
+      scales:{y:{min:0,max:100,ticks:{callback:v=>v+'%',font:{size:9}},grid:{color:'rgba(0,0,0,0.04)'}},x:{ticks:{font:{size:9},maxRotation:45},grid:{display:false}}},
       animation:{duration:400}
     }
   });
