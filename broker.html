@@ -7267,7 +7267,7 @@ async function saveCoverageToSP(absenteeName, date, coverName, isNCR) {
       await spPatch(SP_API+`('CoverageAssignments')/items(${existing.id})`, payload);
       Object.assign(existing, {coverName:spCoverName, isNCR});
     } else {
-      const res = await spPost(SP_API+"('CoverageAssignments')/items", payload);
+      const res = await spPostDirect(SP_API+"('CoverageAssignments')/items", payload);
       const newId = res?.d?.Id||res?.ID||res?.id||res?.['odata.id']?.match(/\((\d+)\)/)?.[1];
       _coverageSP.push({id:newId, absenteeName, date, coverName:spCoverName, isNCR});
     }
@@ -8417,7 +8417,7 @@ async function assignBrokerToStaff() {
   const assignType=document.getElementById('bmAssignType')?.value||'FT';
   if(!staffName||!brokerName){showToast('Select both staff and broker.','err');return;}
   if(_brokerAssignments.some(a=>a.staffName===staffName&&a.brokerName===brokerName)){showToast('Already assigned.','err');return;}
-  const res=await spPost(SP_API+"('BrokerAssignments')/items",{Title:staffName,BrokerName:brokerName,AssignmentType:assignType});
+  const res=await spPostDirect(SP_API+"('BrokerAssignments')/items",{Title:staffName,BrokerName:brokerName,AssignmentType:assignType});
   if(res){await loadBrokerAssignments();renderBrokerMgmtScreen();showToast('Broker assigned ✓','ok');}
 }
 
@@ -8430,7 +8430,7 @@ async function removeBrokerAssignment(id) {
 async function addBroker() {
   const input=document.getElementById('bmNewBroker');const name=input?.value.trim();
   if(!name) return;
-  const res=await spPost(SP_API+"('Brokers')/items",{Title:name});
+  const res=await spPostDirect(SP_API+"('Brokers')/items",{Title:name});
   if(res){if(input)input.value='';await loadBrokers();renderBrokerMgmtScreen();showToast('Broker added ✓','ok');}
 }
 
@@ -8442,7 +8442,7 @@ async function deleteBroker(id) {
 async function addCRMOption() {
   const input=document.getElementById('bmNewCRM');const name=input?.value.trim();
   if(!name) return;
-  const res=await spPost(SP_API+"('CRMOptions')/items",{Title:name});
+  const res=await spPostDirect(SP_API+"('CRMOptions')/items",{Title:name});
   if(res){if(input)input.value='';await loadCRMOptions();renderBrokerMgmtScreen();showToast('CRM added ✓','ok');}
 }
 
@@ -8458,7 +8458,7 @@ async function toggleStaffCRM(staffName, crmName) {
   const payload={Title:staffName,CRMList:JSON.stringify(crms)};
   try{
     if(existing) await spPatch(SP_API+`('StaffCRMs')/items(${existing.id})`,payload);
-    else await spPost(SP_API+"('StaffCRMs')/items",payload);
+    else await spPostDirect(SP_API+"('StaffCRMs')/items",payload);
     await loadStaffCRMs();renderBrokerMgmtScreen();
   }catch(e){showToast('Failed to save CRM.','err');}
 }
