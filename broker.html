@@ -8848,31 +8848,6 @@ function bmCRMShowAdd(selectId) {
   if (sel.style.display === 'block') setTimeout(()=>sel.focus(), 50);
 }
 
-async function bmCRMAdd(selectEl) {
-  const crmName = selectEl.value;
-  const staffName = selectEl.dataset.staff;
-  if (!crmName || !staffName) return;
-  selectEl.style.display = 'none';
-  selectEl.value = '';
-  await toggleStaffCRM(staffName, crmName);
-  renderBrokerMgmtScreen();
-}
-
-async function bmCRMRemove(iconEl) {
-  const staffName = iconEl.dataset.staff;
-  const crmName = iconEl.dataset.crm;
-  if (!staffName || !crmName) return;
-  await toggleStaffCRM(staffName, crmName);
-  renderBrokerMgmtScreen();
-}
-
-async function bmCRMToggle(el) {
-  const staffName = el.dataset.staff;
-  const crmName = el.dataset.crm;
-  if (!staffName || !crmName) return;
-  await toggleStaffCRM(staffName, crmName);
-  renderBrokerMgmtScreen();
-}
 
 
 
