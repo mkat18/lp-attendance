@@ -8387,6 +8387,21 @@ async function loadBrokerTypes() {
   _brokerTypes = BROKER_TYPE_DEFAULTS.map((n,i)=>({id:-(i+1),name:n}));
 }
 
+async function seedBrokerTypes() {
+  const btn = document.getElementById('bmSeedTypesBtn');
+  if (btn) { btn.textContent = 'Saving\u2026'; btn.disabled = true; }
+  let saved = 0;
+  for (const name of BROKER_TYPE_DEFAULTS) {
+    if (!_brokerTypes.find(t=>t.name===name&&t.id>0)) {
+      const res = await spPostDirect(SP_API+"('BrokerTypes')/items", {Title:name});
+      if (res) saved++;
+    }
+  }
+  await loadBrokerTypes();
+  renderBrokerMgmtScreen();
+  showToast(saved+' types saved to SharePoint \u2713','ok');
+}
+
 async function addBrokerType() {
   const input=document.getElementById('bmNewBrokerTypeOpt'); const name=input?.value.trim();
   if(!name) return;
@@ -8637,7 +8652,12 @@ async function renderBrokerMgmtScreen() {
 
     bmSection('brokerlist','Client list <span style="font-size:12px;font-weight:400;color:var(--text-3)">'+_brokers.length+' clients \u00b7 '+allStaff.length+' staff</span>',typeCards,false);
 
-    const btHtml='<div style="display:flex;gap:8px;margin-bottom:10px">'
+    const fromDefaults = _brokerTypes.some(t=>t.id<0);
+    const btHtml=(fromDefaults?'<div style="background:#FEF3C7;border:1.5px solid #FDE68A;border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:10px;font-size:12px;color:#92400E">'
+      +'⚠ These types are not saved in SharePoint yet — they are defaults. '
+      +'<button id="bmSeedTypesBtn" onclick="seedBrokerTypes()" style="font-size:12px;font-weight:600;color:#92400E;background:transparent;border:1.5px solid #FDE68A;border-radius:var(--radius-sm);padding:2px 10px;cursor:pointer">Save all to SharePoint</button>'
+      +'</div>':'')
+      +'<div style="display:flex;gap:8px;margin-bottom:10px">'
       +'<input type="text" id="bmNewBrokerTypeOpt" placeholder="New type\u2026" style="flex:1;font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)" onkeydown="if(event.key===&quot;Enter&quot;){addBrokerType();}"/>'
       +'<button onclick="addBrokerType()" style="padding:7px 14px;border-radius:var(--radius-sm);border:none;background:var(--brand);color:#fff;font-size:13px;font-weight:600;cursor:pointer">+ Add</button>'
       +'</div>'
