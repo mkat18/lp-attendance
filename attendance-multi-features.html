@@ -2151,7 +2151,7 @@ async function loadPermissions() {
       }
       LS.set('ci_permissions', _permissions);
       LS.set('ci_permissions_ver', PERMS_VERSION);
-      setTimeout(() => { buildNav(); applyPermissionVisibility(); }, 100);
+      // Don't call buildNav here — loginAs handles it after permissions are loaded
     }
   } catch(e) {
     // Only use cache if it matches current version
