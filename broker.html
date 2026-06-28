@@ -854,6 +854,7 @@ tr.flagged-row:hover td { background: #FFEAEA; }
       <h1>📊 Performance Summary</h1>
       <p>Your team — visible to Team Lead only</p>
     </div>
+    <div id="perfFilters" style="margin-bottom:0"></div>
     <div id="perfContent"></div>
   </div>
 </main>
@@ -2226,7 +2227,7 @@ function goTab(name, btn) {
   if (name==='myfiles')   renderMyFilesScreen();
   if (name==='brokermgmt') { renderBrokerMgmtScreen(); renderCoverageSection('coverSection-brokermgmt'); }
   if (name==='feedback')  renderFeedbackScreen();
-  if (name==='performance') renderPerformanceScreen();
+  if (name==='performance') { const pf=document.getElementById('perfFilters'); if(pf) pf.dataset.built=''; renderPerformanceScreen(); }
   if (name==='othertasks') renderOtherTasksScreen();
   if (name==='profile')   { initCp(); renderProfileScreen(); }
 }
@@ -11578,6 +11579,7 @@ function perfCellStyle(avg,bench) {
 
 function renderPerformanceScreen() {
   const el=document.getElementById('perfContent');
+  const filtersEl=document.getElementById('perfFilters');
   if(!el) return;
 
   const sa=isSuperAdmin(),om=isOpsManager(),tl=isTeamLead();
@@ -11593,6 +11595,62 @@ function renderPerformanceScreen() {
   const m=calcAllMetrics(names,from,to);
   const tls=getStaff().filter(s=>s.role==='teamlead');
   const allAnalysts=getStaff().filter(s=>['analyst','trainee'].includes(s.role)).map(s=>s.name).sort();
+
+  // Build filter row only if not yet rendered (keeps dropdowns persistent)
+  if(filtersEl && !filtersEl.dataset.built) {
+    filtersEl.dataset.built='1';
+    filtersEl.innerHTML=`<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+    <select id="perf-period-sel" onchange="_perfPeriod=this.value;_perfCustomFrom='';_perfCustomTo='';renderPerformanceScreen()"
+      style="font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)">
+      <option value="today">Today</option>
+      <option value="yesterday">Yesterday</option>
+      <option value="7">Last 7 days</option>
+      <option value="30">Last 30 days</option>
+      <option value="60">Last 60 days</option>
+      <option value="90">Last 90 days</option>
+      <option value="custom">Custom</option>
+    </select>
+    <span id="perf-custom-dates"></span>
+    ${sa||om?`
+      <select id="perf-analyst-sel" onchange="_perfAnalystFlt=this.value;renderPerformanceScreen()"
+        style="font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)">
+        <option value="">All analysts</option>
+        ${allAnalysts.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('')}
+      </select>
+      <select id="perf-team-sel" onchange="_perfTeamFlt=this.value;renderPerformanceScreen()"
+        style="font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)">
+        <option value="">All teams</option>
+        ${tls.map(t=>`<option value="${esc(t.name)}">${esc(t.name.split(' ')[0])}'s team</option>`).join('')}
+      </select>
+    `:tl?`
+      <select id="perf-analyst-sel" onchange="_perfAnalystFlt=this.value;renderPerformanceScreen()"
+        style="font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)">
+        <option value="">All my analysts</option>
+        ${getTeamForTL(currentUser.name).sort().map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('')}
+      </select>
+    `:''}
+  </div>`;
+  }
+
+  // Sync dropdown values without rebuilding them
+  const periodSel=document.getElementById('perf-period-sel');
+  if(periodSel) periodSel.value=_perfPeriod||'7';
+  const analystSel=document.getElementById('perf-analyst-sel');
+  if(analystSel) analystSel.value=_perfAnalystFlt||'';
+  const teamSel=document.getElementById('perf-team-sel');
+  if(teamSel) teamSel.value=_perfTeamFlt||'';
+
+  // Show/hide custom date inputs
+  const customDates=document.getElementById('perf-custom-dates');
+  if(customDates) {
+    customDates.innerHTML=_perfPeriod==='custom'?`
+      <input type="date" value="${_perfCustomFrom}" onchange="_perfCustomFrom=this.value;renderPerformanceScreen()"
+        style="font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)"/>
+      <span style="font-size:13px;color:var(--text-3);align-self:center">to</span>
+      <input type="date" value="${_perfCustomTo}" onchange="_perfCustomTo=this.value;renderPerformanceScreen()"
+        style="font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)"/>
+    `:'';
+  }
 
   // Destroy old charts
   Object.values(_perfCharts).forEach(c=>{try{c.destroy();}catch(e){}});
@@ -11668,7 +11726,7 @@ function renderPerformanceScreen() {
     <div style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:12px">
       <div style="font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Time distribution</div>
       <div style="display:flex;gap:10px;align-items:center">
-        <canvas id="perf-pie" style="max-width:135px;max-height:135px"></canvas>
+        <canvas id="perf-pie" width="135" height="135" style="width:135px;height:135px;flex-shrink:0"></canvas>
         <div id="perf-pie-legend" style="flex:1;min-width:0"></div>
       </div>
     </div>
@@ -11699,13 +11757,8 @@ function renderPerformanceScreen() {
       style="font-size:13px;padding:7px 16px;border-radius:50px;border:1.5px solid ${_perfView==='detail'?'var(--brand)':'var(--border)'};background:${_perfView==='detail'?'var(--brand-light)':'var(--surface)'};color:${_perfView==='detail'?'var(--brand)':'var(--text-2)'};cursor:pointer;font-weight:${_perfView==='detail'?'700':'400'}">Analyst detail</button>
   </div>`;
   const viewContainer=`<div id="perf-view-container"></div>`;
-  el.innerHTML=filterRow+summaryRow+alertBar+viewToggle+viewContainer+chartsRow;
+  el.innerHTML=summaryRow+alertBar+viewToggle+viewContainer+chartsRow;
   el._metrics=m; el._names=names;
-  // Restore dropdown values explicitly (prevents browser state mismatch on re-render)
-  const analystSel=document.getElementById('perf-analyst-sel');
-  if(analystSel) analystSel.value=_perfAnalystFlt||'';
-  const teamSel=document.getElementById('perf-team-sel');
-  if(teamSel) teamSel.value=_perfTeamFlt||'';
   setTimeout(()=>{ perfDrawPie(m.dist); perfDrawTrend(m.trend); perfRenderView(names,from,to,m); },50);
 }
 
@@ -11880,7 +11933,7 @@ function perfDrawPie(dist) {
       labels:data.map(d=>d.label),
       datasets:[{data:data.map(d=>Math.round(d.mins)),backgroundColor:TASK_COLORS.slice(0,data.length),borderWidth:2,borderColor:'var(--surface)'}]
     },
-    options:{plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>' '+ctx.label+': '+perfFmtMins(ctx.raw)+' ('+Math.round(ctx.raw/total*100)+'%)'}}},cutout:'65%',animation:{duration:400}}
+    options:{responsive:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>' '+ctx.label+': '+perfFmtMins(ctx.raw)+' ('+Math.round(ctx.raw/total*100)+'%)'}}},cutout:'65%',animation:{duration:400}}
   });
   // Build compact legend
   const leg=document.getElementById('perf-pie-legend');
