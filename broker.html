@@ -8534,8 +8534,17 @@ async function addBroker() {
 }
 
 async function deleteBroker(id) {
-  try{await spDelete(SP_API+`('Brokers')/items(${id})`);await loadBrokers();renderBrokerMgmtScreen();showToast('Client removed.','ok');}
-  catch(e){showToast('Failed to remove.','err');}
+  try {
+    await spDelete(SP_API+`('Brokers')/items(${id})`);
+    _brokers = _brokers.filter(b=>b.id!==id);
+    LS.set('ci_brokers',_brokers);
+    showToast('Client removed.','ok');
+    // Re-expand current card to refresh the list
+    const currentKey = _bmAvCard;
+    _bmAvCard = '';
+    if (currentKey) bmAvToggle(currentKey);
+    else renderBrokerMgmtScreen();
+  } catch(e){ showToast('Failed to remove.','err'); }
 }
 
 async function setBrokerType(id, typeName) {
@@ -8546,7 +8555,10 @@ async function setBrokerType(id, typeName) {
     broker.type = typeName;
     LS.set('ci_brokers', _brokers);
     showToast('Type updated \u2713','ok');
-    renderBrokerMgmtScreen();
+    // Re-expand the current card in place
+    const currentKey = _bmAvCard;
+    _bmAvCard = '';
+    if (currentKey) bmAvToggle(currentKey);
   } else {
     showToast('Failed to update type.','err');
   }
