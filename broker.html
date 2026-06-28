@@ -8389,7 +8389,7 @@ async function loadBrokerTypes() {
 
 async function seedBrokerTypes() {
   const btn = document.getElementById('bmSeedTypesBtn');
-  if (btn) { btn.textContent = 'Saving\u2026'; btn.disabled = true; }
+  if (btn) { btn.textContent = 'Saving…'; btn.disabled = true; }
   let saved = 0;
   for (const name of BROKER_TYPE_DEFAULTS) {
     if (!_brokerTypes.find(t=>t.name===name&&t.id>0)) {
@@ -8398,22 +8398,34 @@ async function seedBrokerTypes() {
     }
   }
   await loadBrokerTypes();
-  renderBrokerMgmtScreen();
-  showToast(saved+' types saved to SharePoint \u2713','ok');
+  return saved;
+}
+
+async function ensureTypesInSP() {
+  if (_brokerTypes.some(t=>t.id<0)) {
+    showToast('Saving default types to SharePoint first…','ok');
+    await seedBrokerTypes();
+  }
 }
 
 async function addBrokerType() {
   const input=document.getElementById('bmNewBrokerTypeOpt'); const name=input?.value.trim();
   if(!name) return;
+  await ensureTypesInSP();
   const res=await spPostDirect(SP_API+"('BrokerTypes')/items",{Title:name});
   if(res){if(input)input.value='';await loadBrokerTypes();renderBrokerMgmtScreen();showToast('Type added ✓','ok');}
 }
 
 async function deleteBrokerType(id) {
+  if (id<0) {
+    _brokerTypes=_brokerTypes.filter(t=>t.id!==id);
+    LS.set('ci_brokertypes',_brokerTypes);
+    renderBrokerMgmtScreen();
+    return;
+  }
   try{await spDelete(SP_API+`('BrokerTypes')/items(${id})`);await loadBrokerTypes();renderBrokerMgmtScreen();showToast('Type removed.','ok');}
   catch(e){showToast('Failed to remove.','err');}
 }
-let _brokerAssignments = [];
 let _crmOptions = [];
 let _staffCRMs = [];
 
