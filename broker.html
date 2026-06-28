@@ -151,7 +151,7 @@ input[type=text], input[type=date], input[type=number], input[type=tel], input[t
   width: 100%; padding: 10px 13px;
   border: 1.5px solid var(--border); border-radius: var(--radius-sm);
   font-family: var(--font-body); font-size: 14px;
-  color: var(--text); background: var(--surface-2);
+  color: var(--text); background: var(--surface);
   outline: none; transition: border-color .15s, box-shadow .15s;
   -webkit-appearance: none;
 }
@@ -169,7 +169,7 @@ input:focus, select:focus {
 .pin-wrap { display: flex; gap: 10px; justify-content: center; margin-bottom: 20px; }
 .pin-dot {
   width: 13px; height: 13px; border-radius: 50%;
-  border: 2px solid var(--border-strong); background: var(--surface-2);
+  border: 2px solid var(--border); background: var(--surface);
   transition: all .2s;
 }
 .pin-dot.filled { background: var(--brand); border-color: var(--brand); transform: scale(1.1); }
@@ -195,7 +195,7 @@ input:focus, select:focus {
   justify-content: center; gap: 10px;
   padding: 20px 8px 16px;
   border: 1.5px solid var(--border); border-radius: var(--radius-lg);
-  background: var(--surface-2); cursor: pointer;
+  background: var(--surface); cursor: pointer;
   font-family: var(--font-ui); font-size: 13px; font-weight: 600;
   color: var(--text-2); transition: all .15s; text-align: center;
   box-shadow: var(--shadow-sm);
@@ -209,7 +209,7 @@ input:focus, select:focus {
 
 /* ─── BREAK TIMER ────────────────────────────────────────────────────────── */
 .break-box {
-  background: var(--surface-2); border: 1.5px solid var(--border);
+  background: var(--surface); border: 1.5px solid var(--border);
   border-radius: var(--radius); padding: 1.25rem; text-align: center;
 }
 .break-status-txt { font-size: 12px; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
@@ -248,7 +248,7 @@ input:focus, select:focus {
   font-family: var(--font-body); font-size: 12px; font-weight: 500;
   cursor: pointer; color: var(--text-2); transition: background .15s;
 }
-.btn-sm:hover { background: var(--surface-2); }
+.btn-sm:hover { background: var(--surface); }
 .btn-danger { background: var(--danger-light); color: var(--danger); border-color: #FECACA; }
 
 /* ─── TAGS ───────────────────────────────────────────────────────────────── */
@@ -305,12 +305,12 @@ input:focus, select:focus {
   cursor: pointer; font-size: 14px; color: var(--text-2);
   font-family: var(--font-body); transition: background .15s;
 }
-.icon-btn:hover { background: var(--surface-2); }
+.icon-btn:hover { background: var(--surface); }
 
 /* ─── PILL TABS ──────────────────────────────────────────────────────────── */
 .tab-bar {
   display: flex; gap: 4px; flex-wrap: wrap;
-  background: var(--surface-2); border: 1.5px solid var(--border);
+  background: var(--surface); border: 1.5px solid var(--border);
   border-radius: var(--radius); padding: 4px;
   margin-bottom: 1rem;
 }
@@ -340,12 +340,12 @@ th {
   border-bottom: 1.5px solid var(--border);
   font-family: var(--font-ui); font-size: 11px; font-weight: 600;
   color: var(--text-3); text-transform: uppercase; letter-spacing: 0.5px;
-  background: var(--surface-2);
+  background: var(--surface);
 }
 td { padding: 11px 14px; border-bottom: 1px solid var(--border); color: var(--text); }
 tr:last-child td { border-bottom: none; }
 tr.flagged-row td { background: #FFF8F8; }
-tr:hover td { background: var(--surface-2); }
+tr:hover td { background: var(--surface); }
 tr.flagged-row:hover td { background: #FFEAEA; }
 
 .chart-outer { position: relative; width: 100%; height: 240px; }
@@ -372,7 +372,7 @@ tr.flagged-row:hover td { background: #FFEAEA; }
   font-family: var(--font-ui); font-size: 11px; font-weight: 600;
   color: var(--text-3); text-transform: uppercase; letter-spacing: 0.5px;
   display: flex; align-items: center; justify-content: space-between;
-  background: var(--surface-2);
+  background: var(--surface);
 }
 .list-count {
   background: var(--surface); border: 1.5px solid var(--border);
@@ -413,7 +413,7 @@ tr.flagged-row:hover td { background: #FFEAEA; }
   color: var(--text-2); cursor: pointer; margin-top: 8px;
   transition: background .15s;
 }
-.modal-cancel:hover { background: var(--surface-2); }
+.modal-cancel:hover { background: var(--surface); }
 
 /* ─── RESPONSIVE ─────────────────────────────────────────────────────────── */
 @media (max-width: 420px) {
@@ -756,7 +756,7 @@ tr.flagged-row:hover td { background: #FFEAEA; }
       <button class="tab" id="ftab-archive" onclick="switchFilesTab('archive',this)">Archive</button>
     </div>
     <!-- Superadmin filters — shown only for superadmin -->
-    <div id="filesAdminFilters" style="display:none;background:var(--surface-2);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:12px">
+    <div id="filesAdminFilters" style="display:none;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:12px">
       <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">Filter all files</div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px">
         <div>
@@ -886,26 +886,26 @@ tr.flagged-row:hover td { background: #FFEAEA; }
     <div style="margin-bottom:1rem">
       <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Start time</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        <select id="scheduleStartH" style="font-size:15px;padding:10px 12px;border-radius:10px;border:1.5px solid var(--border);background:var(--surface-2);color:var(--text);appearance:none;text-align:center"></select>
-        <select id="scheduleStartM" style="font-size:15px;padding:10px 12px;border-radius:10px;border:1.5px solid var(--border);background:var(--surface-2);color:var(--text);appearance:none;text-align:center"></select>
+        <select id="scheduleStartH" style="font-size:15px;padding:10px 12px;border-radius:10px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);appearance:none;text-align:center"></select>
+        <select id="scheduleStartM" style="font-size:15px;padding:10px 12px;border-radius:10px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);appearance:none;text-align:center"></select>
       </div>
     </div>
 
     <div style="margin-bottom:1rem">
       <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">End time</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        <select id="scheduleEndH" style="font-size:15px;padding:10px 12px;border-radius:10px;border:1.5px solid var(--border);background:var(--surface-2);color:var(--text);appearance:none;text-align:center"></select>
-        <select id="scheduleEndM" style="font-size:15px;padding:10px 12px;border-radius:10px;border:1.5px solid var(--border);background:var(--surface-2);color:var(--text);appearance:none;text-align:center"></select>
+        <select id="scheduleEndH" style="font-size:15px;padding:10px 12px;border-radius:10px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);appearance:none;text-align:center"></select>
+        <select id="scheduleEndM" style="font-size:15px;padding:10px 12px;border-radius:10px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);appearance:none;text-align:center"></select>
       </div>
     </div>
 
     <div style="margin-bottom:1.25rem">
       <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Office</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        <button id="officeBtn_Goregaon" onclick="selectOffice('Goregaon')" style="padding:10px;border-radius:10px;border:1.5px solid var(--border);background:var(--surface-2);color:var(--text);font-size:14px;font-weight:600;cursor:pointer;transition:all .15s">Goregaon</button>
-        <button id="officeBtn_Borivali" onclick="selectOffice('Borivali')" style="padding:10px;border-radius:10px;border:1.5px solid var(--border);background:var(--surface-2);color:var(--text);font-size:14px;font-weight:600;cursor:pointer;transition:all .15s">Borivali</button>
-        <button id="officeBtn_Virar" onclick="selectOffice('Virar')" style="padding:10px;border-radius:10px;border:1.5px solid var(--border);background:var(--surface-2);color:var(--text);font-size:14px;font-weight:600;cursor:pointer;transition:all .15s">Virar</button>
-        <button id="officeBtn_WFH" onclick="selectOffice('WFH')" style="padding:10px;border-radius:10px;border:1.5px solid var(--border);background:var(--surface-2);color:var(--text);font-size:14px;font-weight:600;cursor:pointer;transition:all .15s">WFH</button>
+        <button id="officeBtn_Goregaon" onclick="selectOffice('Goregaon')" style="padding:10px;border-radius:10px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:14px;font-weight:600;cursor:pointer;transition:all .15s">Goregaon</button>
+        <button id="officeBtn_Borivali" onclick="selectOffice('Borivali')" style="padding:10px;border-radius:10px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:14px;font-weight:600;cursor:pointer;transition:all .15s">Borivali</button>
+        <button id="officeBtn_Virar" onclick="selectOffice('Virar')" style="padding:10px;border-radius:10px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:14px;font-weight:600;cursor:pointer;transition:all .15s">Virar</button>
+        <button id="officeBtn_WFH" onclick="selectOffice('WFH')" style="padding:10px;border-radius:10px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:14px;font-weight:600;cursor:pointer;transition:all .15s">WFH</button>
       </div>
     </div>
 
@@ -921,7 +921,7 @@ tr.flagged-row:hover td { background: #FFEAEA; }
   <div class="modal-box">
     <div class="modal-title">Temporary PIN</div>
     <div class="modal-sub" id="tempPinDesc">Share this PIN privately with the staff member. It can only be used once — they'll be asked to set their own PIN on first login.</div>
-    <div style="background:var(--surface-2);border:2px dashed var(--border-strong);border-radius:var(--radius);padding:1.25rem;text-align:center;margin:1rem 0">
+    <div style="background:var(--surface);border:2px dashed var(--border);border-radius:var(--radius);padding:1.25rem;text-align:center;margin:1rem 0">
       <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:8px">Temporary PIN — share privately</div>
       <div id="tempPinDisplay" style="font-family:var(--font-ui);font-size:36px;font-weight:700;letter-spacing:6px;color:var(--brand);font-variant-numeric:tabular-nums"></div>
     </div>
@@ -942,7 +942,7 @@ tr.flagged-row:hover td { background: #FFEAEA; }
     </div>
     <div class="field">
       <label style="display:block;font-size:12px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;font-family:var(--font-ui)">Reason <span style="color:var(--danger)">*</span></label>
-      <textarea id="onBehalfReason" placeholder="e.g. Annual leave, sick day…" style="width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:14px;color:var(--text);background:var(--surface-2);outline:none;resize:none;min-height:68px;line-height:1.5"></textarea>
+      <textarea id="onBehalfReason" placeholder="e.g. Annual leave, sick day…" style="width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:14px;color:var(--text);background:var(--surface);outline:none;resize:none;min-height:68px;line-height:1.5"></textarea>
     </div>
     <button class="btn-primary" onclick="confirmOnBehalf()" style="margin-bottom:8px">Submit</button>
     <button class="modal-cancel" onclick="closeOnBehalfModal()">Cancel</button>
@@ -959,7 +959,7 @@ tr.flagged-row:hover td { background: #FFEAEA; }
 
     <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Add staff to team</div>
     <div style="display:flex;gap:8px;margin-bottom:1.25rem">
-      <select id="manageTeamAddSelect" style="flex:1;font-size:14px;padding:8px 12px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:var(--surface-2)">
+      <select id="manageTeamAddSelect" style="flex:1;font-size:14px;padding:8px 12px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:var(--surface)">
         <option value="">— select staff member —</option>
       </select>
       <button onclick="addToTeam()" style="padding:8px 16px;background:var(--brand);color:#fff;border:none;border-radius:var(--radius-sm);font-size:14px;font-weight:600;cursor:pointer">Add</button>
@@ -1045,12 +1045,12 @@ tr.flagged-row:hover td { background: #FFEAEA; }
     </div>
     <div class="field">
       <label>What's been done</label>
-      <textarea id="fm_done" placeholder="e.g. ID verified, payslips received, valuation ordered…" style="width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:14px;color:var(--text);background:var(--surface-2);outline:none;resize:none;min-height:72px;line-height:1.5"></textarea>
+      <textarea id="fm_done" placeholder="e.g. ID verified, payslips received, valuation ordered…" style="width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:14px;color:var(--text);background:var(--surface);outline:none;resize:none;min-height:72px;line-height:1.5"></textarea>
       <div id="fm_done_history" style="display:none;margin-top:6px"></div>
     </div>
     <div class="field">
       <label>What's pending / next steps</label>
-      <textarea id="fm_pending" placeholder="e.g. Waiting on bank statements, need to call client re: rates…" style="width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:14px;color:var(--text);background:var(--surface-2);outline:none;resize:none;min-height:72px;line-height:1.5"></textarea>
+      <textarea id="fm_pending" placeholder="e.g. Waiting on bank statements, need to call client re: rates…" style="width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:14px;color:var(--text);background:var(--surface);outline:none;resize:none;min-height:72px;line-height:1.5"></textarea>
       <div id="fm_pending_history" style="display:none;margin-top:6px"></div>
     </div>
     <div class="field" id="fm_loanAmountField">
@@ -1107,15 +1107,15 @@ tr.flagged-row:hover td { background: #FFEAEA; }
     <div class="field">
       <label>Overall sentiment</label>
       <div style="display:flex;gap:8px;margin-top:4px">
-        <button type="button" id="bfSent_positive" onclick="setBFSentiment('positive')" style="flex:1;padding:8px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:var(--surface-2);cursor:pointer;font-size:13px">👍 Positive</button>
-        <button type="button" id="bfSent_neutral" onclick="setBFSentiment('neutral')" style="flex:1;padding:8px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:var(--surface-2);cursor:pointer;font-size:13px">😐 Neutral</button>
-        <button type="button" id="bfSent_negative" onclick="setBFSentiment('negative')" style="flex:1;padding:8px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:var(--surface-2);cursor:pointer;font-size:13px">👎 Negative</button>
+        <button type="button" id="bfSent_positive" onclick="setBFSentiment('positive')" style="flex:1;padding:8px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:var(--surface);cursor:pointer;font-size:13px">👍 Positive</button>
+        <button type="button" id="bfSent_neutral" onclick="setBFSentiment('neutral')" style="flex:1;padding:8px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:var(--surface);cursor:pointer;font-size:13px">😐 Neutral</button>
+        <button type="button" id="bfSent_negative" onclick="setBFSentiment('negative')" style="flex:1;padding:8px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:var(--surface);cursor:pointer;font-size:13px">👎 Negative</button>
       </div>
     </div>
 
     <div class="field">
       <label>Note <span style="font-size:11px;color:var(--text-3)">(optional)</span></label>
-      <textarea id="bf_note" placeholder="Any additional context from the broker…" style="width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:14px;color:var(--text);background:var(--surface-2);outline:none;resize:none;min-height:68px;line-height:1.5"></textarea>
+      <textarea id="bf_note" placeholder="Any additional context from the broker…" style="width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:14px;color:var(--text);background:var(--surface);outline:none;resize:none;min-height:68px;line-height:1.5"></textarea>
     </div>
 
     <input type="hidden" id="bf_feedbackId"/>
@@ -2036,7 +2036,7 @@ function showPermConfirmModal(role, changes, affectedCount) {
         You are changing permissions for <strong>${ROLE_LABEL[role]||role}</strong>. 
         This affects <strong>${affectedCount} staff member${affectedCount!==1?'s':''}</strong> and takes effect immediately.
       </div>
-      <div style="background:var(--surface-2);border-radius:var(--radius-sm);padding:12px;margin-bottom:12px;max-height:160px;overflow-y:auto">
+      <div style="background:var(--surface);border-radius:var(--radius-sm);padding:12px;margin-bottom:12px;max-height:160px;overflow-y:auto">
         ${changes.map(c=>`<div style="font-size:12px;padding:3px 0;color:${c.startsWith('✓')?'var(--success)':'var(--danger)'}">${c}</div>`).join('')}
       </div>
       ${dangerousChanges.length ? `
@@ -2365,7 +2365,7 @@ function onNameType() {
     const isPrimary = i === 0;
     html += '<button type="button" onclick="confirmName(' + i + ')" '
       + 'style="display:block;width:100%;padding:' + (isPrimary?'13px':'11px') + ' 14px;'
-      + 'background:' + (isPrimary?'var(--brand-light)':'var(--surface-2)') + ';'
+      + 'background:' + (isPrimary?'var(--brand-light)':'var(--surface)') + ';'
       + 'color:' + (isPrimary?'var(--brand)':'var(--text-2)') + ';'
       + 'border:' + (isPrimary?'2px solid var(--brand)':'1.5px solid var(--border)') + ';'
       + 'border-radius:var(--radius-sm);font-size:' + (isPrimary?'15':'14') + 'px;'
@@ -3362,7 +3362,7 @@ function renderMissing() {
     return;
   }
 
-  const sectionHeader=(label,colour)=>`<tr><td colspan="5" style="background:var(--surface-2);padding:6px 14px;font-size:11px;font-weight:700;color:${colour};text-transform:uppercase;letter-spacing:0.5px">${label}</td></tr>`;
+  const sectionHeader=(label,colour)=>`<tr><td colspan="5" style="background:var(--surface);padding:6px 14px;font-size:11px;font-weight:700;color:${colour};text-transform:uppercase;letter-spacing:0.5px">${label}</td></tr>`;
 
   let html='<thead><tr><th>Name</th><th>Shift</th><th>Clock in</th><th>Clock out</th>'+(canSubmit?'<th></th>':'')+'</tr></thead><tbody>';
 
@@ -3458,7 +3458,7 @@ function renderLateTab() {
     if (!singleDay && r.date!==lastDate) {
       lastDate=r.date;
       const label=r.date===today?'Today':new Date(r.date+'T12:00:00').toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short'});
-      html+=`<tr><td colspan="5" style="background:var(--surface-2);font-size:11px;font-weight:700;color:var(--text-3);letter-spacing:0.5px;text-transform:uppercase;padding:6px 14px">${label}</td></tr>`;
+      html+=`<tr><td colspan="5" style="background:var(--surface);font-size:11px;font-weight:700;color:var(--text-3);letter-spacing:0.5px;text-transform:uppercase;padding:6px 14px">${label}</td></tr>`;
     }
     const severity = r.minsLate>60?'var(--danger)':r.minsLate>30?'#D97706':'var(--warn)';
     html+=`<tr>
@@ -3505,7 +3505,7 @@ function renderEarlyTab() {
     if (!singleDay && r.date!==lastDate) {
       lastDate=r.date;
       const label=r.date===today?'Today':new Date(r.date+'T12:00:00').toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short'});
-      html+=`<tr><td colspan="5" style="background:var(--surface-2);font-size:11px;font-weight:700;color:var(--text-3);letter-spacing:0.5px;text-transform:uppercase;padding:6px 14px">${label}</td></tr>`;
+      html+=`<tr><td colspan="5" style="background:var(--surface);font-size:11px;font-weight:700;color:var(--text-3);letter-spacing:0.5px;text-transform:uppercase;padding:6px 14px">${label}</td></tr>`;
     }
     const severity = r.minsEarly>60?'var(--danger)':r.minsEarly>30?'#D97706':'var(--warn)';
     html+=`<tr>
@@ -3544,7 +3544,7 @@ function renderSuspiciousTab() {
     if (!singleDay && r.date!==lastDate) {
       lastDate=r.date;
       const label=r.date===today?'Today':new Date(r.date+'T12:00:00').toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short'});
-      html+=`<tr><td colspan="5" style="background:var(--surface-2);font-size:11px;font-weight:700;color:var(--text-3);letter-spacing:0.5px;text-transform:uppercase;padding:6px 14px">${label}</td></tr>`;
+      html+=`<tr><td colspan="5" style="background:var(--surface);font-size:11px;font-weight:700;color:var(--text-3);letter-spacing:0.5px;text-transform:uppercase;padding:6px 14px">${label}</td></tr>`;
     }
     html+=`<tr>
       ${singleDay?'':('<td style="font-size:12px;color:var(--text-3)">'+fmtDate(r.date)+'</td>')}
@@ -4156,17 +4156,17 @@ async function renderLeaveScreen() {
       <div class="section-label">My leave — ${bal.leaveYear}</div>
       ${onProb ? `<div style="background:#FEF3C7;border:1.5px solid #FDE68A;border-radius:var(--radius-sm);padding:10px 14px;font-size:13px;color:#92400E;margin-bottom:12px">⚠ You are on probation until ${probEnd}. No leave entitlement during this period.</div>` : ''}
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px">
-        <div style="background:var(--surface-2);border-radius:var(--radius-sm);padding:12px;text-align:center">
+        <div style="background:var(--surface);border-radius:var(--radius-sm);padding:12px;text-align:center">
           <div style="font-size:22px;font-weight:700;color:var(--brand)">${bal.annualUsed}</div>
           <div style="font-size:11px;color:var(--text-3)">Annual leave used</div>
           ${isHRView ? `<div style="font-size:11px;color:var(--text-3)">${bal.annualRemaining} remaining of ${bal.annual}</div>` : ''}
         </div>
-        <div style="background:var(--surface-2);border-radius:var(--radius-sm);padding:12px;text-align:center">
+        <div style="background:var(--surface);border-radius:var(--radius-sm);padding:12px;text-align:center">
           <div style="font-size:22px;font-weight:700;color:var(--success)">${bal.sickUsed}</div>
           <div style="font-size:11px;color:var(--text-3)">Sick leave used</div>
           ${isHRView ? `<div style="font-size:11px;color:var(--text-3)">${bal.sickRemaining} remaining of ${bal.sick}</div>` : ''}
         </div>
-        <div style="background:var(--surface-2);border-radius:var(--radius-sm);padding:12px;text-align:center">
+        <div style="background:var(--surface);border-radius:var(--radius-sm);padding:12px;text-align:center">
           <div style="font-size:22px;font-weight:700;color:var(--text-2)">${bal.totalUsed}</div>
           <div style="font-size:11px;color:var(--text-3)">Total taken</div>
           <div style="font-size:11px;color:var(--text-3)">Unpaid: ${bal.unpaidUsed} · Broker: ${bal.brokerCount}</div>
@@ -4254,7 +4254,7 @@ async function renderLeaveScreen() {
       html += '<div style="font-size:13px;color:var(--text-3)">No pending leave requests ✓</div>';
     } else {
       html += pendingReqs.map(r => `
-        <div style="background:var(--surface-2);border-radius:var(--radius-sm);padding:12px;margin-bottom:8px">
+        <div style="background:var(--surface);border-radius:var(--radius-sm);padding:12px;margin-bottom:8px">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
             <div style="font-weight:600;font-size:14px">${esc(r.Title)}</div>
             <span class="badge badge-warn">Pending</span>
@@ -4492,7 +4492,7 @@ function renderPublicHolidaysManager() {
     <div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:0.5px solid var(--border);font-size:13px">
       <span style="color:var(--text-3);min-width:90px">${fmtDate(h.date)}</span>
       <span style="flex:1;font-weight:500">${esc(h.name)}</span>
-      ${h.isManual?'<span style="font-size:10px;background:var(--surface-2);padding:2px 6px;border-radius:4px;color:var(--text-3)">Manual</span>':''}
+      ${h.isManual?'<span style="font-size:10px;background:var(--surface);padding:2px 6px;border-radius:4px;color:var(--text-3)">Manual</span>':''}
       <button onclick="deletePublicHoliday('${fmtDate(h.date)}')" style="font-size:11px;padding:3px 8px;background:var(--danger);color:#fff;border:none;border-radius:4px;cursor:pointer">Remove</button>
     </div>`).join('');
 }
@@ -4763,7 +4763,7 @@ function renderRecords() {
     if(!singleDay&&r.date!==lastDate){
       lastDate=r.date;
       const label=r.date===today?'Today':new Date(r.date+'T12:00:00').toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short'});
-      html+=`<tr><td colspan="8" style="background:var(--surface-2);font-size:11px;font-weight:700;color:var(--text-3);letter-spacing:0.5px;text-transform:uppercase;padding:6px 14px">${label}</td></tr>`;
+      html+=`<tr><td colspan="8" style="background:var(--surface);font-size:11px;font-weight:700;color:var(--text-3);letter-spacing:0.5px;text-transform:uppercase;padding:6px 14px">${label}</td></tr>`;
     }
     const workedMins=calcWorkedMins(r);
     const isLeave=r.status==='leave';
@@ -4898,7 +4898,7 @@ function renderBreaks() {
     // Detail rows — hidden by default
     if(r.segments.length>0){
       html+=`<tr id="bd-${i}" style="display:none"><td colspan="6" style="padding:0">
-        <table style="width:100%;border-collapse:collapse;background:var(--surface-2)">
+        <table style="width:100%;border-collapse:collapse;background:var(--surface)">
           <thead><tr>
             <th style="padding:6px 14px 6px 28px;font-size:10px;color:var(--text-3);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid var(--border)">Break</th>
             <th style="padding:6px 14px;font-size:10px;color:var(--text-3);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid var(--border)">Started</th>
@@ -5099,15 +5099,15 @@ function renderObsStats() {
 
   // Summary bar
   html += `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px">
-    <div style="background:var(--surface-2);border-radius:var(--radius-sm);padding:10px;text-align:center">
+    <div style="background:var(--surface);border-radius:var(--radius-sm);padding:10px;text-align:center">
       <div style="font-size:22px;font-weight:700;color:var(--brand)">${notes.length}</div>
       <div style="font-size:11px;color:var(--text-3)">Total notes</div>
     </div>
-    <div style="background:var(--surface-2);border-radius:var(--radius-sm);padding:10px;text-align:center">
+    <div style="background:var(--surface);border-radius:var(--radius-sm);padding:10px;text-align:center">
       <div style="font-size:22px;font-weight:700;color:var(--brand)">${sorted.length}</div>
       <div style="font-size:11px;color:var(--text-3)">Staff observed</div>
     </div>
-    <div style="background:var(--surface-2);border-radius:var(--radius-sm);padding:10px;text-align:center">
+    <div style="background:var(--surface);border-radius:var(--radius-sm);padding:10px;text-align:center">
       <div style="font-size:22px;font-weight:700;color:${maxCount>=5?'var(--danger)':'var(--warn)'}">${maxCount}</div>
       <div style="font-size:11px;color:var(--text-3)">Most for one person</div>
     </div>
@@ -5126,7 +5126,7 @@ function renderObsStats() {
         <div style="font-size:14px;font-weight:700;color:var(--text)">${esc(name)}</div>
         <span style="font-size:13px;font-weight:700;color:${barColor};background:${count>=5?'var(--danger-light)':count>=3?'#FEF3C7':'var(--brand-light)'};padding:2px 10px;border-radius:99px">${count} note${count!==1?'s':''}</span>
       </div>
-      <div style="background:var(--surface-2);border-radius:99px;height:6px;margin-bottom:8px">
+      <div style="background:var(--surface);border-radius:99px;height:6px;margin-bottom:8px">
         <div style="background:${barColor};width:${barPct}%;height:6px;border-radius:99px;transition:width .3s"></div>
       </div>
       <div style="font-size:11px;color:var(--text-3);margin-bottom:8px">Noted by: ${esc(uniqueBy)} &nbsp;·&nbsp; Last: ${esc(fmtDate(sortedNotes[0].date))}</div>
@@ -5134,7 +5134,7 @@ function renderObsStats() {
         <summary style="font-size:12px;color:var(--brand);cursor:pointer;user-select:none">View all notes</summary>
         <div style="margin-top:8px">
           ${sortedNotes.map(n=>`
-            <div style="background:var(--surface-2);border-radius:var(--radius-sm);padding:8px 10px;margin-bottom:6px">
+            <div style="background:var(--surface);border-radius:var(--radius-sm);padding:8px 10px;margin-bottom:6px">
               <div style="font-size:13px;color:var(--text);margin-bottom:3px">${esc(n.note)}</div>
               <div style="font-size:11px;color:var(--text-3)">${esc(fmtDate(n.date))} · by ${esc(n.by)}</div>
             </div>`).join('')}
@@ -5614,7 +5614,7 @@ function selectOffice(office) {
   ['Goregaon','Borivali','Virar','WFH'].forEach(o => {
     const btn = document.getElementById('officeBtn_'+o);
     if (btn) {
-      btn.style.background = o===office ? 'var(--brand)' : 'var(--surface-2)';
+      btn.style.background = o===office ? 'var(--brand)' : 'var(--surface)';
       btn.style.color = o===office ? '#fff' : 'var(--text)';
       btn.style.borderColor = o===office ? 'var(--brand)' : 'var(--border)';
     }
@@ -6668,7 +6668,7 @@ function renderManageTeamModal() {
       const allStaffFull = getStaff();
       const member = allStaffFull.find(s => s.name === name);
       const roleLabel = member ? (ROLE_LABEL[member.role]||member.role) : '';
-      return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:var(--surface-2);border-radius:var(--radius-sm);margin-bottom:6px">
+      return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:var(--surface);border-radius:var(--radius-sm);margin-bottom:6px">
         <div style="display:flex;align-items:center;gap:8px">
           <div style="width:30px;height:30px;border-radius:50%;background:var(--brand-light);color:var(--brand);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center">${esc(initials(name))}</div>
           <div>
@@ -6914,7 +6914,7 @@ const _drpCallbacks = {};
 
 function dateRangePicker(prefix, onChangeFn, staffOptions, defaultPreset) {
   _drpCallbacks[prefix] = onChangeFn;
-  const btnStyle = (active) => `padding:5px 10px;border-radius:50px;border:1.5px solid ${active?'var(--brand)':'var(--border)'};background:${active?'var(--brand-light)':'var(--surface-2)'};color:${active?'var(--brand)':'var(--text-2)'};font-size:12px;cursor:pointer;font-weight:${active?'700':'400'}`;
+  const btnStyle = (active) => `padding:5px 10px;border-radius:50px;border:1.5px solid ${active?'var(--brand)':'var(--border)'};background:${active?'var(--brand-light)':'var(--surface)'};color:${active?'var(--brand)':'var(--text-2)'};font-size:12px;cursor:pointer;font-weight:${active?'700':'400'}`;
   const presets = [
     {key:'today',     label:'Today'},
     {key:'yesterday', label:'Yesterday'},
@@ -6948,7 +6948,7 @@ function activateDRPCustom(prefix) {
     if (!btn) return;
     const active = key === 'custom';
     btn.style.borderColor = active ? 'var(--brand)' : 'var(--border)';
-    btn.style.background  = active ? 'var(--brand-light)' : 'var(--surface-2)';
+    btn.style.background  = active ? 'var(--brand-light)' : 'var(--surface)';
     btn.style.color       = active ? 'var(--brand)' : 'var(--text-2)';
     btn.style.fontWeight  = active ? '700' : '400';
   });
@@ -6988,7 +6988,7 @@ function setDRP(prefix, preset) {
     if (!btn) return;
     const active = key === preset;
     btn.style.borderColor = active ? 'var(--brand)' : 'var(--border)';
-    btn.style.background  = active ? 'var(--brand-light)' : 'var(--surface-2)';
+    btn.style.background  = active ? 'var(--brand-light)' : 'var(--surface)';
     btn.style.color       = active ? 'var(--brand)' : 'var(--text-2)';
     btn.style.fontWeight  = active ? '700' : '400';
   });
@@ -7049,11 +7049,11 @@ function refreshObsNotes() {
   el.innerHTML = `
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:6px">
       ${sentCard('pos','#F0FDF4','var(--success)','👍','Positive',posN,posNotes)}
-      ${sentCard('neu','var(--surface-2)','var(--text-3)','😐','Neutral',neuN,neuNotes)}
+      ${sentCard('neu','var(--surface)','var(--text-3)','😐','Neutral',neuN,neuNotes)}
       ${sentCard('neg','#FEF2F2','var(--danger)','👎','Negative',negN,negNotes)}
     </div>
     ${sentExpand('pos','#F0FDF4','var(--success)','👍',posNotes)}
-    ${sentExpand('neu','var(--surface-2)','var(--text-3)','😐',neuNotes)}
+    ${sentExpand('neu','var(--surface)','var(--text-3)','😐',neuNotes)}
     ${sentExpand('neg','#FEF2F2','var(--danger)','👎',negNotes)}
     ${Object.entries(byPerson).map(([name, data]) => `
       <div style="border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px;margin-bottom:8px">
@@ -7061,7 +7061,7 @@ function refreshObsNotes() {
           <div style="font-size:13px;font-weight:600">${esc(name)}</div>
           <div style="display:flex;gap:3px">
             ${data.pos?`<span style="font-size:11px;background:#F0FDF4;color:var(--success);padding:1px 6px;border-radius:99px">👍${data.pos}</span>`:''}
-            ${data.neu?`<span style="font-size:11px;background:var(--surface-2);color:var(--text-3);padding:1px 6px;border-radius:99px">😐${data.neu}</span>`:''}
+            ${data.neu?`<span style="font-size:11px;background:var(--surface);color:var(--text-3);padding:1px 6px;border-radius:99px">😐${data.neu}</span>`:''}
             ${data.neg?`<span style="font-size:11px;background:#FEF2F2;color:var(--danger);padding:1px 6px;border-radius:99px">👎${data.neg}</span>`:''}
           </div>
         </div>
@@ -7069,7 +7069,7 @@ function refreshObsNotes() {
           <summary style="font-size:11px;color:var(--brand);cursor:pointer">View ${data.notes.length} note${data.notes.length!==1?'s':''}</summary>
           <div style="margin-top:6px">
             ${[...data.notes].sort((a,b)=>b.ts-a.ts).map(n=>`
-              <div style="background:${n.sentiment==='positive'?'#F0FDF4':n.sentiment==='negative'?'#FEF2F2':'var(--surface-2)'};padding:6px 8px;border-radius:var(--radius-sm);margin-bottom:4px;border-left:2px solid ${n.sentiment==='positive'?'var(--success)':n.sentiment==='negative'?'var(--danger)':'var(--border)'}">
+              <div style="background:${n.sentiment==='positive'?'#F0FDF4':n.sentiment==='negative'?'#FEF2F2':'var(--surface)'};padding:6px 8px;border-radius:var(--radius-sm);margin-bottom:4px;border-left:2px solid ${n.sentiment==='positive'?'var(--success)':n.sentiment==='negative'?'var(--danger)':'var(--border)'}">
                 <div style="font-size:12px">${n.sentiment==='positive'?'👍':n.sentiment==='negative'?'👎':'😐'} ${esc(n.note)}</div>
                 <div style="font-size:10px;color:var(--text-3)">${fmtDate(n.date)} · by ${esc(n.by)}</div>
               </div>`).join('')}
@@ -7350,13 +7350,13 @@ function _renderCoverageSection(containerId) {
     <div style="border-top:1.5px solid var(--border);margin-top:16px;padding-top:16px">
       <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:10px">📋 Coverage assignments</div>
       <div style="display:flex;align-items:center;gap:6px;margin-bottom:${_coverRangeMode?'8':'12'}px;flex-wrap:wrap">
-        <button onclick="coverStepDate(-1,'${containerId}')" style="padding:6px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface-2);cursor:pointer;font-size:14px;line-height:1">‹</button>
+        <button onclick="coverStepDate(-1,'${containerId}')" style="padding:6px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);cursor:pointer;font-size:14px;line-height:1">‹</button>
         <input type="date" value="${date}" onchange="_coverDate=this.value;_coverRangeMode=false;renderCoverageSection('${containerId}')"
           style="font-size:13px;padding:6px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);flex:1;min-width:130px"/>
-        <button onclick="coverStepDate(1,'${containerId}')" style="padding:6px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface-2);cursor:pointer;font-size:14px;line-height:1">›</button>
-        ${date!==todayStr?`<button onclick="_coverDate=null;_coverRangeMode=false;renderCoverageSection('${containerId}')" style="font-size:12px;padding:6px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface-2);cursor:pointer;color:var(--text-2)">Today</button>`:''}
+        <button onclick="coverStepDate(1,'${containerId}')" style="padding:6px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);cursor:pointer;font-size:14px;line-height:1">›</button>
+        ${date!==todayStr?`<button onclick="_coverDate=null;_coverRangeMode=false;renderCoverageSection('${containerId}')" style="font-size:12px;padding:6px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);cursor:pointer;color:var(--text-2)">Today</button>`:''}
         <button onclick="_coverRangeMode=!_coverRangeMode;if(_coverRangeMode){_coverRangeFrom=_coverDate||'${todayStr}';_coverRangeTo=_coverDate||'${todayStr}';}renderCoverageSection('${containerId}')"
-          style="font-size:12px;padding:6px 12px;border:1.5px solid ${_coverRangeMode?'var(--brand)':'var(--border)'};border-radius:var(--radius-sm);background:${_coverRangeMode?'var(--brand-light)':'var(--surface-2)'};cursor:pointer;color:${_coverRangeMode?'var(--brand)':'var(--text-2)'};font-weight:${_coverRangeMode?'600':'400'};white-space:nowrap">
+          style="font-size:12px;padding:6px 12px;border:1.5px solid ${_coverRangeMode?'var(--brand)':'var(--border)'};border-radius:var(--radius-sm);background:${_coverRangeMode?'var(--brand-light)':'var(--surface)'};cursor:pointer;color:${_coverRangeMode?'var(--brand)':'var(--text-2)'};font-weight:${_coverRangeMode?'600':'400'};white-space:nowrap">
           Date range
         </button>
       </div>
@@ -7373,7 +7373,7 @@ function _renderCoverageSection(containerId) {
         ?`<div style="font-size:13px;color:var(--text-3);padding:8px 0">No staff on leave ${date===todayStr?'today':'on this date'}.</div>`
         :absentees.map(name=>{
             const cov=coverage[name];const isNCR=cov==='_ncr';const hasCover=cov&&!isNCR;
-            return `<div style="background:var(--surface-2);border:1.5px solid ${hasCover?'var(--border)':isNCR?'#FDE68A':'var(--danger)'};border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:8px">
+            return `<div style="background:var(--surface);border:1.5px solid ${hasCover?'var(--border)':isNCR?'#FDE68A':'var(--danger)'};border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:8px">
               <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
                 <div style="flex:1;min-width:100px">
                   <div style="font-size:13px;font-weight:600">${esc(name)}</div>
@@ -7501,7 +7501,7 @@ function renderFileLogList() {
     return;
   }
   el.innerHTML = myLogs.map(l => `
-    <div style="display:flex;align-items:center;justify-content:space-between;background:var(--surface-2);border-radius:var(--radius-sm);padding:8px 10px;gap:8px">
+    <div style="display:flex;align-items:center;justify-content:space-between;background:var(--surface);border-radius:var(--radius-sm);padding:8px 10px;gap:8px">
       <span style="font-size:13px;color:var(--text);flex:1">📁 ${esc(l.file)}</span>
       <button onclick="removeFileLog(${l.ts})" style="background:var(--danger-light);color:var(--danger);border:none;border-radius:4px;padding:2px 8px;font-size:12px;cursor:pointer">✕</button>
     </div>`).join('');
@@ -7613,7 +7613,7 @@ function renderObsNotesForStaff(staffName) {
   const notes = getObsNotes().filter(n => n.target === staffName);
   if (notes.length === 0) return '<div style="font-size:12px;color:var(--text-3)">No notes yet.</div>';
   return notes.sort((a,b)=>b.ts-a.ts).slice(0,5).map(n =>
-    `<div style="background:var(--surface-2);border-radius:var(--radius-sm);padding:8px 10px;margin-bottom:6px;font-size:12px">
+    `<div style="background:var(--surface);border-radius:var(--radius-sm);padding:8px 10px;margin-bottom:6px;font-size:12px">
       <div style="color:var(--text);margin-bottom:2px">${esc(n.note)}</div>
       <div style="color:var(--text-3)">${esc(fmtDate(n.date))} · by ${esc(n.by)}</div>
     </div>`
@@ -7903,11 +7903,11 @@ function renderSubmittedCard(files, containerId) {
   el.innerHTML = '<div class="card" style="margin-bottom:12px">' +
     '<div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">📤 Submitted to Lender</div>' +
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">' +
-    '<div style="background:var(--surface-2);border-radius:var(--radius-sm);padding:12px;text-align:center">' +
+    '<div style="background:var(--surface);border-radius:var(--radius-sm);padding:12px;text-align:center">' +
     '<div style="font-size:28px;font-weight:700;color:var(--brand)">' + activeSubmitted.length + '</div>' +
     '<div style="font-size:11px;color:var(--text-3)">Currently at this stage</div>' +
     '</div>' +
-    '<div style="background:var(--surface-2);border-radius:var(--radius-sm);padding:12px;text-align:center">' +
+    '<div style="background:var(--surface);border-radius:var(--radius-sm);padding:12px;text-align:center">' +
     '<div style="font-size:28px;font-weight:700;color:var(--text-2)">' + everSubmitted + '</div>' +
     '<div style="font-size:11px;color:var(--text-3)">Ever reached this stage</div>' +
     '</div>' +
@@ -7995,7 +7995,7 @@ function renderNoteHistory(elId, note) {
     </div>
     ${past.length ? `<div id="${id}" style="display:none;margin-top:6px">
       ${past.map((e, i) => `
-        <div style="border-left:3px solid var(--border);padding:8px 12px;margin-bottom:6px;background:var(--surface-2);border-radius:0 var(--radius-sm) var(--radius-sm) 0">
+        <div style="border-left:3px solid var(--border);padding:8px 12px;margin-bottom:6px;background:var(--surface);border-radius:0 var(--radius-sm) var(--radius-sm) 0">
           <div style="font-size:11px;color:var(--text-3);margin-bottom:4px">
             ${e.by && e.by !== 'Previous' ? `<strong>${esc(e.by)}</strong>` : 'Previous entry'}${e.at ? ' · ' + e.at : ''}
           </div>
@@ -8117,7 +8117,7 @@ function renderExistingAttachments(entry) {
   const valid = entry.attachments.filter(a => a.expiresAt > now);
   if (valid.length === 0) { el.innerHTML = '<div style="font-size:11px;color:var(--text-3)">Previous attachments have expired.</div>'; return; }
   el.innerHTML = valid.map(a => `
-    <div style="display:flex;align-items:center;justify-content:space-between;background:var(--surface-2);border-radius:var(--radius-sm);padding:6px 10px;margin-bottom:4px;font-size:12px">
+    <div style="display:flex;align-items:center;justify-content:space-between;background:var(--surface);border-radius:var(--radius-sm);padding:6px 10px;margin-bottom:4px;font-size:12px">
       <span>📎 ${esc(a.name)}</span>
       <span style="color:var(--text-3)">expires ${new Date(a.expiresAt).toLocaleDateString('en-AU')}</span>
     </div>`).join('');
@@ -8330,7 +8330,7 @@ function renderFileLogList() {
   }
   el.innerHTML = myFiles.map(f => {
     const sc = FILE_STATUS_COLORS[f.status] || {bg:'#F3F4F6',color:'#374151'};
-    return `<div style="background:var(--surface-2);border-radius:var(--radius-sm);padding:10px 12px;border:1px solid var(--border)">
+    return `<div style="background:var(--surface);border-radius:var(--radius-sm);padding:10px 12px;border:1px solid var(--border)">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
         <span style="font-size:14px;font-weight:600;color:var(--text)">${esc(f.client)}</span>
         <span style="background:${sc.bg};color:${sc.color};border-radius:50px;padding:2px 8px;font-size:11px;font-weight:600">${esc(f.status)}</span>
@@ -8515,7 +8515,7 @@ async function toggleStaffCRM(staffName, crmName) {
   try{
     if(existing) await spPatch(SP_API+`('StaffCRMs')/items(${existing.id})`,payload);
     else await spPostDirect(SP_API+"('StaffCRMs')/items",payload);
-    await loadStaffCRMs();renderBrokerMgmtScreen();
+    await loadStaffCRMs();
   }catch(e){showToast('Failed to save CRM.','err');}
 }
 
@@ -8523,11 +8523,11 @@ async function toggleStaffCRM(staffName, crmName) {
 async function renderBrokerMgmtScreen() {
   const el = document.getElementById('brokerMgmtContent');
   if (!el) return;
-  el.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--text-secondary)">Loading\u2026</div>';
+  el.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--text-2)">Loading\u2026</div>';
   try {
     await Promise.all([loadBrokers(),loadBrokerAssignments(),loadCRMOptions(),loadStaffCRMs(),loadBrokerTypes()]);
   } catch(e) {
-    el.innerHTML = '<div style="text-align:center;padding:2rem"><div style="font-size:1.5rem">\u26a0\ufe0f</div><div style="color:var(--text-danger);margin-top:8px">Error loading</div><button onclick="renderBrokerMgmtScreen()" style="margin-top:12px">Retry</button></div>';
+    el.innerHTML = '<div style="text-align:center;padding:2rem"><div style="font-size:1.5rem">\u26a0\ufe0f</div><div style="color:#991B1B;margin-top:8px">Error loading</div><button onclick="renderBrokerMgmtScreen()" style="margin-top:12px">Retry</button></div>';
     return;
   }
   const sa=isSuperAdmin(), om=isOpsManager(), tl=isTeamLead();
@@ -8539,10 +8539,10 @@ async function renderBrokerMgmtScreen() {
   function bmSection(id, title, contentHtml, defaultOpen) {
     if (defaultOpen===undefined) defaultOpen=true;
     const sec = document.createElement('div');
-    sec.style.cssText = 'background:var(--surface-2);border:0.5px solid var(--border);border-radius:12px;padding:1rem 1.25rem;margin-bottom:12px';
+    sec.style.cssText = 'background:var(--surface);border:0.5px solid var(--border);border-radius:12px;padding:1rem 1.25rem;margin-bottom:12px';
     sec.innerHTML = '<div onclick="bmToggle(\''+id+'\')" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;margin-bottom:'+(defaultOpen?'12':'0')+'px" id="bm-hdr-'+id+'">'
-      +'<span style="font-size:12px;font-weight:500;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px">'+title+'</span>'
-      +'<i class="ti ti-chevron-'+(defaultOpen?'up':'down')+'" id="bm-arr-'+id+'" style="font-size:16px;color:var(--text-muted)" aria-hidden="true"></i>'
+      +'<span style="font-size:12px;font-weight:500;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px">'+title+'</span>'
+      +'<i class="ti ti-chevron-'+(defaultOpen?'up':'down')+'" id="bm-arr-'+id+'" style="font-size:16px;color:var(--text-3)" aria-hidden="true"></i>'
       +'</div>'
       +'<div id="bm-body-'+id+'" style="display:'+(defaultOpen?'block':'none')+'">'+contentHtml+'</div>';
     el.appendChild(sec);
@@ -8559,11 +8559,11 @@ async function renderBrokerMgmtScreen() {
   }
 
   function availLabel(av) {
-    if (av==='none')       return {dot:'var(--text-success)', text:'Free all day', bg:'var(--bg-success)'};
-    if (av==='partial-am') return {dot:'var(--text-warning)', text:'Free AM', bg:'var(--bg-warning)'};
-    if (av==='partial-pm') return {dot:'var(--text-warning)', text:'Free PM', bg:'var(--bg-warning)'};
-    if (av==='other')      return {dot:'var(--text-muted)', text:'Other', bg:'var(--surface-1)'};
-    return {dot:'var(--text-danger)', text:'Fully allocated', bg:'var(--bg-danger)'};
+    if (av==='none')       return {dot:'#065F46', text:'Free all day', bg:'#D1FAE5'};
+    if (av==='partial-am') return {dot:'#92400E', text:'Free AM', bg:'#FEF3C7'};
+    if (av==='partial-pm') return {dot:'#92400E', text:'Free PM', bg:'#FEF3C7'};
+    if (av==='other')      return {dot:'var(--text-3)', text:'Other', bg:'var(--surface)'};
+    return {dot:'#991B1B', text:'Fully allocated', bg:'#FEE2E2'};
   }
 
   // ── AVAILABILITY SECTION ───────────────────────────────────────────────
@@ -8573,12 +8573,12 @@ async function renderBrokerMgmtScreen() {
   const countOther = viewStaff.filter(s=>staffAvailability(s.name)==='other').length;
 
   const avCards = '<div class="bm-av-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:4px">'
-    +'<div data-avkey="none" onclick="bmAvToggle(this.dataset.avkey)" style="background:var(--bg-success);border:0.5px solid var(--border-success);border-radius:var(--radius);padding:10px 8px;text-align:center;cursor:pointer"><div style="font-size:20px;font-weight:500;color:var(--text-success)">'+countNone+'</div><div style="font-size:11px;color:var(--text-success);margin-top:2px">Available</div></div>'
-    +'<div data-avkey="partial" onclick="bmAvToggle(this.dataset.avkey)" style="background:var(--bg-warning);border:0.5px solid var(--border-warning);border-radius:var(--radius);padding:10px 8px;text-align:center;cursor:pointer"><div style="font-size:20px;font-weight:500;color:var(--text-warning)">'+countPart+'</div><div style="font-size:11px;color:var(--text-warning);margin-top:2px">Part time</div></div>'
-    +'<div data-avkey="full" onclick="bmAvToggle(this.dataset.avkey)" style="background:var(--bg-danger);border:0.5px solid var(--border-danger);border-radius:var(--radius);padding:10px 8px;text-align:center;cursor:pointer"><div style="font-size:20px;font-weight:500;color:var(--text-danger)">'+countFull+'</div><div style="font-size:11px;color:var(--text-danger);margin-top:2px">Full</div></div>'
-    +'<div data-avkey="other" onclick="bmAvToggle(this.dataset.avkey)" style="background:var(--surface-1);border:0.5px solid var(--border);border-radius:var(--radius);padding:10px 8px;text-align:center;cursor:pointer"><div style="font-size:20px;font-weight:500;color:var(--text-muted)">'+countOther+'</div><div style="font-size:11px;color:var(--text-muted);margin-top:2px">Other</div></div>'
+    +'<div data-avkey="none" onclick="bmAvToggle(this.dataset.avkey)" style="background:#D1FAE5;border:0.5px solid #6EE7B7;border-radius:var(--radius);padding:10px 8px;text-align:center;cursor:pointer"><div style="font-size:20px;font-weight:500;color:#065F46">'+countNone+'</div><div style="font-size:11px;color:#065F46;margin-top:2px">Available</div></div>'
+    +'<div data-avkey="partial" onclick="bmAvToggle(this.dataset.avkey)" style="background:#FEF3C7;border:0.5px solid #FDE68A;border-radius:var(--radius);padding:10px 8px;text-align:center;cursor:pointer"><div style="font-size:20px;font-weight:500;color:#92400E">'+countPart+'</div><div style="font-size:11px;color:#92400E;margin-top:2px">Part time</div></div>'
+    +'<div data-avkey="full" onclick="bmAvToggle(this.dataset.avkey)" style="background:#FEE2E2;border:0.5px solid #FCA5A5;border-radius:var(--radius);padding:10px 8px;text-align:center;cursor:pointer"><div style="font-size:20px;font-weight:500;color:#991B1B">'+countFull+'</div><div style="font-size:11px;color:#991B1B;margin-top:2px">Full</div></div>'
+    +'<div data-avkey="other" onclick="bmAvToggle(this.dataset.avkey)" style="background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius);padding:10px 8px;text-align:center;cursor:pointer"><div style="font-size:20px;font-weight:500;color:var(--text-3)">'+countOther+'</div><div style="font-size:11px;color:var(--text-3);margin-top:2px">Other</div></div>'
     +'</div>'
-    +'<div class="bm-av-expand" style="display:none;background:var(--surface-1);border:0.5px solid var(--border-accent);border-radius:var(--radius);padding:10px 12px;margin-top:4px;margin-bottom:8px"></div>'
+    +'<div class="bm-av-expand" style="display:none;background:var(--surface);border:0.5px solid var(--brand);border-radius:var(--radius);padding:10px 12px;margin-top:4px;margin-bottom:8px"></div>'
     +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">'
     +'<button id="ab-filter-analyst" onclick="bmAbFilter(\'analyst\')" style="font-size:11px;padding:3px 10px;border-radius:99px">By analyst</button>'
     +'<button id="ab-filter-crm" onclick="bmAbFilter(\'crm\')" style="font-size:11px;padding:3px 10px;border-radius:99px">By CRM skill</button>'
@@ -8588,23 +8588,23 @@ async function renderBrokerMgmtScreen() {
         const assigns=getAssignmentsForStaff(s.name);const crms=getCRMsForStaff(s.name);
         return '<div style="padding:8px 0;border-bottom:0.5px solid var(--border)">'
           +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">'
-          +'<span style="font-size:13px;font-weight:500;flex:1;color:var(--text-primary)">'+esc(s.name)+'</span>'
-          +'<span style="font-size:11px;color:var(--text-muted)">'+(ten?ten+' · ':'')+esc(ROLE_LABEL[s.role]||s.role)+'</span>'
+          +'<span style="font-size:13px;font-weight:500;flex:1;color:var(--text)">'+esc(s.name)+'</span>'
+          +'<span style="font-size:11px;color:var(--text-3)">'+(ten?ten+' · ':'')+esc(ROLE_LABEL[s.role]||s.role)+'</span>'
           +'<span style="font-size:11px;padding:2px 8px;border-radius:99px;background:'+avl.bg+';color:'+avl.dot+'">'+avl.text+'</span>'
           +'</div>'
-          +(assigns.length?'<div style="font-size:11px;color:var(--text-secondary);margin-bottom:2px">'+assigns.map(a=>esc(a.brokerName)+' \u00b7 '+(a.type||'FT')).join(', ')+'</div>':'')
-          +(crms.length?'<div style="display:flex;gap:4px;flex-wrap:wrap">'+crms.map(c=>'<span style="font-size:11px;background:var(--bg-success);color:var(--text-success);padding:1px 7px;border-radius:99px">'+esc(c)+'</span>').join('')+'</div>':'')
+          +(assigns.length?'<div style="font-size:11px;color:var(--text-2);margin-bottom:2px">'+assigns.map(a=>esc(a.brokerName)+' \u00b7 '+(a.type||'FT')).join(', ')+'</div>':'')
+          +(crms.length?'<div style="display:flex;gap:4px;flex-wrap:wrap">'+crms.map(c=>'<span style="font-size:11px;background:#D1FAE5;color:#065F46;padding:1px 7px;border-radius:99px">'+esc(c)+'</span>').join('')+'</div>':'')
           +'</div>';
       }).join('')+'</div>'
     +'<div id="ab-by-crm" style="display:none">'+(_crmOptions.length?_crmOptions.map(crm=>{
         const withCRM=viewStaff.filter(s=>getCRMsForStaff(s.name).includes(crm.name));
         return '<div style="padding:8px 0;border-bottom:0.5px solid var(--border)">'
-          +'<div style="font-size:12px;font-weight:500;color:var(--text-primary);margin-bottom:4px">'+esc(crm.name)+'</div>'
+          +'<div style="font-size:12px;font-weight:500;color:var(--text);margin-bottom:4px">'+esc(crm.name)+'</div>'
           +(withCRM.length?withCRM.map(s=>{const ten=tenureStr(s);const av=staffAvailability(s.name);const avl=availLabel(av);
-            return '<div style="display:flex;align-items:center;gap:6px;padding:3px 0"><span style="flex:1;font-size:12px;color:var(--text-primary)">'+esc(s.name)+'</span>'+(ten?'<span style="font-size:11px;color:var(--text-muted)">'+ten+'</span>':'')+'<span style="font-size:11px;padding:2px 7px;border-radius:99px;background:'+avl.bg+';color:'+avl.dot+'">'+avl.text+'</span></div>';
-          }).join(''):'<div style="font-size:12px;color:var(--text-muted)">No analysts with this skill.</div>')
+            return '<div style="display:flex;align-items:center;gap:6px;padding:3px 0"><span style="flex:1;font-size:12px;color:var(--text)">'+esc(s.name)+'</span>'+(ten?'<span style="font-size:11px;color:var(--text-3)">'+ten+'</span>':'')+'<span style="font-size:11px;padding:2px 7px;border-radius:99px;background:'+avl.bg+';color:'+avl.dot+'">'+avl.text+'</span></div>';
+          }).join(''):'<div style="font-size:12px;color:var(--text-3)">No analysts with this skill.</div>')
           +'</div>';}).join('')
-      :'<div style="font-size:13px;color:var(--text-muted)">No CRM skills configured.</div>')+'</div>';
+      :'<div style="font-size:13px;color:var(--text-3)">No CRM skills configured.</div>')+'</div>';
 
   if (om && !sa) {
     bmSection('availability', 'Analyst availability', avCards, true);
@@ -8619,20 +8619,20 @@ async function renderBrokerMgmtScreen() {
     _brokers.forEach(b=>{ const t=b.type||'Unassigned'; if(!byType[t])byType[t]=[]; byType[t].push(b); });
     const typeList = _brokerTypes.length ? _brokerTypes : [];
 
-    const clTitle = 'Client list <span style="font-size:12px;font-weight:400;color:var(--text-muted)">'+_brokers.length+' clients \u00b7 '+allStaff.length+' staff</span>';
+    const clTitle = 'Client list <span style="font-size:12px;font-weight:400;color:var(--text-3)">'+_brokers.length+' clients \u00b7 '+allStaff.length+' staff</span>';
 
     const typeGrid = '<div class="bm-av-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:4px">'
       +typeList.map(t=>{
         const cnt=(byType[t.name]||[]).length;
-        return '<div data-avkey="type_'+esc(t.name)+'" onclick="bmAvToggle(this.dataset.avkey)" style="background:var(--surface-1);border:0.5px solid var(--border);border-radius:var(--radius);padding:10px 8px;text-align:center;cursor:pointer">'
-          +'<div style="font-size:20px;font-weight:500;color:'+(cnt?'var(--text-primary)':'var(--text-muted)')+'">'+cnt+'</div>'
-          +'<div style="font-size:11px;color:'+(cnt?'var(--text-secondary)':'var(--text-muted)')+';margin-top:2px">'+esc(t.name)+'</div>'
+        return '<div data-avkey="type_'+esc(t.name)+'" onclick="bmAvToggle(this.dataset.avkey)" style="background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius);padding:10px 8px;text-align:center;cursor:pointer">'
+          +'<div style="font-size:20px;font-weight:500;color:'+(cnt?'var(--text)':'var(--text-3)')+'">'+cnt+'</div>'
+          +'<div style="font-size:11px;color:'+(cnt?'var(--text-2)':'var(--text-3)')+';margin-top:2px">'+esc(t.name)+'</div>'
           +'</div>';}).join('')
-      +(byType['Unassigned']?'<div data-avkey="type_Unassigned" onclick="bmAvToggle(this.dataset.avkey)" style="background:var(--surface-1);border:0.5px solid var(--border);border-radius:var(--radius);padding:10px 8px;text-align:center;cursor:pointer">'
-        +'<div style="font-size:20px;font-weight:500;color:var(--text-warning)">'+(byType['Unassigned']||[]).length+'</div>'
-        +'<div style="font-size:11px;color:var(--text-warning);margin-top:2px">Unassigned</div></div>':'')
+      +(byType['Unassigned']?'<div data-avkey="type_Unassigned" onclick="bmAvToggle(this.dataset.avkey)" style="background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius);padding:10px 8px;text-align:center;cursor:pointer">'
+        +'<div style="font-size:20px;font-weight:500;color:#92400E">'+(byType['Unassigned']||[]).length+'</div>'
+        +'<div style="font-size:11px;color:#92400E;margin-top:2px">Unassigned</div></div>':'')
       +'</div>'
-      +'<div class="bm-av-expand" style="display:none;background:var(--surface-1);border:0.5px solid var(--border-accent);border-radius:var(--radius);padding:10px 12px;margin-top:4px;margin-bottom:10px"></div>'
+      +'<div class="bm-av-expand" style="display:none;background:var(--surface);border:0.5px solid var(--brand);border-radius:var(--radius);padding:10px 12px;margin-top:4px;margin-bottom:10px"></div>'
       +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:0">'
       +'<input type="text" id="bmNewBroker" placeholder="Client name\u2026" style="flex:2;min-width:120px;font-size:13px" onkeydown="if(event.key===&quot;Enter&quot;){addBroker();}"/>'
       +'<select id="bmNewBrokerType" style="flex:1;min-width:100px;font-size:13px"><option value="">Type</option>'
@@ -8649,9 +8649,9 @@ async function renderBrokerMgmtScreen() {
       +'</div>'
       +'<div style="display:flex;flex-wrap:wrap;gap:6px">'
       +(_brokerTypes.length?_brokerTypes.map(t=>'<div style="display:flex;align-items:center;gap:4px;border:0.5px solid var(--border);border-radius:99px;padding:3px 10px">'
-        +'<span style="font-size:12px;color:var(--text-primary)">'+esc(t.name)+'</span>'
-        +'<i class="ti ti-x" onclick="deleteBrokerType('+t.id+')" style="font-size:12px;color:var(--text-muted);cursor:pointer" aria-hidden="true"></i>'
-        +'</div>').join(''):'<span style="font-size:13px;color:var(--text-muted)">No types yet.</span>')
+        +'<span style="font-size:12px;color:var(--text)">'+esc(t.name)+'</span>'
+        +'<i class="ti ti-x" onclick="deleteBrokerType('+t.id+')" style="font-size:12px;color:var(--text-3);cursor:pointer" aria-hidden="true"></i>'
+        +'</div>').join(''):'<span style="font-size:13px;color:var(--text-3)">No types yet.</span>')
       +'</div>';
     bmSection('brokertypes', 'Client types', btHtml, false);
   }
@@ -8667,13 +8667,13 @@ async function renderBrokerMgmtScreen() {
     const safeId = s.name.replace(/[^a-z0-9]/gi,'_');
     baHtml += '<div class="ba-row" data-name="'+esc(s.name.toLowerCase())+'" style="padding:10px 0;border-bottom:0.5px solid var(--border)">'
       +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'
-      +'<span style="font-size:13px;font-weight:500;flex:1;color:var(--text-primary)">'+esc(s.name)+'</span>'
-      +'<span style="font-size:11px;color:var(--text-muted)">'+(ten?ten+' \u00b7 ':'')+esc(ROLE_LABEL[s.role]||s.role)+'</span>'
+      +'<span style="font-size:13px;font-weight:500;flex:1;color:var(--text)">'+esc(s.name)+'</span>'
+      +'<span style="font-size:11px;color:var(--text-3)">'+(ten?ten+' \u00b7 ':'')+esc(ROLE_LABEL[s.role]||s.role)+'</span>'
       +'</div>'
       +'<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">'
-      +(assigns.length?assigns.map(a=>'<span style="font-size:12px;background:var(--bg-accent);color:var(--text-accent);padding:3px 10px;border-radius:99px;display:inline-flex;align-items:center;gap:4px">'+esc(a.brokerName)+' \u00b7 '+esc(a.type||'FT')+'<i class="ti ti-x" onclick="removeBrokerAssignment('+a.id+')" style="font-size:11px;cursor:pointer;margin-left:2px" aria-hidden="true"></i></span>').join('')
-        :'<span style="font-size:12px;color:var(--text-danger)">No broker assigned</span>')
-      +'<span onclick="bmToggleAssignForm(\''+safeId+'\')" style="font-size:12px;color:var(--text-muted);padding:3px 10px;border:0.5px dashed var(--border-strong);border-radius:99px;cursor:pointer">+ Assign</span>'
+      +(assigns.length?assigns.map(a=>'<span style="font-size:12px;background:#EFF6FF;color:var(--brand);padding:3px 10px;border-radius:99px;display:inline-flex;align-items:center;gap:4px">'+esc(a.brokerName)+' \u00b7 '+esc(a.type||'FT')+'<i class="ti ti-x" onclick="removeBrokerAssignment('+a.id+')" style="font-size:11px;cursor:pointer;margin-left:2px" aria-hidden="true"></i></span>').join('')
+        :'<span style="font-size:12px;color:#991B1B">No broker assigned</span>')
+      +'<span onclick="bmToggleAssignForm(\''+safeId+'\')" style="font-size:12px;color:var(--text-3);padding:3px 10px;border:0.5px dashed var(--border);border-radius:99px;cursor:pointer">+ Assign</span>'
       +'</div>'
       +'<div id="ba-form-'+safeId+'" style="display:none;margin-top:8px;display:none">'
       +'<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">'
@@ -8695,10 +8695,10 @@ async function renderBrokerMgmtScreen() {
       +'<button onclick="addCRMOption()" style="font-size:13px">Add CRM</button>'
       +'</div>'
       +'<div style="display:flex;flex-wrap:wrap;gap:6px">'
-      +(!_crmOptions.length?'<span style="font-size:13px;color:var(--text-muted)">No CRMs yet.</span>'
+      +(!_crmOptions.length?'<span style="font-size:13px;color:var(--text-3)">No CRMs yet.</span>'
         :_crmOptions.map(c=>'<div style="display:flex;align-items:center;gap:4px;border:0.5px solid var(--border);border-radius:99px;padding:3px 10px">'
-          +'<span style="font-size:12px;color:var(--text-primary)">'+esc(c.name)+'</span>'
-          +'<i class="ti ti-x" onclick="deleteCRMOption('+c.id+')" style="font-size:12px;color:var(--text-muted);cursor:pointer" aria-hidden="true"></i>'
+          +'<span style="font-size:12px;color:var(--text)">'+esc(c.name)+'</span>'
+          +'<i class="ti ti-x" onclick="deleteCRMOption('+c.id+')" style="font-size:12px;color:var(--text-3);cursor:pointer" aria-hidden="true"></i>'
           +'</div>').join(''))
       +'</div>';
     bmSection('crmoptions', 'CRM options', coHtml, false);
@@ -8715,17 +8715,17 @@ async function renderBrokerMgmtScreen() {
       const skillText = staffCRMs.join(' ').toLowerCase();
       csHtml += '<div class="cs-row" data-name="'+esc(s.name.toLowerCase())+'" data-skills="'+esc(skillText)+'" style="padding:10px 0;border-bottom:0.5px solid var(--border)">'
         +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'
-        +'<span style="font-size:13px;font-weight:500;flex:1;color:var(--text-primary)">'+esc(s.name)+'</span>'
-        +(ten?'<span style="font-size:11px;color:var(--text-muted)">'+ten+'</span>':'')
+        +'<span style="font-size:13px;font-weight:500;flex:1;color:var(--text)">'+esc(s.name)+'</span>'
+        +(ten?'<span style="font-size:11px;color:var(--text-3)">'+ten+'</span>':'')
         +'</div>'
         +'<div style="display:flex;flex-wrap:wrap;gap:6px">'
         +_crmOptions.map(c=>{
           const sel = staffCRMs.includes(c.name);
           if (!sa) {
-            return sel ? '<span style="font-size:12px;background:var(--bg-success);color:var(--text-success);padding:3px 10px;border-radius:99px;display:inline-flex;align-items:center;gap:4px"><i class="ti ti-check" style="font-size:11px" aria-hidden="true"></i>'+esc(c.name)+'</span>'
-              : '<span style="font-size:12px;background:var(--surface-1);color:var(--text-muted);padding:3px 10px;border-radius:99px;border:0.5px solid var(--border)">'+esc(c.name)+'</span>';
+            return sel ? '<span style="font-size:12px;background:#D1FAE5;color:#065F46;padding:3px 10px;border-radius:99px;display:inline-flex;align-items:center;gap:4px"><i class="ti ti-check" style="font-size:11px" aria-hidden="true"></i>'+esc(c.name)+'</span>'
+              : '<span style="font-size:12px;background:var(--surface);color:var(--text-3);padding:3px 10px;border-radius:99px;border:0.5px solid var(--border)">'+esc(c.name)+'</span>';
           }
-          return '<span data-staff="'+esc(s.name)+'" data-crm="'+esc(c.name)+'" onclick="bmCRMToggle(this)" style="font-size:12px;padding:3px 10px;border-radius:99px;cursor:pointer;display:inline-flex;align-items:center;gap:4px;'+(sel?'background:var(--bg-success);color:var(--text-success)':'background:var(--surface-1);color:var(--text-muted);border:0.5px solid var(--border)')+'"><i class="ti '+(sel?'ti-check':'ti-circle')+'\" style=\"font-size:11px" aria-hidden="true"></i>'+esc(c.name)+'</span>';
+          return '<span data-staff="'+esc(s.name)+'" data-crm="'+esc(c.name)+'" onclick="bmCRMToggle(this)" style="font-size:12px;padding:3px 10px;border-radius:99px;cursor:pointer;display:inline-flex;align-items:center;gap:4px;'+(sel?'background:#D1FAE5;color:#065F46':'background:var(--surface);color:var(--text-3);border:0.5px solid var(--border)')+'"><i class="ti '+(sel?'ti-check':'ti-circle')+'\" style=\"font-size:11px" aria-hidden="true"></i>'+esc(c.name)+'</span>';
         }).join('')
         +'</div></div>';
     });
@@ -8778,8 +8778,8 @@ async function bmCRMToggle(el) {
   // Update chip in place
   const staffCRMs = getCRMsForStaff(staffName);
   const sel = staffCRMs.includes(crmName);
-  el.style.background = sel ? 'var(--bg-success)' : 'var(--surface-1)';
-  el.style.color = sel ? 'var(--text-success)' : 'var(--text-muted)';
+  el.style.background = sel ? '#D1FAE5' : 'var(--surface)';
+  el.style.color = sel ? '#065F46' : 'var(--text-3)';
   el.style.border = sel ? 'none' : '0.5px solid var(--border)';
   el.querySelector('i').className = 'ti '+(sel?'ti-check':'ti-circle');
 }
@@ -8881,8 +8881,8 @@ function bmAbFilter(mode) {
   const btnC=document.getElementById('ab-filter-crm');
   if(byA) byA.style.display=mode==='analyst'?'block':'none';
   if(byCRM) byCRM.style.display=mode==='crm'?'block':'none';
-  if(btnA) { btnA.style.borderColor=mode==='analyst'?'var(--brand)':'var(--border)'; btnA.style.background=mode==='analyst'?'var(--brand-light)':'var(--surface-2)'; btnA.style.color=mode==='analyst'?'var(--brand)':'var(--text-2)'; btnA.style.fontWeight=mode==='analyst'?'600':'400'; }
-  if(btnC) { btnC.style.borderColor=mode==='crm'?'var(--brand)':'var(--border)'; btnC.style.background=mode==='crm'?'var(--brand-light)':'var(--surface-2)'; btnC.style.color=mode==='crm'?'var(--brand)':'var(--text-2)'; btnC.style.fontWeight=mode==='crm'?'600':'400'; }
+  if(btnA) { btnA.style.borderColor=mode==='analyst'?'var(--brand)':'var(--border)'; btnA.style.background=mode==='analyst'?'var(--brand-light)':'var(--surface)'; btnA.style.color=mode==='analyst'?'var(--brand)':'var(--text-2)'; btnA.style.fontWeight=mode==='analyst'?'600':'400'; }
+  if(btnC) { btnC.style.borderColor=mode==='crm'?'var(--brand)':'var(--border)'; btnC.style.background=mode==='crm'?'var(--brand-light)':'var(--surface)'; btnC.style.color=mode==='crm'?'var(--brand)':'var(--text-2)'; btnC.style.fontWeight=mode==='crm'?'600':'400'; }
 }
 
 
@@ -9169,7 +9169,7 @@ function renderStageHistoryInModal(entry) {
     <div style="display:flex;flex-direction:column;gap:4px">
       ${history.map((h,i) => {
         const durationDays = h.exitTs ? Math.round((h.exitTs - h.enteredTs)/86400000) : null;
-        return `<div style="display:flex;align-items:center;justify-content:space-between;font-size:12px;padding:5px 8px;background:var(--surface-2);border-radius:6px">
+        return `<div style="display:flex;align-items:center;justify-content:space-between;font-size:12px;padding:5px 8px;background:var(--surface);border-radius:6px">
           <span style="color:var(--text)">${esc(h.stage)}</span>
           <span style="color:var(--text-3)">${esc(h.enteredAt)}${durationDays!==null?' · '+durationDays+'d':i===history.length-1?' · current':''}</span>
         </div>`;
@@ -9344,7 +9344,7 @@ function renderFilesAnalytics(el, allFiles, teamNames) {
             <span style="font-size:12px;color:var(--text)">${esc(s)}</span>
             <span style="font-size:12px;font-weight:700;color:${sc.color}">${avg}d</span>
           </div>
-          <div style="background:var(--surface-2);border-radius:4px;height:6px;overflow:hidden">
+          <div style="background:var(--surface);border-radius:4px;height:6px;overflow:hidden">
             <div style="width:${pct}%;height:100%;background:${sc.color};border-radius:4px;transition:width .4s"></div>
           </div>
         </div>`;
@@ -9411,19 +9411,19 @@ function renderMyFileAnalytics() {
   return `<div class="card" style="margin-top:12px">
     <div class="card-label">📊 My file stats</div>
     <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px">
-      <div style="background:var(--surface-2);border-radius:var(--radius-sm);padding:10px;text-align:center">
+      <div style="background:var(--surface);border-radius:var(--radius-sm);padding:10px;text-align:center">
         <div style="font-size:20px;font-weight:700;color:var(--brand)">${a.activeFiles}</div>
         <div style="font-size:11px;color:var(--text-3)">Active files</div>
       </div>
-      <div style="background:var(--surface-2);border-radius:var(--radius-sm);padding:10px;text-align:center">
+      <div style="background:var(--surface);border-radius:var(--radius-sm);padding:10px;text-align:center">
         <div style="font-size:20px;font-weight:700;color:var(--success)">${a.settledCount}</div>
         <div style="font-size:11px;color:var(--text-3)">Settled</div>
       </div>
-      <div style="background:var(--surface-2);border-radius:var(--radius-sm);padding:10px;text-align:center">
+      <div style="background:var(--surface);border-radius:var(--radius-sm);padding:10px;text-align:center">
         <div style="font-size:20px;font-weight:700;color:#92400E">${a.oneTouchCount}</div>
         <div style="font-size:11px;color:var(--text-3)">One-touch</div>
       </div>
-      <div style="background:var(--surface-2);border-radius:var(--radius-sm);padding:10px;text-align:center">
+      <div style="background:var(--surface);border-radius:var(--radius-sm);padding:10px;text-align:center">
         <div style="font-size:20px;font-weight:700;color:#14532D">${a.totalVolume > 0 ? fmt$(a.totalVolume) : '—'}</div>
         <div style="font-size:11px;color:var(--text-3)">Volume settled</div>
       </div>
@@ -9894,7 +9894,7 @@ function fileCard(f, showControls) {
     ${f.checklistSubmitted?`<div style="font-size:11px;color:#065F46;background:#D1FAE5;border-radius:50px;padding:2px 10px;display:inline-block;margin-top:4px;font-weight:600">✓ Checklist submitted</div>`:''}
     ${canEdit?`<div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;align-items:center">
       <button onclick="openFileModal('${f.id}')" style="font-size:12px;padding:4px 12px;border-radius:var(--radius-sm);border:1px solid var(--border);background:transparent;cursor:pointer">✏️ Edit</button>
-      <select onchange="quickStatusUpdate('${f.id}',this.value)" style="font-size:12px;padding:4px 8px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface-2);cursor:pointer;flex:1;max-width:200px">
+      <select onchange="quickStatusUpdate('${f.id}',this.value)" style="font-size:12px;padding:4px 8px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface);cursor:pointer;flex:1;max-width:200px">
         ${statusOptions}
       </select>
       ${f.checklistSubmitted?`<button onclick="reopenChecklist('${f.id}')" style="font-size:11px;padding:4px 10px;border-radius:var(--radius-sm);border:1px solid #FDE68A;background:#FEF3C7;color:#92400E;cursor:pointer">📋 Re-open checklist</button>`:''}
@@ -10273,7 +10273,7 @@ function renderBFTags() {
     const sc = BF_TAG_COLORS[tag] || {bg:'#F3F4F6',color:'#374151'};
     return `<button type="button" onclick="toggleBFTag('${tag.replace(/'/g,"\\'")}\")"
       style="padding:5px 12px;border-radius:50px;border:1.5px solid ${sel?sc.color:'var(--border)'};
-      background:${sel?sc.bg:'var(--surface-2)'};color:${sel?sc.color:'var(--text-2)'};
+      background:${sel?sc.bg:'var(--surface)'};color:${sel?sc.color:'var(--text-2)'};
       font-size:12px;font-weight:${sel?'700':'400'};cursor:pointer;transition:all .15s">
       ${sel?'✓ ':''}${esc(tag)}
     </button>`;
@@ -10294,7 +10294,7 @@ function setBFSentiment(s) {
     const active = k === s;
     btn.style.fontWeight = active ? '700' : '400';
     btn.style.borderColor = active ? 'var(--brand)' : 'var(--border)';
-    btn.style.background = active ? 'var(--brand-light)' : 'var(--surface-2)';
+    btn.style.background = active ? 'var(--brand-light)' : 'var(--surface)';
     btn.style.color = active ? 'var(--brand)' : 'var(--text-2)';
   });
 }
@@ -10681,7 +10681,7 @@ function renderEODScreen() {
             return `<button type="button" onclick="toggleEODChip(this,'blocker')"
               data-val="${esc(b)}"
               style="padding:6px 12px;border-radius:50px;border:1.5px solid ${sel?'var(--brand)':'var(--border)'};
-              background:${sel?'var(--brand-light)':'var(--surface-2)'};color:${sel?'var(--brand)':'var(--text-2)'};
+              background:${sel?'var(--brand-light)':'var(--surface)'};color:${sel?'var(--brand)':'var(--text-2)'};
               font-size:13px;font-weight:${sel?'700':'400'};cursor:pointer">${sel?'✓ ':''}${esc(b)}</button>`;
           }).join('')}
         </div>
@@ -10689,7 +10689,7 @@ function renderEODScreen() {
         <div class="field">
           <label>If blocked — brief description of what's missing</label>
           <textarea id="eod_blockerDetail" placeholder="e.g. Waiting on bank statements from 3 clients, chased twice each…"
-            style="width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:14px;color:var(--text);background:var(--surface-2);outline:none;resize:none;min-height:60px;line-height:1.5">${esc(pf('blockerDetail'))}</textarea>
+            style="width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:14px;color:var(--text);background:var(--surface);outline:none;resize:none;min-height:60px;line-height:1.5">${esc(pf('blockerDetail'))}</textarea>
         </div>
       </div>
 
@@ -10704,7 +10704,7 @@ function renderEODScreen() {
             const labels = {1:'Very low',2:'Low',3:'Moderate',4:'High',5:'Very high'};
             return `<button type="button" onclick="selectEODConfidence(${n})" id="eodConf_${n}"
               style="flex:1;padding:10px 4px;border-radius:var(--radius-sm);border:1.5px solid ${sel?colors[n]:'var(--border)'};
-              background:${sel?'#F0FDF4':'var(--surface-2)'};color:${sel?colors[n]:'var(--text-3)'};
+              background:${sel?'#F0FDF4':'var(--surface)'};color:${sel?colors[n]:'var(--text-3)'};
               font-size:14px;font-weight:${sel?'700':'400'};cursor:pointer;text-align:center">
               <div style="font-size:18px;font-weight:700">${n}</div>
               <div style="font-size:9px;margin-top:2px">${labels[n]}</div>
@@ -10718,17 +10718,17 @@ function renderEODScreen() {
           <div style="display:flex;gap:8px;margin-top:6px">
             <button type="button" onclick="setEODYN('brokerConcern','yes',this)" id="eodBC_yes"
               style="flex:1;padding:9px;border-radius:var(--radius-sm);border:1.5px solid ${pf('brokerConcern')==='yes'?'var(--danger)':'var(--border)'};
-              background:${pf('brokerConcern')==='yes'?'var(--danger-light)':'var(--surface-2)'};
+              background:${pf('brokerConcern')==='yes'?'var(--danger-light)':'var(--surface)'};
               color:${pf('brokerConcern')==='yes'?'var(--danger)':'var(--text-2)'};font-size:14px;font-weight:${pf('brokerConcern')==='yes'?'700':'400'};cursor:pointer">Yes</button>
             <button type="button" onclick="setEODYN('brokerConcern','no',this)" id="eodBC_no"
               style="flex:1;padding:9px;border-radius:var(--radius-sm);border:1.5px solid ${pf('brokerConcern')==='no'?'var(--success)':'var(--border)'};
-              background:${pf('brokerConcern')==='no'?'var(--success-light)':'var(--surface-2)'};
+              background:${pf('brokerConcern')==='no'?'var(--success-light)':'var(--surface)'};
               color:${pf('brokerConcern')==='no'?'var(--success)':'var(--text-2)'};font-size:14px;font-weight:${pf('brokerConcern')==='no'?'700':'400'};cursor:pointer">No</button>
           </div>
           <input type="hidden" id="eod_brokerConcern" value="${pf('brokerConcern')}"/>
           <div id="eodBCDetail_wrap" style="margin-top:8px;display:${pf('brokerConcern')==='yes'?'block':'none'}">
             <textarea id="eod_brokerConcernDetail" placeholder="Describe what the broker raised…"
-              style="width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:14px;color:var(--text);background:var(--surface-2);outline:none;resize:none;min-height:60px;line-height:1.5">${esc(pf('brokerConcernDetail'))}</textarea>
+              style="width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:14px;color:var(--text);background:var(--surface);outline:none;resize:none;min-height:60px;line-height:1.5">${esc(pf('brokerConcernDetail'))}</textarea>
           </div>
         </div>
       </div>
@@ -10741,17 +10741,17 @@ function renderEODScreen() {
           <div style="display:flex;gap:8px;margin-top:6px;margin-bottom:8px">
             <button type="button" onclick="setEODYN('challenges','yes',this)" id="eodCH_yes"
               style="flex:1;padding:9px;border-radius:var(--radius-sm);border:1.5px solid ${pf('challenges')==='yes'?'var(--warn)':'var(--border)'};
-              background:${pf('challenges')==='yes'?'var(--warn-light)':'var(--surface-2)'};
+              background:${pf('challenges')==='yes'?'var(--warn-light)':'var(--surface)'};
               color:${pf('challenges')==='yes'?'var(--warn)':'var(--text-2)'};font-size:14px;font-weight:${pf('challenges')==='yes'?'700':'400'};cursor:pointer">Yes</button>
             <button type="button" onclick="setEODYN('challenges','no',this)" id="eodCH_no"
               style="flex:1;padding:9px;border-radius:var(--radius-sm);border:1.5px solid ${pf('challenges')==='no'?'var(--success)':'var(--border)'};
-              background:${pf('challenges')==='no'?'var(--success-light)':'var(--surface-2)'};
+              background:${pf('challenges')==='no'?'var(--success-light)':'var(--surface)'};
               color:${pf('challenges')==='no'?'var(--success)':'var(--text-2)'};font-size:14px;font-weight:${pf('challenges')==='no'?'700':'400'};cursor:pointer">No</button>
           </div>
           <input type="hidden" id="eod_challenges" value="${pf('challenges')}"/>
           <div id="eodCHDetail_wrap" style="display:${pf('challenges')==='yes'?'block':'none'}">
             <textarea id="eod_challengeDetail" placeholder="Briefly describe the challenge…"
-              style="width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:14px;color:var(--text);background:var(--surface-2);outline:none;resize:none;min-height:60px;line-height:1.5">${esc(pf('challengeDetail'))}</textarea>
+              style="width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:14px;color:var(--text);background:var(--surface);outline:none;resize:none;min-height:60px;line-height:1.5">${esc(pf('challengeDetail'))}</textarea>
           </div>
         </div>
 
@@ -10760,24 +10760,24 @@ function renderEODScreen() {
           <div style="display:flex;gap:8px;margin-top:6px;margin-bottom:8px">
             <button type="button" onclick="setEODYN('supportNeeded','yes',this)" id="eodSN_yes"
               style="flex:1;padding:9px;border-radius:var(--radius-sm);border:1.5px solid ${pf('supportNeeded')==='yes'?'var(--brand)':'var(--border)'};
-              background:${pf('supportNeeded')==='yes'?'var(--brand-light)':'var(--surface-2)'};
+              background:${pf('supportNeeded')==='yes'?'var(--brand-light)':'var(--surface)'};
               color:${pf('supportNeeded')==='yes'?'var(--brand)':'var(--text-2)'};font-size:14px;font-weight:${pf('supportNeeded')==='yes'?'700':'400'};cursor:pointer">Yes</button>
             <button type="button" onclick="setEODYN('supportNeeded','no',this)" id="eodSN_no"
               style="flex:1;padding:9px;border-radius:var(--radius-sm);border:1.5px solid ${pf('supportNeeded')==='no'?'var(--success)':'var(--border)'};
-              background:${pf('supportNeeded')==='no'?'var(--success-light)':'var(--surface-2)'};
+              background:${pf('supportNeeded')==='no'?'var(--success-light)':'var(--surface)'};
               color:${pf('supportNeeded')==='no'?'var(--success)':'var(--text-2)'};font-size:14px;font-weight:${pf('supportNeeded')==='no'?'700':'400'};cursor:pointer">No</button>
           </div>
           <input type="hidden" id="eod_supportNeeded" value="${pf('supportNeeded')}"/>
           <div id="eodSNDetail_wrap" style="display:${pf('supportNeeded')==='yes'?'block':'none'}">
             <textarea id="eod_supportDetail" placeholder="What do you need help with?"
-              style="width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:14px;color:var(--text);background:var(--surface-2);outline:none;resize:none;min-height:60px;line-height:1.5" placeholder="e.g. Need help with Infynity, training on compliance reports…">${esc(pf('supportDetail'))}</textarea>
+              style="width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:14px;color:var(--text);background:var(--surface);outline:none;resize:none;min-height:60px;line-height:1.5" placeholder="e.g. Need help with Infynity, training on compliance reports…">${esc(pf('supportDetail'))}</textarea>
           </div>
         </div>
 
         <div class="field" style="margin-bottom:0">
           <label>Anything else to note? <span style="color:var(--text-3);font-weight:400">(optional)</span></label>
           <textarea id="eod_notes" placeholder="Any learning, observation or handover note for tomorrow…"
-            style="width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:14px;color:var(--text);background:var(--surface-2);outline:none;resize:none;min-height:60px;line-height:1.5">${esc(pf('notes'))}</textarea>
+            style="width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:14px;color:var(--text);background:var(--surface);outline:none;resize:none;min-height:60px;line-height:1.5">${esc(pf('notes'))}</textarea>
         </div>
       </div>
 
@@ -10795,7 +10795,7 @@ function toggleEODChip(btn, group) {
   const isSelected = btn.style.fontWeight === '700';
   if (isSelected) {
     btn.style.border = '1.5px solid var(--border)';
-    btn.style.background = 'var(--surface-2)';
+    btn.style.background = 'var(--surface)';
     btn.style.color = 'var(--text-2)';
     btn.style.fontWeight = '400';
     btn.textContent = val;
@@ -10821,7 +10821,7 @@ function selectEODConfidence(n) {
       btn.style.fontWeight = '700';
     } else {
       btn.style.border = '1.5px solid var(--border)';
-      btn.style.background = 'var(--surface-2)';
+      btn.style.background = 'var(--surface)';
       btn.style.color = 'var(--text-3)';
       btn.style.fontWeight = '400';
     }
@@ -10848,7 +10848,7 @@ function setEODYN(field, val, btn) {
       b.style.fontWeight = '700';
     } else {
       b.style.border = '1.5px solid var(--border)';
-      b.style.background = 'var(--surface-2)';
+      b.style.background = 'var(--surface)';
       b.style.color = 'var(--text-2)';
       b.style.fontWeight = '400';
     }
@@ -10957,15 +10957,15 @@ function renderEODSummary(el, teamNames, date) {
           <div style="font-size:22px;font-weight:700;color:${missing.length>0?'var(--danger)':'var(--success)'}">${reports.length}/${staff.length}</div>
           <div style="font-size:11px;color:var(--text-3)">Submitted</div>
         </div>
-        <div style="background:${lowConf.length>0?'var(--danger-light)':'var(--surface-2)'};border-radius:var(--radius-sm);padding:10px;text-align:center">
+        <div style="background:${lowConf.length>0?'var(--danger-light)':'var(--surface)'};border-radius:var(--radius-sm);padding:10px;text-align:center">
           <div style="font-size:22px;font-weight:700;color:${lowConf.length>0?'var(--danger)':'var(--text-3)'}">${lowConf.length}</div>
           <div style="font-size:11px;color:var(--text-3)">Low confidence</div>
         </div>
-        <div style="background:${brokerFlags.length>0?'#FEF3C7':'var(--surface-2)'};border-radius:var(--radius-sm);padding:10px;text-align:center">
+        <div style="background:${brokerFlags.length>0?'#FEF3C7':'var(--surface)'};border-radius:var(--radius-sm);padding:10px;text-align:center">
           <div style="font-size:22px;font-weight:700;color:${brokerFlags.length>0?'#92400E':'var(--text-3)'}">${brokerFlags.length}</div>
           <div style="font-size:11px;color:var(--text-3)">Broker concerns</div>
         </div>
-        <div style="background:${supportFlags.length>0?'var(--brand-light)':'var(--surface-2)'};border-radius:var(--radius-sm);padding:10px;text-align:center">
+        <div style="background:${supportFlags.length>0?'var(--brand-light)':'var(--surface)'};border-radius:var(--radius-sm);padding:10px;text-align:center">
           <div style="font-size:22px;font-weight:700;color:${supportFlags.length>0?'var(--brand)':'var(--text-3)'}">${supportFlags.length}</div>
           <div style="font-size:11px;color:var(--text-3)">Need support</div>
         </div>
@@ -11111,10 +11111,10 @@ function renderMyTeamEOD(myTeamNames) {
     ['today','Today'],['yesterday','Yesterday'],['week','This week'],
     ['month','This month'],['30d','Last 30d'],['90d','Last 90d'],['custom','📅 Custom']
   ].map(([v,l])=>`<button onclick="_myTeamEODPeriod='${v}';renderMyTeamEOD(window._myTeamNames)"
-    style="font-size:12px;padding:5px 10px;border-radius:50px;border:1.5px solid ${_myTeamEODPeriod===v?'var(--brand)':'var(--border)'};background:${_myTeamEODPeriod===v?'var(--brand-light)':'var(--surface-2)'};color:${_myTeamEODPeriod===v?'var(--brand)':'var(--text-2)'};cursor:pointer;font-weight:${_myTeamEODPeriod===v?'700':'400'};white-space:nowrap">${l}</button>`).join('');
+    style="font-size:12px;padding:5px 10px;border-radius:50px;border:1.5px solid ${_myTeamEODPeriod===v?'var(--brand)':'var(--border)'};background:${_myTeamEODPeriod===v?'var(--brand-light)':'var(--surface)'};color:${_myTeamEODPeriod===v?'var(--brand)':'var(--text-2)'};cursor:pointer;font-weight:${_myTeamEODPeriod===v?'700':'400'};white-space:nowrap">${l}</button>`).join('');
 
   const personBtns = ['', ...myTeamNames].map(n=>`<button onclick="_myTeamEODPerson='${n.replace(/'/g,"\\'")}';renderMyTeamEOD(window._myTeamNames)"
-    style="font-size:12px;padding:5px 10px;border-radius:50px;border:1.5px solid ${_myTeamEODPerson===n?'var(--brand)':'var(--border)'};background:${_myTeamEODPerson===n?'var(--brand-light)':'var(--surface-2)'};color:${_myTeamEODPerson===n?'var(--brand)':'var(--text-2)'};cursor:pointer;font-weight:${_myTeamEODPerson===n?'700':'400'};white-space:nowrap">${n?esc(n.split(' ')[0]):'All staff'}</button>`).join('');
+    style="font-size:12px;padding:5px 10px;border-radius:50px;border:1.5px solid ${_myTeamEODPerson===n?'var(--brand)':'var(--border)'};background:${_myTeamEODPerson===n?'var(--brand-light)':'var(--surface)'};color:${_myTeamEODPerson===n?'var(--brand)':'var(--text-2)'};cursor:pointer;font-weight:${_myTeamEODPerson===n?'700':'400'};white-space:nowrap">${n?esc(n.split(' ')[0]):'All staff'}</button>`).join('');
 
   // Per-member rows
   const memberRows = viewNames.map(name => {
@@ -11157,7 +11157,7 @@ function renderMyTeamEOD(myTeamNames) {
         ${(r.tasks||[]).map(t=>{
           const fmt2 = v=>{if(!v)return'—';const[h,m]=v.split(':');const ap=+h<12?'AM':'PM';return(+h%12||12)+':'+m+' '+ap;};
           const hasSub = t.subType;
-          return `<div style="background:var(--surface-2);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:8px 10px;margin-bottom:6px">
+          return `<div style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:8px 10px;margin-bottom:6px">
             <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
               <span style="font-size:12px;font-weight:600;flex:1">${esc(t.type||'—')}${hasSub?' <span style="font-weight:400;color:var(--text-3)">· '+esc(t.subType)+'</span>':''}</span>
               <span style="font-size:11px;color:var(--text-3);white-space:nowrap">${fmt2(t.startTime)} → ${fmt2(t.endTime)}</span>
@@ -11177,7 +11177,7 @@ function renderMyTeamEOD(myTeamNames) {
   el.innerHTML = `
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
       <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px">📋 EOD Reports</div>
-      <button onclick="refreshMyTeamEOD()" style="font-size:11px;padding:3px 10px;border-radius:50px;border:1.5px solid var(--border);background:var(--surface-2);cursor:pointer;color:var(--text-2)">↺ Refresh</button>
+      <button onclick="refreshMyTeamEOD()" style="font-size:11px;padding:3px 10px;border-radius:50px;border:1.5px solid var(--border);background:var(--surface);cursor:pointer;color:var(--text-2)">↺ Refresh</button>
     </div>
     ${_myTeamEODPeriod==='custom'?`<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
       <input type="date" value="${_myTeamEODFromDt}" onchange="_myTeamEODFromDt=this.value;renderMyTeamEOD(window._myTeamNames)"
@@ -11196,12 +11196,12 @@ function renderMyTeamEOD(myTeamNames) {
         <div style="font-size:18px;font-weight:700;color:#6B7280">${uniqueDrafters.length}</div>
         <div style="font-size:10px;color:#6B7280;margin-top:1px">In progress</div>
       </div>
-      <div onclick="eodCardToggle('support')" style="background:${supportCount>0?'#FEF3C7':'var(--surface-2)'};border-radius:var(--radius-sm);padding:8px 6px;text-align:center;cursor:pointer;border:1.5px solid ${_myTeamEODCard==='support'?'var(--brand)':'transparent'}">
+      <div onclick="eodCardToggle('support')" style="background:${supportCount>0?'#FEF3C7':'var(--surface)'};border-radius:var(--radius-sm);padding:8px 6px;text-align:center;cursor:pointer;border:1.5px solid ${_myTeamEODCard==='support'?'var(--brand)':'transparent'}">
         <div style="font-size:18px;font-weight:700;color:${supportCount>0?'#92400E':'var(--text-3)'}">${supportCount}</div>
         <div style="font-size:10px;color:${supportCount>0?'#92400E':'var(--text-3)'};margin-top:1px">Need support</div>
       </div>
     </div>
-    ${_myTeamEODCard?`<div style="background:var(--surface-2);border:1.5px solid var(--brand);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:10px">
+    ${_myTeamEODCard?`<div style="background:var(--surface);border:1.5px solid var(--brand);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:10px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
         <div style="font-size:12px;font-weight:700;color:var(--brand)">${_myTeamEODCard==='submitted'?'✓ Submitted':_myTeamEODCard==='drafts'?'📝 In progress':'🙋 Need support'}</div>
         <button onclick="_myTeamEODCard='';renderMyTeamEOD(window._myTeamNames)" style="background:transparent;border:none;font-size:16px;cursor:pointer;color:var(--text-3)">×</button>
@@ -11353,7 +11353,7 @@ function calcAllMetrics(names, from, to) {
 }
 
 function perfCellStyle(avg,bench) {
-  if(!avg) return {bg:'var(--surface-1)',text:'var(--text-3)',sub:'—'};
+  if(!avg) return {bg:'var(--surface)',text:'var(--text-3)',sub:'—'};
   const r=avg/bench;
   if(r<=1.05) return {bg:'#D1FAE5',text:'#065F46',sub:'✓ '+perfFmtMins(avg)};
   if(r<=1.25) return {bg:'#FEF3C7',text:'#92400E',sub:'+'+perfFmtMins(Math.round(avg-bench))};
@@ -11479,11 +11479,11 @@ function renderPerformanceScreen() {
   // 3-view bottom section
   const viewToggle=`<div style="display:flex;gap:6px;margin-bottom:14px">
     <button onclick="perfSetView('issues')" id="pvbtn-issues"
-      style="font-size:13px;padding:7px 16px;border-radius:50px;border:1.5px solid ${_perfView==='issues'?'var(--brand)':'var(--border)'};background:${_perfView==='issues'?'var(--brand-light)':'var(--surface-2)'};color:${_perfView==='issues'?'var(--brand)':'var(--text-2)'};cursor:pointer;font-weight:${_perfView==='issues'?'700':'400'}">Issues only</button>
+      style="font-size:13px;padding:7px 16px;border-radius:50px;border:1.5px solid ${_perfView==='issues'?'var(--brand)':'var(--border)'};background:${_perfView==='issues'?'var(--brand-light)':'var(--surface)'};color:${_perfView==='issues'?'var(--brand)':'var(--text-2)'};cursor:pointer;font-weight:${_perfView==='issues'?'700':'400'}">Issues only</button>
     <button onclick="perfSetView('all')" id="pvbtn-all"
-      style="font-size:13px;padding:7px 16px;border-radius:50px;border:1.5px solid ${_perfView==='all'?'var(--brand)':'var(--border)'};background:${_perfView==='all'?'var(--brand-light)':'var(--surface-2)'};color:${_perfView==='all'?'var(--brand)':'var(--text-2)'};cursor:pointer;font-weight:${_perfView==='all'?'700':'400'}">All analysts</button>
+      style="font-size:13px;padding:7px 16px;border-radius:50px;border:1.5px solid ${_perfView==='all'?'var(--brand)':'var(--border)'};background:${_perfView==='all'?'var(--brand-light)':'var(--surface)'};color:${_perfView==='all'?'var(--brand)':'var(--text-2)'};cursor:pointer;font-weight:${_perfView==='all'?'700':'400'}">All analysts</button>
     <button onclick="perfSetView('detail')" id="pvbtn-detail"
-      style="font-size:13px;padding:7px 16px;border-radius:50px;border:1.5px solid ${_perfView==='detail'?'var(--brand)':'var(--border)'};background:${_perfView==='detail'?'var(--brand-light)':'var(--surface-2)'};color:${_perfView==='detail'?'var(--brand)':'var(--text-2)'};cursor:pointer;font-weight:${_perfView==='detail'?'700':'400'}">Analyst detail</button>
+      style="font-size:13px;padding:7px 16px;border-radius:50px;border:1.5px solid ${_perfView==='detail'?'var(--brand)':'var(--border)'};background:${_perfView==='detail'?'var(--brand-light)':'var(--surface)'};color:${_perfView==='detail'?'var(--brand)':'var(--text-2)'};cursor:pointer;font-weight:${_perfView==='detail'?'700':'400'}">Analyst detail</button>
   </div>`;
   const viewContainer=`<div id="perf-view-container"></div>`;
   el.innerHTML=filterRow+summaryRow+alertBar+viewToggle+viewContainer+chartsRow;
@@ -11502,7 +11502,7 @@ function perfSetView(v) {
     const b=document.getElementById('pvbtn-'+x);
     if(!b) return;
     b.style.borderColor=x===v?'var(--brand)':'var(--border)';
-    b.style.background=x===v?'var(--brand-light)':'var(--surface-2)';
+    b.style.background=x===v?'var(--brand-light)':'var(--surface)';
     b.style.color=x===v?'var(--brand)':'var(--text-2)';
     b.style.fontWeight=x===v?'700':'400';
   });
@@ -11558,7 +11558,7 @@ function perfIssuesHTML(names,m) {
       ${overAnalysts.map(a=>`<div style="margin-bottom:6px">
         <div style="display:flex;align-items:center;gap:8px">
           <span style="font-size:12px;font-weight:500;min-width:90px;color:var(--text)">${esc(a.name.split(' ')[0])}</span>
-          <div style="flex:1;height:8px;background:var(--surface-2);border-radius:4px;overflow:hidden;border:0.5px solid var(--border)"><div style="width:${Math.min(100,Math.round(a.avg/maxMins*100))}%;height:100%;background:${a.over>bench*0.2?'#F87171':'#FCD34D'};border-radius:4px"></div></div>
+          <div style="flex:1;height:8px;background:var(--surface);border-radius:4px;overflow:hidden;border:0.5px solid var(--border)"><div style="width:${Math.min(100,Math.round(a.avg/maxMins*100))}%;height:100%;background:${a.over>bench*0.2?'#F87171':'#FCD34D'};border-radius:4px"></div></div>
           <span style="font-size:12px;font-weight:600;min-width:80px;text-align:right;color:${a.over>bench*0.2?'#991B1B':'#92400E'}">${perfFmtMins(a.avg)} <span style="font-size:10px;font-weight:400">(+${perfFmtMins(a.over)})</span></span>
         </div>
         <div style="font-size:11px;color:var(--text-3);margin-left:98px">${a.overSess} of ${a.sessions} sessions over</div>
@@ -11607,18 +11607,18 @@ function perfAllHTML(names,m) {
       const over=avg>bench;
       return `<div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:12px"><span style="flex:1;color:var(--text-2)">${esc(type)} · ${esc(sub)}</span><div style="width:80px;height:6px;background:var(--surface-0);border-radius:3px;overflow:hidden"><div style="width:${Math.min(100,Math.round(avg/bench*80))}%;height:100%;background:${over?'#F87171':'#34D399'};border-radius:3px"></div></div><span style="min-width:56px;text-align:right;font-weight:500;color:${over?'#991B1B':'#065F46'}">${perfFmtMins(avg)}${over?` <span style="font-size:10px;font-weight:400">(+${perfFmtMins(avg-bench)})</span>`:''}</span></div>`;
     }).join(''):'';
-    return `<tr onclick="_perfExpandedRow='${isExp?'':a.name.replace(/'/g,"\\'")}';document.getElementById('perf-view-container').innerHTML=perfAllHTML(document.getElementById('perfContent')._names||[],document.getElementById('perfContent')._metrics||{})" style="cursor:pointer;${isExp?'background:var(--surface-2);':''}">
+    return `<tr onclick="_perfExpandedRow='${isExp?'':a.name.replace(/'/g,"\\'")}';document.getElementById('perf-view-container').innerHTML=perfAllHTML(document.getElementById('perfContent')._names||[],document.getElementById('perfContent')._metrics||{})" style="cursor:pointer;${isExp?'background:var(--surface);':''}">
       <td style="padding:10px;border-bottom:0.5px solid var(--border);vertical-align:top">
         <div style="display:flex;align-items:center;gap:8px"><div style="width:28px;height:28px;border-radius:50%;background:var(--brand-light);color:var(--brand);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;flex-shrink:0">${esc(initials)}</div><span style="font-size:13px;font-weight:500;color:var(--text)">${esc(a.name)}</span></div>
         ${isExp&&detailRows?`<div style="margin-top:10px;margin-left:36px;padding:10px;background:var(--surface);border-radius:var(--radius-sm);border:0.5px solid var(--border)">${detailRows}</div>`:''}
       </td>
       <td style="text-align:center;padding:10px 8px;border-bottom:0.5px solid var(--border);vertical-align:top"><span style="font-size:12px;background:${a.eod>=80?'#D1FAE5':a.eod>=60?'#FEF3C7':'#FEE2E2'};color:${a.eod>=80?'#065F46':a.eod>=60?'#92400E':'#991B1B'};border-radius:50px;padding:3px 8px;font-weight:500">${a.eod}%</span></td>
-      <td style="text-align:center;padding:10px 8px;border-bottom:0.5px solid var(--border);vertical-align:top"><span style="font-size:12px;background:${a.bench==null?'var(--surface-2)':a.bench>=85?'#D1FAE5':a.bench>=65?'#FEF3C7':'#FEE2E2'};color:${a.bench==null?'var(--text-3)':a.bench>=85?'#065F46':a.bench>=65?'#92400E':'#991B1B'};border-radius:50px;padding:3px 8px;font-weight:500">${a.bench!=null?a.bench+'%':'—'}</span></td>
-      <td style="text-align:center;padding:10px 8px;border-bottom:0.5px solid var(--border);vertical-align:top"><span style="font-size:12px;background:${a.over===0?'var(--surface-2)':'#FEE2E2'};color:${a.over===0?'var(--text-3)':'#991B1B'};border-radius:50px;padding:3px 8px;font-weight:500">${a.over} task${a.over!==1?'s':''}</span></td>
-      <td style="text-align:center;padding:10px 8px;border-bottom:0.5px solid var(--border);vertical-align:top"><span style="font-size:12px;background:${a.flags===0?'var(--surface-2)':a.flags>=3?'#FEE2E2':'#FEF3C7'};color:${a.flags===0?'var(--text-3)':a.flags>=3?'#991B1B':'#92400E'};border-radius:50px;padding:3px 8px;font-weight:500">${a.flags}</span></td>
+      <td style="text-align:center;padding:10px 8px;border-bottom:0.5px solid var(--border);vertical-align:top"><span style="font-size:12px;background:${a.bench==null?'var(--surface)':a.bench>=85?'#D1FAE5':a.bench>=65?'#FEF3C7':'#FEE2E2'};color:${a.bench==null?'var(--text-3)':a.bench>=85?'#065F46':a.bench>=65?'#92400E':'#991B1B'};border-radius:50px;padding:3px 8px;font-weight:500">${a.bench!=null?a.bench+'%':'—'}</span></td>
+      <td style="text-align:center;padding:10px 8px;border-bottom:0.5px solid var(--border);vertical-align:top"><span style="font-size:12px;background:${a.over===0?'var(--surface)':'#FEE2E2'};color:${a.over===0?'var(--text-3)':'#991B1B'};border-radius:50px;padding:3px 8px;font-weight:500">${a.over} task${a.over!==1?'s':''}</span></td>
+      <td style="text-align:center;padding:10px 8px;border-bottom:0.5px solid var(--border);vertical-align:top"><span style="font-size:12px;background:${a.flags===0?'var(--surface)':a.flags>=3?'#FEE2E2':'#FEF3C7'};color:${a.flags===0?'var(--text-3)':a.flags>=3?'#991B1B':'#92400E'};border-radius:50px;padding:3px 8px;font-weight:500">${a.flags}</span></td>
     </tr>`;
   }).join('');
-  return `<div style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);overflow:hidden"><table style="width:100%;border-collapse:collapse"><thead style="background:var(--surface-2)"><tr>${th('name','Analyst')}${th('eod','EOD rate')}${th('bench','Benchmark')}${th('over','Tasks over')}${th('flags','Flags')}</tr></thead><tbody>${rows}</tbody></table></div>`;
+  return `<div style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);overflow:hidden"><table style="width:100%;border-collapse:collapse"><thead style="background:var(--surface)"><tr>${th('name','Analyst')}${th('eod','EOD rate')}${th('bench','Benchmark')}${th('over','Tasks over')}${th('flags','Flags')}</tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 
 function perfDetailHTML(names,from,to) {
@@ -11644,7 +11644,7 @@ function perfDetailHTML(names,from,to) {
     const count=reports.reduce((n,r)=>n+(r.tasks||[]).filter(t=>t.type===type&&(t.subType||'')===(sub||'')).length,0);
     const avg=count?Math.round(total/count):0;
     const over=bench&&avg>bench;
-    return `<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span style="color:var(--text-2);font-weight:500">${esc(type)}${sub?` · <span style="color:var(--text-3);font-weight:400">${esc(sub)}</span>`:''}</span><span style="color:var(--text-3)">${count} session${count!==1?'s':''} · ${perfFmtMins(total)} total${bench?' · avg '+perfFmtMins(avg):''}</span></div><div style="height:10px;background:var(--surface-2);border-radius:5px;overflow:hidden;border:0.5px solid var(--border)"><div style="width:${Math.round(total/maxMins*100)}%;height:100%;background:${over?'#F87171':'#34D399'};border-radius:5px"></div></div>${bench&&over?`<div style="font-size:10px;color:#991B1B;margin-top:3px;text-align:right">⚠ avg +${perfFmtMins(avg-bench)} over benchmark (${perfFmtMins(bench)})</div>`:''}</div>`;
+    return `<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span style="color:var(--text-2);font-weight:500">${esc(type)}${sub?` · <span style="color:var(--text-3);font-weight:400">${esc(sub)}</span>`:''}</span><span style="color:var(--text-3)">${count} session${count!==1?'s':''} · ${perfFmtMins(total)} total${bench?' · avg '+perfFmtMins(avg):''}</span></div><div style="height:10px;background:var(--surface);border-radius:5px;overflow:hidden;border:0.5px solid var(--border)"><div style="width:${Math.round(total/maxMins*100)}%;height:100%;background:${over?'#F87171':'#34D399'};border-radius:5px"></div></div>${bench&&over?`<div style="font-size:10px;color:#991B1B;margin-top:3px;text-align:right">⚠ avg +${perfFmtMins(avg-bench)} over benchmark (${perfFmtMins(bench)})</div>`:''}</div>`;
   }).join('');
   return `<div style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:1rem 1.25rem"><div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap"><div style="width:36px;height:36px;border-radius:50%;background:var(--brand-light);color:var(--brand);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;flex-shrink:0">${esc(initials)}</div><select onchange="_perfDetailName=this.value;document.getElementById('perf-view-container').innerHTML=perfDetailHTML(document.getElementById('perfContent')._names||[],'${from}','${to}')" style="font-size:14px;font-weight:600;border:none;background:transparent;color:var(--text);cursor:pointer;padding:0">${analystOpts}</select><span style="font-size:12px;color:var(--text-3)">${reports.length} EOD reports this period</span></div><div style="font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">Time spent per task type</div>${entries.length?bars:'<div style="font-size:13px;color:var(--text-3);padding:8px 0">No tasks logged this period.</div>'}${pdMins>0?`<div style="border-top:1px solid var(--border);margin-top:12px;padding-top:12px;display:flex;justify-content:space-between;align-items:center"><div><div style="font-size:13px;font-weight:500">Professional development</div><div style="font-size:11px;color:var(--text-3)">no benchmark</div></div><div style="font-size:15px;font-weight:600">${perfFmtMins(pdMins)} <span style="font-size:12px;font-weight:400;color:var(--text-3)">total</span></div></div>`:''}</div>`;
 }
@@ -11714,7 +11714,7 @@ function perfFillCard(id, el) {
     el.innerHTML=`${close}<div style="font-size:13px;font-weight:600;margin-bottom:12px">EOD submission rate — per analyst</div>
     ${names.map(n=>{const s=m.subByAnalyst?.[n]||{count:0,rate:0};return`<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:0.5px solid var(--border)">
       <span style="font-size:13px;font-weight:500;min-width:100px">${esc(n.split(' ')[0])}</span>
-      <div style="flex:1;height:8px;background:var(--surface-2);border-radius:4px;overflow:hidden"><div style="width:${s.rate}%;height:100%;background:${s.rate>=80?'#34D399':s.rate>=60?'#FCD34D':'#F87171'};border-radius:4px"></div></div>
+      <div style="flex:1;height:8px;background:var(--surface);border-radius:4px;overflow:hidden"><div style="width:${s.rate}%;height:100%;background:${s.rate>=80?'#34D399':s.rate>=60?'#FCD34D':'#F87171'};border-radius:4px"></div></div>
       <span style="font-size:13px;font-weight:600;color:${s.rate>=80?'#065F46':s.rate>=60?'#92400E':'#991B1B'};min-width:40px;text-align:right">${s.rate}%</span>
       <span style="font-size:11px;color:var(--text-3)">${s.count}/${m.wdays||0} days</span>
     </div>`;}).join('')}`;
@@ -11735,7 +11735,7 @@ function perfFillCard(id, el) {
     el.innerHTML=`${close}<div style="font-size:13px;font-weight:600;margin-bottom:12px">Avg time per task — per analyst</div>
     ${(m.analystAvg||[]).map(({name,avg})=>`<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:0.5px solid var(--border)">
       <span style="font-size:13px;font-weight:500;min-width:100px">${esc(name.split(' ')[0])}</span>
-      <div style="flex:1;height:8px;background:var(--surface-2);border-radius:4px;overflow:hidden"><div style="width:${avg?Math.min(100,Math.round(avg/240*100)):0}%;height:100%;background:#378ADD;border-radius:4px"></div></div>
+      <div style="flex:1;height:8px;background:var(--surface);border-radius:4px;overflow:hidden"><div style="width:${avg?Math.min(100,Math.round(avg/240*100)):0}%;height:100%;background:#378ADD;border-radius:4px"></div></div>
       <span style="font-size:13px;font-weight:600;color:var(--text);min-width:56px;text-align:right">${avg?perfFmtMins(avg):'—'}</span>
     </div>`).join('')}`;
   } else if (id==='flags') {
@@ -11756,7 +11756,7 @@ function perfFillCard(id, el) {
     ${dist.map((d,i)=>{const pct=Math.round(d.mins/total*100);return`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:0.5px solid var(--border)">
       <span style="width:10px;height:10px;border-radius:50%;background:${TASK_COLORS[i%TASK_COLORS.length]};flex-shrink:0"></span>
       <span style="flex:1;font-size:12px">${esc(d.label)}</span>
-      <div style="width:60px;height:6px;background:var(--surface-2);border-radius:3px;overflow:hidden"><div style="width:${pct}%;height:100%;background:${TASK_COLORS[i%TASK_COLORS.length]};border-radius:3px"></div></div>
+      <div style="width:60px;height:6px;background:var(--surface);border-radius:3px;overflow:hidden"><div style="width:${pct}%;height:100%;background:${TASK_COLORS[i%TASK_COLORS.length]};border-radius:3px"></div></div>
       <span style="font-size:12px;color:var(--text-3);min-width:30px;text-align:right">${pct}%</span>
       <span style="font-size:12px;font-weight:500;min-width:48px;text-align:right">${perfFmtMins(d.mins)}</span>
     </div>`;}).join('')}`;
@@ -11765,7 +11765,7 @@ function perfFillCard(id, el) {
     el.innerHTML=`${close}<div style="font-size:13px;font-weight:600;margin-bottom:12px">Daily benchmark adherence</div>
     ${trend.map(({date,pct})=>`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:0.5px solid var(--border)">
       <span style="font-size:12px;color:var(--text-3);min-width:70px">${esc(date)}</span>
-      <div style="flex:1;height:8px;background:var(--surface-2);border-radius:4px;overflow:hidden"><div style="width:${pct||0}%;height:100%;background:${pct==null?'#E5E7EB':pct>=80?'#34D399':pct>=60?'#FCD34D':'#F87171'};border-radius:4px"></div></div>
+      <div style="flex:1;height:8px;background:var(--surface);border-radius:4px;overflow:hidden"><div style="width:${pct||0}%;height:100%;background:${pct==null?'#E5E7EB':pct>=80?'#34D399':pct>=60?'#FCD34D':'#F87171'};border-radius:4px"></div></div>
       <span style="font-size:13px;font-weight:600;min-width:36px;text-align:right;color:${pct==null?'var(--text-3)':pct>=80?'#065F46':pct>=60?'#92400E':'#991B1B'}">${pct!=null?Math.round(pct)+'%':'—'}</span>
     </div>`).join('')}`;
   }
@@ -11785,21 +11785,21 @@ function perfOpenModal(type, taskKey, analyst) {
   const avg=sessions.length?Math.round(sessions.reduce((a,b)=>a+b.mins,0)/sessions.length):null;
   const maxM=Math.max(...sessions.map(x=>x.mins),bench||0)*1.15||240;
   window._perfModalNames = names;
-  const close=`<button onclick="perfRenderView(window._perfModalNames,'${from}','${to}',document.getElementById('perfContent')._metrics)" style="font-size:12px;padding:4px 12px;border-radius:50px;border:1.5px solid var(--border);background:var(--surface-2);cursor:pointer;margin-bottom:12px">← Back</button>`;
+  const close=`<button onclick="perfRenderView(window._perfModalNames,'${from}','${to}',document.getElementById('perfContent')._metrics)" style="font-size:12px;padding:4px 12px;border-radius:50px;border:1.5px solid var(--border);background:var(--surface);cursor:pointer;margin-bottom:12px">← Back</button>`;
   c.innerHTML=`${close}
     <div style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:1rem 1.25rem">
       <div style="font-size:15px;font-weight:700;margin-bottom:2px">${esc(dType)}${dSub?' · <span style="color:var(--text-3);font-weight:400">'+esc(dSub)+'</span>':''}</div>
       <div style="font-size:12px;color:var(--text-3);margin-bottom:14px">${analyst?esc(analyst)+' · ':'All analysts · '}${sessions.length} session${sessions.length!==1?'s':''}</div>
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px">
         <div style="background:${avg&&bench&&avg>bench?'#FEE2E2':'#D1FAE5'};border-radius:8px;padding:10px;text-align:center"><div style="font-size:18px;font-weight:700;color:${avg&&bench&&avg>bench?'#991B1B':'#065F46'}">${avg?perfFmtMins(avg):'—'}</div><div style="font-size:10px;opacity:.8;margin-top:2px;color:${avg&&bench&&avg>bench?'#991B1B':'#065F46'}">avg</div></div>
-        <div style="background:var(--surface-2);border-radius:8px;padding:10px;text-align:center"><div style="font-size:18px;font-weight:700;color:var(--text)">${bench?perfFmtMins(bench):'—'}</div><div style="font-size:10px;color:var(--text-3);margin-top:2px">benchmark</div></div>
-        <div style="background:${avg&&bench&&avg>bench?'#FEF3C7':'var(--surface-2)'};border-radius:8px;padding:10px;text-align:center"><div style="font-size:18px;font-weight:700;color:${avg&&bench&&avg>bench?'#92400E':'var(--text-3)'}">${avg&&bench?perfFmtMins(Math.abs(avg-bench))+(avg>bench?' over':' under'):'—'}</div><div style="font-size:10px;margin-top:2px;color:${avg&&bench&&avg>bench?'#92400E':'var(--text-3)'}">avg diff</div></div>
+        <div style="background:var(--surface);border-radius:8px;padding:10px;text-align:center"><div style="font-size:18px;font-weight:700;color:var(--text)">${bench?perfFmtMins(bench):'—'}</div><div style="font-size:10px;color:var(--text-3);margin-top:2px">benchmark</div></div>
+        <div style="background:${avg&&bench&&avg>bench?'#FEF3C7':'var(--surface)'};border-radius:8px;padding:10px;text-align:center"><div style="font-size:18px;font-weight:700;color:${avg&&bench&&avg>bench?'#92400E':'var(--text-3)'}">${avg&&bench?perfFmtMins(Math.abs(avg-bench))+(avg>bench?' over':' under'):'—'}</div><div style="font-size:10px;margin-top:2px;color:${avg&&bench&&avg>bench?'#92400E':'var(--text-3)'}">avg diff</div></div>
       </div>
       <div style="font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Session history</div>
       ${sessions.length?sessions.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(s=>`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:0.5px solid var(--border)">
         <span style="font-size:12px;color:var(--text-3);min-width:80px">${esc(fmtDate(s.date))}</span>
         ${names.length>1&&!analyst?`<span style="font-size:12px;color:var(--text-2);min-width:70px">${esc(s.name.split(' ')[0])}</span>`:''}
-        <div style="flex:1;height:6px;background:var(--surface-2);border-radius:3px;overflow:hidden"><div style="width:${Math.min(100,Math.round(s.mins/maxM*100))}%;height:100%;background:${bench&&s.mins>bench?'#F87171':'#34D399'};border-radius:3px"></div></div>
+        <div style="flex:1;height:6px;background:var(--surface);border-radius:3px;overflow:hidden"><div style="width:${Math.min(100,Math.round(s.mins/maxM*100))}%;height:100%;background:${bench&&s.mins>bench?'#F87171':'#34D399'};border-radius:3px"></div></div>
         <span style="font-size:13px;font-weight:700;min-width:56px;text-align:right;color:${bench&&s.mins>bench?'#991B1B':'#065F46'}">${perfFmtMins(s.mins)}${bench&&s.mins>bench?` <span style="font-size:10px;font-weight:400">(+${perfFmtMins(s.mins-bench)})</span>`:''}</span>
       </div>`).join(''):'<div style="font-size:13px;color:var(--text-3);padding:8px 0">No sessions logged.</div>'}
     </div>`;
@@ -11899,7 +11899,7 @@ function openChecklistHistory(fileId) {
         const prevAns = prev ? (prev.answers[idx] || '—') : null;
         const changed = prevAns !== null && prevAns !== ans;
         const col = ans==='Yes'?'#065F46':ans==='No'?'#991B1B':ans==='N/A'?'#92400E':'var(--text-3)';
-        const bg  = ans==='Yes'?'#D1FAE5':ans==='No'?'#FEE2E2':ans==='N/A'?'#FEF3C7':'var(--surface-2)';
+        const bg  = ans==='Yes'?'#D1FAE5':ans==='No'?'#FEE2E2':ans==='N/A'?'#FEF3C7':'var(--surface)';
         itemHtml += '<div style="display:flex;align-items:flex-start;gap:10px;padding:5px 0;border-bottom:0.5px solid var(--border);'+(changed?'background:#FEF9C3;margin:0 -8px;padding:5px 8px;':'')+'">'
           +'<span style="flex:1;font-size:12px;color:var(--text-2);padding-top:2px">'+esc(question)+'</span>'
           +(changed?'<span style="font-size:11px;color:#92400E;white-space:nowrap;padding-top:2px">was: '+esc(prevAns)+'</span>':'')
@@ -11910,7 +11910,7 @@ function openChecklistHistory(fileId) {
     });
 
     html += '<div style="border:1.5px solid '+(isLatest?'var(--brand)':'var(--border)')+';border-radius:var(--radius-sm);margin-bottom:10px;overflow:hidden">'
-      +'<div style="padding:10px 12px;background:'+(isLatest?'var(--brand-light)':'var(--surface-2)')+';display:flex;align-items:center;gap:8px">'
+      +'<div style="padding:10px 12px;background:'+(isLatest?'var(--brand-light)':'var(--surface)')+';display:flex;align-items:center;gap:8px">'
       +'<div style="flex:1"><div style="font-size:13px;font-weight:700;color:'+(isLatest?'var(--brand)':'var(--text)')+'">'+esc(entry.submittedBy.split(' ')[0])+(isLatest?' <span style="font-size:11px;background:var(--brand);color:#fff;border-radius:50px;padding:1px 7px">Latest</span>':'')+'</div>'
       +'<div style="font-size:11px;color:var(--text-3)">Submitted '+esc(entry.submittedAt)+'</div></div>'
       +(changed && !isLatest?'<span style="font-size:11px;background:#FEF9C3;color:#92400E;border-radius:50px;padding:2px 8px;font-weight:600">⚠ Modified</span>':'')
@@ -11944,7 +11944,7 @@ function clvRender() {
         sec.items.forEach(function(question) {
           const ans = answers[idx] || '—';
           const col = ans==='Yes'?'#065F46':ans==='No'?'#991B1B':ans==='N/A'?'#92400E':'var(--text-3)';
-          const bg  = ans==='Yes'?'#D1FAE5':ans==='No'?'#FEE2E2':ans==='N/A'?'#FEF3C7':'var(--surface-2)';
+          const bg  = ans==='Yes'?'#D1FAE5':ans==='No'?'#FEE2E2':ans==='N/A'?'#FEF3C7':'var(--surface)';
           clHtml += '<div style="display:flex;align-items:flex-start;gap:10px;padding:5px 0;border-bottom:0.5px solid var(--border)">'
             +'<span style="flex:1;font-size:12px;color:var(--text-2);padding-top:2px">'+esc(question)+'</span>'
             +'<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:50px;background:'+bg+';color:'+col+';white-space:nowrap;flex-shrink:0">'+esc(ans)+'</span>'
@@ -11957,7 +11957,7 @@ function clvRender() {
     }
     const histCount = (f.checklistHistory||[]).length;
     html += '<div style="border:1.5px solid var(--border);border-radius:var(--radius-sm);margin-bottom:8px;overflow:hidden">'
-      +'<div style="display:flex;align-items:center;gap:8px;padding:10px 12px;cursor:pointer;background:var(--surface-2)" onclick="clvToggle(this)">'
+      +'<div style="display:flex;align-items:center;gap:8px;padding:10px 12px;cursor:pointer;background:var(--surface)" onclick="clvToggle(this)">'
       +'<div style="flex:1"><div style="font-size:13px;font-weight:600">'+esc(f.client)+'</div>'
       +'<div style="font-size:11px;color:var(--text-3)">'+esc(f.owner)+' \u00b7 '+esc(fmtDate(f.checklistDate||''))+' \u00b7 '+esc(f.status)+'</div></div>'
       +(histCount>1?'<button data-fid="'+esc(f.id)+'" onclick="event.stopPropagation();openChecklistHistory(this.dataset.fid)" style="font-size:11px;padding:2px 8px;border-radius:50px;border:1.5px solid #FDE68A;background:#FEF3C7;color:#92400E;cursor:pointer;font-weight:600;white-space:nowrap">'+histCount+' versions</button>':'')
@@ -11968,8 +11968,8 @@ function clvRender() {
   html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px">'
     +'<span style="font-size:12px;color:var(--text-3)">'+total+' response'+(total!==1?'s':'')+'</span>'
     +'<div style="display:flex;gap:6px">'
-    +(_clvPage>0?'<button onclick="_clvPage--;clvRender()" style="font-size:12px;padding:4px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface-2);cursor:pointer">Prev</button>':'')
-    +((_clvPage+1)*CLV_PER_PAGE<total?'<button onclick="_clvPage++;clvRender()" style="font-size:12px;padding:4px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface-2);cursor:pointer">Next</button>':'')
+    +(_clvPage>0?'<button onclick="_clvPage--;clvRender()" style="font-size:12px;padding:4px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);cursor:pointer">Prev</button>':'')
+    +((_clvPage+1)*CLV_PER_PAGE<total?'<button onclick="_clvPage++;clvRender()" style="font-size:12px;padding:4px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);cursor:pointer">Next</button>':'')
     +'</div></div>';
   el.innerHTML = html;
 }
