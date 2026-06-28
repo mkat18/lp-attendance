@@ -8691,7 +8691,9 @@ async function renderBrokerMgmtScreen() {
     _brokers.forEach(b=>{const t=b.type||'Unassigned';if(!byType[t])byType[t]=[];byType[t].push(b);});
     const typeList = _brokerTypes.length ? _brokerTypes : BROKER_TYPE_DEFAULTS.map((n,i)=>({id:-(i+1),name:n}));
 
-    const typeCards = '<div class="bm-av-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:4px">'
+    const typeCards = '<input type="text" id="bmClientSearch" placeholder="Search clients\u2026" oninput="bmSearchClients(this.value)" style="width:100%;font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);margin-bottom:10px">'
+      +'<div id="bmClientSearchResults" style="display:none;margin-bottom:8px"></div>'
+      +'<div id="bmClientGrid"><div class="bm-av-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:4px">'
       +typeList.map(t=>{
         const cnt=(byType[t.name]||[]).length;
         return '<div data-avkey="type_'+esc(t.name)+'" onclick="bmAvToggle(this.dataset.avkey)" style="border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:10px 8px;text-align:center;cursor:pointer;background:var(--surface-2)">'
@@ -8702,6 +8704,7 @@ async function renderBrokerMgmtScreen() {
         +'<div style="font-size:10px;color:#92400E;margin-top:3px">Unassigned</div></div>':'')
       +'</div>'
       +'<div id="bm-exp-types" style="display:none;background:var(--surface-2);border:1.5px solid var(--brand);border-radius:var(--radius-sm);padding:10px 12px;margin-top:4px;margin-bottom:10px"></div>'
+      +'</div>'
       +'<div style="border-top:0.5px solid var(--border);margin:10px 0"></div>'
       +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">'
       +'<input type="text" id="bmNewBroker" placeholder="Client name\u2026" style="flex:2;min-width:120px;font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)" onkeydown="if(event.key===&quot;Enter&quot;){addBroker();}"/>'
@@ -8824,6 +8827,39 @@ function bmToggle(id) {
   body.style.display=open?'none':'block';
   if (arr) arr.textContent=open?'\u25be':'\u25b4';
   if (hdr) hdr.style.marginBottom=open?'0':'10px';
+}
+
+function bmSearchClients(q) {
+  const grid = document.getElementById('bmClientGrid');
+  const results = document.getElementById('bmClientSearchResults');
+  if (!grid || !results) return;
+  const term = q.toLowerCase().trim();
+  if (!term) {
+    grid.style.display = '';
+    results.style.display = 'none';
+    results.innerHTML = '';
+    return;
+  }
+  grid.style.display = 'none';
+  const matches = _brokers.filter(b => b.name.toLowerCase().includes(term));
+  if (!matches.length) {
+    results.innerHTML = '<div style="font-size:13px;color:var(--text-3);padding:8px 0">No clients found.</div>';
+  } else {
+    const typeOptions = '<option value="">No type</option>'
+      +_brokerTypes.filter(t=>t.id>0).map(t=>'<option value="'+esc(t.name)+'">'+esc(t.name)+'</option>').join('');
+    results.innerHTML = matches.map(b=>{
+      const analysts = _brokerAssignments.filter(a=>a.brokerName===b.name).map(a=>a.staffName);
+      return '<div style="padding:8px 0;border-bottom:0.5px solid var(--border)">'
+        +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
+        +'<span style="font-size:13px;font-weight:500;flex:1">'+esc(b.name)+'</span>'
+        +'<select onchange="setBrokerType('+b.id+',this.value)" style="font-size:12px;padding:3px 8px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface-2)">'+typeOptions.replace('value="'+esc(b.type||'')+'"','value="'+esc(b.type||'')+'" selected')+'</select>'
+        +'<button onclick="deleteBroker('+b.id+')" style="font-size:12px;padding:3px 10px;border-radius:var(--radius-sm);border:1.5px solid var(--danger);color:var(--danger);background:transparent;cursor:pointer">Remove</button>'
+        +'</div>'
+        +(analysts.length?'<div style="font-size:11px;color:var(--text-3);margin-top:4px">\u{1F464} '+analysts.join(', ')+'</div>':'')
+        +'</div>';
+    }).join('');
+  }
+  results.style.display = 'block';
 }
 
 function bmToggleAssignForm(sid) {
