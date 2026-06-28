@@ -8664,6 +8664,7 @@ async function renderBrokerMgmtScreen() {
     +(!om?'<div data-avkey="full" onclick="bmAvToggle(this.dataset.avkey)" style="background:#FEE2E2;border-radius:var(--radius-sm);padding:10px 8px;text-align:center;cursor:pointer"><div style="font-size:20px;font-weight:700;color:#991B1B">'+countFull+'</div><div style="font-size:11px;color:#991B1B;margin-top:2px">Full</div></div>':'')
     +(!om?'<div data-avkey="other" onclick="bmAvToggle(this.dataset.avkey)" style="background:var(--surface-2);border-radius:var(--radius-sm);padding:10px 8px;text-align:center;cursor:pointer"><div style="font-size:20px;font-weight:700;color:var(--text-3)">'+countOther+'</div><div style="font-size:11px;color:var(--text-3);margin-top:2px">Other</div></div>':'')
     +'</div>'
+    +'<div id="bm-exp-avail" style="display:none;background:var(--surface-2);border:1.5px solid var(--brand);border-radius:var(--radius-sm);padding:10px 12px;margin-top:4px;margin-bottom:8px"></div>'
     +'<div style="display:flex;gap:0;border-bottom:1.5px solid var(--border);margin-bottom:10px">'
     +'<button id="ab-filter-analyst" onclick="bmAbFilter(\'analyst\')" style="font-size:12px;padding:6px 14px;border:none;background:transparent;color:var(--brand);cursor:pointer;font-weight:600;border-bottom:2px solid var(--brand);margin-bottom:-1.5px">By analyst</button>'
     +'<button id="ab-filter-crm" onclick="bmAbFilter(\'crm\')" style="font-size:12px;padding:6px 14px;border:none;background:transparent;color:var(--text-3);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1.5px">By CRM skill</button>'
@@ -8697,7 +8698,7 @@ async function renderBrokerMgmtScreen() {
         +'<div style="font-size:20px;font-weight:700;color:#92400E">'+(byType['Unassigned']||[]).length+'</div>'
         +'<div style="font-size:10px;color:#92400E;margin-top:3px">Unassigned</div></div>':'')
       +'</div>'
-      +'<div class="bm-av-expand" style="display:none;background:var(--surface-2);border:1.5px solid var(--brand);border-radius:var(--radius-sm);padding:10px 12px;margin-top:4px;margin-bottom:10px"></div>'
+      +'<div id="bm-exp-types" style="display:none;background:var(--surface-2);border:1.5px solid var(--brand);border-radius:var(--radius-sm);padding:10px 12px;margin-top:4px;margin-bottom:10px"></div>'
       +'<div style="border-top:0.5px solid var(--border);margin:10px 0"></div>'
       +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">'
       +'<input type="text" id="bmNewBroker" placeholder="Client name\u2026" style="flex:2;min-width:120px;font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)" onkeydown="if(event.key===&quot;Enter&quot;){addBroker();}"/>'
@@ -8939,95 +8940,103 @@ function bmCRMShowAdd(selectId) {
 
 
 function bmAvToggle(key) {
-  // Toggle same card off
+  var expId = (key==='none'||key==='partial'||key==='full'||key==='other') ? 'bm-exp-avail'
+    : key.startsWith('type_') ? 'bm-exp-types' : 'bm-exp-hc';
+
   if (_bmAvCard === key) {
     _bmAvCard = '';
-    document.querySelectorAll('[data-avkey]').forEach(el => el.style.outline = '');
-    document.querySelectorAll('.bm-av-expand').forEach(el => { el.style.display = 'none'; el.innerHTML = ''; });
+    document.querySelectorAll('[data-avkey]').forEach(function(el){el.style.outline='';});
+    ['bm-exp-avail','bm-exp-types','bm-exp-hc'].forEach(function(id){
+      var el=document.getElementById(id); if(el){el.style.display='none';el.innerHTML='';}
+    });
     return;
   }
   _bmAvCard = key;
-
-  // Update card outlines
-  document.querySelectorAll('[data-avkey]').forEach(el => {
-    el.style.outline = el.dataset.avkey === key ? '2px solid var(--brand)' : '';
+  document.querySelectorAll('[data-avkey]').forEach(function(el){
+    el.style.outline = el.dataset.avkey===key ? '2px solid var(--brand)' : '';
   });
+  ['bm-exp-avail','bm-exp-types','bm-exp-hc'].forEach(function(id){
+    var el=document.getElementById(id); if(el){el.style.display='none';el.innerHTML='';}
+  });
+  var expandEl = document.getElementById(expId);
+  if (!expandEl) return;
 
-  // Find the expansion div nearest to the clicked card
-  const clickedCard = document.querySelector('[data-avkey="'+key+'"]');
-  if (!clickedCard) return;
-  const expandEl = clickedCard.closest('.bm-av-grid')?.nextElementSibling;
-  if (!expandEl || !expandEl.classList.contains('bm-av-expand')) return;
-
-  // Hide all expansion divs first
-  document.querySelectorAll('.bm-av-expand').forEach(el => { el.style.display = 'none'; el.innerHTML = ''; });
-
-  // Build content
-  let html = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'
+  expandEl.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'
     +'<span style="font-size:12px;font-weight:700;color:var(--brand)" id="bm-av-title"></span>'
-    +'<button onclick="_bmAvCard=\'\';document.querySelectorAll(\'[data-avkey]\').forEach(e=>e.style.outline=\'\');this.closest(\'.bm-av-expand\').style.display=\'none\'" style="background:transparent;border:none;font-size:18px;cursor:pointer;color:var(--text-3);line-height:1">&times;</button>'
+    +'<button onclick="bmAvClose()" style="background:transparent;border:none;font-size:18px;cursor:pointer;color:var(--text-3);line-height:1">&times;</button>'
     +'</div><div id="bm-av-content"></div>';
-  expandEl.innerHTML = html;
   expandEl.style.display = 'block';
 
-  const titleEl = expandEl.querySelector('#bm-av-title');
-  const contentEl = expandEl.querySelector('#bm-av-content');
+  var titleEl = expandEl.querySelector('#bm-av-title');
+  var contentEl = expandEl.querySelector('#bm-av-content');
+  var allStaff = getStaff().filter(function(s){return ['analyst','teamlead','trainee'].includes(s.role);});
+  var om=isOpsManager(), sa=isSuperAdmin(), tl=isTeamLead();
+  var myTeam = tl ? getTeamForTL(currentUser.name) : [];
+  var viewStaff = (sa||om) ? allStaff : allStaff.filter(function(s){return myTeam.includes(s.name);});
+  var avScope = om ? viewStaff.filter(function(s){return ['none','partial-am','partial-pm'].includes(staffAvailability(s.name));}) : viewStaff;
 
-  const allStaff = typeof getStaff === 'function' ? getStaff().filter(s=>['analyst','teamlead','trainee'].includes(s.role)) : [];
-
-  if (key === 'staff') {
-    titleEl.textContent = 'All staff';
-    contentEl.innerHTML = allStaff.map(s=>'<div style="font-size:12px;padding:4px 0;border-bottom:0.5px solid var(--border);display:flex;justify-content:space-between"><span>'+esc(s.name)+'</span><span style="color:var(--text-3)">'+esc((typeof ROLE_LABEL!=='undefined'?ROLE_LABEL[s.role]:'')||s.role)+'</span></div>').join('') || '<div style="font-size:12px;color:var(--text-3)">No staff.</div>';
-  } else if (key === 'clients') {
-    titleEl.textContent = 'All clients';
-    contentEl.innerHTML = _brokers.map(b=>'<div style="font-size:12px;padding:4px 0;border-bottom:0.5px solid var(--border);display:flex;justify-content:space-between"><span>'+esc(b.name)+'</span><span style="color:var(--text-3)">'+esc(b.type||'')+'</span></div>').join('') || '<div style="font-size:12px;color:var(--text-3)">No clients.</div>';
+  if (key==='staff') {
+    titleEl.textContent='All staff';
+    contentEl.innerHTML=allStaff.map(function(s){return '<div style="font-size:12px;padding:4px 0;border-bottom:0.5px solid var(--border);display:flex;justify-content:space-between"><span>'+esc(s.name)+'</span><span style="color:var(--text-3)">'+esc((ROLE_LABEL[s.role])||s.role)+'</span></div>';}).join('') || '<div style="font-size:12px;color:var(--text-3)">No staff.</div>';
+  } else if (key==='clients') {
+    titleEl.textContent='All clients';
+    contentEl.innerHTML=_brokers.map(function(b){return '<div style="font-size:12px;padding:4px 0;border-bottom:0.5px solid var(--border);display:flex;justify-content:space-between"><span>'+esc(b.name)+'</span><span style="color:var(--text-3)">'+esc(b.type||'')+'</span></div>';}).join('') || '<div style="font-size:12px;color:var(--text-3)">No clients.</div>';
   } else if (key.startsWith('type_')) {
-    const typeName = key.slice(5);
-    titleEl.textContent = typeName + (typeName==='Unassigned'?' — set a type to move them':' — '+(_brokers.filter(b=>(b.type||'Unassigned')===typeName).length)+' clients');
-    const group = _brokers.filter(b=>(b.type||'Unassigned')===typeName);
-    const typeOptions = '<option value="">No type</option>'
-      +_brokerTypes.filter(t=>t.id>0).map(t=>'<option value="'+esc(t.name)+'">'+esc(t.name)+'</option>').join('');
-    contentEl.innerHTML = group.map(b=>{
-      const analysts = _brokerAssignments.filter(a=>a.brokerName===b.name).map(a=>a.staffName);
+    var typeName=key.slice(5);
+    var group=_brokers.filter(function(b){return (b.type||'Unassigned')===typeName;});
+    titleEl.textContent=typeName+' ('+group.length+')';
+    var typeOptions='<option value="">No type</option>'+_brokerTypes.filter(function(t){return t.id>0;}).map(function(t){return '<option value="'+esc(t.name)+'">'+esc(t.name)+'</option>';}).join('');
+    contentEl.innerHTML=group.map(function(b){
+      var analysts=_brokerAssignments.filter(function(a){return a.brokerName===b.name;}).map(function(a){return a.staffName;});
       return '<div style="padding:8px 0;border-bottom:0.5px solid var(--border)">'
         +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
         +'<span style="font-size:13px;font-weight:500;flex:1">'+esc(b.name)+'</span>'
-        +'<select onchange="setBrokerType('+b.id+',this.value)" style="font-size:12px;padding:3px 8px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface-2)">'
-        +typeOptions.replace('value="'+esc(b.type||'')+'"','value="'+esc(b.type||'')+'" selected')
-        +'</select>'
+        +'<select onchange="setBrokerType('+b.id+',this.value)" style="font-size:12px;padding:3px 8px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface-2)">'+typeOptions.replace('value="'+esc(b.type||'')+'"','value="'+esc(b.type||'')+'" selected')+'</select>'
         +'<button onclick="deleteBroker('+b.id+')" style="font-size:12px;padding:3px 10px;border-radius:var(--radius-sm);border:1.5px solid var(--danger);color:var(--danger);background:transparent;cursor:pointer">Remove</button>'
         +'</div>'
         +(analysts.length?'<div style="font-size:11px;color:var(--text-3);margin-top:4px">\u{1F464} '+analysts.join(', ')+'</div>':'')
         +'</div>';
     }).join('') || '<div style="font-size:12px;color:var(--text-3)">No clients of this type.</div>';
   } else {
-    // Availability cards: none/partial/full/other
-    const labels = {none:'Available',partial:'Part time',full:'Fully allocated',other:'Other'};
-    titleEl.textContent = labels[key] || key;
-    const group = allStaff.filter(s => {
-      const av = typeof staffAvailability==='function' ? staffAvailability(s.name) : 'none';
-      if (key==='none') return av==='none';
-      if (key==='partial') return av==='partial-am'||av==='partial-pm';
-      if (key==='full') return av==='full';
+    var labels={none:'Available',partial:'Part time',full:'Fully allocated',other:'Other'};
+    titleEl.textContent=labels[key]||key;
+    var group2=avScope.filter(function(s){
+      var av=staffAvailability(s.name);
+      if(key==='none') return av==='none';
+      if(key==='partial') return av==='partial-am'||av==='partial-pm';
+      if(key==='full') return av==='full';
       return av==='other';
     });
-    contentEl.innerHTML = group.map(s=>{
-      const ten = typeof tenureStr==='function' ? tenureStr(s) : '';
-      const av = typeof staffAvailability==='function' ? staffAvailability(s.name) : '';
-      const avl = typeof availLabel==='function' ? availLabel(av) : {dot:'#888',text:av};
-      const assigns = typeof getAssignmentsForStaff==='function' ? getAssignmentsForStaff(s.name) : [];
-      return '<div style="padding:6px 0;border-bottom:0.5px solid var(--border)">'
-        +'<div style="display:flex;align-items:center;gap:6px"><span style="font-size:12px;font-weight:600;flex:1">'+esc(s.name)+'</span>'
+    contentEl.innerHTML=group2.map(function(s){
+      var t=s.joinDate?calcTenure(s.joinDate):null;
+      var ten=t?((t.years?t.years+'y ':'')+( t.months?t.months+'m':'')).trim():'';
+      var av=staffAvailability(s.name);
+      var avColors={none:{bg:'#D1FAE5',col:'#065F46',txt:'Free all day'},'partial-am':{bg:'#FEF3C7',col:'#92400E',txt:'Free AM'},'partial-pm':{bg:'#FEF3C7',col:'#92400E',txt:'Free PM'},full:{bg:'#FEE2E2',col:'#991B1B',txt:'Fully allocated'},other:{bg:'var(--surface-2)',col:'var(--text-3)',txt:'Other'}};
+      var avl=avColors[av]||avColors.other;
+      var assigns=getAssignmentsForStaff(s.name);
+      var crms=getCRMsForStaff(s.name);
+      return '<div style="padding:8px 0;border-bottom:0.5px solid var(--border)">'
+        +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:'+(crms.length||assigns.length?'4':'0')+'px">'
+        +'<span style="font-size:13px;font-weight:600;flex:1">'+esc(s.name)+'</span>'
         +(ten?'<span style="font-size:11px;color:var(--text-3)">'+ten+'</span>':'')
-        +'<span style="font-size:11px;border-radius:50px;padding:2px 7px;background:'+avl.dot+'22;color:'+avl.dot+';font-weight:600">'+avl.text+'</span></div>'
-        +(assigns.length?'<div style="font-size:11px;color:var(--text-2);margin-top:3px">'+assigns.map(a=>esc(a.brokerName)+' · '+(a.type||'FT')).join(', ')+'</div>':'')
+        +'<span style="font-size:11px;padding:2px 8px;border-radius:50px;background:'+avl.bg+';color:'+avl.col+'">'+avl.txt+'</span>'
+        +'</div>'
+        +(assigns.length?'<div style="font-size:11px;color:var(--text-2);margin-bottom:3px">'+assigns.map(function(a){return esc(a.brokerName)+' \u00b7 '+(a.type||'FT');}).join(', ')+'</div>':'')
+        +(crms.length?'<div style="display:flex;gap:4px;flex-wrap:wrap">'+crms.map(function(c){return '<span style="font-size:11px;background:#EDE9FE;color:#5B21B6;padding:2px 8px;border-radius:50px">'+esc(c)+'</span>';}).join('')+'</div>':'')
         +'</div>';
     }).join('') || '<div style="font-size:12px;color:var(--text-3)">None in this category.</div>';
   }
-
-  // Scroll expansion into view smoothly without jumping to top
-  setTimeout(()=>expandEl.scrollIntoView({behavior:'smooth',block:'nearest'}), 50);
+  setTimeout(function(){expandEl.scrollIntoView({behavior:'smooth',block:'nearest'});},50);
 }
+
+function bmAvClose() {
+  _bmAvCard='';
+  document.querySelectorAll('[data-avkey]').forEach(function(el){el.style.outline='';});
+  ['bm-exp-avail','bm-exp-types','bm-exp-hc'].forEach(function(id){
+    var el=document.getElementById(id); if(el){el.style.display='none';el.innerHTML='';}
+  });
+}
+
 
 function bmToggle(id) {
   const body=document.getElementById('bm-body-'+id);
