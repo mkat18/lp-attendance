@@ -1783,7 +1783,7 @@ async function loadPermissions() {
         }
       }
       LS.set('ci_permissions', _permissions);
-      setTimeout(() => { buildNav(); applyPermissionVisibility(); }, 100);
+      // Don't call buildNav here — loginAs handles it after permissions are loaded
     }
   } catch(e) {
     const cached = LS.get('ci_permissions');

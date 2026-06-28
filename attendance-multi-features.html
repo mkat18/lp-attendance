@@ -11246,7 +11246,10 @@ function renderEODScreen() {
 
     <!-- ── TASKS ────────────────────────────────────── -->
     <div class="card" style="margin-bottom:1rem">
-      <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">📋 Tasks today</div>
+      <div onclick="toggleEODTasksPanel()" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;margin-bottom:10px">
+        <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px">📋 Tasks today</div>
+        <span id="eodTasksToggleIcon" style="font-size:12px;color:var(--text-3)">▾ tap to edit</span>
+      </div>
       <button type="button" onclick="addEODTask()"
         style="width:100%;padding:10px;border:1.5px dashed var(--brand);border-radius:var(--radius-sm);background:var(--brand-light);color:var(--brand);font-size:13px;font-weight:600;cursor:pointer;margin-bottom:10px">
         + Add task
@@ -11322,6 +11325,7 @@ function renderEODScreen() {
          <div style="text-align:center;font-size:12px;color:var(--text-3);margin-top:8px">Submitted at ${esc(submitted.submittedAt||'')}</div>`
       : `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
            <button type="button" onclick="saveDraftEOD()" style="padding:14px;font-size:15px;font-weight:600;border-radius:var(--radius-sm);border:1.5px solid #D97706;background:#FEF3C7;color:#92400E;cursor:pointer">Save draft</button>
+           <span id="eodAutoSaveInd" style="font-size:11px;color:var(--success);opacity:0;transition:opacity 0.5s;align-self:center">✓ Auto-saved</span>
            <button type="submit" class="btn-primary" style="padding:14px;font-size:15px">Submit EOD</button>
          </div>`
     }
@@ -11584,6 +11588,7 @@ function confirmAddEODTask() {
   cancelAddEODTask();
   renderEODTaskList();
   updateEODTaskSummary();
+  autoSaveEODDraft();
 }
 
 function cancelAddEODTask() {
@@ -11595,6 +11600,7 @@ function removeEODTask(idx) {
   _eodTasks.splice(idx, 1);
   renderEODTaskList();
   updateEODTaskSummary();
+  autoSaveEODDraft();
 }
 
 function updateEODTask(idx, field, value) {
@@ -11752,6 +11758,18 @@ function setEODYN(field, val, btn) {
     document.getElementById('eodCHDetail_wrap').style.display = val==='yes'?'block':'none';
   if (field==='supportNeeded' && document.getElementById('eodSNDetail_wrap'))
     document.getElementById('eodSNDetail_wrap').style.display = val==='yes'?'block':'none';
+}
+
+async function autoSaveEODDraft() {
+  if (!currentUser) return;
+  const report = buildEODReport('draft');
+  const all = getEODReports().filter(r => !(r.name===currentUser.name && r.date===today));
+  all.push(report);
+  saveEODReports(all);
+  spSyncEOD(report).catch(()=>{});
+  // Show subtle indicator instead of toast
+  const ind = document.getElementById('eodAutoSaveInd');
+  if (ind) { ind.textContent = '✓ Auto-saved'; ind.style.opacity='1'; setTimeout(()=>ind.style.opacity='0',2000); }
 }
 
 async function saveDraftEOD() {
