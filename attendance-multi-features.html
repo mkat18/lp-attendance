@@ -8016,7 +8016,7 @@ function renderMyTeam() {
   const negN = recentNotes.filter(n=>n.sentiment==='negative').length;
   const neuN = recentNotes.length - posN - negN;
 
-  let obsHTML = '';
+  let obsContent = '';
   if (teamNotes.length > 0) {
     const byPerson = {};
     for (const n of recentNotes) {
@@ -8026,8 +8026,7 @@ function renderMyTeam() {
       else byPerson[n.target].neu++;
       byPerson[n.target].notes.push(n);
     }
-    obsHTML = `<div class="card" style="margin-top:1rem">
-      <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">📝 Observation Notes — Last 30 days</div>
+    obsContent = `
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:12px">
         <div style="background:#F0FDF4;border-radius:var(--radius-sm);padding:8px;text-align:center">
           <div style="font-size:20px;font-weight:700;color:var(--success)">${posN}</div>
@@ -8062,21 +8061,28 @@ function renderMyTeam() {
                 </div>`).join('')}
             </div>
           </details>
-        </div>`).join('')}
+        </div>`).join('')}`;
+  }
+
+  function collapsibleCard(title, content) {
+    return `<div class="card" style="margin-bottom:1rem">
+      <div onclick="var b=this.nextElementSibling;b.style.display=b.style.display==='none'?'block':'none';this.querySelector('span').textContent=b.style.display==='none'?'\u25be':'\u25b4'" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer">
+        <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px">${title}</div>
+        <span style="font-size:13px;color:var(--text-3)">\u25be</span>
+      </div>
+      <div style="display:none;margin-top:10px">${content}</div>
     </div>`;
   }
 
   el.innerHTML = `
     <div class="card" style="margin-bottom:1rem">${summaryHTML}</div>
-    <div class="card">
-      <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Team members (${teamNames.length})</div>
-      ${cardsHTML}
-    </div>
-    ${obsHTML}
+    ${collapsibleCard('Team members ('+teamNames.length+')', cardsHTML)}
+    ${obsContent ? collapsibleCard('\ud83d\udcdd Observation Notes \u2014 Last 30 days', obsContent) : ''}
     <div style="text-align:center;margin-top:8px">
       <button onclick="renderMyTeam()" style="background:transparent;border:1.5px solid var(--border);border-radius:50px;padding:8px 20px;font-size:13px;color:var(--text-2);cursor:pointer">↻ Refresh</button>
     </div>`;
 }
+
 
 // ── Auto-refresh My Team every 60s when on that screen ───────────────────
 setInterval(() => {
@@ -11325,9 +11331,9 @@ function renderEODScreen() {
          <div style="text-align:center;font-size:12px;color:var(--text-3);margin-top:8px">Submitted at ${esc(submitted.submittedAt||'')}</div>`
       : `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
            <button type="button" onclick="saveDraftEOD()" style="padding:14px;font-size:15px;font-weight:600;border-radius:var(--radius-sm);border:1.5px solid #D97706;background:#FEF3C7;color:#92400E;cursor:pointer">Save draft</button>
-           <span id="eodAutoSaveInd" style="font-size:11px;color:var(--success);opacity:0;transition:opacity 0.5s;align-self:center">✓ Auto-saved</span>
            <button type="submit" class="btn-primary" style="padding:14px;font-size:15px">Submit EOD</button>
-         </div>`
+         </div>
+         <div style="text-align:center;margin-top:6px"><span id="eodAutoSaveInd" style="font-size:11px;color:var(--success);opacity:0;transition:opacity 0.5s">✓ Auto-saved</span></div>`
     }
   </form>`;
 
