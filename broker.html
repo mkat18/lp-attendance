@@ -8364,30 +8364,37 @@ async function loadBrokers() {
 
 async function loadBrokerAssignments() {
   try {
-    const res = await spGet(SP_API+"('BrokerAssignments')/items?$select=Id,Title,BrokerName&$top=1000");
-    if (res?.value) { _brokerAssignments = res.value.map(r=>({id:r.Id,staffName:r.Title,brokerName:r.BrokerName})); LS.set('ci_brokerassign',_brokerAssignments); return; }
-  } catch(e){}
+    const res = await spGet(SP_API+"('BrokerAssignments')/items?$select=Id,Title,BrokerName,AssignmentType&$top=1000");
+    if (res?.value) { _brokerAssignments = res.value.map(r=>({id:r.Id,staffName:r.Title,brokerName:r.BrokerName,type:r.AssignmentType||'FT'})); LS.set('ci_brokerassign',_brokerAssignments); return; }
+  } catch(e){
+    try {
+      const res2 = await spGet(SP_API+"('BrokerAssignments')/items?$select=Id,Title,BrokerName&$top=1000");
+      if (res2?.value) { _brokerAssignments = res2.value.map(r=>({id:r.Id,staffName:r.Title,brokerName:r.BrokerName,type:'FT'})); LS.set('ci_brokerassign',_brokerAssignments); return; }
+    } catch(e2){}
+  }
   _brokerAssignments = LS.get('ci_brokerassign') || [];
-}
-
-async function loadCRMOptions() {
-  try {
-    const res = await spGet(SP_API+"('CRMOptions')/items?$select=Id,Title&$top=200");
-    if (res?.value) { _crmOptions = res.value.map(r=>({id:r.Id,name:r.Title})); LS.set('ci_crmoptions',_crmOptions); return; }
-  } catch(e){}
-  _crmOptions = LS.get('ci_crmoptions') || [];
-}
-
-async function loadStaffCRMs() {
-  try {
-    const res = await spGet(SP_API+"('StaffCRMs')/items?$select=Id,Title,CRMList&$top=500");
-    if (res?.value) { _staffCRMs = res.value.map(r=>({id:r.Id,staffName:r.Title,crms:JSON.parse(r.CRMList||'[]')})); LS.set('ci_staffcrms',_staffCRMs); return; }
-  } catch(e){}
-  _staffCRMs = LS.get('ci_staffcrms') || [];
 }
 
 function getBrokersForStaff(staffName) {
   return _brokerAssignments.filter(a=>a.staffName===staffName).map(a=>a.brokerName);
+}
+
+function getAssignmentsForStaff(staffName) {
+  return _brokerAssignments.filter(a=>a.staffName===staffName);
+}
+
+function staffAvailability(staffName) {
+  const assigns = getAssignmentsForStaff(staffName);
+  if (!assigns.length) return 'none';
+  const types = assigns.map(a=>a.type||'FT');
+  if (types.includes('FT')) return 'full';
+  const hasAM = types.includes('PT AM');
+  const hasPM = types.includes('PT PM');
+  if (hasAM && hasPM) return 'full';
+  if (hasAM) return 'partial-pm';
+  if (hasPM) return 'partial-am';
+  if (types.every(t=>t==='Other')) return 'other';
+  return 'full';
 }
 
 function getCRMsForStaff(staffName) {
@@ -8397,9 +8404,10 @@ function getCRMsForStaff(staffName) {
 async function assignBrokerToStaff() {
   const staffName=document.getElementById('bmStaffSel')?.value;
   const brokerName=document.getElementById('bmBrokerSel')?.value;
+  const assignType=document.getElementById('bmAssignType')?.value||'FT';
   if(!staffName||!brokerName){showToast('Select both staff and broker.','err');return;}
   if(_brokerAssignments.some(a=>a.staffName===staffName&&a.brokerName===brokerName)){showToast('Already assigned.','err');return;}
-  const res=await spPost(SP_API+"('BrokerAssignments')/items",{Title:staffName,BrokerName:brokerName});
+  const res=await spPost(SP_API+"('BrokerAssignments')/items",{Title:staffName,BrokerName:brokerName,AssignmentType:assignType});
   if(res){await loadBrokerAssignments();renderBrokerMgmtScreen();showToast('Broker assigned ✓','ok');}
 }
 
@@ -8462,12 +8470,14 @@ async function renderBrokerMgmtScreen() {
   const viewStaff = (sa||om) ? allStaff : allStaff.filter(s=>myTeam.includes(s.name));
   el.innerHTML = '';
 
-  function bmSection(id, title, contentHtml, defaultOpen=true) {
+  // ── Helpers ───────────────────────────────────────────────────────────
+  function bmSection(id, title, contentHtml, defaultOpen) {
+    if (defaultOpen===undefined) defaultOpen=true;
     const sec = document.createElement('div');
     sec.className = 'card'; sec.style.marginBottom = '10px';
-    sec.innerHTML = '<div onclick="bmToggle(\''+id+'\')" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:2px 0;margin-bottom:6px">'
+    sec.innerHTML = '<div onclick="bmToggle(\''+id+'\')" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding-bottom:6px;margin-bottom:'+(defaultOpen?'8':'0')+'px;border-bottom:'+(defaultOpen?'0.5px solid var(--border)':'none')+'">'
       +'<div style="font-size:13px;font-weight:700;color:var(--text)">'+title+'</div>'
-      +'<span id="bm-arr-'+id+'" style="font-size:14px;color:var(--text-3);transition:transform .2s">'+(defaultOpen?'\u25b4':'\u25be')+'</span>'
+      +'<span id="bm-arr-'+id+'" style="font-size:14px;color:var(--text-3)">'+(defaultOpen?'\u25b4':'\u25be')+'</span>'
       +'</div>'
       +'<div id="bm-body-'+id+'" style="display:'+(defaultOpen?'block':'none')+'">'+contentHtml+'</div>';
     el.appendChild(sec);
@@ -8483,114 +8493,162 @@ async function renderBrokerMgmtScreen() {
     return parts.length ? parts.join(' ') : '<1m';
   }
 
-  // ── Analysts without broker ───────────────────────────────────────────
-  const unassigned = viewStaff.filter(s=>!getBrokersForStaff(s.name).length);
-  let abHtml = '<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">'
-    +'<button id="ab-filter-analyst" onclick="bmAbFilter(\'analyst\')" style="font-size:12px;padding:4px 12px;border-radius:50px;border:1.5px solid var(--brand);background:var(--brand-light);color:var(--brand);cursor:pointer;font-weight:600">By analyst</button>'
-    +'<button id="ab-filter-crm" onclick="bmAbFilter(\'crm\')" style="font-size:12px;padding:4px 12px;border-radius:50px;border:1.5px solid var(--border);background:var(--surface-2);color:var(--text-2);cursor:pointer">By CRM skill</button>'
-    +'</div>'
-    +'<div id="ab-by-analyst">'
-    +(unassigned.length ? unassigned.map(s=>{
-        const crms = getCRMsForStaff(s.name);
-        const ten = tenureStr(s);
-        return '<div style="padding:10px 0;border-bottom:0.5px solid var(--border)">'
-          +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
-          +'<span style="font-size:13px;font-weight:600;flex:1">'+esc(s.name)+'</span>'
-          +'<span style="font-size:11px;color:var(--text-3)">'+esc(ROLE_LABEL[s.role]||s.role)+'</span>'
-          +(ten?'<span style="font-size:11px;background:var(--surface-2);border-radius:50px;padding:2px 8px;color:var(--text-3)">\u231b '+ten+'</span>':'')
-          +'</div>'
-          +(crms.length?'<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px">'+crms.map(c=>'<span style="font-size:11px;background:#EDE9FE;color:#5B21B6;border-radius:50px;padding:2px 8px">'+esc(c)+'</span>').join('')+'</div>'
-            :'<div style="font-size:11px;color:var(--text-3);margin-top:4px">No CRM skills assigned</div>')
-          +'</div>';
-      }).join('')
-    : '<div style="font-size:13px;color:var(--success);">\u2713 All analysts have a broker assigned.</div>')
-    +'</div>'
-    +'<div id="ab-by-crm" style="display:none">'
+  function availLabel(av) {
+    if (av==='none')       return {dot:'#22C55E', text:'Fully available'};
+    if (av==='partial-am') return {dot:'#F59E0B', text:'Free AM'};
+    if (av==='partial-pm') return {dot:'#F59E0B', text:'Free PM'};
+    if (av==='other')      return {dot:'#94A3B8', text:'Other industry'};
+    return {dot:'#EF4444', text:'Fully allocated'};
+  }
+
+  function personCard(s, showAvail) {
+    const crms = getCRMsForStaff(s.name);
+    const ten = tenureStr(s);
+    const assigns = getAssignmentsForStaff(s.name);
+    const av = staffAvailability(s.name);
+    const avl = availLabel(av);
+    return '<div style="padding:10px 0;border-bottom:0.5px solid var(--border)">'
+      +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:'+(crms.length||assigns.length?'6':'0')+'px">'
+      +'<span style="font-size:13px;font-weight:600;flex:1">'+esc(s.name)+'</span>'
+      +'<span style="font-size:11px;color:var(--text-3)">'+esc(ROLE_LABEL[s.role]||s.role)+'</span>'
+      +(ten?'<span style="font-size:11px;background:var(--surface-2);border-radius:50px;padding:2px 8px;color:var(--text-3)">\u231b '+ten+'</span>':'')
+      +(showAvail?'<span style="font-size:11px;border-radius:50px;padding:2px 8px;background:'+avl.dot+'22;color:'+avl.dot+';font-weight:600">\u25cf '+avl.text+'</span>':'')
+      +'</div>'
+      +(assigns.length?'<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:'+(crms.length?'4':'0')+'px">'
+        +assigns.map(a=>'<span style="font-size:11px;background:var(--brand-light);color:var(--brand);border-radius:50px;padding:2px 9px;font-weight:500">'+esc(a.brokerName)+' \u00b7 '+esc(a.type||'FT')+'</span>').join('')
+        +'</div>':'')
+      +(crms.length?'<div style="display:flex;flex-wrap:wrap;gap:4px">'
+        +crms.map(c=>'<span style="font-size:11px;background:#EDE9FE;color:#5B21B6;border-radius:50px;padding:2px 8px">'+esc(c)+'</span>').join('')+'</div>':'')
+      +'</div>';
+  }
+
+  // ── OPS MANAGER VIEW ─────────────────────────────────────────────────
+  if (om && !sa) {
+    // Coverage is rendered into coverSection-brokermgmt separately by goTab
+    // Analyst availability — only show available + partial
+    const available = viewStaff.filter(s=>['none','partial-am','partial-pm'].includes(staffAvailability(s.name)));
+    const countNone = viewStaff.filter(s=>staffAvailability(s.name)==='none').length;
+    const countPart = viewStaff.filter(s=>['partial-am','partial-pm'].includes(staffAvailability(s.name))).length;
+    const countFull = viewStaff.filter(s=>staffAvailability(s.name)==='full').length;
+    const countOther= viewStaff.filter(s=>staffAvailability(s.name)==='other').length;
+
+    const summaryHtml = '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px">'
+      +'<div style="background:#D1FAE5;border-radius:var(--radius-sm);padding:10px;text-align:center"><div style="font-size:18px;font-weight:700;color:#065F46">'+countNone+'</div><div style="font-size:11px;color:#065F46;margin-top:2px">Available</div></div>'
+      +'<div style="background:#FEF9C3;border-radius:var(--radius-sm);padding:10px;text-align:center"><div style="font-size:18px;font-weight:700;color:#92400E">'+countPart+'</div><div style="font-size:11px;color:#92400E;margin-top:2px">Part time</div></div>'
+      +'<div style="background:#FEE2E2;border-radius:var(--radius-sm);padding:10px;text-align:center"><div style="font-size:18px;font-weight:700;color:#991B1B">'+countFull+'</div><div style="font-size:11px;color:#991B1B;margin-top:2px">Fully allocated</div></div>'
+      +'<div style="background:var(--surface-2);border-radius:var(--radius-sm);padding:10px;text-align:center"><div style="font-size:18px;font-weight:700;color:var(--text-3)">'+countOther+'</div><div style="font-size:11px;color:var(--text-3);margin-top:2px">Other</div></div>'
+      +'</div>';
+
+    const filterBar = '<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">'
+      +'<button id="ab-filter-analyst" onclick="bmAbFilter(\'analyst\')" style="font-size:12px;padding:4px 12px;border-radius:50px;border:1.5px solid var(--brand);background:var(--brand-light);color:var(--brand);cursor:pointer;font-weight:600">By analyst</button>'
+      +'<button id="ab-filter-crm" onclick="bmAbFilter(\'crm\')" style="font-size:12px;padding:4px 12px;border-radius:50px;border:1.5px solid var(--border);background:var(--surface-2);color:var(--text-2);cursor:pointer">By CRM skill</button>'
+      +'</div>';
+
+    const byAnalyst = '<div id="ab-by-analyst">'
+      +(available.length ? available.map(s=>personCard(s,true)).join('')
+        : '<div style="font-size:13px;color:var(--danger);padding:8px 0">No analysts currently available.</div>')
+      +'</div>';
+
+    const byCRM = '<div id="ab-by-crm" style="display:none">'
+      +(_crmOptions.length ? _crmOptions.map(crm=>{
+          const avWithCRM = available.filter(s=>getCRMsForStaff(s.name).includes(crm.name));
+          return '<div style="padding:10px 0;border-bottom:0.5px solid var(--border)">'
+            +'<div style="font-size:13px;font-weight:600;margin-bottom:6px">'+esc(crm.name)+'</div>'
+            +(avWithCRM.length ? avWithCRM.map(s=>{
+                const av=staffAvailability(s.name); const avl=availLabel(av); const ten=tenureStr(s);
+                return '<div style="display:flex;align-items:center;gap:6px;padding:4px 0">'
+                  +'<span style="flex:1;font-size:12px">'+esc(s.name)+'</span>'
+                  +(ten?'<span style="font-size:11px;color:var(--text-3)">\u231b '+ten+'</span>':'')
+                  +'<span style="font-size:11px;border-radius:50px;padding:2px 8px;background:'+avl.dot+'22;color:'+avl.dot+';font-weight:600">'+avl.text+'</span>'
+                  +'</div>';}).join('')
+              : '<div style="font-size:12px;color:var(--text-3)">No available analysts with this skill.</div>')
+            +'</div>';}).join('')
+        : '<div style="font-size:13px;color:var(--text-3)">No CRM skills configured.</div>')
+      +'</div>';
+
+    bmSection('availability', '\ud83d\udcca Analyst availability', summaryHtml+filterBar+byAnalyst+byCRM, true);
+    return;
+  }
+
+  // ── SA / TL VIEW ──────────────────────────────────────────────────────
+
+  // Analyst availability
+  const countNone  = viewStaff.filter(s=>staffAvailability(s.name)==='none').length;
+  const countPart  = viewStaff.filter(s=>['partial-am','partial-pm'].includes(staffAvailability(s.name))).length;
+  const countFull  = viewStaff.filter(s=>staffAvailability(s.name)==='full').length;
+  const countOther = viewStaff.filter(s=>staffAvailability(s.name)==='other').length;
+
+  const availSummary = sa ? '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px">'
+    +'<div style="background:#D1FAE5;border-radius:var(--radius-sm);padding:8px;text-align:center"><div style="font-size:16px;font-weight:700;color:#065F46">'+countNone+'</div><div style="font-size:11px;color:#065F46">Available</div></div>'
+    +'<div style="background:#FEF9C3;border-radius:var(--radius-sm);padding:8px;text-align:center"><div style="font-size:16px;font-weight:700;color:#92400E">'+countPart+'</div><div style="font-size:11px;color:#92400E">Part time</div></div>'
+    +'<div style="background:#FEE2E2;border-radius:var(--radius-sm);padding:8px;text-align:center"><div style="font-size:16px;font-weight:700;color:#991B1B">'+countFull+'</div><div style="font-size:11px;color:#991B1B">Full</div></div>'
+    +'<div style="background:var(--surface-2);border-radius:var(--radius-sm);padding:8px;text-align:center"><div style="font-size:16px;font-weight:700;color:var(--text-3)">'+countOther+'</div><div style="font-size:11px;color:var(--text-3)">Other</div></div>'
+    +'</div>' : '';
+
+  const availAnalyst = '<div id="ab-by-analyst">'+viewStaff.map(s=>personCard(s,true)).join('')+'</div>';
+  const availCRM = '<div id="ab-by-crm" style="display:none">'
     +(_crmOptions.length ? _crmOptions.map(crm=>{
         const withCRM = viewStaff.filter(s=>getCRMsForStaff(s.name).includes(crm.name));
-        const withoutCRM = unassigned.filter(s=>getCRMsForStaff(s.name).includes(crm.name));
         return '<div style="padding:10px 0;border-bottom:0.5px solid var(--border)">'
           +'<div style="font-size:13px;font-weight:600;margin-bottom:6px">'+esc(crm.name)+'</div>'
-          +(withoutCRM.length
-            ? withoutCRM.map(s=>{
-                const ten=tenureStr(s);
-                return '<div style="display:flex;align-items:center;gap:6px;padding:3px 0">'
-                  +'<span style="font-size:12px;flex:1">'+esc(s.name)+'</span>'
-                  +(ten?'<span style="font-size:11px;color:var(--text-3)">\u231b '+ten+'</span>':'')
-                  +'<span style="font-size:11px;background:#FEE2E2;color:#991B1B;border-radius:50px;padding:1px 7px">No broker</span>'
-                  +'</div>';}).join('')
-            : '<div style="font-size:12px;color:var(--success)">\u2713 All with this skill have a broker</div>')
-          +'</div>';
-      }).join('')
-    : '<div style="font-size:13px;color:var(--text-3)">No CRM skills configured.</div>')
+          +withCRM.map(s=>{
+            const av=staffAvailability(s.name); const avl=availLabel(av); const ten=tenureStr(s);
+            return '<div style="display:flex;align-items:center;gap:6px;padding:4px 0">'
+              +'<span style="flex:1;font-size:12px">'+esc(s.name)+'</span>'
+              +(ten?'<span style="font-size:11px;color:var(--text-3)">\u231b '+ten+'</span>':'')
+              +'<span style="font-size:11px;border-radius:50px;padding:2px 8px;background:'+avl.dot+'22;color:'+avl.dot+';font-weight:600">'+avl.text+'</span>'
+              +'</div>';}).join('')
+          +'</div>';}).join('')
+      : '<div style="font-size:13px;color:var(--text-3)">No CRM skills configured.</div>')
     +'</div>';
-  bmSection('unassigned', '\ud83d\udc64 Analysts without broker', abHtml, true);
 
-  // ── Broker List (SA only) ─────────────────────────────────────────────
+  const filterBar2 = '<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">'
+    +'<button id="ab-filter-analyst" onclick="bmAbFilter(\'analyst\')" style="font-size:12px;padding:4px 12px;border-radius:50px;border:1.5px solid var(--brand);background:var(--brand-light);color:var(--brand);cursor:pointer;font-weight:600">By analyst</button>'
+    +'<button id="ab-filter-crm" onclick="bmAbFilter(\'crm\')" style="font-size:12px;padding:4px 12px;border-radius:50px;border:1.5px solid var(--border);background:var(--surface-2);color:var(--text-2);cursor:pointer">By CRM skill</button>'
+    +'</div>';
+  bmSection('availability', '\ud83d\udcca Analyst availability', availSummary+filterBar2+availAnalyst+availCRM, true);
+
+  // Broker List (SA only)
   if (sa) {
     const blHtml = '<div style="display:flex;gap:8px;margin-bottom:12px">'
       +'<input type="text" id="bmNewBroker" placeholder="Broker name\u2026" style="flex:1;font-size:13px;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)" onkeydown="if(event.key===\'Enter\'){addBroker();event.preventDefault()}"/>'
       +'<button onclick="addBroker()" style="padding:8px 16px;border-radius:var(--radius-sm);border:none;background:var(--brand);color:#fff;font-size:13px;font-weight:600;cursor:pointer">+ Add</button>'
       +'</div>'
       +(!_brokers.length?'<div style="font-size:13px;color:var(--text-3)">No brokers added yet.</div>'
-        :_brokers.map(b=>'<div style="display:flex;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)">'
-          +'<span style="flex:1;font-size:14px;font-weight:500">'+esc(b.name)+'</span>'
-          +'<button onclick="deleteBroker('+b.id+')" style="font-size:12px;padding:3px 10px;border-radius:4px;border:1px solid var(--danger);color:var(--danger);background:transparent;cursor:pointer">Remove</button>'
-          +'</div>').join(''));
+        :_brokers.map(b=>'<div style="display:flex;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)"><span style="flex:1;font-size:14px;font-weight:500">'+esc(b.name)+'</span><button onclick="deleteBroker('+b.id+')" style="font-size:12px;padding:3px 10px;border-radius:4px;border:1px solid var(--danger);color:var(--danger);background:transparent;cursor:pointer">Remove</button></div>').join(''));
     bmSection('brokerlist', '\ud83c\udfe6 Broker list', blHtml, false);
   }
 
-  // ── Broker Assignments ────────────────────────────────────────────────
+  // Broker Assignments
   let baHtml = '';
   if (sa) {
     baHtml += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--border)">'
-      +'<select id="bmStaffSel" style="flex:1;font-size:13px;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)"><option value="">— select staff —</option>'
-      +allStaff.map(s=>'<option value="'+esc(s.name)+'">'+esc(s.name)+' ('+esc(ROLE_LABEL[s.role]||s.role)+')</option>').join('')
-      +'</select>'
-      +'<select id="bmBrokerSel" style="flex:1;font-size:13px;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)"><option value="">— select broker —</option>'
-      +_brokers.map(b=>'<option value="'+esc(b.name)+'">'+esc(b.name)+'</option>').join('')
+      +'<select id="bmStaffSel" style="flex:1;min-width:140px;font-size:13px;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)"><option value="">— staff —</option>'
+      +allStaff.map(s=>'<option value="'+esc(s.name)+'">'+esc(s.name)+'</option>').join('')+'</select>'
+      +'<select id="bmBrokerSel" style="flex:1;min-width:140px;font-size:13px;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)"><option value="">— broker —</option>'
+      +_brokers.map(b=>'<option value="'+esc(b.name)+'">'+esc(b.name)+'</option>').join('')+'</select>'
+      +'<select id="bmAssignType" style="font-size:13px;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)">'
+      +'<option value="FT">FT</option><option value="PT AM">PT AM</option><option value="PT PM">PT PM</option><option value="Other">Other</option>'
       +'</select>'
       +'<button onclick="assignBrokerToStaff()" style="padding:8px 16px;border-radius:var(--radius-sm);border:none;background:var(--brand);color:#fff;font-size:13px;font-weight:600;cursor:pointer">Assign</button>'
       +'</div>';
   }
-  baHtml += viewStaff.map(s=>{
-    const brokers=getBrokersForStaff(s.name);
-    const ten=tenureStr(s);
-    return '<div style="padding:10px 0;border-bottom:1px solid var(--border)">'
-      +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px">'
-      +'<span style="font-size:13px;font-weight:600;flex:1">'+esc(s.name)+'</span>'
-      +'<span style="font-size:11px;color:var(--text-3)">'+esc(ROLE_LABEL[s.role]||s.role)+'</span>'
-      +(ten?'<span style="font-size:11px;background:var(--surface-2);border-radius:50px;padding:2px 8px;color:var(--text-3)">\u231b '+ten+'</span>':'')
-      +'</div>'
-      +'<div style="display:flex;flex-wrap:wrap;gap:6px">'
-      +(brokers.length ? brokers.map(b=>{
-        const assign=_brokerAssignments.find(a=>a.staffName===s.name&&a.brokerName===b);
-        return '<div style="display:flex;align-items:center;gap:4px;background:var(--brand-light);border:1px solid var(--brand);border-radius:50px;padding:3px 10px">'
-          +'<span style="font-size:12px;color:var(--brand);font-weight:500">'+esc(b)+'</span>'
-          +(sa?'<button onclick="removeBrokerAssignment('+(assign?.id)+')" style="background:transparent;border:none;color:var(--brand);cursor:pointer;font-size:14px;line-height:1;padding:0 0 0 2px">\u00d7</button>':'')
-          +'</div>';}).join('')
-        : '<span style="font-size:12px;color:var(--danger)">No broker assigned</span>')
-      +'</div></div>';
-  }).join('');
+  baHtml += viewStaff.map(s=>personCard(s,false)).join('');
   bmSection('assignments', '\ud83d\udc65 Broker assignments', baHtml, true);
 
-  // ── CRM Options (SA only) ─────────────────────────────────────────────
+  // CRM Options (SA only)
   if (sa) {
     const coHtml = '<div style="display:flex;gap:8px;margin-bottom:12px">'
       +'<input type="text" id="bmNewCRM" placeholder="CRM name\u2026" style="flex:1;font-size:13px;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)" onkeydown="if(event.key===\'Enter\'){addCRMOption();event.preventDefault()}"/>'
       +'<button onclick="addCRMOption()" style="padding:8px 16px;border-radius:var(--radius-sm);border:none;background:var(--brand);color:#fff;font-size:13px;font-weight:600;cursor:pointer">+ Add</button>'
-      +'</div>'
-      +'<div style="display:flex;flex-wrap:wrap;gap:6px">'
+      +'</div><div style="display:flex;flex-wrap:wrap;gap:6px">'
       +(!_crmOptions.length?'<span style="font-size:13px;color:var(--text-3)">No CRMs yet.</span>'
-        :_crmOptions.map(c=>'<div style="display:flex;align-items:center;gap:4px;background:var(--surface-2);border:1.5px solid var(--border);border-radius:50px;padding:4px 12px">'
-          +'<span style="font-size:13px">'+esc(c.name)+'</span>'
-          +'<button onclick="deleteCRMOption('+c.id+')" style="background:transparent;border:none;color:var(--text-3);cursor:pointer;font-size:16px;line-height:1;padding:0 0 0 4px">\u00d7</button>'
-          +'</div>').join(''))
+        :_crmOptions.map(c=>'<div style="display:flex;align-items:center;gap:4px;background:var(--surface-2);border:1.5px solid var(--border);border-radius:50px;padding:4px 12px"><span style="font-size:13px">'+esc(c.name)+'</span><button onclick="deleteCRMOption('+c.id+')" style="background:transparent;border:none;color:var(--text-3);cursor:pointer;font-size:16px;line-height:1;padding:0 0 0 4px">\u00d7</button></div>').join(''))
       +'</div>';
     bmSection('crmoptions', '\ud83d\udcbb CRM options', coHtml, false);
   }
 
-  // ── CRM Skills ────────────────────────────────────────────────────────
+  // CRM Skills
   if (_crmOptions.length) {
     const csHtml = viewStaff.map(s=>{
       const staffCRMs=getCRMsForStaff(s.name);
@@ -8600,36 +8658,42 @@ async function renderBrokerMgmtScreen() {
         +'<span style="font-size:13px;font-weight:600;flex:1">'+esc(s.name)+'</span>'
         +'<span style="font-size:11px;color:var(--text-3)">'+esc(ROLE_LABEL[s.role]||s.role)+'</span>'
         +(ten?'<span style="font-size:11px;background:var(--surface-2);border-radius:50px;padding:2px 8px;color:var(--text-3)">\u231b '+ten+'</span>':'')
-        +'</div>'
-        +'<div style="display:flex;flex-wrap:wrap;gap:6px">'
+        +'</div><div style="display:flex;flex-wrap:wrap;gap:6px">'
         +_crmOptions.map(c=>{
           const sel=staffCRMs.includes(c.name);
-          return '<button type="button" onclick="'+(sa?'toggleStaffCRM(\''+s.name.replace(/'/g,"\\'")+"','"+esc(c.name)+"')":'')+'"'
+          return '<button type="button" onclick="'+(sa?'toggleStaffCRM(\''+s.name.replace(/'/g,"\\'")+'\',\''+esc(c.name)+'\')':'')+'"'
             +' style="font-size:12px;padding:4px 12px;border-radius:50px;border:1.5px solid '+(sel?'var(--brand)':'var(--border)')+';'
-            +'background:'+(sel?'var(--brand-light)':'var(--surface-2)')+';color:'+(sel?'var(--brand)':'var(--text-3)')+';'
-            +'cursor:'+(sa?'pointer':'default')+';font-weight:'+(sel?'600':'400')+'">'
+            +'background:'+(sel?'var(--brand-light)':'var(--surface-2)')+';color:'+(sel?'var(--brand)':'var(--text-3)')+';cursor:'+(sa?'pointer':'default')+';font-weight:'+(sel?'600':'400')+'">'
             +(sel?'\u2713 ':'')+esc(c.name)+'</button>';}).join('')
         +'</div></div>';
     }).join('');
-    bmSection('crmskills', '\ud83e\uddd1\u200d\ud83d\udcbb CRM skills', csHtml, true);
+    bmSection('crmskills', '\ud83e\uddd1\u200d\ud83d\udcbb CRM skills', csHtml, !tl);
   }
 }
 
 function bmToggle(id) {
-  const body = document.getElementById('bm-body-'+id);
-  const arr  = document.getElementById('bm-arr-'+id);
+  const body=document.getElementById('bm-body-'+id);
+  const arr=document.getElementById('bm-arr-'+id);
   if (!body) return;
-  const open = body.style.display !== 'none';
-  body.style.display = open ? 'none' : 'block';
-  if (arr) arr.textContent = open ? '\u25be' : '\u25b4';
+  const open=body.style.display!=='none';
+  body.style.display=open?'none':'block';
+  if (arr) arr.textContent=open?'\u25be':'\u25b4';
+  const hdr=arr?.closest('div');
+  if (hdr) hdr.style.borderBottom=open?'none':'0.5px solid var(--border)';
 }
 
 function bmAbFilter(mode) {
-  document.getElementById('ab-by-analyst').style.display = mode==='analyst'?'block':'none';
-  document.getElementById('ab-by-crm').style.display     = mode==='crm'?'block':'none';
-  document.getElementById('ab-filter-analyst').style.cssText = 'font-size:12px;padding:4px 12px;border-radius:50px;cursor:pointer;font-weight:'+(mode==='analyst'?'600':'400')+';border:1.5px solid '+(mode==='analyst'?'var(--brand)':'var(--border)')+';background:'+(mode==='analyst'?'var(--brand-light)':'var(--surface-2)')+';color:'+(mode==='analyst'?'var(--brand)':'var(--text-2)');
-  document.getElementById('ab-filter-crm').style.cssText   = 'font-size:12px;padding:4px 12px;border-radius:50px;cursor:pointer;font-weight:'+(mode==='crm'?'600':'400')+';border:1.5px solid '+(mode==='crm'?'var(--brand)':'var(--border)')+';background:'+(mode==='crm'?'var(--brand-light)':'var(--surface-2)')+';color:'+(mode==='crm'?'var(--brand)':'var(--text-2)');
+  const byA=document.getElementById('ab-by-analyst');
+  const byCRM=document.getElementById('ab-by-crm');
+  const btnA=document.getElementById('ab-filter-analyst');
+  const btnC=document.getElementById('ab-filter-crm');
+  if(byA) byA.style.display=mode==='analyst'?'block':'none';
+  if(byCRM) byCRM.style.display=mode==='crm'?'block':'none';
+  if(btnA) { btnA.style.borderColor=mode==='analyst'?'var(--brand)':'var(--border)'; btnA.style.background=mode==='analyst'?'var(--brand-light)':'var(--surface-2)'; btnA.style.color=mode==='analyst'?'var(--brand)':'var(--text-2)'; btnA.style.fontWeight=mode==='analyst'?'600':'400'; }
+  if(btnC) { btnC.style.borderColor=mode==='crm'?'var(--brand)':'var(--border)'; btnC.style.background=mode==='crm'?'var(--brand-light)':'var(--surface-2)'; btnC.style.color=mode==='crm'?'var(--brand)':'var(--text-2)'; btnC.style.fontWeight=mode==='crm'?'600':'400'; }
 }
+
+
 
 
 // ── Cover file assignment ──────────────────────────────────────────────────
