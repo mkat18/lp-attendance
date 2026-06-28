@@ -11725,14 +11725,18 @@ function renderPerformanceScreen() {
   const chartsRow=`<div style="display:flex;gap:10px;margin-bottom:16px">
     <div style="flex:1;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:12px;min-width:0">
       <div style="font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Time distribution</div>
-      <div style="display:flex;gap:10px;align-items:center">
-        <canvas id="perf-pie" width="135" height="135" style="width:135px;height:135px;flex-shrink:0"></canvas>
+      <div style="display:flex;gap:12px;align-items:center">
+        <div style="width:160px;height:160px;flex-shrink:0;position:relative">
+          <canvas id="perf-pie"></canvas>
+        </div>
         <div id="perf-pie-legend" style="flex:1;min-width:0"></div>
       </div>
     </div>
     <div style="flex:1;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:12px;min-width:0">
       <div style="font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Benchmark trend <span style="font-weight:400;color:var(--text-3)">— red line = 80% target</span></div>
-      <canvas id="perf-trend" height="135" style="width:100%"></canvas>
+      <div style="height:160px;position:relative">
+        <canvas id="perf-trend"></canvas>
+      </div>
     </div>
   </div>`;
 
@@ -11933,7 +11937,7 @@ function perfDrawPie(dist) {
       labels:data.map(d=>d.label),
       datasets:[{data:data.map(d=>Math.round(d.mins)),backgroundColor:TASK_COLORS.slice(0,data.length),borderWidth:2,borderColor:'var(--surface)'}]
     },
-    options:{responsive:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>' '+ctx.label+': '+perfFmtMins(ctx.raw)+' ('+Math.round(ctx.raw/total*100)+'%)'}}},cutout:'65%',animation:{duration:400}}
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>' '+ctx.label+': '+perfFmtMins(ctx.raw)+' ('+Math.round(ctx.raw/total*100)+'%)'}}},cutout:'65%',animation:{duration:400}}
   });
   // Build compact legend
   const leg=document.getElementById('perf-pie-legend');
@@ -11956,7 +11960,7 @@ function perfDrawTrend(trend) {
       ]
     },
     options:{
-      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+(ctx.raw!=null?Math.round(ctx.raw)+'%':'no data')}},datalabels:{display:false}},
+      responsive:true,maintainAspectRatio:false,
       scales:{y:{min:0,max:100,ticks:{callback:v=>v+'%',font:{size:9}},grid:{color:'rgba(0,0,0,0.04)'}},x:{ticks:{font:{size:9},maxRotation:45},grid:{display:false}}},
       animation:{duration:400}
     }
