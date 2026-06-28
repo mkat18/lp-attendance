@@ -11618,21 +11618,21 @@ function renderPerformanceScreen() {
         style="font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)"/>
     `:''}
     ${sa||om?`
-      <select onchange="_perfAnalystFlt=this.value;renderPerformanceScreen()"
+      <select id="perf-analyst-sel" onchange="_perfAnalystFlt=this.value;renderPerformanceScreen()"
         style="font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)">
         <option value="">All analysts</option>
-        ${allAnalysts.map(n=>`<option value="${esc(n)}" ${n===_perfAnalystFlt?'selected':''}>${esc(n)}</option>`).join('')}
+        ${allAnalysts.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('')}
       </select>
-      <select onchange="_perfTeamFlt=this.value;renderPerformanceScreen()"
+      <select id="perf-team-sel" onchange="_perfTeamFlt=this.value;renderPerformanceScreen()"
         style="font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)">
         <option value="">All teams</option>
-        ${tls.map(tl=>`<option value="${esc(tl.name)}" ${tl.name===_perfTeamFlt?'selected':''}>${esc(tl.name.split(' ')[0])}'s team</option>`).join('')}
+        ${tls.map(tl=>`<option value="${esc(tl.name)}">${esc(tl.name.split(' ')[0])}'s team</option>`).join('')}
       </select>
     `:`
-      <select onchange="_perfAnalystFlt=this.value;renderPerformanceScreen()"
+      <select id="perf-analyst-sel" onchange="_perfAnalystFlt=this.value;renderPerformanceScreen()"
         style="font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)">
         <option value="">All my analysts</option>
-        ${names.map(n=>`<option value="${esc(n)}" ${n===_perfAnalystFlt?'selected':''}>${esc(n)}</option>`).join('')}
+        ${names.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('')}
       </select>
     `}
   </div>`;
@@ -11701,6 +11701,11 @@ function renderPerformanceScreen() {
   const viewContainer=`<div id="perf-view-container"></div>`;
   el.innerHTML=filterRow+summaryRow+alertBar+viewToggle+viewContainer+chartsRow;
   el._metrics=m; el._names=names;
+  // Restore dropdown values explicitly (prevents browser state mismatch on re-render)
+  const analystSel=document.getElementById('perf-analyst-sel');
+  if(analystSel) analystSel.value=_perfAnalystFlt||'';
+  const teamSel=document.getElementById('perf-team-sel');
+  if(teamSel) teamSel.value=_perfTeamFlt||'';
   setTimeout(()=>{ perfDrawPie(m.dist); perfDrawTrend(m.trend); perfRenderView(names,from,to,m); },50);
 }
 
