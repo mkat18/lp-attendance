@@ -6883,11 +6883,20 @@ function renderMyTeam() {
 
   el.innerHTML = `
     <div class="card" style="margin-bottom:1rem">${summaryHTML}</div>
-    <div class="card">
-      <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Team members (${teamNames.length})</div>
-      ${cardsHTML}
+    <div class="card" style="margin-bottom:1rem">
+      <div onclick="var b=this.nextElementSibling;b.style.display=b.style.display==='none'?'block':'none';this.querySelector('span').textContent=b.style.display==='none'?'▾':'▴'" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer">
+        <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px">Team members (${teamNames.length})</div>
+        <span style="font-size:13px;color:var(--text-3)">▾</span>
+      </div>
+      <div style="display:none;margin-top:10px">${cardsHTML}</div>
     </div>
-    ${obsHTML}
+    ${obsHTML ? `<div class="card" style="margin-bottom:1rem">
+      <div onclick="var b=this.nextElementSibling;b.style.display=b.style.display==='none'?'block':'none';this.querySelector('span').textContent=b.style.display==='none'?'▾':'▴'" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer">
+        <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px">📝 Observation notes</div>
+        <span style="font-size:13px;color:var(--text-3)">▾</span>
+      </div>
+      <div style="display:none;margin-top:10px"><div id="obsNoteContent"></div></div>
+    </div>` : ''}
     <div style="text-align:center;margin-top:8px">
       <button onclick="renderMyTeam()" style="background:transparent;border:1.5px solid var(--border);border-radius:50px;padding:8px 20px;font-size:13px;color:var(--text-2);cursor:pointer">↻ Refresh</button>
     </div>`;
@@ -11014,7 +11023,6 @@ function renderMyTeamEOD(myTeamNames) {
       <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px">📋 EOD Reports</div>
       <button onclick="refreshMyTeamEOD()" style="font-size:11px;padding:3px 10px;border-radius:50px;border:1.5px solid var(--border);background:var(--surface-2);cursor:pointer;color:var(--text-2)">↺ Refresh</button>
     </div>
-    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">${periodBtns}</div>
     ${_myTeamEODPeriod==='custom'?`<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
       <input type="date" value="${_myTeamEODFromDt}" onchange="_myTeamEODFromDt=this.value;renderMyTeamEOD(window._myTeamNames)"
         style="font-size:13px;padding:5px 8px;border:1.5px solid var(--border);border-radius:var(--radius-sm)"/>
@@ -11023,22 +11031,48 @@ function renderMyTeamEOD(myTeamNames) {
         style="font-size:13px;padding:5px 8px;border:1.5px solid var(--border);border-radius:var(--radius-sm)"/>
     </div>`:''}
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">${personBtns}</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr${isToday&&uniqueDrafters.length?' 1fr':''}${supportCount?' 1fr':'1fr'};gap:8px;margin-bottom:12px">
-      <div style="background:${uniqueSubmitters.length===viewNames.length?'#D1FAE5':'#FEF3C7'};border-radius:var(--radius-sm);padding:10px;text-align:center">
-        <div style="font-size:20px;font-weight:700;color:${uniqueSubmitters.length===viewNames.length?'#065F46':'#92400E'}">${uniqueSubmitters.length}/${viewNames.length}</div>
-        <div style="font-size:11px;color:${uniqueSubmitters.length===viewNames.length?'#065F46':'#92400E'};margin-top:2px">Submitted</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:4px">
+      <div onclick="eodCardToggle('submitted')" style="background:${uniqueSubmitters.length===viewNames.length?'#D1FAE5':'#FEF3C7'};border-radius:var(--radius-sm);padding:8px 6px;text-align:center;cursor:pointer;border:1.5px solid ${_myTeamEODCard==='submitted'?'var(--brand)':'transparent'}">
+        <div style="font-size:18px;font-weight:700;color:${uniqueSubmitters.length===viewNames.length?'#065F46':'#92400E'}">${uniqueSubmitters.length}/${viewNames.length}</div>
+        <div style="font-size:10px;color:${uniqueSubmitters.length===viewNames.length?'#065F46':'#92400E'};margin-top:1px">Submitted</div>
       </div>
-      ${isToday&&uniqueDrafters.length?`<div style="background:#F3F4F6;border-radius:var(--radius-sm);padding:10px;text-align:center">
-        <div style="font-size:20px;font-weight:700;color:#6B7280">${uniqueDrafters.length}</div>
-        <div style="font-size:11px;color:#6B7280;margin-top:2px">In progress</div>
-      </div>`:''}
-      <div style="background:${supportCount>0?'#FEF3C7':'var(--surface-2)'};border-radius:var(--radius-sm);padding:10px;text-align:center">
-        <div style="font-size:20px;font-weight:700;color:${supportCount>0?'#92400E':'var(--text-3)'}">${supportCount}</div>
-        <div style="font-size:11px;color:${supportCount>0?'#92400E':'var(--text-3)'};margin-top:2px">Need support</div>
+      <div onclick="eodCardToggle('drafts')" style="background:#F3F4F6;border-radius:var(--radius-sm);padding:8px 6px;text-align:center;cursor:pointer;border:1.5px solid ${_myTeamEODCard==='drafts'?'var(--brand)':'transparent'}">
+        <div style="font-size:18px;font-weight:700;color:#6B7280">${uniqueDrafters.length}</div>
+        <div style="font-size:10px;color:#6B7280;margin-top:1px">In progress</div>
+      </div>
+      <div onclick="eodCardToggle('support')" style="background:${supportCount>0?'#FEF3C7':'var(--surface-2)'};border-radius:var(--radius-sm);padding:8px 6px;text-align:center;cursor:pointer;border:1.5px solid ${_myTeamEODCard==='support'?'var(--brand)':'transparent'}">
+        <div style="font-size:18px;font-weight:700;color:${supportCount>0?'#92400E':'var(--text-3)'}">${supportCount}</div>
+        <div style="font-size:10px;color:${supportCount>0?'#92400E':'var(--text-3)'};margin-top:1px">Need support</div>
       </div>
     </div>
+    ${_myTeamEODCard?`<div style="background:var(--surface-2);border:1.5px solid var(--brand);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:10px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <div style="font-size:12px;font-weight:700;color:var(--brand)">${_myTeamEODCard==='submitted'?'✓ Submitted':_myTeamEODCard==='drafts'?'📝 In progress':'🙋 Need support'}</div>
+        <button onclick="_myTeamEODCard='';renderMyTeamEOD(window._myTeamNames)" style="background:transparent;border:none;font-size:16px;cursor:pointer;color:var(--text-3)">×</button>
+      </div>
+      ${_myTeamEODCard==='submitted'?uniqueSubmitters.map(n=>`<div style="font-size:12px;padding:3px 0;border-bottom:0.5px solid var(--border)">${esc(n.split(' ')[0])}</div>`).join('')||'<div style="font-size:12px;color:var(--text-3)">None yet</div>':''}
+      ${_myTeamEODCard==='drafts'?uniqueDrafters.map(n=>`<div style="font-size:12px;padding:3px 0;border-bottom:0.5px solid var(--border)">${esc(n.split(' ')[0])}</div>`).join('')||'<div style="font-size:12px;color:var(--text-3)">No drafts</div>':''}
+      ${_myTeamEODCard==='support'?submittedReports.filter(r=>r.supportNeeded==='yes').map(r=>`<div style="padding:4px 0;border-bottom:0.5px solid var(--border)"><div style="font-size:12px;font-weight:600">${esc(r.name.split(' ')[0])}</div>${r.supportDetail?`<div style="font-size:11px;color:var(--text-2)">${esc(r.supportDetail)}</div>`:''}</div>`).join('')||'<div style="font-size:12px;color:var(--text-3)">No support flags</div>':''}
+    </div>`:''}
     ${notSubmitted.length?`<div style="font-size:12px;color:var(--danger);margin-bottom:10px">⏳ Not submitted: ${notSubmitted.map(n=>esc(n.split(' ')[0])).join(', ')}</div>`:''}
-    <div>${memberRows}</div>`;
+    <div onclick="eodReportsToggle()" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:6px 0;margin-bottom:${_myTeamEODOpen?'8':'0'}px;border-top:0.5px solid var(--border)">
+      <span style="font-size:12px;font-weight:600;color:var(--text-2)">EOD Reports</span>
+      <span style="font-size:12px;color:var(--text-3)">${_myTeamEODOpen?'▴ collapse':'▾ expand'}</span>
+    </div>
+    ${_myTeamEODOpen?`<div>${memberRows}</div>`:''}`;
+}
+
+let _myTeamEODCard = '';   // which summary card is expanded: 'submitted'|'drafts'|'support'|''
+let _myTeamEODOpen = true; // whether member rows section is expanded
+
+function eodCardToggle(card) {
+  _myTeamEODCard = _myTeamEODCard === card ? '' : card;
+  renderMyTeamEOD(window._myTeamNames);
+}
+
+function eodReportsToggle() {
+  _myTeamEODOpen = !_myTeamEODOpen;
+  renderMyTeamEOD(window._myTeamNames);
 }
 
 function myTeamToggleMember(name, teamNames) {
