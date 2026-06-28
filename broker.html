@@ -7313,7 +7313,10 @@ function coverageScope(date) {
 }
 
 function coverageCandidates(excludeName) {
-  return getStaff().filter(s=>['analyst','trainee'].includes(s.role)&&s.name!==excludeName).sort((a,b)=>a.name.localeCompare(b.name));
+  return getStaff()
+    .filter(s => ['analyst','trainee'].includes(s.role) && s.name !== excludeName
+      && ['none','partial-am','partial-pm'].includes(staffAvailability(s.name)))
+    .sort((a,b) => a.name.localeCompare(b.name));
 }
 
 let _coverDate      = null;
@@ -8808,6 +8811,8 @@ async function renderBrokerMgmtScreen() {
     csHtml+='</div>';
     bmSection('crmskills','CRM skills',csHtml,true);
   }
+  // Always render coverage at the end — covers OM, TL, SA
+  renderCoverageSection('coverSection-brokermgmt');
 }
 
 function bmToggle(id) {
