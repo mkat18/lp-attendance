@@ -2555,7 +2555,7 @@ function buildNav() {
   let tabs = [];
   const r = currentUser.role;
   if (r === 'superadmin') {
-    tabs = [['dashboard','Dashboard'],['admin','Staff'],['profile','My Details']];
+    tabs = [['dashboard','Dashboard'],['eod','EOD'],['admin','Staff'],['profile','My Details']];
   } else if (r === 'hrmanager') {
     tabs = [['checkin','Check in'],['leave','🌴 Leave'],['dashboard','Dashboard'],['admin','Staff'],['profile','My Details']];
     // hrmanager explicitly excluded from All Files tab
@@ -11148,7 +11148,261 @@ function updateEODPromptCard() {
 }
 
 // ── EOD Screen ────────────────────────────────────────────────────────────
+let _saEodCard = '';
+let _saEodPiePeriod = 'today';
+let _saEodPieFrom = '';
+let _saEodPieTo = '';
+let _saEodPieChart = null;
+const SA_EOD_TASK_COLORS = ['#6366F1','#34D399','#F59E0B','#F87171','#60A5FA','#A78BFA','#FB923C','#4ADE80'];
+
+function renderSAEODScreen() {
+  const el = document.getElementById('eodScreenContent');
+  if (!el) return;
+  const sub = document.getElementById('eodScreenSub');
+  const viewDate = _eodViewDate || today;
+  const dp = document.getElementById('eodDatePicker');
+  if (dp && dp.value !== viewDate) dp.value = viewDate;
+  if (sub) sub.textContent = 'All staff — ' + fmtDate(viewDate);
+
+  const allStaff = getStaff().filter(s => roleHasEOD(s.role));
+  const reports = getEODReports().filter(r => r.date === viewDate);
+  const submitted = reports.filter(r => r.status === 'submitted');
+  const drafts    = reports.filter(r => r.status === 'draft');
+  const notDone   = allStaff.filter(s => !reports.find(r => r.name === s.name));
+  const support   = submitted.filter(r => r.supportNeeded === 'yes');
+
+  const fmt12 = v => {
+    if (!v) return '—';
+    const [h, m] = v.split(':');
+    const ap = +h < 12 ? 'AM' : 'PM';
+    return (+h % 12 || 12) + ':' + m + ' ' + ap;
+  };
+
+  const cardStyle = (bg, col, bdr) =>
+    `background:${bg};border-radius:var(--radius-sm);padding:10px 8px;text-align:center;cursor:pointer;border:1.5px solid ${bdr};transition:opacity .15s`;
+
+  const statCards = `<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:4px">
+    <div data-sacard="submitted" onclick="saEodCardToggle('submitted')" style="${cardStyle('#D1FAE5','#065F46',_saEodCard==='submitted'?'#065F46':'#6EE7B7')}">
+      <div style="font-size:22px;font-weight:700;color:#065F46">${submitted.length}</div>
+      <div style="font-size:11px;color:#065F46;margin-top:2px">Submitted</div>
+    </div>
+    <div data-sacard="draft" onclick="saEodCardToggle('draft')" style="${cardStyle('#FEF3C7','#92400E',_saEodCard==='draft'?'#92400E':'transparent')}">
+      <div style="font-size:22px;font-weight:700;color:#92400E">${drafts.length}</div>
+      <div style="font-size:11px;color:#92400E;margin-top:2px">In progress</div>
+    </div>
+    <div data-sacard="notdone" onclick="saEodCardToggle('notdone')" style="${cardStyle('#FEE2E2','#991B1B',_saEodCard==='notdone'?'#991B1B':'transparent')}">
+      <div style="font-size:22px;font-weight:700;color:#991B1B">${notDone.length}</div>
+      <div style="font-size:11px;color:#991B1B;margin-top:2px">Not started</div>
+    </div>
+    <div data-sacard="support" onclick="saEodCardToggle('support')" style="${cardStyle('var(--brand-light)','var(--brand)',_saEodCard==='support'?'var(--brand)':'transparent')}">
+      <div style="font-size:22px;font-weight:700;color:var(--brand)">${support.length}</div>
+      <div style="font-size:11px;color:var(--brand);margin-top:2px">Need support</div>
+    </div>
+  </div>
+  <div id="saEodCardExp" style="display:${_saEodCard?'block':'none'};background:var(--surface-2);border:1.5px solid var(--brand);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:10px"></div>`;
+
+  const supportBar = support.length
+    ? `<div style="background:#FEE2E2;border:0.5px solid #FCA5A5;border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:12px;font-size:13px;color:#991B1B;font-weight:500">⚑ Support flagged: ${support.map(r=>esc(r.name.split(' ')[0])).join(', ')}</div>`
+    : '';
+
+  const isCustomPie = _saEodPiePeriod === 'custom';
+  const pieSection = `<div class="card" style="margin-bottom:12px">
+    <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Time distribution</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:${isCustomPie?'8':'12'}px">
+      ${['today','7d','30d','60d','90d','custom'].map(p=>{
+        const lbl={today:'Today','7d':'7 days','30d':'30 days','60d':'60 days','90d':'90 days',custom:'Custom'}[p];
+        const active=_saEodPiePeriod===p;
+        return `<button onclick="saEodSetPiePeriod('${p}')" style="font-size:12px;padding:4px 10px;border-radius:var(--radius-sm);border:1.5px solid ${active?'var(--brand)':'var(--border)'};background:${active?'var(--brand-light)':'var(--surface-2)'};color:${active?'var(--brand)':'var(--text-2)'};cursor:pointer;font-weight:${active?'600':'400'}">${lbl}</button>`;
+      }).join('')}
+    </div>
+    ${isCustomPie?`<div style="display:flex;gap:8px;align-items:center;margin-bottom:12px">
+      <input type="date" value="${_saEodPieFrom}" onchange="_saEodPieFrom=this.value;saEodDrawPie()" style="font-size:13px;padding:6px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);flex:1"/>
+      <span style="font-size:12px;color:var(--text-3)">to</span>
+      <input type="date" value="${_saEodPieTo}" onchange="_saEodPieTo=this.value;saEodDrawPie()" style="font-size:13px;padding:6px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);flex:1"/>
+    </div>`:''}
+    <div style="display:flex;gap:16px;align-items:center">
+      <div style="flex-shrink:0;position:relative;width:140px;height:140px"><canvas id="saEodPie"></canvas></div>
+      <div id="saEodPieLegend" style="flex:1;min-width:0"></div>
+    </div>
+  </div>`;
+
+  const renderReport = r => {
+    const isOM = r.role === 'opsmanager';
+    const rid = 'saRpt_' + r.name.replace(/[^a-z0-9]/gi,'_');
+    const tasks = (r.tasks||[]).map(t =>
+      `<div style="display:grid;grid-template-columns:2fr 1fr 1fr 2fr;gap:6px;padding:4px 0;border-bottom:0.5px solid var(--border);font-size:12px">
+        <span style="font-weight:500">${esc(t.type||'—')}${t.subType?' · '+esc(t.subType):''}</span>
+        <span style="color:var(--text-2)">${fmt12(t.startTime)}</span>
+        <span style="color:var(--text-2)">${fmt12(t.endTime)}</span>
+        <span style="color:var(--text-3)">${esc(t.notes||'—')}</span>
+      </div>`).join('');
+
+    const wrapItems = isOM
+      ? [['Support needed', r.supportNeeded==='yes'?'Yes — '+(r.supportDetail||''):'No']]
+      : [
+          ['Challenges', r.challenges==='yes'?'Yes — '+(r.challengeDetail||''):'No'],
+          ['Support needed', r.supportNeeded==='yes'?'Yes — '+(r.supportDetail||''):'No'],
+          ['First priority tomorrow', r.firstPriority||'—'],
+          ['Notes', r.notes||'—'],
+        ];
+
+    const wrapHtml = wrapItems.map(([lbl,val])=>
+      `<div style="padding:5px 0;border-bottom:0.5px solid var(--border)">
+        <div style="font-size:11px;color:var(--text-3);margin-bottom:2px">${lbl}</div>
+        <div style="font-size:12px;font-weight:500;color:${lbl==='Support needed'&&r.supportNeeded==='yes'?'#991B1B':'var(--text)'}">${esc(val)}</div>
+      </div>`).join('');
+
+    const badge = r.status==='submitted'
+      ? `<span style="font-size:11px;padding:2px 8px;border-radius:4px;background:#D1FAE5;color:#065F46;font-weight:500">✓ Submitted</span>`
+      : `<span style="font-size:11px;padding:2px 8px;border-radius:4px;background:#FEF9C3;color:#92400E;font-weight:500">📝 Draft</span>`;
+
+    const supportBadge = r.supportNeeded==='yes'
+      ? `<span style="font-size:11px;padding:2px 8px;border-radius:4px;background:#FEE2E2;color:#991B1B;font-weight:500">⚑ Support</span>` : '';
+
+    return `<div class="saRptRow" data-name="${esc(r.name.toLowerCase())}" style="border:1.5px solid ${r.status==='submitted'?'var(--border)':'#FDE68A'};border-radius:var(--radius-sm);margin-bottom:8px;overflow:hidden">
+      <div onclick="saEodToggleReport('${rid}')" style="display:flex;align-items:center;gap:8px;padding:10px 12px;cursor:pointer;background:var(--surface-2)">
+        <span style="font-size:13px;font-weight:600;flex:1">${esc(r.name)}</span>
+        <span style="font-size:11px;color:var(--text-3)">${esc(ROLE_LABEL[r.role]||r.role)}</span>
+        ${badge}${supportBadge}
+        <i class="ti ti-chevron-down" id="${rid}_icon" style="font-size:14px;color:var(--text-3)" aria-hidden="true"></i>
+      </div>
+      <div id="${rid}" style="display:none;padding:10px 12px;border-top:0.5px solid var(--border)">
+        ${tasks?`<div style="display:grid;grid-template-columns:2fr 1fr 1fr 2fr;gap:6px;padding:3px 0;border-bottom:0.5px solid var(--border);margin-bottom:2px">
+          <span style="font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase">Task</span>
+          <span style="font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase">Start</span>
+          <span style="font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase">End</span>
+          <span style="font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase">Notes</span>
+        </div>${tasks}`:`<div style="font-size:12px;color:var(--text-3);margin-bottom:8px">No tasks logged</div>`}
+        <div style="margin-top:8px;border-top:0.5px solid var(--border);padding-top:8px">${wrapHtml}</div>
+      </div>
+    </div>`;
+  };
+
+  const allReports = [...submitted, ...drafts].sort((a,b)=>a.name.localeCompare(b.name));
+
+  const reportsSection = `<div class="card">
+    <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Reports</div>
+    <input type="text" placeholder="Filter by name…" oninput="saEodFilterReports(this.value)"
+      style="width:100%;font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);margin-bottom:10px;box-sizing:border-box"/>
+    ${allReports.length ? allReports.map(renderReport).join('') : '<div style="font-size:13px;color:var(--text-3);padding:8px 0">No EODs submitted or in progress yet.</div>'}
+  </div>`;
+
+  el.innerHTML = statCards + supportBar + pieSection + reportsSection;
+
+  // Fill card expansion if active
+  if (_saEodCard) saEodFillCard(_saEodCard, submitted, drafts, notDone, support);
+
+  // Draw pie
+  setTimeout(() => saEodDrawPie(), 50);
+}
+
+function saEodCardToggle(key) {
+  _saEodCard = _saEodCard === key ? '' : key;
+  renderSAEODScreen();
+}
+
+function saEodFillCard(key, submitted, drafts, notDone, support) {
+  const exp = document.getElementById('saEodCardExp');
+  if (!exp) return;
+  const groups = {submitted, draft:drafts, notdone:notDone, support};
+  const labels = {submitted:'Submitted',draft:'In progress',notdone:'Not started',support:'Need support'};
+  const people = groups[key]||[];
+  exp.innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+    <span style="font-size:12px;font-weight:700;color:var(--brand)">${labels[key]} — ${people.length}</span>
+    <button onclick="_saEodCard='';document.getElementById('saEodCardExp').style.display='none';document.querySelectorAll('[data-sacard]').forEach(c=>c.style.borderColor='transparent')" style="background:transparent;border:none;font-size:18px;cursor:pointer;color:var(--text-3);line-height:1">&times;</button>
+  </div>
+  <div style="display:flex;flex-wrap:wrap;gap:6px">
+    ${people.length ? people.map(p=>`<span style="font-size:12px;background:var(--surface);border:0.5px solid var(--border);border-radius:50px;padding:3px 10px">${esc((p.name||p.name||'').split(' ')[0])}</span>`).join('') : '<span style="font-size:12px;color:var(--text-3)">None</span>'}
+  </div>`;
+  exp.style.display = 'block';
+}
+
+function saEodSetPiePeriod(p) {
+  _saEodPiePeriod = p;
+  if (p !== 'custom') { _saEodPieFrom=''; _saEodPieTo=''; }
+  renderSAEODScreen();
+}
+
+function saEodDrawPie() {
+  const canvas = document.getElementById('saEodPie');
+  if (!canvas) return;
+  if (_saEodPieChart) { try{_saEodPieChart.destroy();}catch(e){} _saEodPieChart=null; }
+
+  const {from, to} = saEodPieDates();
+  const allRpts = getEODReports().filter(r => r.date >= from && r.date <= to && r.status === 'submitted');
+
+  // Aggregate task minutes
+  const taskMins = {};
+  allRpts.forEach(r => {
+    (r.tasks||[]).forEach(t => {
+      if (!t.type || t.type === 'Professional Development' || !t.startTime || !t.endTime) return;
+      const [sh,sm]=t.startTime.split(':').map(Number);
+      const [eh,em]=t.endTime.split(':').map(Number);
+      const mins=(eh*60+em)-(sh*60+sm);
+      if (mins<=0) return;
+      const key = t.type + (t.subType?' · '+t.subType:'');
+      taskMins[key]=(taskMins[key]||0)+mins;
+    });
+  });
+
+  const entries = Object.entries(taskMins).sort((a,b)=>b[1]-a[1]);
+  const leg = document.getElementById('saEodPieLegend');
+  if (!entries.length) {
+    if (leg) leg.innerHTML = '<div style="font-size:12px;color:var(--text-3)">No task data for this period.</div>';
+    return;
+  }
+
+  const total = entries.reduce((s,[,m])=>s+m,0);
+  const fmt = m => m>=60 ? Math.floor(m/60)+'h '+(m%60)+'m' : m+'m';
+
+  _saEodPieChart = new Chart(canvas, {
+    type:'doughnut',
+    data:{
+      labels:entries.map(([k])=>k),
+      datasets:[{data:entries.map(([,m])=>m),backgroundColor:SA_EOD_TASK_COLORS.slice(0,entries.length),borderWidth:2,borderColor:'var(--surface)'}]
+    },
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>' '+ctx.label+': '+fmt(ctx.raw)+' ('+Math.round(ctx.raw/total*100)+'%)'}}},cutout:'65%',animation:{duration:400}}
+  });
+
+  if (leg) leg.innerHTML = entries.map(([k,m],i)=>
+    `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
+      <div style="display:flex;align-items:center;gap:6px;min-width:0">
+        <span style="width:9px;height:9px;border-radius:2px;background:${SA_EOD_TASK_COLORS[i]};flex-shrink:0;display:inline-block"></span>
+        <span style="font-size:11px;color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(k)}</span>
+      </div>
+      <span style="font-size:11px;color:var(--text-3);flex-shrink:0;margin-left:8px">${Math.round(m/total*100)}%</span>
+    </div>`).join('');
+}
+
+function saEodPieDates() {
+  const todayStr = today;
+  if (_saEodPiePeriod === 'today') return {from:todayStr,to:todayStr};
+  if (_saEodPiePeriod === 'custom') return {from:_saEodPieFrom||todayStr,to:_saEodPieTo||todayStr};
+  const days = {'-7d':7,'7d':7,'30d':30,'60d':60,'90d':90}[_saEodPiePeriod]||7;
+  const d=new Date(); d.setDate(d.getDate()-days);
+  return {from:d.toISOString().split('T')[0],to:todayStr};
+}
+
+function saEodToggleReport(rid) {
+  const el=document.getElementById(rid);
+  const icon=document.getElementById(rid+'_icon');
+  if(!el) return;
+  const open=el.style.display!=='none';
+  el.style.display=open?'none':'block';
+  if(icon) icon.className='ti ti-chevron-'+(open?'down':'up');
+}
+
+function saEodFilterReports(q) {
+  const term=q.toLowerCase().trim();
+  document.querySelectorAll('.saRptRow').forEach(row=>{
+    row.style.display=(!term||(row.dataset.name||'').includes(term))?'':'none';
+  });
+}
+
+
+
 function renderEODScreen() {
+  if (isSuperAdmin()) { renderSAEODScreen(); return; }
   const el = document.getElementById('eodScreenContent');
   if (!el) return;
 
