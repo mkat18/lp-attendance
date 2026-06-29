@@ -1998,7 +1998,7 @@ function buildViewAsOptions() {
   return opts;
 }
 
-const ROLE_LABEL = { superadmin:'Super Admin', hrmanager:'HR Manager', hr:'HR', teamlead:'Team Lead', analyst:'Analyst', trainee:'Trainee', assistant:'Assistant', sales:'Sales', customerservice:'Customer Service', socialmedia:'Social Media', opsmanager:'Ops Manager' };
+const ROLE_LABEL = { superadmin:'Super Admin', hrmanager:'HR Manager', administrator:'Administrator', hr:'HR', teamlead:'Team Lead', analyst:'Analyst', trainee:'Trainee', assistant:'Assistant', sales:'Sales', customerservice:'Customer Service', socialmedia:'Social Media', opsmanager:'Ops Manager' };
 const ANALYST_ROLES = ['analyst','teamlead']; // roles that get Files tab
 const CHECKIN_ROLES = ['manager','hr','teamlead','analyst','trainee','assistant','sales','customerservice','socialmedia']; // all check in except superadmin
 const DASHBOARD_ROLES = ['manager','hr','teamlead','assistant']; // see dashboard
@@ -2036,7 +2036,7 @@ function isTrainee()       { return currentUser&&currentUser.role==='trainee'; }
 function canSeeFiles()     { return isSuperAdmin() || canDo('canSeeAllFiles'); }
 function canSeeDashboard() { return currentUser&&(DASHBOARD_ROLES.includes(currentUser.role)||isSuperAdmin()); }
 function canSeeAdmin()     { return currentUser&&ADMIN_ROLES.includes(currentUser.role); }
-function hasDashboard() { return currentUser&&['superadmin','hrmanager','assistant'].includes(currentUser.role); }
+function hasDashboard() { return currentUser&&['superadmin','hrmanager','administrator','assistant'].includes(currentUser.role); }
 function canEdit()      { return currentUser&&['superadmin','hrmanager'].includes(currentUser.role); }
 function canAddStaff()  { return isSuperAdmin() || canDo('canAddStaff'); }
 function canDeleteStaff(){ return isSuperAdmin() || canDo('canDeleteStaff'); }
@@ -2124,6 +2124,10 @@ function previewPersonSearch(q) {
 
 // Default permissions per role — used if SP has nothing
 const DEFAULT_PERMISSIONS = {
+  administrator: {
+    tabs: { checkin:true, leave:true, dashboard:true, admin:false, files:false, myfiles:false, myteam:false, eod:false, performance:false, othertasks:false, feedback:false, profile:true },
+    features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canApproveLeave:false, canSeeLeaveBalance:true, canSeeTeamLeaveBalances:false, canSeeAllFiles:false, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:false }
+  },
   hrmanager: {
     tabs: { checkin:true, leave:true, dashboard:true, admin:true, files:false, myfiles:false, myteam:false, eod:false, performance:false, othertasks:false, feedback:false, profile:true },
     features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canApproveLeave:true, canSeeLeaveBalance:true, canSeeTeamLeaveBalances:true, canSeeAllFiles:false, canAddStaff:true, canResetPins:true, canChangeRoles:false, canDeleteStaff:false, canExportData:true, canAddObsNotes:true }
@@ -2612,6 +2616,8 @@ function buildNav() {
   } else if (r === 'hrmanager') {
     tabs = [['checkin','Check in'],['leave','🌴 Leave'],['dashboard','Dashboard'],['admin','Staff'],['profile','My Details']];
     // hrmanager explicitly excluded from All Files tab
+  } else if (r === 'administrator') {
+    tabs = [['checkin','Check in'],['leave','🌴 Leave'],['dashboard','Dashboard'],['profile','My Details']];
   } else {
     // All other roles — build tabs dynamically from permissions
     const ALL_TABS_DEF = [
