@@ -1485,15 +1485,15 @@ const CONFIG = {
 
 // ── Built-in staff list (fallback if SharePoint unavailable) ──────────────
 const BUILTIN_STAFF = [
-    { name:'Mayur', role:'superadmin', pin:hashPin('284716'), tempPin:null, startTime:null, endTime:null, office:null },
-    { name:'Divit', role:'superadmin', pin:hashPin('539182'), tempPin:null, startTime:null, endTime:null, office:null },
-    { name:'Yug Kanojia', role:'hrmanager', pin:hashPin('617394'), tempPin:null, startTime:'06:00', endTime:'14:30', office:'Goregaon' },
-    { name:'Krutika Nakti', role:'hrmanager', pin:hashPin('492851'), tempPin:null, startTime:'06:00', endTime:'14:30', office:'Goregaon' },
-    { name:'Ankita Lokhande', role:'assistant', pin:hashPin('736429'), tempPin:null, startTime:'06:00', endTime:'14:30', office:'Goregaon' },
+    { name:'Mayur', role:'superadmin', pin:null, tempPin:null, startTime:null, endTime:null, office:null },
+    { name:'Divit', role:'superadmin', pin:null, tempPin:null, startTime:null, endTime:null, office:null },
+    { name:'Yug Kanojia', role:'hrmanager', pin:null, tempPin:null, startTime:'06:00', endTime:'14:30', office:'Goregaon' },
+    { name:'Krutika Nakti', role:'hrmanager', pin:null, tempPin:null, startTime:'06:00', endTime:'14:30', office:'Goregaon' },
+    { name:'Ankita Lokhande', role:'assistant', pin:null, tempPin:null, startTime:'06:00', endTime:'14:30', office:'Goregaon' },
 
-    { name:'Nikki Jain', role:'staff', pin:hashPin('473829'), tempPin:null, startTime:'06:00', endTime:'14:30', office:'Borivali' },
-    { name:'Nehal Poojari', role:'staff', pin:hashPin('916274'), tempPin:null, startTime:'06:00', endTime:'14:30', office:'Borivali' },
-    { name:'Vianney Romeo', role:'hrmanager', pin:hashPin('739284'), tempPin:null, startTime:'06:00', endTime:'14:30', office:'Goregaon' },
+    { name:'Nikki Jain', role:'staff', pin:null, tempPin:null, startTime:'06:00', endTime:'14:30', office:'Borivali' },
+    { name:'Nehal Poojari', role:'staff', pin:null, tempPin:null, startTime:'06:00', endTime:'14:30', office:'Borivali' },
+    { name:'Vianney Romeo', role:'hrmanager', pin:null, tempPin:null, startTime:'06:00', endTime:'14:30', office:'Goregaon' },
     { name:'Shruti Rathod', role:'staff', pin:null, tempPin:null, startTime:'05:00', endTime:'13:30', office:'Goregaon' },
     { name:'Athmika Shetty', role:'staff', pin:null, tempPin:null, startTime:'05:00', endTime:'13:30', office:'Goregaon' },
     { name:'Tushar Goud', role:'staff', pin:null, tempPin:null, startTime:'05:00', endTime:'13:30', office:'Borivali' },
@@ -1782,7 +1782,6 @@ const today = new Date().toLocaleDateString('en-CA', {timeZone:'Asia/Kolkata'});
 let currentUser = null;
 let selectedStatus = null;
 let dashData = []; let tabData = []; let chartInst = null;
-let cpBuffer=''; let cpStage='new'; let cpFirst='';
 let breakOngoing=false; let breakStart=null; let breakInterval=null;
 
 // ── Login greeting ────────────────────────────────────────────────────────
@@ -2641,7 +2640,7 @@ function goTab(name, btn) {
 function logout() {
   sessionStorage.removeItem('lp_session');
   localStorage.removeItem('lp_portal_token');
-  currentUser=null; pinBuffer=''; pinStage='login'; pinFirst='';
+  currentUser=null; 
   stopBreakTimer(false); // preserve ongoing break across logout
   buildNav(); window.location.href = 'index.html';
   clearName();
@@ -2744,7 +2743,7 @@ function onNameType() {
   // Reset PIN if name changes
   hidden.value = '';
   document.getElementById('pinSection').style.display = 'none';
-  pinBuffer=''; pinStage='login'; pinFirst='';
+  
   if (document.getElementById('d0')) updateDots();
   document.getElementById('loginErr').textContent = '';
 
@@ -2803,13 +2802,13 @@ function clearName() {
   if (ps) ps.style.display = 'none';
   const err = document.getElementById('loginErr');
   if (err) err.textContent = '';
-  pinBuffer=''; pinStage='login'; pinFirst='';
+  
   if (document.getElementById('d0')) updateDots();
 }
 
 function onNameChange() {
   const name = document.getElementById('loginName').value;
-  pinBuffer=''; pinStage='login'; pinFirst='';
+  
   document.getElementById('loginErr').textContent='';
   if (!name) { document.getElementById('pinSection').style.display='none'; return; }
   document.getElementById('pinSection').style.display='block';
@@ -3276,22 +3275,6 @@ function stopBreakTimer(clearOngoing=true) {
 }
 
 // ── Change PIN ────────────────────────────────────────────────────────────
-function initCp() { cpBuffer=''; cpStage='new'; cpFirst=''; document.getElementById('cpErr').textContent=''; document.getElementById('cpLabel').textContent='Enter new PIN'; updateCpDots(); }
-function updateCpDots() { for(let i=0;i<6;i++){const d=document.getElementById('cp'+i);if(d){d.classList.toggle('filled',i<cpBuffer.length);d.classList.remove('confirm');if(cpStage==='confirm'&&i<cpBuffer.length)d.classList.add('confirm');}} }
-function cpKey(n) { if(!n||cpBuffer.length>=6)return; cpBuffer+=n; updateCpDots(); if(cpBuffer.length===6)setTimeout(handleCp,120); }
-function cpDel() { cpBuffer=cpBuffer.slice(0,-1); updateCpDots(); document.getElementById('cpErr').textContent=''; }
-function handleCp() {
-  if (cpStage==='new') {
-    const err=pinStrengthError(cpBuffer);
-    if (err) { document.getElementById('cpErr').textContent=err; cpBuffer=''; updateCpDots(); return; }
-    cpFirst=cpBuffer; cpStage='confirm'; cpBuffer=''; updateCpDots(); document.getElementById('cpLabel').textContent='Confirm new PIN'; return;
-  }
-  if (cpBuffer!==cpFirst) { document.getElementById('cpErr').textContent="PINs don't match — try again."; cpBuffer=''; cpStage='new'; cpFirst=''; updateCpDots(); document.getElementById('cpLabel').textContent='Enter new PIN'; return; }
-  const staff=getStaff(); const idx=staff.findIndex(s=>s.name===currentUser.name);
-  if (idx>=0) { staff[idx].pin=hashPin(cpBuffer); saveStaff(staff); spSavePinOnly(staff[idx]); }
-  showToast('PIN updated!','ok');
-  setTimeout(()=>{ const tabs=document.querySelectorAll('.nav-tab'); if(tabs[0]) goTab('checkin',tabs[0]); },600);
-}
 
 // ── Unified date range init ─────────────────────────────────────────────
 
@@ -6564,7 +6547,7 @@ async function addPersonUnified() {
 
   const tempPin = genTempPin();
   const newMember = {
-    name, role, pin: null, tempPin: hashPin(tempPin),
+    name, role, pin: null, tempPin: null,
     addedBy: currentUser.name, addedAt: new Date().toLocaleString('en-AU'),
     joinDate: gv('newJoinDate') || new Date().toISOString().split('T')[0],
     dob: gv('newDOB'),
@@ -6612,7 +6595,7 @@ function addPerson(role) {
   const tempPin = genTempPin();
   const gv = id => (document.getElementById(id)&&document.getElementById(id).value)||'';
   const newMember = {
-    name, role:'staff', pin:null, tempPin:hashPin(tempPin),
+    name, role:'staff', pin:null, tempPin:null,
     addedBy:currentUser.name, addedAt:new Date().toLocaleString('en-AU'),
     joinDate: gv('newJoinDate')||new Date().toISOString().split('T')[0],
     dob: gv('newDOB'),
@@ -6647,7 +6630,7 @@ function addPrivilegedPerson() {
   const tempPin = genTempPin();
   const gv = id => (document.getElementById(id)&&document.getElementById(id).value)||'';
   const newMember = {
-    name, role, pin:null, tempPin:hashPin(tempPin),
+    name, role, pin:null, tempPin:null,
     addedBy:currentUser.name, addedAt:new Date().toLocaleString('en-AU'),
     joinDate: gv('newManagerJoinDate')||new Date().toISOString().split('T')[0],
     dob: gv('newManagerDOB'),
@@ -6692,10 +6675,10 @@ async function resetPin(i) {
   }
   if(!confirm('Reset PIN for '+s.name+'? A new temporary PIN will be generated.'))return;
   const tempPin=genTempPin();
-  staff[i].pin=null; staff[i].tempPin=hashPin(tempPin);
+  staff[i].pin=null; staff[i].tempPin=null;
   staff[i].pinResetBy=currentUser.name; staff[i].pinResetAt=new Date().toLocaleString('en-AU');
   saveStaff(staff);
-  await spSavePinOnly(staff[i]); // lightweight PIN-only save
+  // PIN save removed
   writeAuditLog('PIN Reset', s.name, `PIN reset by ${currentUser.name}`);
   renderAdmin();
   showTempPin(s.name, tempPin);
@@ -7502,13 +7485,6 @@ async function checkOpenBreak(userName) {
 
 // Lightweight PIN-only save — used for PIN reset and change PIN
 // Avoids sending all fields which can cause 400 if any column is misconfigured
-async function spSavePinOnly(s) {
-  if (!s.id) { return await spSaveStaffMember(s); } // no ID yet — do full save
-  return await spPatch(SP_API + "('AttendanceStaff')/items(" + s.id + ")", {
-    Pin: String(s.pin||''),
-    TempPin: String(s.tempPin||''),
-  });
-}
 
 async function spSaveStaffMember(s) {
   // Build payload — only include fields confirmed to exist in SP AttendanceStaff

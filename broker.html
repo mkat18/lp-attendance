@@ -683,32 +683,6 @@ tr.flagged-row:hover td { background: #FFEAEA; }
       </div>
       <button class="btn-primary" onclick="saveProfileDetails()">Save details</button>
     </div>
-
-    <div class="card">
-      <div class="section-label">Change PIN</div>
-      <p style="font-size:12px;color:var(--text-3);margin-bottom:12px">Enter a new 6-digit PIN twice to confirm.</p>
-      <div class="pin-label" id="cpLabel">Enter new PIN</div>
-      <div class="pin-wrap">
-        <div class="pin-dot" id="cp0"></div><div class="pin-dot" id="cp1"></div>
-        <div class="pin-dot" id="cp2"></div><div class="pin-dot" id="cp3"></div>
-        <div class="pin-dot" id="cp4"></div><div class="pin-dot" id="cp5"></div>
-      </div>
-      <div class="err-msg" id="cpErr"></div>
-      <div class="pin-keypad">
-        <button class="key" onclick="cpKey('1')">1</button>
-        <button class="key" onclick="cpKey('2')">2</button>
-        <button class="key" onclick="cpKey('3')">3</button>
-        <button class="key" onclick="cpKey('4')">4</button>
-        <button class="key" onclick="cpKey('5')">5</button>
-        <button class="key" onclick="cpKey('6')">6</button>
-        <button class="key" onclick="cpKey('7')">7</button>
-        <button class="key" onclick="cpKey('8')">8</button>
-        <button class="key" onclick="cpKey('9')">9</button>
-        <button class="key" onclick="cpKey('')"></button>
-        <button class="key" onclick="cpKey('0')">0</button>
-        <button class="key del" onclick="cpDel()">⌫</button>
-      </div>
-    </div>
   </div>
 
   <!-- ── ADMIN ───────────────────────────────────────────────────────────── -->
@@ -1132,7 +1106,6 @@ tr.flagged-row:hover td { background: #FFEAEA; }
 <script>
 // ── One-time staff push to SharePoint ────────────────────────────────────
 async function pushAllStaffToSharePoint() {
-  (async()=>{const staff=[{"Title": "Mayur", "Role": "superadmin", "Pin": "587feb2e", "TempPin": "", "StartTime": "", "EndTime": "", "Office": ""}, {"Title": "Divit", "Role": "superadmin", "Pin": "5d5a2fb0", "TempPin": "", "StartTime": "", "EndTime": "", "Office": ""}, {"Title": "Yug Kanojia", "Role": "manager", "Pin": "5ef1f832", "TempPin": "", "StartTime": "06:00", "EndTime": "14:30", "Office": "Goregaon"}, {"Title": "Krutika Nakti", "Role": "manager", "Pin": "5bf6cf67", "TempPin": "", "StartTime": "06:00", "EndTime": "14:30", "Office": "Goregaon"}, {"Title": "Ankita Lokhande", "Role": "assistant", "Pin": "60c28e61", "TempPin": "", "StartTime": "06:00", "EndTime": "14:30", "Office": "Goregaon"}, {"Title": "Nikki Jain", "Role": "staff", "Pin": "5bdb146f", "TempPin": "", "StartTime": "06:00", "EndTime": "14:30", "Office": "Borivali"}, {"Title": "Nehal Poojari", "Role": "staff", "Pin": "641009b1", "TempPin": "", "StartTime": "06:00", "EndTime": "14:30", "Office": "Borivali"}, {"Title": "Vianney Romeo", "Role": "manager", "Pin": "60c3e4b1", "TempPin": "", "StartTime": "06:00", "EndTime": "14:30", "Office": "Goregaon"}, {"Title": "Shruti Rathod", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "05:00", "EndTime": "13:30", "Office": "Goregaon"}, {"Title": "Athmika Shetty", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "05:00", "EndTime": "13:30", "Office": "Goregaon"}, {"Title": "Tushar Goud", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "05:00", "EndTime": "13:30", "Office": "Borivali"}, {"Title": "Saloni Pariwala", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "05:00", "EndTime": "13:30", "Office": "Virar"}, {"Title": "Sonali Vasaikar", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "10:00", "EndTime": "18:30", "Office": "Borivali"}, {"Title": "Adwita Gokhe", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "10:00", "EndTime": "18:30", "Office": "Virar"}, {"Title": "Marlyn Coutinho", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "10:00", "EndTime": "18:30", "Office": "Virar"}, {"Title": "Tejas Sojitra", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "13:00", "EndTime": "16:00", "Office": "WFH"}, {"Title": "Ansel David", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "13:00", "EndTime": "16:00", "Office": "Goregaon"}, {"Title": "Praneet Shetty", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "06:00", "EndTime": "14:30", "Office": "Goregaon"}, {"Title": "Dipanshu Jain", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "06:00", "EndTime": "14:30", "Office": "WFH"}, {"Title": "Harsh Malhotra", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "06:00", "EndTime": "14:30", "Office": "Goregaon"}, {"Title": "Maitheeli Nikam", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "05:00", "EndTime": "13:30", "Office": "Goregaon"}, {"Title": "Ravi Barai", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "05:00", "EndTime": "13:30", "Office": "Borivali"}, {"Title": "Soham Kawalkar", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "05:00", "EndTime": "13:30", "Office": "Borivali"}, {"Title": "Aryan Bodas", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "05:00", "EndTime": "13:30", "Office": "Goregaon"}, {"Title": "Aditi Saeev", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "10:00", "EndTime": "18:30", "Office": "Goregaon"}, {"Title": "Shruti singh", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "10:00", "EndTime": "18:30", "Office": "Goregaon"}, {"Title": "Siddhi Ghadi", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "10:00", "EndTime": "18:30", "Office": "Borivali"}, {"Title": "Christina Jennifer", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "13:00", "EndTime": "16:00", "Office": "Virar"}, {"Title": "Sakshi Tak", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "13:00", "EndTime": "16:00", "Office": "Borivali"}, {"Title": "Shaurya Mathur", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "06:00", "EndTime": "14:30", "Office": "Virar"}, {"Title": "Dhanshree Patil", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "06:00", "EndTime": "14:30", "Office": "Virar"}, {"Title": "Lekhana Divakar", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "06:00", "EndTime": "14:30", "Office": "WFH"}, {"Title": "Rhea Soares", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "05:00", "EndTime": "13:30", "Office": "Goregaon"}, {"Title": "Durga S", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "05:00", "EndTime": "13:30", "Office": "Goregaon"}, {"Title": "Jatin Parmar", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "05:00", "EndTime": "13:30", "Office": "WFH"}, {"Title": "Hetain Khanna", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "05:00", "EndTime": "13:30", "Office": "Goregaon"}, {"Title": "Mahavir Jain", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "10:00", "EndTime": "18:30", "Office": "Goregaon"}, {"Title": "Sarvesh Mhatre", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "10:00", "EndTime": "18:30", "Office": "Borivali"}, {"Title": "Mehul Dhapare", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "10:00", "EndTime": "18:30", "Office": "Borivali"}, {"Title": "Krish Jethva", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "13:00", "EndTime": "16:00", "Office": "Goregaon"}, {"Title": "Kashish Akre", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "13:00", "EndTime": "16:00", "Office": "Goregaon"}, {"Title": "Vaibhav Hate", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "06:00", "EndTime": "14:30", "Office": "Goregaon"}, {"Title": "Sneha Singh", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "06:00", "EndTime": "14:30", "Office": "Borivali"}, {"Title": "Abhishek Yadav", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "06:00", "EndTime": "14:30", "Office": "Virar"}, {"Title": "Esha Gupta", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "05:00", "EndTime": "13:30", "Office": "Borivali"}, {"Title": "Nikhil Bohra", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "05:00", "EndTime": "13:30", "Office": "Virar"}, {"Title": "Khushi Mishra", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "05:00", "EndTime": "13:30", "Office": "Virar"}, {"Title": "Arjun S", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "05:00", "EndTime": "13:30", "Office": "WFH"}, {"Title": "Kshitij Parab", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "10:00", "EndTime": "18:30", "Office": "Goregaon"}, {"Title": "Ayush Chavan", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "10:00", "EndTime": "18:30", "Office": "Goregaon"}, {"Title": "Rahul Prajapat", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "10:00", "EndTime": "18:30", "Office": "WFH"}, {"Title": "Tanvi Akre", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "13:00", "EndTime": "16:00", "Office": "Goregaon"}, {"Title": "Sakshi Pallav", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "13:00", "EndTime": "16:00", "Office": "Goregaon"}, {"Title": "Rutik Kansare", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "06:00", "EndTime": "14:30", "Office": "Borivali"}, {"Title": "Megha Mutha", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "06:00", "EndTime": "14:30", "Office": "Borivali"}, {"Title": "Anusha Achari", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "06:00", "EndTime": "14:30", "Office": "Goregaon"}, {"Title": "Rishi Merchant", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "05:00", "EndTime": "13:30", "Office": "Goregaon"}, {"Title": "Akshita Tarange", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "05:00", "EndTime": "13:30", "Office": "Goregaon"}, {"Title": "Kartik Mehendiratta", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "05:00", "EndTime": "13:30", "Office": "Borivali"}, {"Title": "Pratham Patel", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "05:00", "EndTime": "13:30", "Office": "Virar"}, {"Title": "Sahil Nandoskar", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "10:00", "EndTime": "18:30", "Office": "Borivali"}, {"Title": "Shreyas Lingayat", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "10:00", "EndTime": "18:30", "Office": "Virar"}, {"Title": "Tanmay Dave", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "10:00", "EndTime": "18:30", "Office": "Virar"}, {"Title": "Austin Fernandes", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "13:00", "EndTime": "16:00", "Office": "WFH"}, {"Title": "Sourav Saha", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "13:00", "EndTime": "16:00", "Office": "Goregaon"}, {"Title": "Dinkal Bohra", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "06:00", "EndTime": "14:30", "Office": "Goregaon"}, {"Title": "Sneha Thorat", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "06:00", "EndTime": "14:30", "Office": "WFH"}, {"Title": "Harsh kumar", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "06:00", "EndTime": "14:30", "Office": "Goregaon"}, {"Title": "Ansh Naik", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "05:00", "EndTime": "13:30", "Office": "Goregaon"}, {"Title": "Uday Tandel", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "05:00", "EndTime": "13:30", "Office": "Borivali"}, {"Title": "Aishwarya Shelke", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "05:00", "EndTime": "13:30", "Office": "Borivali"}, {"Title": "Satyam Jha", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "05:00", "EndTime": "13:30", "Office": "Goregaon"}, {"Title": "Khushi Pandey", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "10:00", "EndTime": "18:30", "Office": "Goregaon"}, {"Title": "Hiya Doshi", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "10:00", "EndTime": "18:30", "Office": "Goregaon"}, {"Title": "Yash Jhobalia", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "10:00", "EndTime": "18:30", "Office": "Borivali"}, {"Title": "Aryan Sharma", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "13:00", "EndTime": "16:00", "Office": "Virar"}, {"Title": "Cherry Jain", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "13:00", "EndTime": "16:00", "Office": "Borivali"}, {"Title": "Mahima Kunder", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "06:00", "EndTime": "14:30", "Office": "Virar"}, {"Title": "Saurabh Kalshetty", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "06:00", "EndTime": "14:30", "Office": "Virar"}, {"Title": "Anjali Sharma", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "06:00", "EndTime": "14:30", "Office": "WFH"}, {"Title": "Smit Sawant", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "05:00", "EndTime": "13:30", "Office": "Goregaon"}, {"Title": "Yukta Sawant", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "05:00", "EndTime": "13:30", "Office": "Goregaon"}, {"Title": "Ishita Jagtap", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "05:00", "EndTime": "13:30", "Office": "WFH"}, {"Title": "Sneha Bhomia", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "05:00", "EndTime": "13:30", "Office": "Goregaon"}, {"Title": "Tushar Salian", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "10:00", "EndTime": "18:30", "Office": "Goregaon"}, {"Title": "Aditya Mishra", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "10:00", "EndTime": "18:30", "Office": "Borivali"}, {"Title": "Komal Gupta", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "10:00", "EndTime": "18:30", "Office": "Borivali"}, {"Title": "Vaidhavi Singh", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "13:00", "EndTime": "16:00", "Office": "Goregaon"}, {"Title": "Pratheek Poojary", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "13:00", "EndTime": "16:00", "Office": "Goregaon"}, {"Title": "Yukta Champanekar", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "06:00", "EndTime": "14:30", "Office": "Goregaon"}, {"Title": "Bharat Kanodia", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "06:00", "EndTime": "14:30", "Office": "Borivali"}, {"Title": "Swapnil Patil", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "06:00", "EndTime": "14:30", "Office": "Virar"}, {"Title": "Jai Bane", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "05:00", "EndTime": "13:30", "Office": "Borivali"}, {"Title": "Mansi Mourya", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "05:00", "EndTime": "13:30", "Office": "Virar"}, {"Title": "Sayali Tondekar", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "05:00", "EndTime": "13:30", "Office": "Virar"}, {"Title": "Joshua Arora", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "05:00", "EndTime": "13:30", "Office": "WFH"}, {"Title": "Sakhi Patwardhan", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "10:00", "EndTime": "18:30", "Office": "Goregaon"}, {"Title": "Rahul Sharma", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "10:00", "EndTime": "18:30", "Office": "Goregaon"}, {"Title": "Aniket Chand", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "10:00", "EndTime": "18:30", "Office": "WFH"}, {"Title": "Kunal Choksi", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "13:00", "EndTime": "16:00", "Office": "Goregaon"}, {"Title": "Craige", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "06:00", "EndTime": "14:30", "Office": "Borivali"}, {"Title": "Divya Mahale", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "06:00", "EndTime": "14:30", "Office": "Goregaon"}, {"Title": "Bhavesh", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "05:00", "EndTime": "13:30", "Office": "Goregaon"}, {"Title": "Ramesh Kaka", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "05:00", "EndTime": "13:30", "Office": "Goregaon"}, {"Title": "Pooja", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "05:00", "EndTime": "13:30", "Office": "Borivali"}, {"Title": "Tea Person", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "05:00", "EndTime": "13:30", "Office": "Virar"}, {"Title": "Auto Driver", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "10:00", "EndTime": "18:30", "Office": "Virar"}, {"Title": "Chirag Seo", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "10:00", "EndTime": "18:30", "Office": "Virar"}, {"Title": "Samyak Dani", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "13:00", "EndTime": "16:00", "Office": "Goregaon"}, {"Title": "Kirti Prajapati", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "13:00", "EndTime": "16:00", "Office": "Goregaon"}, {"Title": "Cherisha Jain", "Role": "staff", "Pin": "", "TempPin": "", "StartTime": "13:00", "EndTime": "16:00", "Office": "WFH"}];const token=await getToken();let count=0;for(const s of staff){const r=await fetch("https://loanprocessorau.sharepoint.com/sites/lpattendance/_api/lists/getbytitle('AttendanceStaff')/items",{method:'POST',headers:{'Authorization':'Bearer '+token,'Accept':'application/json;odata=nometadata','Content-Type':'application/json;odata=nometadata'},body:JSON.stringify(s)});if(r.ok)count++;else console.log('Failed:',s.Title,r.status);}console.log('Done:',count,'of',staff.length);})();
 }
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
@@ -1189,20 +1162,19 @@ const CONFIG = {
 // ════════════════════════════════════════════════════════════════════════════
 
 // ── Storage helpers ───────────────────────────────────────────────────────
-function hashPin(p){ let h=0; for(let i=0;i<p.length;i++) h=(Math.imul(31,h)+p.charCodeAt(i))|0; return h.toString(36); }
 
 
 // ── Built-in staff list (fallback if SharePoint unavailable) ──────────────
 const BUILTIN_STAFF = [
-    { name:'Mayur', role:'superadmin', pin:hashPin('284716'), tempPin:null, startTime:null, endTime:null, office:null },
-    { name:'Divit', role:'superadmin', pin:hashPin('539182'), tempPin:null, startTime:null, endTime:null, office:null },
-    { name:'Yug Kanojia', role:'hrmanager', pin:hashPin('617394'), tempPin:null, startTime:'06:00', endTime:'14:30', office:'Goregaon' },
-    { name:'Krutika Nakti', role:'hrmanager', pin:hashPin('492851'), tempPin:null, startTime:'06:00', endTime:'14:30', office:'Goregaon' },
-    { name:'Ankita Lokhande', role:'assistant', pin:hashPin('736429'), tempPin:null, startTime:'06:00', endTime:'14:30', office:'Goregaon' },
+    { name:'Mayur', role:'superadmin', pin:null, tempPin:null, startTime:null, endTime:null, office:null },
+    { name:'Divit', role:'superadmin', pin:null, tempPin:null, startTime:null, endTime:null, office:null },
+    { name:'Yug Kanojia', role:'hrmanager', pin:null, tempPin:null, startTime:'06:00', endTime:'14:30', office:'Goregaon' },
+    { name:'Krutika Nakti', role:'hrmanager', pin:null, tempPin:null, startTime:'06:00', endTime:'14:30', office:'Goregaon' },
+    { name:'Ankita Lokhande', role:'assistant', pin:null, tempPin:null, startTime:'06:00', endTime:'14:30', office:'Goregaon' },
 
-    { name:'Nikki Jain', role:'staff', pin:hashPin('473829'), tempPin:null, startTime:'06:00', endTime:'14:30', office:'Borivali' },
-    { name:'Nehal Poojari', role:'staff', pin:hashPin('916274'), tempPin:null, startTime:'06:00', endTime:'14:30', office:'Borivali' },
-    { name:'Vianney Romeo', role:'hrmanager', pin:hashPin('739284'), tempPin:null, startTime:'06:00', endTime:'14:30', office:'Goregaon' },
+    { name:'Nikki Jain', role:'staff', pin:null, tempPin:null, startTime:'06:00', endTime:'14:30', office:'Borivali' },
+    { name:'Nehal Poojari', role:'staff', pin:null, tempPin:null, startTime:'06:00', endTime:'14:30', office:'Borivali' },
+    { name:'Vianney Romeo', role:'hrmanager', pin:null, tempPin:null, startTime:'06:00', endTime:'14:30', office:'Goregaon' },
     { name:'Shruti Rathod', role:'staff', pin:null, tempPin:null, startTime:'05:00', endTime:'13:30', office:'Goregaon' },
     { name:'Athmika Shetty', role:'staff', pin:null, tempPin:null, startTime:'05:00', endTime:'13:30', office:'Goregaon' },
     { name:'Tushar Goud', role:'staff', pin:null, tempPin:null, startTime:'05:00', endTime:'13:30', office:'Borivali' },
@@ -1483,7 +1455,6 @@ const today = new Date().toLocaleDateString('en-CA', {timeZone:'Asia/Kolkata'});
 let currentUser = null;
 let selectedStatus = null;
 let dashData = []; let tabData = []; let chartInst = null;
-let cpBuffer=''; let cpStage='new'; let cpFirst='';
 let breakOngoing=false; let breakStart=null; let breakInterval=null;
 
 // ── Login greeting ────────────────────────────────────────────────────────
@@ -2250,13 +2221,13 @@ function goTab(name, btn) {
   if (name==='feedback')  renderFeedbackScreen();
   if (name==='performance') { const pf=document.getElementById('perfFilters'); if(pf) pf.dataset.built=''; renderPerformanceScreen(); }
   if (name==='othertasks') renderOtherTasksScreen();
-  if (name==='profile')   { initCp(); renderProfileScreen(); }
+  if (name==='profile')   { renderProfileScreen(); }
 }
 
 function logout() {
   sessionStorage.removeItem('lp_session');
   localStorage.removeItem('lp_portal_token');
-  currentUser=null; pinBuffer=''; pinStage='login'; pinFirst='';
+  currentUser=null; 
   stopBreakTimer(false); // preserve ongoing break across logout
   buildNav(); window.location.href = 'index.html';
   clearName();
@@ -2359,7 +2330,7 @@ function onNameType() {
   // Reset PIN if name changes
   hidden.value = '';
   document.getElementById('pinSection').style.display = 'none';
-  pinBuffer=''; pinStage='login'; pinFirst='';
+  
   if (document.getElementById('d0')) updateDots();
   document.getElementById('loginErr').textContent = '';
 
@@ -2418,13 +2389,13 @@ function clearName() {
   if (ps) ps.style.display = 'none';
   const err = document.getElementById('loginErr');
   if (err) err.textContent = '';
-  pinBuffer=''; pinStage='login'; pinFirst='';
+  
   if (document.getElementById('d0')) updateDots();
 }
 
 function onNameChange() {
   const name = document.getElementById('loginName').value;
-  pinBuffer=''; pinStage='login'; pinFirst='';
+  
   document.getElementById('loginErr').textContent='';
   if (!name) { document.getElementById('pinSection').style.display='none'; return; }
   document.getElementById('pinSection').style.display='block';
@@ -2449,9 +2420,7 @@ document.addEventListener('keydown', function(e) {
     if (e.key>='0'&&e.key<='9') { e.preventDefault(); keyPress(e.key); }
     else if (e.key==='Backspace') { e.preventDefault(); keyDel(); }
   } else if (profileActive) {
-    if (e.key>='0'&&e.key<='9') { e.preventDefault(); cpKey(e.key); }
-    else if (e.key==='Backspace') { e.preventDefault(); cpDel(); }
-  }
+          }
 });
 
 
@@ -2730,7 +2699,6 @@ async function uploadPhoto(dataUrl, rec) {
       const recs = getRecords();
       const idx = recs.findIndex(r => r.id === rec.id || (r.name === rec.name && r.date === rec.date));
       if (idx >= 0) { recs[idx].hasPhoto = true; saveRecords(recs); }
-      console.log('Photo uploaded:', filename);
     } else {
       console.warn('Photo upload failed with status:', uploadRes.status);
     }
@@ -2881,22 +2849,6 @@ function stopBreakTimer(clearOngoing=true) {
 }
 
 // ── Change PIN ────────────────────────────────────────────────────────────
-function initCp() { cpBuffer=''; cpStage='new'; cpFirst=''; document.getElementById('cpErr').textContent=''; document.getElementById('cpLabel').textContent='Enter new PIN'; updateCpDots(); }
-function updateCpDots() { for(let i=0;i<6;i++){const d=document.getElementById('cp'+i);if(d){d.classList.toggle('filled',i<cpBuffer.length);d.classList.remove('confirm');if(cpStage==='confirm'&&i<cpBuffer.length)d.classList.add('confirm');}} }
-function cpKey(n) { if(!n||cpBuffer.length>=6)return; cpBuffer+=n; updateCpDots(); if(cpBuffer.length===6)setTimeout(handleCp,120); }
-function cpDel() { cpBuffer=cpBuffer.slice(0,-1); updateCpDots(); document.getElementById('cpErr').textContent=''; }
-function handleCp() {
-  if (cpStage==='new') {
-    const err=pinStrengthError(cpBuffer);
-    if (err) { document.getElementById('cpErr').textContent=err; cpBuffer=''; updateCpDots(); return; }
-    cpFirst=cpBuffer; cpStage='confirm'; cpBuffer=''; updateCpDots(); document.getElementById('cpLabel').textContent='Confirm new PIN'; return;
-  }
-  if (cpBuffer!==cpFirst) { document.getElementById('cpErr').textContent="PINs don't match — try again."; cpBuffer=''; cpStage='new'; cpFirst=''; updateCpDots(); document.getElementById('cpLabel').textContent='Enter new PIN'; return; }
-  const staff=getStaff(); const idx=staff.findIndex(s=>s.name===currentUser.name);
-  if (idx>=0) { staff[idx].pin=hashPin(cpBuffer); saveStaff(staff); spSavePinOnly(staff[idx]); }
-  showToast('PIN updated!','ok');
-  setTimeout(()=>{ const tabs=document.querySelectorAll('.nav-tab'); if(tabs[0]) goTab(tabs[0].dataset.tab,tabs[0]); },600);
-}
 
 // ── Dashboard — cards (single day or range) — attendance only, skipped in broker
 // (selectedDate elements only exist in attendance app)
@@ -5377,7 +5329,7 @@ async function addPersonUnified() {
 
   const tempPin = genTempPin();
   const newMember = {
-    name, role, pin: null, tempPin: hashPin(tempPin),
+    name, role, pin: null, tempPin: null,
     addedBy: currentUser.name, addedAt: new Date().toLocaleString('en-AU'),
     joinDate: gv('newJoinDate') || new Date().toISOString().split('T')[0],
     dob: gv('newDOB'),
@@ -5424,7 +5376,7 @@ function addPerson(role) {
   const tempPin = genTempPin();
   const gv = id => (document.getElementById(id)&&document.getElementById(id).value)||'';
   const newMember = {
-    name, role:'staff', pin:null, tempPin:hashPin(tempPin),
+    name, role:'staff', pin:null, tempPin:null,
     addedBy:currentUser.name, addedAt:new Date().toLocaleString('en-AU'),
     joinDate: gv('newJoinDate')||new Date().toISOString().split('T')[0],
     dob: gv('newDOB'),
@@ -5458,7 +5410,7 @@ function addPrivilegedPerson() {
   const tempPin = genTempPin();
   const gv = id => (document.getElementById(id)&&document.getElementById(id).value)||'';
   const newMember = {
-    name, role, pin:null, tempPin:hashPin(tempPin),
+    name, role, pin:null, tempPin:null,
     addedBy:currentUser.name, addedAt:new Date().toLocaleString('en-AU'),
     joinDate: gv('newManagerJoinDate')||new Date().toISOString().split('T')[0],
     dob: gv('newManagerDOB'),
@@ -6205,7 +6157,6 @@ async function spStartBreak(brk) {
       EndTime: '',
       IsOpen: 'true'
     };
-    console.log('[BREAK PAYLOAD]', JSON.stringify(p), 'types:', Object.entries(p).map(([k,v])=>k+':'+typeof v).join(', '));
     const res = await spPostDirect(SP_API + "('AttendanceBreaks')/items", p);
     return res && (res.ID || res.Id) ? (res.ID || res.Id) : null;
   } catch(e) {
@@ -6306,13 +6257,6 @@ async function checkOpenBreak(userName) {
 
 // Lightweight PIN-only save — used for PIN reset and change PIN
 // Avoids sending all fields which can cause 400 if any column is misconfigured
-async function spSavePinOnly(s) {
-  if (!s.id) { return await spSaveStaffMember(s); } // no ID yet — do full save
-  return await spPatch(SP_API + "('AttendanceStaff')/items(" + s.id + ")", {
-    Pin: String(s.pin||''),
-    TempPin: String(s.tempPin||''),
-  });
-}
 
 async function spSaveStaffMember(s) {
   // Build payload — only include fields that exist in SP
