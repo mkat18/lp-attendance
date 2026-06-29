@@ -5683,9 +5683,27 @@ async function onMsLogin(account) {
       s.name.toLowerCase().replace(/\s+/g,'').includes(emailPrefix.replace(/\s+/g,'').slice(0,6))
     );
     if (member) { await loginAs(member); return; }
+
+    // No match — only SA can use name picker
+    const isSAEmail = staff.find(s => s.role === 'superadmin' &&
+      ((s.email && s.email.toLowerCase() === email) ||
+       s.name.toLowerCase().replace(/\s+/g,'').includes(emailPrefix.replace(/\s+/g,'').slice(0,6)))
+    );
+    if (!isSAEmail) {
+      showScreen('login');
+      const card = document.querySelector('#screen-login .card');
+      if (card) card.innerHTML = `
+        <div style="text-align:center;padding:2rem 1rem">
+          <div style="font-size:48px;margin-bottom:1rem">🔒</div>
+          <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:8px">Access not configured</div>
+          <div style="font-size:13px;color:var(--text-2);margin-bottom:1.5rem">Your account <strong>${esc(msalAccount.username)}</strong> is not set up in this system yet. Please contact your administrator.</div>
+          <button onclick="logout()" style="padding:10px 24px;border-radius:var(--radius-sm);border:none;background:var(--brand);color:#fff;font-size:14px;font-weight:600;cursor:pointer">Sign out</button>
+        </div>`;
+      return;
+    }
   }
 
-  // Fallback — show name search
+  // SA fallback — show name search
   populateNameDropdown();
   showScreen('login');
 }
