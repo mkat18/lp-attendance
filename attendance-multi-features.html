@@ -6478,10 +6478,51 @@ function renderAllStaffCards(staff) {
             ${canEditScheduleThis?`<button class="btn-sm" onclick="editScheduleByName('${sname}')">Schedule & Office</button>`:''}
             ${sa?`<button class="btn-sm" onclick="toggleFlexibleSchedule('${sname}')" style="background:${s.flexibleSchedule?'var(--brand-light)':'var(--surface-2)'};color:${s.flexibleSchedule?'var(--brand)':'var(--text-2)'};border-color:${s.flexibleSchedule?'var(--brand)':'var(--border)'}">⚡ ${s.flexibleSchedule?'Flex ON':'Flex OFF'}</button>`:''}            ${canResetThis?`<button class="btn-sm" onclick="resetPinByName('${sname}')">Reset PIN</button>`:''}
             ${canDeleteThis?`<button class="btn-sm btn-danger" onclick="removePersonByName('${sname}')">Remove</button>`:''}
+            ${(sa||mgr)?`<button class="btn-sm" id="detbtn-${s.name}" onclick="toggleStaffDetails(\'${sname}\')" style="background:var(--brand-light);color:var(--brand);border-color:var(--brand)">👤 Details</button>`:''}
           </div>
+        </div>
         </div>`;
       }).join('')
     : '<div class="empty-state">No accounts yet.</div>';
+}
+
+function toggleStaffDetails(name) {
+  const btn = document.getElementById('detbtn-' + name);
+  const existing = document.getElementById('staff-details-' + name);
+  if (existing) {
+    existing.remove();
+    if (btn) btn.textContent = '👤 Details';
+    return;
+  }
+  const s = getStaff().find(x => x.name === name);
+  if (!s) return;
+
+  const panel = document.createElement('div');
+  panel.id = 'staff-details-' + name;
+  panel.style.cssText = 'grid-column:1/-1;margin-top:10px;padding:12px;background:var(--surface-2);border-radius:var(--radius-sm);border:1px solid var(--border);font-size:12px';
+
+  const row = (lbl, val) => `<div style="margin-bottom:8px"><div style="color:var(--text-3);font-size:11px;margin-bottom:2px">${lbl}</div><div style="font-weight:500">${esc(val||'—')}</div></div>`;
+  const ec = (label, n, r, p) => (n ? `<div style="margin-top:10px;padding-top:10px;border-top:0.5px solid var(--border)">
+    <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">${label}</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">
+      ${row('Name',n)}${row('Relation',r)}${row('Phone',p)}
+    </div></div>` : '');
+
+  panel.innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 16px">
+      ${row('Work email', s.email)}
+      ${row('Personal email', s.personalEmail)}
+      ${row('Phone', s.phone)}
+      ${row('Date of birth', s.dob)}
+      <div style="grid-column:1/-1">${row('Address', s.address)}</div>
+    </div>
+    ${ec('Emergency contact 1', s.ec1Name, s.ec1Relation, s.ec1Phone)}
+    ${ec('Emergency contact 2', s.ec2Name, s.ec2Relation, s.ec2Phone)}`;
+
+  // Insert after the staff-row div
+  const staffRow = btn?.closest('.staff-row');
+  if (staffRow) staffRow.after(panel);
+  if (btn) btn.textContent = '👤 Hide';
 }
 
 async function toggleAuditLog() {
