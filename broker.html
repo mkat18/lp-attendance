@@ -5658,7 +5658,6 @@ async function onMsLogin(account) {
   const urlUser = urlParams.get('_u');
   const urlRole = urlParams.get('_r');
   if (fromPortal && urlUser) {
-    // Clean URL so refreshing doesn't re-use the param
     window.history.replaceState({}, '', window.location.pathname);
   }
   const saved = sessionStorage.getItem('lp_session') || (fromPortal && urlUser ? JSON.stringify({name:urlUser, role:urlRole}) : null);
@@ -5671,7 +5670,22 @@ async function onMsLogin(account) {
       }
     } catch(e) {}
   }
-  // No session — show PIN screen
+
+  // Auto-match by MS account email — skip login screen
+  if (msalAccount && msalAccount.username) {
+    const email = msalAccount.username.toLowerCase();
+    const emailPrefix = email.split('@')[0].toLowerCase().replace(/[._-]/g,' ');
+    const staff = getStaff();
+    const member = staff.find(s =>
+      (s.email && s.email.toLowerCase() === email) ||
+      (s.personalEmail && s.personalEmail.toLowerCase() === email) ||
+      s.name.toLowerCase() === emailPrefix ||
+      s.name.toLowerCase().replace(/\s+/g,'').includes(emailPrefix.replace(/\s+/g,'').slice(0,6))
+    );
+    if (member) { await loginAs(member); return; }
+  }
+
+  // Fallback — show name search
   populateNameDropdown();
   showScreen('login');
 }
