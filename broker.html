@@ -166,27 +166,7 @@ input:focus, select:focus {
   font-family: var(--font-ui); font-size: 14px; font-weight: 500;
   color: var(--text-2); text-align: center; margin-bottom: 16px;
 }
-.pin-wrap { display: flex; gap: 10px; justify-content: center; margin-bottom: 20px; }
-.pin-dot {
-  width: 13px; height: 13px; border-radius: 50%;
-  border: 2px solid var(--border); background: var(--surface);
-  transition: all .2s;
-}
-.pin-dot.filled { background: var(--brand); border-color: var(--brand); transform: scale(1.1); }
-.pin-dot.confirm { background: var(--success); border-color: var(--success); }
 
-.pin-keypad { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-bottom: .75rem; }
-.key {
-  padding: 16px 8px; border: 1.5px solid var(--border);
-  border-radius: var(--radius-sm); background: var(--surface);
-  font-family: var(--font-ui); font-size: 20px; font-weight: 500;
-  cursor: pointer; color: var(--text);
-  transition: background .1s, transform .08s, border-color .1s;
-  text-align: center; line-height: 1;
-}
-.key:hover { background: var(--brand-light); border-color: var(--brand); color: var(--brand); }
-.key:active { transform: scale(.94); }
-.key.del { font-size: 15px; color: var(--text-3); }
 
 /* ─── STATUS BUTTONS (signature element) ────────────────────────────────── */
 .status-row { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; }
@@ -390,7 +370,6 @@ tr.flagged-row:hover td { background: #FFEAEA; }
 .staff-avatar.mgr { background: var(--purple-light); color: var(--purple); }
 .staff-info { flex: 1; min-width: 0; }
 .staff-name-txt { font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.staff-pin-status { font-size: 12px; color: var(--text-3); margin-top: 1px; }
 
 /* ─── ADMIN MODAL ────────────────────────────────────────────────────────── */
 /* removed */ 
@@ -644,7 +623,7 @@ tr.flagged-row:hover td { background: #FFEAEA; }
   <div id="screen-login" class="screen">
     <div class="page-header" style="text-align:center;margin-top:.5rem">
       <h1 id="loginGreeting">Good morning 👋</h1>
-      <p>Search your name and enter your PIN</p>
+      <p>Search your name to log in</p>
     </div>
     <div class="card">
       <div class="field">
@@ -1502,7 +1481,6 @@ function fmtDate(d) {
 
 const today = new Date().toLocaleDateString('en-CA', {timeZone:'Asia/Kolkata'}); // YYYY-MM-DD in AU time
 let currentUser = null;
-let pinBuffer=''; let pinStage='login'; let pinFirst='';
 let selectedStatus = null;
 let dashData = []; let tabData = []; let chartInst = null;
 let cpBuffer=''; let cpStage='new'; let cpFirst='';
@@ -2454,34 +2432,8 @@ function onNameChange() {
   setPinLabel('Enter your PIN');
 }
 
-function setPinLabel(t) { document.getElementById('pinLabel').textContent=t; }
-
-function updateDots() {
-  for (let i=0;i<6;i++) {
-    const d=document.getElementById('d'+i);
-    if (!d) continue;
-    d.classList.toggle('filled', i<pinBuffer.length);
-    d.classList.remove('confirm');
-    if (pinStage==='confirm-new' && i<pinBuffer.length) d.classList.add('confirm');
-  }
-}
 
 // ── PIN strength validator ────────────────────────────────────────────────
-const WEAK_PINS = new Set(['123456','654321','112233','121212','123123','111111','222222','333333','444444','555555','666666','777777','888888','999999','000000','246810','135790']);
-function pinStrengthError(pin) {
-  if (/^(\d)\1{5}$/.test(pin)) return 'That PIN is too simple — all same digits. Try something less predictable.';
-  if (/^(0123456789|9876543210|012345|123456|234567|345678|456789|567890|987654|876543|765432|654321|543210)/.test(pin) ||
-      /^(012345|123456|234567|345678|456789|567890|098765|987654|876543|765432|654321|543210)$/.test(pin))
-    return 'That PIN is a number sequence — too easy to guess. Try a random combination.';
-  if (WEAK_PINS.has(pin)) return 'That\'s a very common PIN. Please choose something more unique.';
-  // Check for repeated pairs like 112233
-  const pairs = pin.match(/.{2}/g);
-  if (pairs && new Set(pairs).size === 1) return 'That pattern is too predictable. Mix it up a bit.';
-  return null; // valid
-}
-
-function keyPress(n) { if (!n||pinBuffer.length>=6) return; pinBuffer+=n; updateDots(); if (pinBuffer.length===6) setTimeout(handlePin,120); }
-function keyDel() { pinBuffer=pinBuffer.slice(0,-1); updateDots(); document.getElementById('loginErr').textContent=''; }
 
 // ── Physical keyboard support for PIN entry ───────────────────────────────
 document.addEventListener('keydown', function(e) {
@@ -2502,45 +2454,6 @@ document.addEventListener('keydown', function(e) {
   }
 });
 
-function handlePin() {
-  const name = document.getElementById('loginName').value;
-  const staff = getStaff(); const idx = staff.findIndex(s=>s.name===name);
-  if (idx<0) return;
-  const member = staff[idx];
-
-  // Forced new PIN setup after temp PIN used
-  if (pinStage==='set-new') {
-    const err=pinStrengthError(pinBuffer);
-    if (err) { document.getElementById('loginErr').textContent=err; pinBuffer=''; updateDots(); return; }
-    pinFirst=pinBuffer; pinStage='confirm-new'; pinBuffer=''; updateDots(); setPinLabel('Confirm your new PIN'); return;
-  }
-  if (pinStage==='confirm-new') {
-    if (pinBuffer!==pinFirst) { document.getElementById('loginErr').textContent="PINs don't match — try again."; pinBuffer=''; pinStage='set-new'; pinFirst=''; updateDots(); setPinLabel('Choose your new PIN'); return; }
-    member.pin=hashPin(pinBuffer); member.tempPin=null; staff[idx]=member; saveStaff(staff);
-    spSavePinOnly(member); // save new PIN to SharePoint so it works on all devices
-    showToast('PIN set! Welcome, '+member.name.split(' ')[0]+'!','ok');
-    loginAs(member); return;
-  }
-
-  // No PIN set at all — wrong PIN, reveal nothing
-  if (!member.pin && !member.tempPin) {
-    document.getElementById('loginErr').textContent='Wrong PIN — try again.'; pinBuffer=''; updateDots(); return;
-  }
-
-  // Temp PIN check — if they enter the temp PIN, force them to set a permanent one
-  if (member.tempPin && hashPin(pinBuffer)===member.tempPin) {
-    pinStage='set-new'; pinBuffer=''; updateDots();
-    setPinLabel('Temp PIN accepted — choose a permanent PIN');
-    document.getElementById('loginErr').textContent='';
-    return;
-  }
-
-  // Normal PIN check
-  if (!member.pin || hashPin(pinBuffer)!==member.pin) {
-    document.getElementById('loginErr').textContent='Wrong PIN — try again.'; pinBuffer=''; updateDots(); return;
-  }
-  loginAs(member);
-}
 
 async function loginAs(member) {
   currentUser={name:member.name, role:member.role};
@@ -5062,7 +4975,6 @@ function renderChart() {
 
 // Name-based wrappers — fix for filtered list index mismatch
 function getStaffIdxByName(name) { return getStaff().findIndex(s => s.name === name); }
-function resetPinByName(name) { const i = getStaffIdxByName(name); if (i>=0) resetPin(i); }
 function changeRoleByName(name, role) { const i = getStaffIdxByName(name); if (i>=0) changeRole(i, role); }
 function editScheduleByName(name) { const i = getStaffIdxByName(name); if (i>=0) editSchedule(i); }
 function removePersonByName(name) { const i = getStaffIdxByName(name); if (i>=0) removePerson(i); }
@@ -5267,8 +5179,6 @@ function renderAllStaffCards(staff) {
   const sa=isSuperAdmin();
   const mgr=currentUser.role==='hrmanager';
   return staff.length ? staff.map((s,i)=>{
-        const pinStatus = s.pin ? 'PIN set' : s.tempPin ? 'Awaiting first login' : 'No PIN — reset required';
-        const pinColor = s.pin ? 'var(--text-3)' : s.tempPin ? 'var(--warn)' : 'var(--danger)';
         const schedule = (s.startTime&&s.endTime) ? `${fmt12(s.startTime)} – ${fmt12(s.endTime)}` : s.role==='superadmin'?'—':'No schedule';
         const roleTag = {
           superadmin:      '<span class="tag" style="background:#EDE9FE;color:#5B21B6">Super Admin</span>',
@@ -5304,7 +5214,6 @@ function renderAllStaffCards(staff) {
               <button onclick="saveEditName('${sname}')" style="font-size:12px;padding:4px 8px;border-radius:var(--radius-sm);background:var(--brand);color:#fff;border:none;cursor:pointer;margin-left:4px">Save</button>
               <button onclick="cancelEditName('${sname}')" style="font-size:12px;padding:4px 8px;border-radius:var(--radius-sm);background:var(--border);color:var(--text-1);border:none;cursor:pointer;margin-left:2px">Cancel</button>
             </div>
-            <div class="staff-pin-status" style="color:${pinColor}">${pinStatus}</div>
             <div style="font-size:11px;color:var(--text-3);margin-top:2px">🕐 ${schedule}${s.office?` &nbsp;📍 ${s.office}`:''}</div>
             <div style="font-size:11px;color:var(--text-3);margin-top:1px">${s.joinDate?'📅 '+calcTenureLabel(s.joinDate):''}</div>
             <div style="font-size:11px;color:var(--text-3);margin-top:1px">${s.role==='trainee'?(s.assignedBroker?'🎯 Broker: '+esc(s.assignedBroker):'⚠️ No broker assigned yet'):''}${s.role==='analyst'&&s.assignedBroker?'🎯 Broker: '+esc(s.assignedBroker):''}</div>
@@ -5316,7 +5225,6 @@ function renderAllStaffCards(staff) {
             ${canManageTeam?`<button class="btn-sm" style="background:#FEF3C7;color:#92400E;border-color:#FDE68A" onclick="openManageTeam('${sname}')">👥 Manage Team</button>`:''}
             ${canAssignBroker?`<button class="btn-sm" style="background:#FFF7ED;color:#C2410C;border-color:#FED7AA" onclick="openAssignBrokerModal('${sname}')">🎯 Assign broker</button>`:''}
             ${canEditScheduleThis?`<button class="btn-sm" onclick="editScheduleByName('${sname}')">Schedule & Office</button>`:''}
-            ${canResetThis?`<button class="btn-sm" onclick="resetPinByName('${sname}')">Reset PIN</button>`:''}
             ${canDeleteThis?`<button class="btn-sm btn-danger" onclick="removePersonByName('${sname}')">Remove</button>`:''}
           </div>
         </div>`;
@@ -5588,21 +5496,6 @@ function removePerson(i) {
   showToast(s.name+' removed.','ok');
 }
 
-async function resetPin(i) {
-  const staff=getStaff(); const s=staff[i];
-  if (!isSuperAdmin() && !(currentUser.role==='hrmanager' && s.role==='staff')) {
-    showToast('Permission denied.','err'); return;
-  }
-  if(!confirm('Reset PIN for '+s.name+'? A new temporary PIN will be generated.'))return;
-  const tempPin=genTempPin();
-  staff[i].pin=null; staff[i].tempPin=hashPin(tempPin);
-  staff[i].pinResetBy=currentUser.name; staff[i].pinResetAt=new Date().toLocaleString('en-AU');
-  saveStaff(staff);
-  await spSavePinOnly(staff[i]); // lightweight PIN-only save
-  writeAuditLog('PIN Reset', s.name, `PIN reset by ${currentUser.name}`);
-  renderAdmin();
-  showTempPin(s.name, tempPin);
-}
 
 function fmt12(t) {
   if (!t) return '—';
@@ -5692,12 +5585,6 @@ function saveSchedule() {
   showToast(`Updated for ${staff[i].name.split(' ')[0]}.`, 'ok');
 }
 
-function genTempPin() {
-  // Generate a random 6-digit PIN that passes strength check
-  let pin;
-  do { pin = String(Math.floor(100000+Math.random()*900000)); } while(pinStrengthError(pin));
-  return pin;
-}
 
 function showTempPin(name, pin) {
   document.getElementById('tempPinDesc').textContent='Share this PIN privately with '+name.split(' ')[0]+'. It can only be used once — they\'ll be asked to set their own permanent PIN on first login.';
@@ -5754,7 +5641,7 @@ const msalConfig = {
   auth: {
     clientId: 'e2905b6d-7f90-41dc-9c57-7c5bfc4af1c7',
     authority: 'https://login.microsoftonline.com/c8838da3-903c-4e2d-ae8a-de9fc6f28d35',
-    redirectUri: 'https://mkat18.github.io/lp-attendance/broker.html',
+    redirectUri: 'https://portal.loanprocessor.com.au/broker.html',
     navigateToLoginRequestUrl: true,
   },
   cache: { 
@@ -8810,7 +8697,7 @@ async function renderBrokerMgmtScreen() {
         +'<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">'
         +'<select id="ba-broker-'+sid+'" style="flex:2;min-width:120px;font-size:13px;padding:6px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)"><option value="">Select broker\u2026</option>'
         +_brokers.map(b=>'<option value="'+esc(b.name)+'">'+esc(b.name)+'</option>').join('')+'</select>'
-        +'<select id="ba-type-'+sid+'" style="font-size:13px;padding:6px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);width:90px"><option value="FT">FT</option><option value="PT AM">PT AM</option><option value="PT PM">PT PM</option><option value="Other">Other</option></select>'
+        +'<select id="ba-type-'+sid+'" style="font-size:13px;padding:6px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);width:90px"><option value="FT">FT</option><option value="PT AM">PT AM</option><option value="PT PM">PT PM</option></select>'
         +'<button onclick="bmSaveAssign(\''+sid+'\',\''+esc(s.name)+'\')" style="padding:6px 14px;border-radius:var(--radius-sm);border:none;background:var(--brand);color:#fff;font-size:13px;cursor:pointer">Save</button>'
         +'<button onclick="document.getElementById(\'ba-form-'+sid+'\').style.display=\'none\'" style="padding:6px 14px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:transparent;font-size:13px;cursor:pointer">Cancel</button>'
         +'</div></div>':'')
