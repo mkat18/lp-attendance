@@ -7454,7 +7454,7 @@ async function spSaveRecord(rec) {
     await spPatch(SP_API + "('AttendanceRecords')/items(" + rec.id + ")", payload);
   } else {
     const res = await spPostDirect(SP_API + "('AttendanceRecords')/items", payload);
-    if (res && res.ID) rec.id = res.ID;
+    if (res && (res.Id || res.ID)) rec.id = res.Id || res.ID;
   }
 }
 
@@ -7606,7 +7606,7 @@ async function spSaveStaffMember(s) {
     return await spPatch(SP_API + "('AttendanceStaff')/items(" + s.id + ")", payload);
   } else {
     const res = await spPostDirect(SP_API + "('AttendanceStaff')/items", payload);
-    if (res && res.ID) s.id = res.ID;
+    if (res && (res.Id || res.ID)) s.id = res.Id || res.ID;
     return res;
   }
 }
