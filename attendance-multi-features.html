@@ -1462,9 +1462,6 @@ tr.flagged-row:hover td { background: #FFEAEA; }
 <div id="toast" role="status" aria-live="polite"></div>
 
 <script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
-<script>
-}
-</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script>
 // ════════════════════════════════════════════════════════════════════════════
@@ -6549,7 +6546,6 @@ async function addPersonUnified() {
     showToast('Only Super Admins can add managers.','err'); return;
   }
 
-  const tempPin = genTempPin();
   const newMember = {
     name, role, pin: null, tempPin: null,
     addedBy: currentUser.name, addedAt: new Date().toLocaleString('en-AU'),
@@ -6596,7 +6592,6 @@ function addPerson(role) {
   if (!ec1Name || !ec1Phone || !ec1Relation) { showToast('Emergency contact 1 is required.','err'); return; }
   const staff = getStaff();
   if (staff.find(s=>s.name.toLowerCase()===name.toLowerCase())) { showToast('Name already exists.','err'); return; }
-  const tempPin = genTempPin();
   const gv = id => (document.getElementById(id)&&document.getElementById(id).value)||'';
   const newMember = {
     name, role:'staff', pin:null, tempPin:null,
@@ -6631,7 +6626,6 @@ function addPrivilegedPerson() {
   if (!name) { showToast('Enter a name.','err'); return; }
   const staff = getStaff();
   if (staff.find(s=>s.name.toLowerCase()===name.toLowerCase())) { showToast('Name already exists.','err'); return; }
-  const tempPin = genTempPin();
   const gv = id => (document.getElementById(id)&&document.getElementById(id).value)||'';
   const newMember = {
     name, role, pin:null, tempPin:null,
@@ -6678,7 +6672,6 @@ async function resetPin(i) {
     showToast('Permission denied.','err'); return;
   }
   if(!confirm('Reset PIN for '+s.name+'? A new temporary PIN will be generated.'))return;
-  const tempPin=genTempPin();
   staff[i].pin=null; staff[i].tempPin=null;
   staff[i].pinResetBy=currentUser.name; staff[i].pinResetAt=new Date().toLocaleString('en-AU');
   saveStaff(staff);
