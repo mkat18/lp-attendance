@@ -7802,19 +7802,33 @@ async function confirmBulkStaffUpload() {
   const btn = document.querySelector('#bulkStaffPreview .btn-primary');
   if (btn) { btn.textContent='Importing…'; btn.disabled=true; }
   const staff = getStaff();
-  let added=0, skipped=0;
+  let added=0, skipped=0, failed=[];
   for (const member of _bulkStaffRows) {
     if (!member.name) { skipped++; continue; }
     if (staff.find(s=>s.name.toLowerCase()===member.name.toLowerCase())) { skipped++; continue; }
-    staff.push(member);
-    await spSaveStaffMember(member);
-    added++;
+    let res;
+    try {
+      res = await spSaveStaffMember(member);
+    } catch(e) {
+      res = null;
+    }
+    if (res) {
+      staff.push(member);
+      added++;
+    } else {
+      failed.push(member.name);
+    }
   }
   saveStaff(staff);
   _bulkStaffRows = [];
-  document.getElementById('bulkStaffPreview').innerHTML = `<div style="background:#D1FAE5;border:1.5px solid #6EE7B7;border-radius:var(--radius-sm);padding:12px 16px;font-size:13px;color:#065F46;font-weight:600">✓ ${added} staff imported successfully${skipped?' · '+skipped+' skipped (already exist)':''}</div>`;
+  const failHtml = failed.length
+    ? `<div style="background:#FEE2E2;border:1.5px solid #FCA5A5;border-radius:var(--radius-sm);padding:12px 16px;margin-top:8px;font-size:13px;color:#991B1B">
+        ⚠ ${failed.length} failed to save to SharePoint (not added): ${failed.join(', ')}
+        <br><span style="font-weight:400">Check your SharePoint connection/permissions and try uploading these again.</span>
+      </div>` : '';
+  document.getElementById('bulkStaffPreview').innerHTML = `<div style="background:#D1FAE5;border:1.5px solid #6EE7B7;border-radius:var(--radius-sm);padding:12px 16px;font-size:13px;color:#065F46;font-weight:600">✓ ${added} staff saved to SharePoint${skipped?' · '+skipped+' skipped (already exist)':''}</div>${failHtml}`;
   renderAdmin(); populateNameDropdown();
-  showToast(added+' staff imported ✓','ok');
+  showToast(added+' staff saved to SharePoint \u2713'+(failed.length?' \u2014 '+failed.length+' failed':''), failed.length?'err':'ok');
 }
 
 function exportCSV() {
