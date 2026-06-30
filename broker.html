@@ -8619,13 +8619,29 @@ async function renderBrokerMgmtScreen() {
       +'<div id="bmClientSearchResults" style="display:none;margin-bottom:8px"></div>'
       +'<div id="bmClientGrid"><div class="bm-av-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:4px">'
       +typeList.map(t=>{
-        const cnt=(byType[t.name]||[]).length;
+        const clientsOfType=byType[t.name]||[];
+        const cnt=clientsOfType.reduce((sum,b)=>{
+          const assigns=_brokerAssignments.filter(a=>a.brokerName===b.name);
+          if(!assigns.length) return sum+1;
+          const weight=assigns.reduce((w,a)=>w+(a.type==='FT'?1:0.5),0);
+          return sum+weight;
+        },0);
+        const cntDisplay=Number.isInteger(cnt)?cnt:cnt.toFixed(1);
         return '<div data-avkey="type_'+esc(t.name)+'" onclick="bmAvToggle(this.dataset.avkey)" style="border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:10px 8px;text-align:center;cursor:pointer;background:var(--surface-2)">'
-          +'<div style="font-size:20px;font-weight:700;color:'+(cnt?'var(--text)':'var(--text-3)')+'">'+cnt+'</div>'
+          +'<div style="font-size:20px;font-weight:700;color:'+(cnt?'var(--text)':'var(--text-3)')+'">'+cntDisplay+'</div>'
           +'<div style="font-size:10px;color:'+(cnt?'var(--text-2)':'var(--text-3)')+';margin-top:3px;line-height:1.3">'+esc(t.name)+'</div></div>';}).join('')
-      +(Object.keys(byType).includes('Unassigned')?'<div data-avkey="type_Unassigned" onclick="bmAvToggle(this.dataset.avkey)" style="border:1.5px solid #FDE68A;border-radius:var(--radius-sm);padding:10px 8px;text-align:center;cursor:pointer;background:#FEF9C3">'
-        +'<div style="font-size:20px;font-weight:700;color:#92400E">'+(byType['Unassigned']||[]).length+'</div>'
-        +'<div style="font-size:10px;color:#92400E;margin-top:3px">Unassigned</div></div>':'')
+      +(Object.keys(byType).includes('Unassigned')?(function(){
+        const uCnt=(byType['Unassigned']||[]).reduce((sum,b)=>{
+          const assigns=_brokerAssignments.filter(a=>a.brokerName===b.name);
+          if(!assigns.length) return sum+1;
+          const weight=assigns.reduce((w,a)=>w+(a.type==='FT'?1:0.5),0);
+          return sum+weight;
+        },0);
+        const uDisplay=Number.isInteger(uCnt)?uCnt:uCnt.toFixed(1);
+        return '<div data-avkey="type_Unassigned" onclick="bmAvToggle(this.dataset.avkey)" style="border:1.5px solid #FDE68A;border-radius:var(--radius-sm);padding:10px 8px;text-align:center;cursor:pointer;background:#FEF9C3">'
+          +'<div style="font-size:20px;font-weight:700;color:#92400E">'+uDisplay+'</div>'
+          +'<div style="font-size:10px;color:#92400E;margin-top:3px">Unassigned</div></div>';
+      })():'')
       +'</div>'
       +'<div id="bm-exp-types" style="display:none;background:var(--surface-2);border:1.5px solid var(--brand);border-radius:var(--radius-sm);padding:10px 12px;margin-top:4px;margin-bottom:10px"></div>'
       +'</div>'
@@ -8949,7 +8965,13 @@ function bmAvToggle(key) {
   } else if (key.startsWith('type_')) {
     var typeName=key.slice(5);
     var group=_brokers.filter(function(b){return (b.type||'Unassigned')===typeName;});
-    titleEl.textContent=typeName+' ('+group.length+')';
+    var typeCnt=group.reduce(function(sum,b){
+      var assigns=_brokerAssignments.filter(function(a){return a.brokerName===b.name;});
+      if(!assigns.length) return sum+1;
+      var weight=assigns.reduce(function(w,a){return w+(a.type==='FT'?1:0.5);},0);
+      return sum+weight;
+    },0);
+    titleEl.textContent=typeName+' ('+(Number.isInteger(typeCnt)?typeCnt:typeCnt.toFixed(1))+')';
     var typeOptions='<option value="">No type</option>'+_brokerTypes.filter(function(t){return t.id>0;}).map(function(t){return '<option value="'+esc(t.name)+'">'+esc(t.name)+'</option>';}).join('');
     contentEl.innerHTML=group.map(function(b){
       var analysts=_brokerAssignments.filter(function(a){return a.brokerName===b.name;}).map(function(a){return a.staffName;});
