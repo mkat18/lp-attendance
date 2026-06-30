@@ -1668,6 +1668,7 @@ function spToStaff(item) {
     personalEmail: item.PersonalEmail||'',
     address: item.Address||'',
     flexibleSchedule: item.FlexibleSchedule === 'true' || item.FlexibleSchedule === true,
+    worksSaturday: item.WorksSaturday === 'true' || item.WorksSaturday === true,
     ec1Name: item.EmergencyContact1Name||'',
     ec1Phone: item.EmergencyContact1Phone||'',
     ec1Relation: item.EmergencyContact1Relation||'',
@@ -1970,10 +1971,35 @@ async function toggleFlexibleSchedule(name) {
   const staff = getStaff();
   const idx = staff.findIndex(s => s.name === name);
   if (idx < 0) return;
-  staff[idx].flexibleSchedule = !staff[idx].flexibleSchedule;
+  const newVal = !staff[idx].flexibleSchedule;
+  staff[idx].flexibleSchedule = newVal;
+  const res = await spSaveStaffMember(staff[idx]);
+  if (!res) {
+    staff[idx].flexibleSchedule = !newVal; // revert on failure
+    showToast('Failed to save — check your connection and try again.', 'err');
+    renderAdmin();
+    return;
+  }
   saveStaff(staff);
-  await spSaveStaffMember(staff[idx]);
-  showToast(name.split(' ')[0] + (staff[idx].flexibleSchedule ? ' set to flexible schedule ✓' : ' set to fixed schedule ✓'), 'ok');
+  showToast(name.split(' ')[0] + (newVal ? ' set to flexible schedule ✓' : ' set to fixed schedule ✓'), 'ok');
+  renderAdmin();
+}
+
+async function toggleWorksSaturday(name) {
+  const staff = getStaff();
+  const idx = staff.findIndex(s => s.name === name);
+  if (idx < 0) return;
+  const newVal = !staff[idx].worksSaturday;
+  staff[idx].worksSaturday = newVal;
+  const res = await spSaveStaffMember(staff[idx]);
+  if (!res) {
+    staff[idx].worksSaturday = !newVal; // revert on failure
+    showToast('Failed to save — check your connection and try again.', 'err');
+    renderAdmin();
+    return;
+  }
+  saveStaff(staff);
+  showToast(name.split(' ')[0] + (newVal ? ' now works Saturdays ✓' : ' no longer works Saturdays ✓'), 'ok');
   renderAdmin();
 }
 
@@ -4026,6 +4052,8 @@ function renderMissing() {
   const missing=allStaff.filter(s=>{
     if(submitted.has(s.name)) return false;
     if(fn&&!s.name === fn) return false;
+    if(isWeekend && new Date(date).getDay()===6 && !s.worksSaturday) return false; // Saturday — skip staff not rostered
+    if(isWeekend && new Date(date).getDay()===0) return false; // Sunday — nobody expected
     return true;
   }).sort((a,b)=>{
     const aM=a.startTime?parseInt(a.startTime)*60+parseInt(a.startTime.split(':')[1]):999;
@@ -6348,7 +6376,8 @@ function renderAllStaffCards(staff) {
             ${canManageTeam?`<button class="btn-sm" style="background:#FEF3C7;color:#92400E;border-color:#FDE68A" onclick="openManageTeam('${sname}')">👥 Manage Team</button>`:''}
             ${canAssignBroker?`<button class="btn-sm" style="background:#FFF7ED;color:#C2410C;border-color:#FED7AA" onclick="openAssignBrokerModal('${sname}')">🎯 Assign broker</button>`:''}
             ${canEditScheduleThis?`<button class="btn-sm" onclick="editScheduleByName('${sname}')">Schedule & Office</button>`:''}
-            ${sa?`<button class="btn-sm" onclick="toggleFlexibleSchedule('${sname}')" style="background:${s.flexibleSchedule?'var(--brand-light)':'var(--surface-2)'};color:${s.flexibleSchedule?'var(--brand)':'var(--text-2)'};border-color:${s.flexibleSchedule?'var(--brand)':'var(--border)'}">⚡ ${s.flexibleSchedule?'Flex ON':'Flex OFF'}</button>`:''}            ${canDeleteThis?`<button class="btn-sm btn-danger" onclick="removePersonByName('${sname}')">Remove</button>`:''}
+            ${sa?`<button class="btn-sm" onclick="toggleFlexibleSchedule('${sname}')" style="background:${s.flexibleSchedule?'var(--brand-light)':'var(--surface-2)'};color:${s.flexibleSchedule?'var(--brand)':'var(--text-2)'};border-color:${s.flexibleSchedule?'var(--brand)':'var(--border)'}">⚡ ${s.flexibleSchedule?'Flex ON':'Flex OFF'}</button>`:''}
+            ${sa?`<button class="btn-sm" onclick="toggleWorksSaturday('${sname}')" style="background:${s.worksSaturday?'var(--brand-light)':'var(--surface-2)'};color:${s.worksSaturday?'var(--brand)':'var(--text-2)'};border-color:${s.worksSaturday?'var(--brand)':'var(--border)'}">📅 ${s.worksSaturday?'Sat ON':'Sat OFF'}</button>`:''}            ${canDeleteThis?`<button class="btn-sm btn-danger" onclick="removePersonByName('${sname}')">Remove</button>`:''}
             ${canDeleteThis?`<button class="btn-sm btn-danger" onclick="removePersonByName('${sname}')">Remove</button>`:''}
             ${(sa||mgr)?`<button class="btn-sm" id="detbtn-${s.name}" onclick="toggleStaffDetails(\'${sname}\')" style="background:var(--brand-light);color:var(--brand);border-color:var(--brand)">👤 Details</button>`:''}
           </div>
@@ -7005,11 +7034,19 @@ async function spGet(url) {
   const token = await getToken();
   const r = await fetch(url, { headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json;odata=nometadata' } });
   if (!r.ok) {
+    if (r.status === 401) showSessionExpiredOnce();
     const listName = url.match(/getbytitle\('([^']+)'\)/)?.[1] || url;
     logError('Read: ' + listName, r.status, r.statusText, r.status >= 500 ? 'critical' : 'warning');
     return null;
   }
   return await r.json();
+}
+
+let _sessionExpiredShown = false;
+function showSessionExpiredOnce() {
+  if (_sessionExpiredShown) return;
+  _sessionExpiredShown = true;
+  showToast('Your session expired — please refresh the page.', 'err');
 }
 
 async function spPostDirect(url, body) {
@@ -7020,6 +7057,7 @@ async function spPostDirect(url, body) {
     body: JSON.stringify(body)
   });
   if (!r.ok) {
+    if (r.status === 401) showSessionExpiredOnce();
     const errText = await r.text();
     console.error('[SP POST ERROR]', r.status, url, errText);
     // Self-heal: if SP says a property doesn't exist on this list, strip it and retry once
@@ -7047,6 +7085,7 @@ async function spPatch(url, body) {
     body: JSON.stringify(body)
   });
   if (!r.ok) {
+    if (r.status === 401) showSessionExpiredOnce();
     const listName = url.match(/getbytitle\('([^']+)'\)/)?.[1] || url;
     logError('Update: ' + listName, r.status, r.statusText, 'critical');
   }
@@ -7547,9 +7586,9 @@ async function spSaveStaffMember(s) {
     EmergencyContact2Phone: String(s.ec2Phone||''),
     EmergencyContact2Relation: String(s.ec2Relation||''),
     PersonalEmail: String(s.personalEmail||''),
+    FlexibleSchedule: !!s.flexibleSchedule,
+    WorksSaturday: !!s.worksSaturday,
   };
-  // Optional fields — only send if the SP column exists / value is set, to avoid breaking the whole save on missing columns
-  if (s.flexibleSchedule) payload.FlexibleSchedule = true;
   // Address is Multiple lines of text — add separately only if set
   if (s.address) payload.Address = String(s.address);
   if (s.id) {
