@@ -7086,10 +7086,21 @@ async function spPatch(url, body) {
   });
   if (!r.ok) {
     if (r.status === 401) showSessionExpiredOnce();
+    const errText = await r.text();
+    console.error('[SP PATCH ERROR]', r.status, url, errText);
+    // Self-heal: if SP says a property doesn't exist on this list, strip it and retry once
+    const missingProp = errText.match(/The property '(\w+)' does not exist/);
+    if (missingProp && body.hasOwnProperty(missingProp[1])) {
+      const retryBody = { ...body };
+      delete retryBody[missingProp[1]];
+      console.warn('[SP RETRY] Stripping missing column "'+missingProp[1]+'" and retrying PATCH:', url);
+      return await spPatch(url, retryBody);
+    }
     const listName = url.match(/getbytitle\('([^']+)'\)/)?.[1] || url;
-    logError('Update: ' + listName, r.status, r.statusText, 'critical');
+    logError('Update: ' + listName, r.status, errText.substring(0,300), 'critical').catch(()=>{});
+    return false;
   }
-  return r.ok;
+  return true;
 }
 
 async function spDelete(url) {
