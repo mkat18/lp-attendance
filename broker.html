@@ -8606,8 +8606,8 @@ async function renderBrokerMgmtScreen() {
           +'</div>';}).join('')
       :'<div style="font-size:13px;color:var(--text-3)">No CRM skills configured.</div>')+'</div>';
 
-  if (om && !sa) { bmSection('availability','Analyst availability',avHtml,true); }
-  else { bmSection('availability','Analyst availability',avHtml,true); }
+  if (om && !sa) { bmSection('availability','Analyst availability',avHtml,false); }
+  else { bmSection('availability','Analyst availability',avHtml,false); }
 
   // ── CLIENT LIST (SA only) ─────────────────────────────────────────────
   if (sa) {
@@ -8703,7 +8703,7 @@ async function renderBrokerMgmtScreen() {
       +'</div>';
   });
   baHtml+='</div>';
-  bmSection('assignments','Broker assignments',baHtml,true);
+  bmSection('assignments','Broker assignments',baHtml,false);
   } // end !om
 
   // ── CRM OPTIONS (SA only) ─────────────────────────────────────────────
@@ -8752,7 +8752,7 @@ async function renderBrokerMgmtScreen() {
         +'</div>';
     });
     csHtml+='</div>';
-    bmSection('crmskills','CRM skills',csHtml,true);
+    bmSection('crmskills','CRM skills',csHtml,false);
   }
   // Always render coverage at the end — covers OM, TL, SA
   renderCoverageSection('coverSection-brokermgmt');
