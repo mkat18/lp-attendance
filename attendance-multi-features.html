@@ -7029,9 +7029,17 @@ async function spPostDirect(url, body) {
   if (!r.ok) {
     const errText = await r.text();
     console.error('[SP POST ERROR]', r.status, url, errText);
+    // Self-heal: if SP says a property doesn't exist on this list, strip it and retry once
+    const missingProp = errText.match(/The property '(\w+)' does not exist/);
+    if (missingProp && body.hasOwnProperty(missingProp[1])) {
+      const retryBody = { ...body };
+      delete retryBody[missingProp[1]];
+      console.warn('[SP RETRY] Stripping missing column "'+missingProp[1]+'" and retrying:', url);
+      return await spPostDirect(url, retryBody);
+    }
     const listName = url.match(/getbytitle\('([^']+)'\)/)?.[1] || url;
     if (listName !== 'ErrorLog') { // avoid infinite loop
-      logError('Write: ' + listName, r.status, errText.substring(0,300), 'critical');
+      logError('Write: ' + listName, r.status, errText.substring(0,300), 'critical').catch(()=>{});
     }
     return null;
   }
@@ -7545,9 +7553,10 @@ async function spSaveStaffMember(s) {
     EmergencyContact2Name: String(s.ec2Name||''),
     EmergencyContact2Phone: String(s.ec2Phone||''),
     EmergencyContact2Relation: String(s.ec2Relation||''),
-    FlexibleSchedule: s.flexibleSchedule ? 'true' : 'false',
     PersonalEmail: String(s.personalEmail||''),
   };
+  // Optional fields — only send if the SP column exists / value is set, to avoid breaking the whole save on missing columns
+  if (s.flexibleSchedule) payload.FlexibleSchedule = true;
   // Address is Multiple lines of text — add separately only if set
   if (s.address) payload.Address = String(s.address);
   if (s.id) {
