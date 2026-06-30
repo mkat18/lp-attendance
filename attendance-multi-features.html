@@ -7704,7 +7704,7 @@ async function initMsal() {
 // ── Export CSV ────────────────────────────────────────────────────────────
 const BULK_STAFF_HEADERS = ['Name','JoinDate','Phone','Email','DateOfBirth','Address','Role','TeamLeader','Office','StartTime','EndTime','EC1Name','EC1Relation','EC1Phone','EC2Name','EC2Relation','EC2Phone','PersonalEmail'];
 const BULK_STAFF_EXAMPLE = ['Jane Smith','2024-06-01','0412 345 678','jane@email.com','1990-03-15','12 Main St, Goregaon, Mumbai 400063','analyst','Sarah TL','Goregaon','06:00','14:30','John Smith','Father','0412 111 222','','','','jane.personal@gmail.com'];
-const VALID_ROLES = ['analyst','trainee','teamlead','opsmanager','hrmanager','hr','assistant','sales','customerservice','socialmedia','accountant','staff'];
+const VALID_ROLES = ['analyst','trainee','teamlead','opsmanager','hrmanager','administrator','hr','assistant','sales','customerservice','socialmedia','accountant','staff'];
 
 function downloadStaffCSVTemplate() {
   const rows = [BULK_STAFF_HEADERS, BULK_STAFF_EXAMPLE];
