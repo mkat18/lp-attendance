@@ -6781,7 +6781,24 @@ async function renderMyTeam() {
     <div style="background:#E8F7EE;border:1.5px solid #BBF7D0;border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:1rem;display:flex;align-items:center;justify-content:space-between">
       <span style="font-size:13px;font-weight:600;color:var(--success)">✅ Available right now</span>
       <span style="font-size:20px;font-weight:700;color:var(--success)">${statuses.available} / ${teamNames.length}</span>
-    </div>`;
+    </div>
+    ${(()=>{
+      const nco = memberData.filter(m => m.rec && m.rec.clockIn && !m.rec.clockOut && m.rec.status !== 'leave');
+      if (!nco.length) return '';
+      const ncoId = 'myteam_nco_list';
+      return `<div style="border:1.5px solid #FDE68A;border-radius:var(--radius-sm);margin-bottom:1rem;overflow:hidden">
+        <div onclick="(function(){var el=document.getElementById('${ncoId}');el.style.display=el.style.display==='none'?'block':'none'})()" style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#FFFBEB;cursor:pointer">
+          <span style="font-size:13px;font-weight:600;color:#92400E">🔓 Not clocked out (${nco.length})</span>
+          <span style="font-size:11px;color:#92400E">${nco.slice(0,2).map(m=>shortName(m.name)).join(', ')}${nco.length>2?' +more':''}</span>
+        </div>
+        <div id="${ncoId}" style="display:none;padding:8px 14px">
+          ${nco.map(m=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px">
+            <span style="font-weight:600">${esc(m.name)}</span>
+            <span style="color:#92400E">In ${m.clockInStr} · not clocked out</span>
+          </div>`).join('')}
+        </div>
+      </div>`;
+    })()}`;
 
   // Member cards
   const cardsHTML = memberData.map(m => `
