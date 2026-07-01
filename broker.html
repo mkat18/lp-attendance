@@ -5689,16 +5689,13 @@ async function onMsLogin(account) {
       (s.email && s.email.toLowerCase() === email) ||
       (s.personalEmail && s.personalEmail.toLowerCase() === email) ||
       s.name.toLowerCase() === emailPrefix ||
-      s.name.toLowerCase() === emailPrefix.replace(/[._-]/g,' ') ||
-      (emailPrefix.replace(/\s+/g,'').length >= 10 &&
-       s.name.toLowerCase().replace(/\s+/g,'').includes(emailPrefix.replace(/\s+/g,'').slice(0,10)))
+      s.name.toLowerCase() === emailPrefix.replace(/[._-]/g,' ')
     );
     if (member) { await loginAs(member); return; }
 
     // No match — only SA can use name picker
     const isSAEmail = staff.find(s => s.role === 'superadmin' &&
-      ((s.email && s.email.toLowerCase() === email) ||
-       s.name.toLowerCase().replace(/\s+/g,'').includes(emailPrefix.replace(/\s+/g,'').slice(0,10)))
+      (s.email && s.email.toLowerCase() === email)
     );
     if (!isSAEmail) {
       showScreen('login');
@@ -5707,7 +5704,7 @@ async function onMsLogin(account) {
         <div style="text-align:center;padding:2rem 1rem">
           <div style="font-size:48px;margin-bottom:1rem">🔒</div>
           <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:8px">Access not configured</div>
-          <div style="font-size:13px;color:var(--text-2);margin-bottom:1.5rem">Your account <strong>${esc(msalAccount.username)}</strong> is not set up in this system yet. Please contact your administrator.</div>
+          <div style="font-size:13px;color:var(--text-2);margin-bottom:1.5rem">Your account <strong>${esc(msalAccount.username)}</strong> is not set up in this system yet.<br><br>Please contact your administrator to add your email address.</div>
           <button onclick="logout()" style="padding:10px 24px;border-radius:var(--radius-sm);border:none;background:var(--brand);color:#fff;font-size:14px;font-weight:600;cursor:pointer">Sign out</button>
         </div>`;
       return;
@@ -6110,10 +6107,9 @@ async function loadFromSharePoint() {
   const timeout = new Promise(resolve => setTimeout(resolve, 20000)); // 20s max
   try {
     const load = async () => {
-      const todayStr = new Date().toISOString().split('T')[0];
       const [staffRes, recRes, brkRes] = await Promise.all([
         spGet(SP_API + "('AttendanceStaff')/items?$top=500"),
-        spGet(SP_API + `('AttendanceRecords')/items?$filter=RecordDate ge datetime'${todayStr}T00:00:00Z'&$top=500&$orderby=RecordDate desc`),
+        spGet(SP_API + "('AttendanceRecords')/items?$top=5000"),
         spGet(SP_API + "('AttendanceBreaks')/items?$top=5000"),
       ]);
       if (staffRes?.value?.length) { _staff = staffRes.value.map(spToStaff); LS.set('ci_staff', _staff); }
@@ -6671,7 +6667,7 @@ function removeFromTeam(name) {
 }
 
 // ── My Team screen (shown to Team Lead after check-in) ───────────────────
-function renderMyTeam() {
+async function renderMyTeam() {
   const el = document.getElementById('myteamContent');
   const date = today;
   const tlName = currentUser.name;
@@ -6688,6 +6684,12 @@ function renderMyTeam() {
     </div>`;
     return;
   }
+
+  // Always fetch fresh records from SP so My Team reflects real-time check-ins
+  const recRes = await spGet(SP_API + "('AttendanceRecords')/items?$top=5000");
+  if (recRes?.value?.length) { _records = recRes.value.map(spToRecord); LS.set('ci_records', _records); }
+  const brkRes = await spGet(SP_API + "('AttendanceBreaks')/items?$top=5000");
+  if (brkRes?.value?.length) { _breaks = brkRes.value.map(spToBreak); LS.set('ci_breaks', _breaks); }
 
   const allStaff = getStaff();
   const dayRecs = getRecords().filter(r => r.date === date);

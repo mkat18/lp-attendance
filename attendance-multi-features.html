@@ -2659,7 +2659,6 @@ function goTab(name, btn) {
   if (name==='admin')      renderAdmin();
   if (name==='leave')      renderLeaveScreen();
   if (name==='profile') {
-    initCp();
     // Load CRM options if not yet loaded (for CRM Skills section)
     const crmLoad = _crmOptions.length ? Promise.resolve() : loadCRMOptions().then(loadStaffCRMs);
     crmLoad.then(() => renderProfileScreen()).catch(() => renderProfileScreen());
@@ -6977,7 +6976,7 @@ async function onMsLogin(account) {
     } catch(e) {}
   }
 
-  // Auto-match by MS account email — skip login screen entirely
+  // Auto-match by MS account email only — no name prefix fallback to avoid wrong-person login
   if (account && account.username) {
     const email = account.username.toLowerCase();
     const emailPrefix = email.split('@')[0].toLowerCase().replace(/[._-]/g,' ');
@@ -6986,18 +6985,13 @@ async function onMsLogin(account) {
       (s.email && s.email.toLowerCase() === email) ||
       (s.personalEmail && s.personalEmail.toLowerCase() === email) ||
       s.name.toLowerCase() === emailPrefix ||
-      // Match full name from email prefix (e.g. "shruti.rathod" -> "shruti rathod")
-      s.name.toLowerCase() === emailPrefix.replace(/[._-]/g,' ') ||
-      // Only fall back to partial match if it's specific enough (10+ chars) to avoid false matches
-      (emailPrefix.replace(/\s+/g,'').length >= 10 &&
-       s.name.toLowerCase().replace(/\s+/g,'').includes(emailPrefix.replace(/\s+/g,'').slice(0,10)))
+      s.name.toLowerCase() === emailPrefix.replace(/[._-]/g,' ')
     );
     if (member) { await loginAs(member); return; }
 
     // No match — only SA can use name picker, everyone else gets access denied
     const isSAEmail = staff.find(s => s.role === 'superadmin' &&
-      ((s.email && s.email.toLowerCase() === email) ||
-       s.name.toLowerCase().replace(/\s+/g,'').includes(emailPrefix.replace(/\s+/g,'').slice(0,10)))
+      (s.email && s.email.toLowerCase() === email)
     );
     if (!isSAEmail) {
       showScreen('login');
@@ -7006,7 +7000,7 @@ async function onMsLogin(account) {
         <div style="text-align:center;padding:2rem 1rem">
           <div style="font-size:48px;margin-bottom:1rem">🔒</div>
           <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:8px">Access not configured</div>
-          <div style="font-size:13px;color:var(--text-2);margin-bottom:1.5rem">Your account <strong>${esc(account.username)}</strong> is not set up in this system yet. Please contact your administrator.</div>
+          <div style="font-size:13px;color:var(--text-2);margin-bottom:1.5rem">Your account <strong>${esc(account.username)}</strong> is not set up in this system yet.<br><br>Please contact your administrator to add your email address.</div>
           <button onclick="logout()" style="padding:10px 24px;border-radius:var(--radius-sm);border:none;background:var(--brand);color:#fff;font-size:14px;font-weight:600;cursor:pointer">Sign out</button>
         </div>`;
       return;
