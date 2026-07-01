@@ -1425,6 +1425,15 @@ const TAG = {
 };
 const tag = s => { const t=TAG[s]||TAG.office; return `<span class="tag ${t.cls}">${t.label}</span>`; };
 const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+// "Yukta Champanekar" -> "Yukta C"
+function shortName(name) {
+  if (!name) return '';
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0];
+  return parts[0] + ' ' + parts[parts.length-1][0].toUpperCase();
+}
+
 const initials = name => name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
 const fmtMs = ms => { const t=Math.floor(ms/1000),m=Math.floor(t/60),s=t%60; return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`; };
 const fmtTime = ts => ts ? new Date(ts).toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit',hour12:true,timeZone:'Asia/Kolkata'}) : '—';
@@ -2938,7 +2947,7 @@ function renderMetrics() {
     const dayRecs  = allRecs.filter(r=>r.date===date);
     const submitted= new Set(dayRecs.map(r=>r.name));
     missing = allPeople.filter(n=>!submitted.has(n));
-    missingLabel = missing.length>0 ? missing.slice(0,3).map(n=>n.split(' ')[0]).join(', ')+(missing.length>3?' +more':'') : 'all clear ✓';
+    missingLabel = missing.length>0 ? missing.slice(0,3).map(n=>shortName(n)).join(', ')+(missing.length>3?' +more':'') : 'all clear ✓';
   } else {
     // Count unique staff who submitted at least once in the range vs total working days
     const submittedDays = allRecs.length; // total check-ins
@@ -3034,39 +3043,39 @@ function renderMetrics() {
     <div class="met clickable" style="${onBreakNames.length>0?'border-color:#E8A040':''}" onclick="cardTap('onbreak')">
       <div class="met-lbl">On break now</div>
       <div class="met-val" style="color:${onBreakNames.length>0?'var(--warn)':'var(--text-3)'}">${onBreakNames.length}</div>
-      <div class="met-sub">${onBreakNames.length>0?onBreakNames.slice(0,2).map(n=>n.split(' ')[0]).join(', ')+(onBreakNames.length>2?' +more':''):'nobody on break'}</div>
+      <div class="met-sub">${onBreakNames.length>0?onBreakNames.slice(0,2).map(n=>shortName(n)).join(', ')+(onBreakNames.length>2?' +more':''):'nobody on break'}</div>
     </div>
     <div class="met clickable" onclick="cardTap('available')">
       <div class="met-lbl">Available</div>
       <div class="met-val" style="color:var(--success)">${availableNames.length}</div>
-      <div class="met-sub">${availableNames.length>0?availableNames.slice(0,2).map(n=>n.split(' ')[0]).join(', ')+(availableNames.length>2?' +more':''):'&nbsp;'}</div>
+      <div class="met-sub">${availableNames.length>0?availableNames.slice(0,2).map(n=>shortName(n)).join(', ')+(availableNames.length>2?' +more':''):'&nbsp;'}</div>
     </div>`:''}
     <div class="met clickable" style="${lateStaff.length>0?'border-color:#FECACA':''}" onclick="cardTap('late')">
       <div class="met-lbl">Late clock in</div>
       <div class="met-val" style="color:${lateStaff.length>0?'var(--danger)':'var(--success)'}">${lateStaff.length}</div>
-      <div class="met-sub">${lateStaff.length>0?lateStaff.slice(0,2).map(n=>n.name.split(' ')[0]).join(', ')+(lateStaff.length>2?' +more':''):'all on time ✓'}</div>
+      <div class="met-sub">${lateStaff.length>0?lateStaff.slice(0,2).map(n=>shortName(n.name)).join(', ')+(lateStaff.length>2?' +more':''):'all on time ✓'}</div>
     </div>
     <div class="met clickable" style="${earlyStaff.length>0?'border-color:#FECACA':''}" onclick="cardTap('early')">
       <div class="met-lbl">Early clock out</div>
       <div class="met-val" style="color:${earlyStaff.length>0?'var(--danger)':'var(--success)'}">${earlyStaff.length}</div>
-      <div class="met-sub">${earlyStaff.length>0?earlyStaff.slice(0,2).map(n=>n.name.split(' ')[0]).join(', ')+(earlyStaff.length>2?' +more':''):'all good ✓'}</div>
+      <div class="met-sub">${earlyStaff.length>0?earlyStaff.slice(0,2).map(n=>shortName(n.name)).join(', ')+(earlyStaff.length>2?' +more':''):'all good ✓'}</div>
     </div>
     <div class="met clickable" style="grid-column:1/-1;${locationFlagged.length>0?'border-color:#FECACA':''}" onclick="cardTap('location')">
       <div class="met-lbl">📍 Location issues</div>
       <div class="met-val" style="color:${locationFlagged.length>0?'var(--danger)':'var(--success)'}">${locationFlagged.length}</div>
-      <div class="met-sub">${locationFlagged.length>0?locationFlagged.slice(0,3).map(r=>r.name.split(' ')[0]).join(', ')+(locationFlagged.length>3?' +more':''):'all locations verified ✓'}</div>
+      <div class="met-sub">${locationFlagged.length>0?locationFlagged.slice(0,3).map(r=>shortName(r.name)).join(', ')+(locationFlagged.length>3?' +more':''):'all locations verified ✓'}</div>
     </div>
     ${isSuperAdmin()?`
     <div class="met" style="grid-column:1/-1;${suspicious.length>0?'border-color:#F59E0B;background:#FFFBEB':''}">
       <div class="met-lbl">🔍 Suspicious activity</div>
       <div class="met-val" style="color:${suspicious.length>0?'#B45309':'var(--success)'}">${suspicious.length}</div>
-      <div class="met-sub" style="white-space:normal">${suspicious.length>0?suspicious.map(r=>esc(r.name.split(' ')[0])+' via <b>'+esc(r.msAccount)+'</b>').join(' · '):'no anomalies detected ✓'}</div>
+      <div class="met-sub" style="white-space:normal">${suspicious.length>0?suspicious.map(r=>esc(shortName(r.name))+' via <b>'+esc(r.msAccount)+'</b>').join(' · '):'no anomalies detected ✓'}</div>
     </div>`:''}
     ${isManager()?`
     <div class="met" style="grid-column:1/-1;${noPhoto.length>0?'border-color:#FECACA':''}">
       <div class="met-lbl">📷 No selfie</div>
       <div class="met-val" style="color:${noPhoto.length>0?'var(--danger)':'var(--success)'}">${noPhoto.length}</div>
-      <div class="met-sub">${noPhoto.length>0?noPhoto.slice(0,3).map(r=>r.name.split(' ')[0]).join(', ')+(noPhoto.length>3?' +more':''):'all selfies captured ✓'}</div>
+      <div class="met-sub">${noPhoto.length>0?noPhoto.slice(0,3).map(r=>shortName(r.name)).join(', ')+(noPhoto.length>3?' +more':''):'all selfies captured ✓'}</div>
     </div>`:''}
     ${isManager()?renderAbsencePatternCard():''}
     ${isManager()?renderCoverageCard(date):''}
@@ -6960,8 +6969,8 @@ function refreshObsNotes() {
     <div id="obs_exp_${id}" style="display:none;background:${bg};border-radius:var(--radius-sm);padding:8px 12px;margin-bottom:6px;font-size:12px;color:${color}">
       ${items.map(n=>`
         <div style="padding:4px 0;border-bottom:1px solid rgba(0,0,0,0.08)">
-          <span style="font-weight:600">${esc(n.target?.split(' ')[0])}</span>
-          <span style="opacity:.6;margin-left:4px">· ${fmtDate(n.date)} · by ${esc(n.by?.split(' ')[0]||'')}</span>
+          <span style="font-weight:600">${esc(shortName(n.target))}</span>
+          <span style="opacity:.6;margin-left:4px">· ${fmtDate(n.date)} · by ${esc(shortName(n.by||''))}</span>
           <div style="font-size:11px;opacity:.85;margin-top:2px">${esc(n.note)}</div>
         </div>`).join('')}
     </div>`;
@@ -7300,7 +7309,7 @@ function _renderCoverageSection(containerId) {
               <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
                 <div style="flex:1;min-width:100px">
                   <div style="font-size:13px;font-weight:600">${esc(name)}</div>
-                  <div style="font-size:11px;margin-top:2px">${hasCover?`<span style="color:var(--success)">✓ Covered by ${esc(cov.split(' ')[0])}</span>`:isNCR?`<span style="color:#92400E">NCR — no cover needed</span>`:`<span style="color:var(--danger)">Unassigned</span>`}</div>
+                  <div style="font-size:11px;margin-top:2px">${hasCover?`<span style="color:var(--success)">✓ Covered by ${esc(shortName(cov))}</span>`:isNCR?`<span style="color:#92400E">NCR — no cover needed</span>`:`<span style="color:var(--danger)">Unassigned</span>`}</div>
                 </div>
                 <select id="cov_sel_${name.replace(/\s/g,'_')}" style="${selStyle}">
                   <option value="">— assign cover —</option>
@@ -11298,7 +11307,7 @@ function renderMyTeamEOD(myTeamNames) {
     style="font-size:12px;padding:5px 10px;border-radius:50px;border:1.5px solid ${_myTeamEODPeriod===v?'var(--brand)':'var(--border)'};background:${_myTeamEODPeriod===v?'var(--brand-light)':'var(--surface)'};color:${_myTeamEODPeriod===v?'var(--brand)':'var(--text-2)'};cursor:pointer;font-weight:${_myTeamEODPeriod===v?'700':'400'};white-space:nowrap">${l}</button>`).join('');
 
   const personBtns = ['', ...myTeamNames].map(n=>`<button onclick="_myTeamEODPerson='${n.replace(/'/g,"\\'")}';renderMyTeamEOD(window._myTeamNames)"
-    style="font-size:12px;padding:5px 10px;border-radius:50px;border:1.5px solid ${_myTeamEODPerson===n?'var(--brand)':'var(--border)'};background:${_myTeamEODPerson===n?'var(--brand-light)':'var(--surface)'};color:${_myTeamEODPerson===n?'var(--brand)':'var(--text-2)'};cursor:pointer;font-weight:${_myTeamEODPerson===n?'700':'400'};white-space:nowrap">${n?esc(n.split(' ')[0]):'All staff'}</button>`).join('');
+    style="font-size:12px;padding:5px 10px;border-radius:50px;border:1.5px solid ${_myTeamEODPerson===n?'var(--brand)':'var(--border)'};background:${_myTeamEODPerson===n?'var(--brand-light)':'var(--surface)'};color:${_myTeamEODPerson===n?'var(--brand)':'var(--text-2)'};cursor:pointer;font-weight:${_myTeamEODPerson===n?'700':'400'};white-space:nowrap">${n?esc(shortName(n)):'All staff'}</button>`).join('');
 
   // Per-member rows
   const memberRows = viewNames.map(name => {
@@ -11390,9 +11399,9 @@ function renderMyTeamEOD(myTeamNames) {
         <div style="font-size:12px;font-weight:700;color:var(--brand)">${_myTeamEODCard==='submitted'?'✓ Submitted':_myTeamEODCard==='drafts'?'📝 In progress':'🙋 Need support'}</div>
         <button onclick="_myTeamEODCard='';renderMyTeamEOD(window._myTeamNames)" style="background:transparent;border:none;font-size:16px;cursor:pointer;color:var(--text-3)">×</button>
       </div>
-      ${_myTeamEODCard==='submitted'?uniqueSubmitters.map(n=>`<div style="font-size:12px;padding:3px 0;border-bottom:0.5px solid var(--border)">${esc(n.split(' ')[0])}</div>`).join('')||'<div style="font-size:12px;color:var(--text-3)">None yet</div>':''}
-      ${_myTeamEODCard==='drafts'?uniqueDrafters.map(n=>`<div style="font-size:12px;padding:3px 0;border-bottom:0.5px solid var(--border)">${esc(n.split(' ')[0])}</div>`).join('')||'<div style="font-size:12px;color:var(--text-3)">No drafts</div>':''}
-      ${_myTeamEODCard==='support'?submittedReports.filter(r=>r.supportNeeded==='yes').map(r=>`<div style="padding:4px 0;border-bottom:0.5px solid var(--border)"><div style="font-size:12px;font-weight:600">${esc(r.name.split(' ')[0])}</div>${r.supportDetail?`<div style="font-size:11px;color:var(--text-2)">${esc(r.supportDetail)}</div>`:''}</div>`).join('')||'<div style="font-size:12px;color:var(--text-3)">No support flags</div>':''}
+      ${_myTeamEODCard==='submitted'?uniqueSubmitters.map(n=>`<div style="font-size:12px;padding:3px 0;border-bottom:0.5px solid var(--border)">${esc(shortName(n))}</div>`).join('')||'<div style="font-size:12px;color:var(--text-3)">None yet</div>':''}
+      ${_myTeamEODCard==='drafts'?uniqueDrafters.map(n=>`<div style="font-size:12px;padding:3px 0;border-bottom:0.5px solid var(--border)">${esc(shortName(n))}</div>`).join('')||'<div style="font-size:12px;color:var(--text-3)">No drafts</div>':''}
+      ${_myTeamEODCard==='support'?submittedReports.filter(r=>r.supportNeeded==='yes').map(r=>`<div style="padding:4px 0;border-bottom:0.5px solid var(--border)"><div style="font-size:12px;font-weight:600">${esc(shortName(r.name))}</div>${r.supportDetail?`<div style="font-size:11px;color:var(--text-2)">${esc(r.supportDetail)}</div>`:''}</div>`).join('')||'<div style="font-size:12px;color:var(--text-3)">No support flags</div>':''}
     </div>`:''}
     ${notSubmitted.length?`<div style="font-size:12px;color:var(--danger);margin-bottom:10px">⏳ Not submitted: ${notSubmitted.map(n=>esc(n.split(' ')[0])).join(', ')}</div>`:''}
     <div onclick="eodReportsToggle()" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:6px 0;margin-bottom:${_myTeamEODOpen?'8':'0'}px;border-top:0.5px solid var(--border)">

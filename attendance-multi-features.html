@@ -1747,6 +1747,15 @@ const TAG = {
 };
 const tag = s => { const t=TAG[s]||TAG.office; return `<span class="tag ${t.cls}">${t.label}</span>`; };
 const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+// "Yukta Champanekar" -> "Yukta C"
+function shortName(name) {
+  if (!name) return '';
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0];
+  return parts[0] + ' ' + parts[parts.length-1][0].toUpperCase();
+}
+
 const initials = name => name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
 const fmtMs = ms => { const t=Math.floor(ms/1000),m=Math.floor(t/60),s=t%60; return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`; };
 const fmtTime = ts => ts ? new Date(ts).toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit',hour12:true,timeZone:'Asia/Kolkata'}) : '—';
@@ -3495,7 +3504,16 @@ function tapCard(key, row) {
   } else if (key === 'noselfie') {
     rows = allRecs.filter(r => r.status!=='leave'&&!r.hasPhoto).map(r => personRow(r.name, 'No selfie', 'var(--danger)'));
     title = 'No selfie'; emptyMsg = 'All selfies captured ✓';
-  } else if (key === 'eod') {
+  } else if (key === 'noclockout') {
+    const dayRecs2 = getRecords().filter(r => r.date === today);
+    rows = allStaff.filter(s => {
+      const rec = dayRecs2.find(r => r.name === s.name);
+      return rec && rec.clockIn && !rec.clockOut && rec.status !== 'leave';
+    }).map(s => {
+      const rec = dayRecs2.find(r => r.name === s.name);
+      return personRow(s.name, 'Clocked in '+fmtTime(rec.clockIn)+' · not clocked out', 'var(--warn)');
+    });
+    title = 'Not clocked out'; emptyMsg = 'All staff have clocked out ✓';
     const eodRpts   = getEODReports().filter(r => r.date === date && r.status === 'submitted');
     const submitted = new Set(eodRpts.map(r => r.name));
     const onLeave   = new Set(allRecs.filter(r => r.date===date && r.status==='leave').map(r => r.name));
@@ -3604,7 +3622,7 @@ function renderMetrics() {
     const dayRecs  = allRecs.filter(r=>r.date===date);
     const submitted= new Set(dayRecs.map(r=>r.name));
     missing = allPeople.filter(n=>!submitted.has(n));
-    missingLabel = missing.length>0 ? missing.slice(0,3).map(n=>n.split(' ')[0]).join(', ')+(missing.length>3?' +more':'') : 'all clear ✓';
+    missingLabel = missing.length>0 ? missing.slice(0,3).map(n=>shortName(n)).join(', ')+(missing.length>3?' +more':'') : 'all clear ✓';
   } else {
     // Count unique staff who submitted at least once in the range vs total working days
     const submittedDays = allRecs.length; // total check-ins
@@ -3668,6 +3686,12 @@ function renderMetrics() {
     return !r.hasPhoto;
   }) : [];
 
+
+  // Staff checked in today but not yet clocked out
+  const notClockedOut = isToday ? allStaff.filter(s => {
+    const rec = dayRecs.find(r => r.name === s.name);
+    return rec && rec.clockIn && !rec.clockOut && rec.status !== 'leave';
+  }) : [];
   const rangeLabel = multi ? ` <span style="font-size:10px;color:var(--text-3);font-weight:400">${fromDate} – ${toDate}</span>` : '';
 
   // ── Compute data needed for Row 3 ──────────────────────────────────────
@@ -3707,34 +3731,38 @@ function renderMetrics() {
   r1 += metCard('onbreak',  1, 'On break',
     isToday?onBreakNames.length:'—',
     isToday&&onBreakNames.length?'var(--warn)':'var(--text-3)',
-    isToday?(onBreakNames.length>0?onBreakNames.slice(0,2).map(n=>n.split(' ')[0]).join(', ')+(onBreakNames.length>2?' +more':''):'nobody on break'):'today only',
+    isToday?(onBreakNames.length>0?onBreakNames.slice(0,2).map(n=>shortName(n)).join(', ')+(onBreakNames.length>2?' +more':''):'nobody on break'):'today only',
     isToday&&onBreakNames.length?'border-color:#E8A040;':'');
   r1 += metCard('available', 1, 'Available',
     isToday?availableNames.length:'—',
     isToday&&availableNames.length?'var(--success)':'var(--text-3)',
-    isToday?(availableNames.length>0?availableNames.slice(0,2).map(n=>n.split(' ')[0]).join(', ')+(availableNames.length>2?' +more':''):'&nbsp;'):'today only');
+    isToday?(availableNames.length>0?availableNames.slice(0,2).map(n=>shortName(n)).join(', ')+(availableNames.length>2?' +more':''):'&nbsp;'):'today only');
   r1 += rowExpandHTML(1);
 
   // Row 2: Flags
   let r2 = '';
   r2 += metCard('late',     2, '⏰ Late clock in',  lateStaff.length,
     lateStaff.length?'var(--danger)':'var(--success)',
-    lateStaff.length>0?lateStaff.slice(0,2).map(n=>n.name.split(' ')[0]).join(', ')+(lateStaff.length>2?' +more':''):'all on time ✓',
+    lateStaff.length>0?lateStaff.slice(0,2).map(n=>shortName(n.name)).join(', ')+(lateStaff.length>2?' +more':''):'all on time ✓',
     lateStaff.length?'border-color:#FECACA;':'');
   r2 += metCard('early',    2, '🏃 Early out',       earlyStaff.length,
     earlyStaff.length?'var(--danger)':'var(--success)',
-    earlyStaff.length>0?earlyStaff.slice(0,2).map(n=>n.name.split(' ')[0]).join(', ')+(earlyStaff.length>2?' +more':''):'all good ✓',
+    earlyStaff.length>0?earlyStaff.slice(0,2).map(n=>shortName(n.name)).join(', ')+(earlyStaff.length>2?' +more':''):'all good ✓',
     earlyStaff.length?'border-color:#FECACA;':'');
   r2 += metCard('location', 2, '📍 Location',        locationFlagged.length,
     locationFlagged.length?'var(--danger)':'var(--success)',
-    locationFlagged.length>0?locationFlagged.slice(0,3).map(r=>r.name.split(' ')[0]).join(', ')+(locationFlagged.length>3?' +more':''):'all verified ✓',
+    locationFlagged.length>0?locationFlagged.slice(0,3).map(r=>shortName(r.name)).join(', ')+(locationFlagged.length>3?' +more':''):'all verified ✓',
     locationFlagged.length?'border-color:#FECACA;':'');
   r2 += isManager()
     ? metCard('noselfie', 2, '📷 No selfie', noPhoto.length,
         noPhoto.length?'var(--danger)':'var(--success)',
-        noPhoto.length>0?noPhoto.slice(0,3).map(r=>r.name.split(' ')[0]).join(', ')+(noPhoto.length>3?' +more':''):'all captured ✓',
+        noPhoto.length>0?noPhoto.slice(0,3).map(r=>shortName(r.name)).join(', ')+(noPhoto.length>3?' +more':''):'all captured ✓',
         noPhoto.length?'border-color:#FECACA;':'')
     : '';
+  r2 += metCard('noclockout', 2, '🔓 Not clocked out', notClockedOut.length,
+    notClockedOut.length?'var(--warn)':'var(--success)',
+    notClockedOut.length>0?notClockedOut.slice(0,2).map(s=>shortName(s.name)).join(', ')+(notClockedOut.length>2?' +more':''):'all clocked out ✓',
+    notClockedOut.length?'border-color:#FDE68A;':'');
   r2 += rowExpandHTML(2);
 
   // Row 3: Insights (manager/SA)
@@ -3756,7 +3784,7 @@ function renderMetrics() {
     r3 += isSuperAdmin()
       ? metCard('suspicious', 3, '🔍 Suspicious', suspicious.length,
           suspicious.length?'#B45309':'var(--success)',
-          suspicious.length>0?suspicious.slice(0,1).map(r=>r.name.split(' ')[0]).join('')+(suspicious.length>1?' +'+(suspicious.length-1)+' more':''):'no anomalies ✓',
+          suspicious.length>0?suspicious.slice(0,1).map(r=>shortName(r.name)).join('')+(suspicious.length>1?' +'+(suspicious.length-1)+' more':''):'no anomalies ✓',
           suspicious.length?'border-color:#F59E0B;background:#FFFBEB;':'')
       : '';
     r3 += rowExpandHTML(3);
@@ -8243,7 +8271,24 @@ async function renderMyTeam() {
     <div style="background:#E8F7EE;border:1.5px solid #BBF7D0;border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:1rem;display:flex;align-items:center;justify-content:space-between">
       <span style="font-size:13px;font-weight:600;color:var(--success)">✅ Available right now</span>
       <span style="font-size:20px;font-weight:700;color:var(--success)">${statuses.available} / ${teamNames.length}</span>
-    </div>`;
+    </div>
+    ${(()=>{
+      const nco = memberData.filter(m => m.rec && m.rec.clockIn && !m.rec.clockOut && m.rec.status !== 'leave');
+      if (!nco.length) return '';
+      const ncoId = 'myteam_nco_list';
+      return `<div id="myteam_nco" style="border:1.5px solid #FDE68A;border-radius:var(--radius-sm);margin-bottom:1rem;overflow:hidden">
+        <div onclick="(function(){var el=document.getElementById('${ncoId}');el.style.display=el.style.display==='none'?'block':'none'})()" style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#FFFBEB;cursor:pointer">
+          <span style="font-size:13px;font-weight:600;color:#92400E">🔓 Not clocked out (${nco.length})</span>
+          <span style="font-size:11px;color:#92400E">${nco.slice(0,2).map(m=>shortName(m.name)).join(', ')}${nco.length>2?' +more':''}</span>
+        </div>
+        <div id="${ncoId}" style="display:none;padding:8px 14px">
+          ${nco.map(m=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px">
+            <span style="font-weight:600">${esc(m.name)}</span>
+            <span style="color:#92400E">In ${m.clockInStr} · not clocked out</span>
+          </div>`).join('')}
+        </div>
+      </div>`;
+    })()}`;
 
   // Member cards
   const cardsHTML = memberData.map(m => `
