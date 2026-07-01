@@ -1367,7 +1367,9 @@ function hhmmToTs(hhmm, dateStr) {
 
 // Map SharePoint item to record object
 function spToRecord(item) {
-  const dateStr = item.RecordDate ? item.RecordDate.split('T')[0] : '';
+  const dateStr = item.RecordDate
+    ? new Date(item.RecordDate).toLocaleDateString('en-CA', {timeZone:'Asia/Kolkata'})
+    : '';
   return {
     id: item.ID||item.id,
     name: item.StaffName||'',
@@ -6108,9 +6110,10 @@ async function loadFromSharePoint() {
   const timeout = new Promise(resolve => setTimeout(resolve, 20000)); // 20s max
   try {
     const load = async () => {
+      const todayStr = new Date().toISOString().split('T')[0];
       const [staffRes, recRes, brkRes] = await Promise.all([
         spGet(SP_API + "('AttendanceStaff')/items?$top=500"),
-        spGet(SP_API + "('AttendanceRecords')/items?$top=5000"),
+        spGet(SP_API + `('AttendanceRecords')/items?$filter=RecordDate ge datetime'${todayStr}T00:00:00Z'&$top=500&$orderby=RecordDate desc`),
         spGet(SP_API + "('AttendanceBreaks')/items?$top=5000"),
       ]);
       if (staffRes?.value?.length) { _staff = staffRes.value.map(spToStaff); LS.set('ci_staff', _staff); }

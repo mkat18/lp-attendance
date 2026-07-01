@@ -1689,7 +1689,9 @@ function hhmmToTs(hhmm, dateStr) {
 
 // Map SharePoint item to record object
 function spToRecord(item) {
-  const dateStr = item.RecordDate ? item.RecordDate.split('T')[0] : '';
+  const dateStr = item.RecordDate
+    ? new Date(item.RecordDate).toLocaleDateString('en-CA', {timeZone:'Asia/Kolkata'})
+    : '';
   return {
     id: item.ID||item.id,
     name: item.StaffName||'',
@@ -8131,7 +8133,7 @@ function removeFromTeam(name) {
 }
 
 // ── My Team screen (shown to Team Lead after check-in) ───────────────────
-function renderMyTeam() {
+async function renderMyTeam() {
   const el = document.getElementById('myteamContent');
   const date = today;
   const tlName = currentUser.name;
@@ -8148,6 +8150,10 @@ function renderMyTeam() {
     </div>`;
     return;
   }
+
+  // Refresh records from SP so we always see latest check-ins
+  el.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--text-3);font-size:13px">Refreshing...</div>';
+  await loadFromSharePoint().catch(()=>{});
 
   const allStaff = getStaff();
   const dayRecs = getRecords().filter(r => r.date === date);
