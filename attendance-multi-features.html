@@ -6962,7 +6962,7 @@ async function onMsLogin(account) {
   if (loadingMsg) loadingMsg.textContent = 'Loading your workspace…';
   requestGeo();
   await loadFromSharePoint().catch(()=>{});
-  autoSaveMsEmail(account).catch(()=>{});
+  // Note: email is managed manually in SP, not auto-saved on login
 
   // 1. Try session restore
   const saved = sessionStorage.getItem('lp_session');
