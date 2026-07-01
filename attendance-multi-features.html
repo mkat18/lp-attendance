@@ -688,9 +688,35 @@ tr.flagged-row:hover td { background: #FFEAEA; }
           </button>
         </div>
       </div>
-      <div id="leaveReasonField" style="display:none;margin-bottom:1.1rem">
-        <label style="display:block;font-size:12px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;font-family:var(--font-ui)">Reason <span style="color:var(--danger)">*</span></label>
-        <textarea id="leaveReason" placeholder="e.g. Annual leave, sick day, working morning only…" style="width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:14px;color:var(--text);background:var(--surface-2);outline:none;resize:none;min-height:76px;line-height:1.5;transition:border-color .15s" onfocus="this.style.borderColor='var(--brand)'" onblur="this.style.borderColor='var(--border)'"></textarea>
+      <div id="leaveReasonField" style="display:none;margin-bottom:1.1rem;background:#F0FDF4;border:1.5px solid #BBF7D0;border-radius:var(--radius-sm);padding:14px">
+        <div class="field">
+          <label>Leave type <span style="color:var(--danger)">*</span></label>
+          <select id="ciLeaveType" onchange="(function(){var f=document.getElementById('ciLeaveBrokerField');f.style.display=this.value==='Broker Holiday'?'block':'none'}).call(this)" style="font-size:14px;padding:8px 10px;width:100%;border:1.5px solid var(--border);border-radius:var(--radius-sm)">
+            <option value="">— select —</option>
+            <option value="Annual Leave">Annual Leave</option>
+            <option value="Sick Leave">Sick Leave</option>
+            <option value="Unpaid Leave">Unpaid Leave</option>
+            <option value="Broker Holiday">Broker Holiday</option>
+          </select>
+        </div>
+        <div id="ciLeaveBrokerField" style="display:none" class="field">
+          <label>Broker name <span style="color:var(--danger)">*</span></label>
+          <input type="text" id="ciLeaveBrokerName" placeholder="Broker name…" style="font-size:14px;padding:8px 10px;width:100%;border:1.5px solid var(--border);border-radius:var(--radius-sm)"/>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px" class="field">
+          <div>
+            <label>Start date <span style="color:var(--danger)">*</span></label>
+            <input type="date" id="ciLeaveStartDate" style="font-size:14px;padding:8px 10px;width:100%;border:1.5px solid var(--border);border-radius:var(--radius-sm)"/>
+          </div>
+          <div>
+            <label>End date</label>
+            <input type="date" id="ciLeaveEndDate" style="font-size:14px;padding:8px 10px;width:100%;border:1.5px solid var(--border);border-radius:var(--radius-sm)"/>
+          </div>
+        </div>
+        <div class="field">
+          <label>Brief reason <span style="color:var(--danger)">*</span></label>
+          <textarea id="leaveReason" placeholder="Reason for leave…" rows="2" style="width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:14px;color:var(--text);background:var(--surface-2);outline:none;resize:none;line-height:1.5" onfocus="this.style.borderColor='var(--brand)'" onblur="this.style.borderColor='var(--border)'"></textarea>
+        </div>
       </div>
       <button class="btn-primary" id="submitBtn" onclick="submitCheckin()">Submit</button>
       <div id="submittedMsg" style="display:none;text-align:center;padding:10px 0 2px;font-size:13px;color:var(--success);font-weight:600">✓ Submitted for today</div>
@@ -2965,7 +2991,10 @@ function lockCheckin() {
   const ta=document.getElementById('leaveReason');
   if(selectedStatus==='leave'&&ta.value){
     reasonField.style.display='block';
-    ta.disabled=true; ta.style.opacity='0.6'; ta.style.cursor='default';
+    // Disable all leave form inputs
+    ['ciLeaveType','ciLeaveBrokerName','ciLeaveStartDate','ciLeaveEndDate','leaveReason'].forEach(id=>{
+      const el=document.getElementById(id); if(el){el.disabled=true;el.style.opacity='0.6';}
+    });
   } else {
     reasonField.style.display='none';
   }
@@ -2976,17 +3005,25 @@ function unlockCheckin() {
   document.getElementById('submitBtn').style.display='block';
   document.getElementById('submittedMsg').style.display='none';
   document.getElementById('leaveReasonField').style.display='none';
-  document.getElementById('leaveReason').value='';
-  document.getElementById('leaveReason').disabled=false;
-  document.getElementById('leaveReason').style.opacity='1';
-  document.getElementById('leaveReason').style.cursor='text';
+  ['ciLeaveType','ciLeaveBrokerName','ciLeaveStartDate','ciLeaveEndDate','leaveReason'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el){el.value='';el.disabled=false;el.style.opacity='1';}
+  });
+  document.getElementById('ciLeaveBrokerField').style.display='none';
 }
 
 function pick(btn) {
   document.querySelectorAll('.status-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active'); selectedStatus=btn.dataset.val;
   const reasonField=document.getElementById('leaveReasonField');
-  if(selectedStatus==='leave'||selectedStatus==='halfday'){
+  if(selectedStatus==='leave'){
+    reasonField.style.display='block';
+    const sd=document.getElementById('ciLeaveStartDate');
+    const ed=document.getElementById('ciLeaveEndDate');
+    if(sd&&!sd.value) sd.value=today;
+    if(ed&&!ed.value) ed.value=today;
+    document.getElementById('leaveReason').focus();
+  } else if(selectedStatus==='halfday'){
     reasonField.style.display='block';
     document.getElementById('leaveReason').focus();
   } else {
@@ -2997,7 +3034,17 @@ function pick(btn) {
 
 async function submitCheckin() {
   if (!selectedStatus) { showToast('Please choose a status.','err'); return; }
-  if (selectedStatus==='leave'||selectedStatus==='halfday') {
+  if (selectedStatus==='leave') {
+    const leaveType = document.getElementById('ciLeaveType')?.value;
+    const reason = document.getElementById('leaveReason').value.trim();
+    const startDate = document.getElementById('leaveStartDate')?.value;
+    const brokerName = document.getElementById('ciLeaveBrokerName')?.value.trim();
+    if (!leaveType) { showToast('Please select a leave type.','err'); return; }
+    if (leaveType==='Broker Holiday' && !brokerName) { showToast('Please enter the broker name.','err'); return; }
+    if (!startDate) { showToast('Please select a start date.','err'); return; }
+    if (!reason) { showToast('Please enter a reason.','err'); return; }
+  }
+  if (selectedStatus==='halfday') {
     const reason=document.getElementById('leaveReason').value.trim();
     if (!reason) {
       document.getElementById('leaveReason').style.borderColor='var(--danger)';
@@ -3104,7 +3151,13 @@ async function closeCameraAndSubmit(photoDataUrl) {
   if (!_pendingSubmit) return;
   _pendingSubmit = false;
 
-  const reason = selectedStatus==='leave'||selectedStatus==='halfday' ? document.getElementById('leaveReason').value.trim() : '';
+  const leaveType   = selectedStatus==='leave' ? (document.getElementById('ciLeaveType')?.value||'') : '';
+  const brokerName  = selectedStatus==='leave' ? (document.getElementById('ciLeaveBrokerName')?.value.trim()||'') : '';
+  const leaveStart  = selectedStatus==='leave' ? (document.getElementById('ciLeaveStartDate')?.value||today) : today;
+  const leaveEnd    = selectedStatus==='leave' ? (document.getElementById('ciLeaveEndDate')?.value||leaveStart) : today;
+  const reason = selectedStatus==='leave'
+    ? [leaveType, brokerName?'('+brokerName+')':'', document.getElementById('leaveReason').value.trim()].filter(Boolean).join(' · ')
+    : selectedStatus==='halfday' ? document.getElementById('leaveReason').value.trim() : '';
   const clockIn = (selectedStatus==='leave') ? null : Date.now();
   showToast('Getting your location…', 'ok');
 
@@ -3128,6 +3181,14 @@ async function closeCameraAndSubmit(photoDataUrl) {
       showToast('⚠ Check-in saved on this device but failed to sync — please try again or contact your manager.','err');
     } else {
       showToast('✓ Submitted!','ok');
+    }
+    // If on leave, also create a leave request entry so it appears in the Leave tab
+    if (selectedStatus === 'leave' && leaveType) {
+      const days = countLeaveDays(leaveStart, leaveEnd, false);
+      if (days > 0) {
+        doSubmitLeave(leaveType, leaveStart, leaveEnd, false, 'AM',
+          document.getElementById('leaveReason').value.trim(), brokerName, days).catch(()=>{});
+      }
     }
     // Upload photo to SharePoint in background
     if (photoDataUrl) uploadPhoto(photoDataUrl, newRec);
@@ -4728,7 +4789,7 @@ async function submitLeaveRequest() {
   const halfDay = document.getElementById('leaveHalfDay').checked;
   const halfDaySession = document.getElementById('leaveHalfDaySession').value;
   const reason = document.getElementById('leaveReason2').value.trim();
-  const brokerName = document.getElementById('leaveBrokerName')?.value.trim()||'';
+  const brokerName = document.getElementById('ciLeaveBrokerName')?.value.trim()||'';
 
   if (!leaveType) { showToast('Select a leave type.','err'); return; }
   if (!startDate) { showToast('Select a start date.','err'); return; }
