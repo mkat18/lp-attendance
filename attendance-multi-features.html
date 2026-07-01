@@ -3689,7 +3689,7 @@ function renderMetrics() {
 
   // Staff checked in today but not yet clocked out
   const notClockedOut = isToday ? allStaff.filter(s => {
-    const rec = dayRecs.find(r => r.name === s.name);
+    const rec = allRecs.find(r => r.name === s.name && r.date === today);
     return rec && rec.clockIn && !rec.clockOut && rec.status !== 'leave';
   }) : [];
   const rangeLabel = multi ? ` <span style="font-size:10px;color:var(--text-3);font-weight:400">${fromDate} – ${toDate}</span>` : '';

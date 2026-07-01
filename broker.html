@@ -6676,7 +6676,7 @@ function removeFromTeam(name) {
 }
 
 // ── My Team screen (shown to Team Lead after check-in) ───────────────────
-async function renderMyTeam() {
+function renderMyTeam() {
   const el = document.getElementById('myteamContent');
   const date = today;
   const tlName = currentUser.name;
@@ -6693,12 +6693,6 @@ async function renderMyTeam() {
     </div>`;
     return;
   }
-
-  // Always fetch fresh records from SP so My Team reflects real-time check-ins
-  const recRes = await spGet(SP_API + "('AttendanceRecords')/items?$top=5000");
-  if (recRes?.value?.length) { _records = recRes.value.map(spToRecord); LS.set('ci_records', _records); }
-  const brkRes = await spGet(SP_API + "('AttendanceBreaks')/items?$top=5000");
-  if (brkRes?.value?.length) { _breaks = brkRes.value.map(spToBreak); LS.set('ci_breaks', _breaks); }
 
   const allStaff = getStaff();
   const dayRecs = getRecords().filter(r => r.date === date);
