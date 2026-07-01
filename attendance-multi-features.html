@@ -1751,8 +1751,8 @@ const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replac
 // "Yukta Champanekar" -> "Yukta C"
 function shortName(name) {
   if (!name) return '';
-  const parts = name.trim().split(/\s+/);
-  if (parts.length === 1) return parts[0];
+  const parts = name.trim().split(/\s+/).filter(p => p.length > 0);
+  if (parts.length <= 1) return parts[0] || '';
   return parts[0] + ' ' + parts[parts.length-1][0].toUpperCase();
 }
 
@@ -12556,8 +12556,8 @@ function setPerfDays(days, btn) {
 
 // ── Patch renderMyTeam to append Performance Pulse ────────────────────────
 const _origRenderMyTeamPerf = window.renderMyTeam;
-window.renderMyTeam = function() {
-  if (_origRenderMyTeamPerf) _origRenderMyTeamPerf.apply(this, arguments);
+window.renderMyTeam = async function() {
+  if (_origRenderMyTeamPerf) await _origRenderMyTeamPerf.apply(this, arguments);
   if (!isTeamLead()) return;
   const myteamEl = document.getElementById('myteamContent');
   if (!myteamEl) return;
