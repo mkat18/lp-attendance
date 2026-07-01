@@ -3037,7 +3037,7 @@ async function submitCheckin() {
   if (selectedStatus==='leave') {
     const leaveType = document.getElementById('ciLeaveType')?.value;
     const reason = document.getElementById('leaveReason').value.trim();
-    const startDate = document.getElementById('leaveStartDate')?.value;
+    const startDate = document.getElementById('ciLeaveStartDate')?.value;
     const brokerName = document.getElementById('ciLeaveBrokerName')?.value.trim();
     if (!leaveType) { showToast('Please select a leave type.','err'); return; }
     if (leaveType==='Broker Holiday' && !brokerName) { showToast('Please enter the broker name.','err'); return; }
