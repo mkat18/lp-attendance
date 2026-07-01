@@ -7931,13 +7931,24 @@ function toggleNoteHistory(id) {
   if (icon) icon.textContent = open ? '▶' : '▼';
 }
 
-function populateBrokerDropdown(selectedBroker) {
+function populateBrokerDropdown(selectedBroker, ownerName) {
   const sel = document.getElementById('fm_broker');
   if (!sel) return;
-  const staffBrokers = currentUser ? getBrokersForStaff(currentUser.name) : [];
-  const allBrokers = _brokers.map(b=>b.name);
-  // Show brokers assigned to this staff member, or all brokers for TL/SA
-  const brokers = (isTeamLead()||isSuperAdmin()||isOpsManager()) ? allBrokers : staffBrokers.length ? staffBrokers : allBrokers;
+  const effectiveOwner = ownerName || (currentUser ? currentUser.name : '');
+  let brokers;
+  if (isSuperAdmin()) {
+    brokers = _brokers.map(b=>b.name);
+  } else if (isTeamLead()) {
+    // TL sees brokers assigned to themselves + all their team members
+    const myTeam = getTeamForTL(currentUser.name);
+    const teamAndSelf = [currentUser.name, ...myTeam];
+    const teamBrokers = new Set();
+    teamAndSelf.forEach(name => getBrokersForStaff(name).forEach(b => teamBrokers.add(b)));
+    brokers = teamBrokers.size ? [...teamBrokers].sort() : _brokers.map(b=>b.name);
+  } else {
+    const staffBrokers = getBrokersForStaff(effectiveOwner);
+    brokers = staffBrokers.length ? staffBrokers : _brokers.map(b=>b.name);
+  }
   sel.innerHTML = '<option value="">— select broker —</option>' +
     brokers.map(b=>`<option value="${esc(b)}" ${b===selectedBroker?'selected':''}>${esc(b)}</option>`).join('');
 }
@@ -7964,16 +7975,10 @@ function openFileModal(fileId) {
       const isCover = coverNames.includes(s.name) && !myTeam.includes(s.name);
       return `<option value="${esc(s.name)}" ${s.name===currentUser.name?'selected':''}>${esc(s.name)}${isCover?' (cover)':''}</option>`;
     }).join('');
-    // Update broker dropdown when owner changes
-    ownerSel.onchange = () => {
-      const selectedOwner = ownerSel.value;
-      const ownerBrokers = getBrokersForStaff(selectedOwner);
-      const brokers = ownerBrokers.length ? ownerBrokers : _brokers.map(b=>b.name);
-      document.getElementById('fm_broker').innerHTML = '<option value="">— select broker —</option>' +
-        brokers.map(b=>`<option value="${esc(b)}">${esc(b)}</option>`).join('');
-    };
+    // Update broker dropdown when owner changes — shows that owner's assigned brokers
+    ownerSel.onchange = () => populateBrokerDropdown('', ownerSel.value);
     // Trigger initial broker list for current user
-    ownerSel.dispatchEvent(new Event('change'));
+    populateBrokerDropdown('', currentUser.name);
   } else {
     ownerField.style.display = 'none';
   }
