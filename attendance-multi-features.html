@@ -5809,7 +5809,7 @@ function renderRecords() {
   if(!filtered.length){document.getElementById('recordsTable').innerHTML='<tr><td><div class="empty-state">'+(locationFilter?'No location issues found.':'No records in this range.')+'</div></td></tr>';return;}
   const from=document.getElementById('fromDate').value, to=document.getElementById('toDate').value;
   const singleDay=from===to;
-  let html='<thead><tr>'+(singleDay?'':'<th>Date</th>')+'<th>Name</th><th>Status</th><th>Clock in</th><th>Clock out</th><th>Worked</th><th>Location</th><th>Reason</th></tr></thead><tbody>';
+  let html='<thead><tr>'+(singleDay?'':'<th>Date</th>')+'<th>Name</th><th>Status</th><th>Clock in</th><th>Clock out</th><th>Worked</th><th>Location</th><th>Reason</th>'+(isSuperAdmin()?'<th></th>':'')+'</tr></thead><tbody>';
   let lastDate='';
   for(const r of filtered){
     if(!singleDay&&r.date!==lastDate){
@@ -5819,18 +5819,64 @@ function renderRecords() {
     }
     const workedMins=calcWorkedMins(r);
     const isLeave=r.status==='leave';
+    const rowId = (r.name+'_'+r.date).replace(/[^a-z0-9]/gi,'_');
     html+=`<tr>
       <td style="color:var(--text-3);${singleDay?'display:none':''}">${fmtDate(r.date)}</td>
       <td style="font-weight:600">${esc(r.name)}</td>
       <td>${tag(r.status)}</td>
-      <td style="font-size:12px;color:var(--text-2)">${isLeave?'—':r.clockIn?fmtTime(r.clockIn):'—'}</td>
-      <td style="font-size:12px;color:var(--text-2)">${isLeave?'—':r.clockOut?fmtTime(r.clockOut):'not yet'}</td>
+      <td style="font-size:12px;color:var(--text-2)" id="ci_${rowId}">${isLeave?'—':r.clockIn?fmtTime(r.clockIn):'—'}</td>
+      <td style="font-size:12px;color:var(--text-2)" id="co_${rowId}">${isLeave?'—':r.clockOut?fmtTime(r.clockOut):'not yet'}</td>
       <td style="font-size:12px;font-weight:600;color:${workedMins!==null?'var(--text)':'var(--text-3)'}">${isLeave?'—':fmtWorked(workedMins)}</td>
       <td>${geoTag(r)}</td>
       <td style="color:var(--text-2);font-size:12px">${r.reason?esc(r.reason):'—'}</td>
+      ${isSuperAdmin()&&!isLeave?`<td><button class="btn-sm" onclick="toggleEditRecordTime('${esc(r.name)}','${r.date}')" style="padding:3px 10px;font-size:11px">Edit</button></td>`:(isSuperAdmin()?'<td></td>':'')}
     </tr>`;
+    if (isSuperAdmin() && !isLeave) {
+      html+=`<tr id="editrow_${rowId}" style="display:none"><td colspan="9" style="background:var(--surface-2);padding:10px 14px">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <label style="font-size:12px;color:var(--text-3)">Clock in</label>
+          <input type="time" id="editci_${rowId}" value="${r.clockIn?new Date(r.clockIn).toTimeString().slice(0,5):''}" style="font-size:13px;padding:5px 8px;border:1.5px solid var(--border);border-radius:var(--radius-sm)"/>
+          <label style="font-size:12px;color:var(--text-3)">Clock out</label>
+          <input type="time" id="editco_${rowId}" value="${r.clockOut?new Date(r.clockOut).toTimeString().slice(0,5):''}" style="font-size:13px;padding:5px 8px;border:1.5px solid var(--border);border-radius:var(--radius-sm)"/>
+          <button class="btn-sm" onclick="saveEditedRecordTime('${esc(r.name)}','${r.date}')" style="background:var(--brand);color:#fff;border-color:var(--brand)">Save</button>
+          <button class="btn-sm" onclick="toggleEditRecordTime('${esc(r.name)}','${r.date}')">Cancel</button>
+        </div>
+      </td></tr>`;
+    }
   }
   document.getElementById('recordsTable').innerHTML=html+'</tbody>';
+}
+
+function toggleEditRecordTime(name, date) {
+  const rowId = (name+'_'+date).replace(/[^a-z0-9]/gi,'_');
+  const el = document.getElementById('editrow_'+rowId);
+  if (el) el.style.display = el.style.display==='none' ? 'table-row' : 'none';
+}
+
+async function saveEditedRecordTime(name, date) {
+  const rowId = (name+'_'+date).replace(/[^a-z0-9]/gi,'_');
+  const ciVal = document.getElementById('editci_'+rowId)?.value;
+  const coVal = document.getElementById('editco_'+rowId)?.value;
+  const recs = getRecords();
+  const idx = recs.findIndex(r=>r.name===name && r.date===date);
+  if (idx<0) { showToast('Record not found.','err'); return; }
+
+  const oldCi = recs[idx].clockIn, oldCo = recs[idx].clockOut;
+  if (ciVal) recs[idx].clockIn = new Date(date+'T'+ciVal+':00+05:30').getTime();
+  if (coVal) recs[idx].clockOut = new Date(date+'T'+coVal+':00+05:30').getTime();
+  recs[idx].editedBy = currentUser.name;
+  recs[idx].editedAt = new Date().toLocaleString('en-AU');
+
+  const res = await spSaveRecord(recs[idx]);
+  if (!res) {
+    recs[idx].clockIn = oldCi; recs[idx].clockOut = oldCo; // revert
+    showToast('Failed to save — check your connection.','err');
+    return;
+  }
+  saveRecords(recs);
+  showToast('Times updated for '+name.split(' ')[0]+' ✓','ok');
+  toggleEditRecordTime(name, date);
+  renderRecords();
 }
 
 function renderPeople() {
@@ -6934,14 +6980,18 @@ async function onMsLogin(account) {
       (s.email && s.email.toLowerCase() === email) ||
       (s.personalEmail && s.personalEmail.toLowerCase() === email) ||
       s.name.toLowerCase() === emailPrefix ||
-      s.name.toLowerCase().replace(/\s+/g,'').includes(emailPrefix.replace(/\s+/g,'').slice(0,6))
+      // Match full name from email prefix (e.g. "shruti.rathod" -> "shruti rathod")
+      s.name.toLowerCase() === emailPrefix.replace(/[._-]/g,' ') ||
+      // Only fall back to partial match if it's specific enough (10+ chars) to avoid false matches
+      (emailPrefix.replace(/\s+/g,'').length >= 10 &&
+       s.name.toLowerCase().replace(/\s+/g,'').includes(emailPrefix.replace(/\s+/g,'').slice(0,10)))
     );
     if (member) { await loginAs(member); return; }
 
     // No match — only SA can use name picker, everyone else gets access denied
     const isSAEmail = staff.find(s => s.role === 'superadmin' &&
       ((s.email && s.email.toLowerCase() === email) ||
-       s.name.toLowerCase().replace(/\s+/g,'').includes(emailPrefix.replace(/\s+/g,'').slice(0,6)))
+       s.name.toLowerCase().replace(/\s+/g,'').includes(emailPrefix.replace(/\s+/g,'').slice(0,10)))
     );
     if (!isSAEmail) {
       showScreen('login');
@@ -7451,10 +7501,11 @@ async function spSaveRecord(rec) {
     HasPhoto: rec.hasPhoto ? 'true' : 'false'
   };
   if (rec.id) {
-    await spPatch(SP_API + "('AttendanceRecords')/items(" + rec.id + ")", payload);
+    return await spPatch(SP_API + "('AttendanceRecords')/items(" + rec.id + ")", payload);
   } else {
     const res = await spPostDirect(SP_API + "('AttendanceRecords')/items", payload);
     if (res && (res.Id || res.ID)) rec.id = res.Id || res.ID;
+    return !!res;
   }
 }
 

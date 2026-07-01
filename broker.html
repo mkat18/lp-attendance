@@ -5687,14 +5687,16 @@ async function onMsLogin(account) {
       (s.email && s.email.toLowerCase() === email) ||
       (s.personalEmail && s.personalEmail.toLowerCase() === email) ||
       s.name.toLowerCase() === emailPrefix ||
-      s.name.toLowerCase().replace(/\s+/g,'').includes(emailPrefix.replace(/\s+/g,'').slice(0,6))
+      s.name.toLowerCase() === emailPrefix.replace(/[._-]/g,' ') ||
+      (emailPrefix.replace(/\s+/g,'').length >= 10 &&
+       s.name.toLowerCase().replace(/\s+/g,'').includes(emailPrefix.replace(/\s+/g,'').slice(0,10)))
     );
     if (member) { await loginAs(member); return; }
 
     // No match — only SA can use name picker
     const isSAEmail = staff.find(s => s.role === 'superadmin' &&
       ((s.email && s.email.toLowerCase() === email) ||
-       s.name.toLowerCase().replace(/\s+/g,'').includes(emailPrefix.replace(/\s+/g,'').slice(0,6)))
+       s.name.toLowerCase().replace(/\s+/g,'').includes(emailPrefix.replace(/\s+/g,'').slice(0,10)))
     );
     if (!isSAEmail) {
       showScreen('login');
@@ -7960,8 +7962,18 @@ function openFileModal(fileId) {
     const staff = getStaff().filter(s => allCandidates.has(s.name));
     ownerSel.innerHTML = staff.map(s => {
       const isCover = coverNames.includes(s.name) && !myTeam.includes(s.name);
-      return `<option value="${esc(s.name)}">${esc(s.name)}${isCover?' (cover)':''}</option>`;
+      return `<option value="${esc(s.name)}" ${s.name===currentUser.name?'selected':''}>${esc(s.name)}${isCover?' (cover)':''}</option>`;
     }).join('');
+    // Update broker dropdown when owner changes
+    ownerSel.onchange = () => {
+      const selectedOwner = ownerSel.value;
+      const ownerBrokers = getBrokersForStaff(selectedOwner);
+      const brokers = ownerBrokers.length ? ownerBrokers : _brokers.map(b=>b.name);
+      document.getElementById('fm_broker').innerHTML = '<option value="">— select broker —</option>' +
+        brokers.map(b=>`<option value="${esc(b)}">${esc(b)}</option>`).join('');
+    };
+    // Trigger initial broker list for current user
+    ownerSel.dispatchEvent(new Event('change'));
   } else {
     ownerField.style.display = 'none';
   }
