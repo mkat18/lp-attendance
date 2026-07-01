@@ -1715,7 +1715,7 @@ function spToBreak(item) {
   const endTs = hhmmToTs(item.EndTime, dateStr);
   // Calculate duration from start/end times — don't rely on DurationMs field
   const durMs = (startTs && endTs && endTs > startTs) ? (endTs - startTs) : 0;
-  const isOpen = item.IsOpen === 'true';
+  const isOpen = item.IsOpen === true || item.IsOpen === 'true' || item.IsOpen === 1;
   return {
     id: item.ID||item.Id||item.id,
     name: item.StaffName||'',
@@ -3280,7 +3280,11 @@ async function toggleBreak() {
     // Write open break to SharePoint — store returned ID for patching on end
     const brk={name:currentUser.name, date:today, startTime:breakStart};
     const spId = await spStartBreak(brk);
-    if (spId) LS.set('ci_breakSpId_'+currentUser.name, spId);
+    if (spId) {
+      LS.set('ci_breakSpId_'+currentUser.name, spId);
+    } else {
+      showToast('⚠ Break started but failed to sync — your manager may not see this. Try ending and restarting the break.','err');
+    }
   } else {
     // Ending a break
     const durationMs=Date.now()-breakStart;
@@ -3294,9 +3298,13 @@ async function toggleBreak() {
     brks.push(newBreak);
     saveBreaks(brks);
     // Patch the open SP record with end time
-    await spEndBreak(spId, newBreak);
+    const ended = await spEndBreak(spId, newBreak);
     updateBreakUI();
-    showToast('Break logged.','ok');
+    if (!ended) {
+      showToast('⚠ Break ended locally but failed to sync — please notify your manager.','err');
+    } else {
+      showToast('Break logged.','ok');
+    }
   }
 }
 function stopBreakTimer(clearOngoing=true) {
@@ -4415,7 +4423,7 @@ async function managerCloseBreak(breakId, name, date) {
   const endTime = staff && staff.endTime ? staff.endTime : '18:00';
   await spPatch(SP_API + "('AttendanceBreaks')/items(" + breakId + ")", {
     EndTime: endTime,
-    IsOpen: 'false',
+    IsOpen: false,
     Title: 'MANAGER-CLOSED'
   });
   // Update local cache
@@ -7522,7 +7530,7 @@ async function spStartBreak(brk) {
       BreakDate: brk.date + 'T00:00:00Z',
       StartTime: toHHMM(brk.startTime)||'',
       EndTime: '',
-      IsOpen: 'true'
+      IsOpen: true
     };
     console.log('[BREAK PAYLOAD]', JSON.stringify(p), 'types:', Object.entries(p).map(([k,v])=>k+':'+typeof v).join(', '));
     const res = await spPostDirect(SP_API + "('AttendanceBreaks')/items", p);
@@ -7538,22 +7546,24 @@ async function spEndBreak(spId, brk) {
   try {
     const durMins = brk.durationMs ? Math.round(brk.durationMs/60000) + ' mins' : '';
     if (spId) {
-      await spPatch(SP_API + "('AttendanceBreaks')/items(" + spId + ")", {
+      return await spPatch(SP_API + "('AttendanceBreaks')/items(" + spId + ")", {
         EndTime: toHHMM(brk.endTime)||'',
-        IsOpen: 'false'
+        IsOpen: false
       });
     } else {
       // No SP ID (break started offline) — create full record
-      await spPostDirect(SP_API + "('AttendanceBreaks')/items", {
+      const res = await spPostDirect(SP_API + "('AttendanceBreaks')/items", {
         StaffName: String(brk.name||''),
         BreakDate: brk.date + 'T00:00:00Z',
         StartTime: toHHMM(brk.startTime)||'',
         EndTime: toHHMM(brk.endTime)||'',
-        IsOpen: 'false'
+        IsOpen: false
       });
+      return !!res;
     }
   } catch(e) {
     console.warn('spEndBreak failed:', e);
+    return false;
   }
 }
 
@@ -7566,7 +7576,7 @@ async function checkOpenBreak(userName) {
     const token = await getToken();
     if (!token) return;
     const res = await fetch(
-      SP_API + "('AttendanceBreaks')/items?$filter=StaffName eq '" + encodeURIComponent(userName) + "' and IsOpen eq 'true'&$select=Id,StartTime,BreakDate&$top=1",
+      SP_API + "('AttendanceBreaks')/items?$filter=StaffName eq '" + encodeURIComponent(userName) + "' and IsOpen eq 1&$select=Id,StartTime,BreakDate&$top=1",
       { headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json;odata=nometadata' } }
     );
     if (!res.ok) return;
@@ -7585,7 +7595,7 @@ async function checkOpenBreak(userName) {
         // Patch SP record — close at scheduled end time
         await spPatch(SP_API + "('AttendanceBreaks')/items(" + item.Id + ")", {
           EndTime: endTime,
-          IsOpen: 'false',
+          IsOpen: false,
           Title: 'AUTO-CLOSED'
         });
         // Flag the attendance record for manager review
