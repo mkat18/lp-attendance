@@ -3057,6 +3057,7 @@ async function submitCheckin() {
   if (idx>=0) { showToast('Already submitted for today.','err'); return; }
   // Leave doesn't need selfie or location — submit directly
   if (selectedStatus==='leave') {
+    _pendingSubmit = true;
     await closeCameraAndSubmit(null);
     return;
   }
