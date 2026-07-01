@@ -3055,7 +3055,12 @@ async function submitCheckin() {
   const recs=getRecords();
   const idx=recs.findIndex(r=>r.date===today&&r.name===currentUser.name);
   if (idx>=0) { showToast('Already submitted for today.','err'); return; }
-  // Open camera first
+  // Leave doesn't need selfie or location — submit directly
+  if (selectedStatus==='leave') {
+    await closeCameraAndSubmit(null);
+    return;
+  }
+  // Open camera first for office/wfh/halfday
   openCamera();
 }
 
@@ -3159,6 +3164,31 @@ async function closeCameraAndSubmit(photoDataUrl) {
     ? [leaveType, brokerName?'('+brokerName+')':'', document.getElementById('leaveReason').value.trim()].filter(Boolean).join(' · ')
     : selectedStatus==='halfday' ? document.getElementById('leaveReason').value.trim() : '';
   const clockIn = (selectedStatus==='leave') ? null : Date.now();
+
+  // Leave doesn't need geo or selfie — submit directly
+  if (selectedStatus==='leave') {
+    const recs2=getRecords();
+    if (recs2.findIndex(r=>r.date===today&&r.name===currentUser.name)>=0) return;
+    const newRec={name:currentUser.name,date:today,status:'leave',reason,clockIn:null,clockOut:null,geo:null,submittedBy:currentUser.name,msAccount:msalAccount?msalAccount.username:'',hasPhoto:false,ts:Date.now()};
+    recs2.push(newRec);
+    saveRecords(recs2);
+    const saved = await spSaveRecord(newRec);
+    if (!saved) {
+      showToast('⚠ Check-in saved on this device but failed to sync — please try again or contact your manager.','err');
+    } else {
+      showToast('✓ Leave submitted!','ok');
+    }
+    const days = countLeaveDays(leaveStart, leaveEnd, false);
+    if (days > 0) doSubmitLeave(leaveType, leaveStart, leaveEnd, false, 'AM',
+      document.getElementById('leaveReason').value.trim(), brokerName, days).catch(()=>{});
+    lockCheckin();
+    document.getElementById('breakCard').style.display='none';
+    document.getElementById('clockOutCard').style.display='none';
+    updateBreakUI();
+    updateClockOutUI();
+    return;
+  }
+
   showToast('Getting your location…', 'ok');
 
   captureGeoAndSubmit(async function(geo) {
@@ -3181,14 +3211,6 @@ async function closeCameraAndSubmit(photoDataUrl) {
       showToast('⚠ Check-in saved on this device but failed to sync — please try again or contact your manager.','err');
     } else {
       showToast('✓ Submitted!','ok');
-    }
-    // If on leave, also create a leave request entry so it appears in the Leave tab
-    if (selectedStatus === 'leave' && leaveType) {
-      const days = countLeaveDays(leaveStart, leaveEnd, false);
-      if (days > 0) {
-        doSubmitLeave(leaveType, leaveStart, leaveEnd, false, 'AM',
-          document.getElementById('leaveReason').value.trim(), brokerName, days).catch(()=>{});
-      }
     }
     // Upload photo to SharePoint in background
     if (photoDataUrl) uploadPhoto(photoDataUrl, newRec);
