@@ -6814,7 +6814,7 @@ function renderMyTeam() {
   let obsHTML = '';
   if (teamNotes.length > 0) {
     const obsStaffOptions = [...new Set(teamNotes.map(n=>n.target))]
-      .map(name=>`<option value="${esc(name)}">${esc(name.split(' ')[0])}</option>`).join('');
+      .map(name=>`<option value="${esc(name)}">${esc(shortName(name))}</option>`).join('');
     const last30str = (() => { const d=new Date(); d.setDate(d.getDate()-30); return d.toISOString().split('T')[0]; })();
 
     obsHTML = `<div class="card" style="margin-top:1rem">
@@ -11245,7 +11245,7 @@ window.renderMyTeam = function() {
       ${Object.entries(byPerson).map(([name,{submitted,pending}])=>`
         <div style="padding:7px 0;border-bottom:0.5px solid var(--border)">
           <div style="display:flex;align-items:center;justify-content:space-between">
-            <span style="font-size:13px;font-weight:600">${esc(name.split(' ')[0])}</span>
+            <span style="font-size:13px;font-weight:600">${esc(shortName(name))}</span>
             <span style="font-size:12px;color:${pending.length?'var(--danger)':'var(--success)'};font-weight:600">${submitted.length} done${pending.length?' · '+pending.length+' pending':''}</span>
           </div>
           ${pending.length?`<div style="font-size:12px;color:var(--danger)">${pending.map(f=>esc(f.client)).join(', ')}</div>`:''}
@@ -11342,7 +11342,7 @@ function renderMyTeamEOD(myTeamNames) {
       ? `<span style="font-size:11px;background:#FEF3C7;color:#92400E;border-radius:4px;padding:2px 7px;font-weight:600">🙋 ${memberReports.filter(r=>r.supportNeeded==='yes').length} support</span>` : '';
 
     const header = `<div style="display:flex;align-items:center;gap:8px;padding:8px 0;cursor:pointer;border-bottom:0.5px solid var(--border)" onclick="myTeamToggleMember('${name.replace(/'/g,"\\'")}',window._myTeamNames)">
-      <span style="font-size:13px;font-weight:600;flex:1">${esc(name.split(' ')[0])}</span>
+      <span style="font-size:13px;font-weight:600;flex:1">${esc(shortName(name))}</span>
       ${ciStatus}${eodBadge}${supportFlag}
       <span style="font-size:14px;color:var(--text-3)">${isExpanded?'▴':'▾'}</span>
     </div>`;
@@ -11414,7 +11414,7 @@ function renderMyTeamEOD(myTeamNames) {
       ${_myTeamEODCard==='drafts'?uniqueDrafters.map(n=>`<div style="font-size:12px;padding:3px 0;border-bottom:0.5px solid var(--border)">${esc(shortName(n))}</div>`).join('')||'<div style="font-size:12px;color:var(--text-3)">No drafts</div>':''}
       ${_myTeamEODCard==='support'?submittedReports.filter(r=>r.supportNeeded==='yes').map(r=>`<div style="padding:4px 0;border-bottom:0.5px solid var(--border)"><div style="font-size:12px;font-weight:600">${esc(shortName(r.name))}</div>${r.supportDetail?`<div style="font-size:11px;color:var(--text-2)">${esc(r.supportDetail)}</div>`:''}</div>`).join('')||'<div style="font-size:12px;color:var(--text-3)">No support flags</div>':''}
     </div>`:''}
-    ${notSubmitted.length?`<div style="font-size:12px;color:var(--danger);margin-bottom:10px">⏳ Not submitted: ${notSubmitted.map(n=>esc(n.split(' ')[0])).join(', ')}</div>`:''}
+    ${notSubmitted.length?`<div style="font-size:12px;color:var(--danger);margin-bottom:10px">⏳ Not submitted: ${notSubmitted.map(n=>esc(shortName(n))).join(', ')}</div>`:''}
     <div onclick="eodReportsToggle()" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:6px 0;margin-bottom:${_myTeamEODOpen?'8':'0'}px;border-top:0.5px solid var(--border)">
       <span style="font-size:12px;font-weight:600;color:var(--text-2)">EOD Reports</span>
       <span style="font-size:12px;color:var(--text-3)">${_myTeamEODOpen?'▴ collapse':'▾ expand'}</span>
@@ -11607,7 +11607,7 @@ function renderPerformanceScreen() {
       <select id="perf-team-sel" onchange="_perfTeamFlt=this.value;renderPerformanceScreen()"
         style="font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)">
         <option value="">All teams</option>
-        ${tls.map(t=>`<option value="${esc(t.name)}">${esc(t.name.split(' ')[0])}'s team</option>`).join('')}
+        ${tls.map(t=>`<option value="${esc(t.name)}">${esc(shortName(t.name))}'s team</option>`).join('')}
       </select>
     `:tl?`
       <select id="perf-analyst-sel" onchange="_perfAnalystFlt=this.value;renderPerformanceScreen()"
@@ -11671,7 +11671,7 @@ function renderPerformanceScreen() {
       <select id="perf-team-sel" onchange="_perfTeamFlt=this.value;renderPerformanceScreen()"
         style="font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm)">
         <option value="">All teams</option>
-        ${tls.map(tl=>`<option value="${esc(tl.name)}">${esc(tl.name.split(' ')[0])}'s team</option>`).join('')}
+        ${tls.map(tl=>`<option value="${esc(tl.name)}">${esc(shortName(tl.name))}'s team</option>`).join('')}
       </select>
     `:`
       <select id="perf-analyst-sel" onchange="_perfAnalystFlt=this.value;renderPerformanceScreen()"
@@ -11979,7 +11979,7 @@ function perfFillCard(id, el) {
   if (id==='eod') {
     el.innerHTML=`${close}<div style="font-size:13px;font-weight:600;margin-bottom:12px">EOD submission rate — per analyst</div>
     ${names.map(n=>{const s=m.subByAnalyst?.[n]||{count:0,rate:0};return`<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:0.5px solid var(--border)">
-      <span style="font-size:13px;font-weight:500;min-width:100px">${esc(n.split(' ')[0])}</span>
+      <span style="font-size:13px;font-weight:500;min-width:100px">${esc(shortName(n))}</span>
       <div style="flex:1;height:8px;background:var(--surface);border-radius:4px;overflow:hidden"><div style="width:${s.rate}%;height:100%;background:${s.rate>=80?'#34D399':s.rate>=60?'#FCD34D':'#F87171'};border-radius:4px"></div></div>
       <span style="font-size:13px;font-weight:600;color:${s.rate>=80?'#065F46':s.rate>=60?'#92400E':'#991B1B'};min-width:40px;text-align:right">${s.rate}%</span>
       <span style="font-size:11px;color:var(--text-3)">${s.count}/${m.wdays||0} days</span>
@@ -12000,7 +12000,7 @@ function perfFillCard(id, el) {
   } else if (id==='avg') {
     el.innerHTML=`${close}<div style="font-size:13px;font-weight:600;margin-bottom:12px">Avg time per task — per analyst</div>
     ${(m.analystAvg||[]).map(({name,avg})=>`<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:0.5px solid var(--border)">
-      <span style="font-size:13px;font-weight:500;min-width:100px">${esc(name.split(' ')[0])}</span>
+      <span style="font-size:13px;font-weight:500;min-width:100px">${esc(shortName(name))}</span>
       <div style="flex:1;height:8px;background:var(--surface);border-radius:4px;overflow:hidden"><div style="width:${avg?Math.min(100,Math.round(avg/240*100)):0}%;height:100%;background:#378ADD;border-radius:4px"></div></div>
       <span style="font-size:13px;font-weight:600;color:var(--text);min-width:56px;text-align:right">${avg?perfFmtMins(avg):'—'}</span>
     </div>`).join('')}`;
@@ -12064,7 +12064,7 @@ function perfOpenModal(type, taskKey, analyst) {
       <div style="font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Session history</div>
       ${sessions.length?sessions.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(s=>`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:0.5px solid var(--border)">
         <span style="font-size:12px;color:var(--text-3);min-width:80px">${esc(fmtDate(s.date))}</span>
-        ${names.length>1&&!analyst?`<span style="font-size:12px;color:var(--text-2);min-width:70px">${esc(s.name.split(' ')[0])}</span>`:''}
+        ${names.length>1&&!analyst?`<span style="font-size:12px;color:var(--text-2);min-width:70px">${esc(shortName(s.name))}</span>`:''}
         <div style="flex:1;height:6px;background:var(--surface);border-radius:3px;overflow:hidden"><div style="width:${Math.min(100,Math.round(s.mins/maxM*100))}%;height:100%;background:${bench&&s.mins>bench?'#F87171':'#34D399'};border-radius:3px"></div></div>
         <span style="font-size:13px;font-weight:700;min-width:56px;text-align:right;color:${bench&&s.mins>bench?'#991B1B':'#065F46'}">${perfFmtMins(s.mins)}${bench&&s.mins>bench?` <span style="font-size:10px;font-weight:400">(+${perfFmtMins(s.mins-bench)})</span>`:''}</span>
       </div>`).join(''):'<div style="font-size:13px;color:var(--text-3);padding:8px 0">No sessions logged.</div>'}
