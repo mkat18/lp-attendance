@@ -2987,7 +2987,7 @@ function pick(btn) {
   }
 }
 
-function submitCheckin() {
+async function submitCheckin() {
   if (!selectedStatus) { showToast('Please choose a status.','err'); return; }
   if (selectedStatus==='leave'||selectedStatus==='halfday') {
     const reason=document.getElementById('leaveReason').value.trim();
@@ -3080,7 +3080,7 @@ function skipPhoto() {
   closeCameraAndSubmit(null);
 }
 
-function closeCameraAndSubmit(photoDataUrl) {
+async function closeCameraAndSubmit(photoDataUrl) {
   // Stop camera
   if (_cameraStream) {
     _cameraStream.getTracks().forEach(t => t.stop());
@@ -3100,7 +3100,7 @@ function closeCameraAndSubmit(photoDataUrl) {
   const clockIn = (selectedStatus==='leave') ? null : Date.now();
   showToast('Getting your location…', 'ok');
 
-  captureGeoAndSubmit(function(geo) {
+  captureGeoAndSubmit(async function(geo) {
     if (!geo) {
       showToast('Location required to check in. Please allow location access and try again.', 'err');
       // Try requesting geo again
@@ -3115,10 +3115,14 @@ function closeCameraAndSubmit(photoDataUrl) {
     const newRec={name:currentUser.name,date:today,status:selectedStatus,reason,clockIn,clockOut:null,geo:geo||null,submittedBy:currentUser.name,msAccount:msalAccount?msalAccount.username:'',hasPhoto:!!photoDataUrl,ts:Date.now()};
     recs2.push(newRec);
     saveRecords(recs2);
-    spSaveRecord(newRec);
+    const saved = await spSaveRecord(newRec);
+    if (!saved) {
+      showToast('⚠ Check-in saved on this device but failed to sync — please try again or contact your manager.','err');
+    } else {
+      showToast('✓ Submitted!','ok');
+    }
     // Upload photo to SharePoint in background
     if (photoDataUrl) uploadPhoto(photoDataUrl, newRec);
-    showToast('✓ Submitted!','ok');
     lockCheckin();
     if (selectedStatus==='office'||selectedStatus==='wfh'||selectedStatus==='halfday') {
       document.getElementById('breakCard').style.display='block';
@@ -3194,7 +3198,7 @@ function completeClockOut(photoDataUrl) {
   const idx=recs.findIndex(r=>r.date===today&&r.name===currentUser.name);
   if (idx<0) return;
   showToast('Getting your location…','ok');
-  captureGeoAndSubmit(function(geo) {
+  captureGeoAndSubmit(async function(geo) {
     recs[idx].clockOut=Date.now();
     recs[idx].clockOutGeo=geo||null;
     recs[idx].clockOutPhoto=!!photoDataUrl;
