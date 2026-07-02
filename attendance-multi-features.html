@@ -829,6 +829,9 @@ tr.flagged-row:hover td { background: #FFEAEA; }
           <option value="">— All staff —</option>
         </select>
       </div>
+      <div style="margin-bottom:8px">
+        <input type="text" id="missingNameSearch" placeholder="🔍 Search by name…" oninput="renderActiveTab(document.querySelector('.panel.active')?.id.replace('dpanel-',''))" style="width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-size:13px;background:var(--surface-2);color:var(--text);outline:none" onfocus="this.style.borderColor='var(--brand)'" onblur="this.style.borderColor='var(--border)'"/>
+      </div>
       <div class="tab-bar" style="margin-bottom:.75rem">
         <button class="tab active" onclick="switchDashTab('records',this)">Records</button>
         <button class="tab" onclick="switchDashTab('people',this)">By person</button>
@@ -846,9 +849,6 @@ tr.flagged-row:hover td { background: #FFEAEA; }
       </div>
       <div id="dpanel-missing" class="panel">
         <div id="missingDayPicker"></div>
-        <div style="padding:10px 0 6px">
-          <input type="text" id="missingNameSearch" placeholder="🔍 Search by name…" oninput="renderMissing()" style="width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-size:13px;background:var(--surface-2);color:var(--text);outline:none" onfocus="this.style.borderColor='var(--brand)'" onblur="this.style.borderColor='var(--border)'"/>
-        </div>
         <div class="tbl-card"><div class="tbl-wrap"><table id="missingTable"></table></div></div>
       </div>
       <div id="dpanel-breaks" class="panel">
@@ -3541,7 +3541,17 @@ function tapCard(key, row) {
 
   if (key === 'missing') {
     const sub = new Set(allRecs.map(r => r.name));
-    rows = allStaff.filter(s => !sub.has(s.name)).map(s => personRow(s.name, 'Not submitted', 'var(--danger)'));
+    const nowIST = new Date(new Date().toLocaleString('en-US', {timeZone:'Asia/Kolkata'}));
+    const nowMinsIST = nowIST.getHours()*60 + nowIST.getMinutes();
+    const isToday = date === today;
+    rows = allStaff.filter(s => {
+      if (sub.has(s.name)) return false;
+      if (isToday) {
+        if (s.flexibleSchedule) { if (nowMinsIST < 10*60+30) return false; }
+        else if (s.startTime) { const [sh,sm]=s.startTime.split(':').map(Number); if(nowMinsIST < sh*60+sm+20) return false; }
+      }
+      return true;
+    }).map(s => personRow(s.name, 'Not submitted', 'var(--danger)'));
     title = 'Not submitted'; emptyMsg = 'All staff have submitted ✓';
   } else if (key === 'office') {
     rows = allRecs.filter(r => r.status==='office').map(r => personRow(r.name, r.clockIn?'In '+fmtTime(r.clockIn)+(r.clockOut?' · Out '+fmtTime(r.clockOut):''):'—', 'var(--brand)'));
@@ -4297,6 +4307,7 @@ function renderLateTab() {
   const from = document.getElementById('fromDate').value;
   const to   = document.getElementById('toDate').value;
   const fn   = document.getElementById('filterName').value.trim();
+  const nameSearch = (document.getElementById('missingNameSearch')?.value||'').trim().toLowerCase();
   const allStaff = getStaff().filter(s=>s.role!=='superadmin'&&s.startTime&&!s.flexibleSchedule);
   const allRecs  = getRecords().filter(r=>r.date>=from&&r.date<=to);
   const singleDay = from===to;
@@ -4304,6 +4315,7 @@ function renderLateTab() {
   const rows = [];
   for (const s of allStaff) {
     if (fn && !s.name === fn) continue;
+    if (nameSearch && !s.name.toLowerCase().includes(nameSearch)) continue;
     const recs = allRecs.filter(r=>r.name===s.name&&r.clockIn);
     for (const r of recs) {
       const scheduledMs = new Date(r.date+'T'+s.startTime+':00').getTime();
@@ -4344,6 +4356,7 @@ function renderEarlyTab() {
   const from = document.getElementById('fromDate').value;
   const to   = document.getElementById('toDate').value;
   const fn   = document.getElementById('filterName').value.trim();
+  const nameSearch = (document.getElementById('missingNameSearch')?.value||'').trim().toLowerCase();
   const allStaff = getStaff().filter(s=>s.role!=='superadmin'&&s.endTime&&!s.flexibleSchedule);
   const allRecs  = getRecords().filter(r=>r.date>=from&&r.date<=to);
   const singleDay = from===to;
@@ -4351,6 +4364,7 @@ function renderEarlyTab() {
   const rows = [];
   for (const s of allStaff) {
     if (fn && !s.name === fn) continue;
+    if (nameSearch && !s.name.toLowerCase().includes(nameSearch)) continue;
     const recs = allRecs.filter(r=>r.name===s.name&&r.clockOut);
     for (const r of recs) {
       const scheduledEndMs = new Date(r.date+'T'+s.endTime+':00').getTime();
@@ -5953,7 +5967,8 @@ function renderRecords() {
   const locationFilter = window._locationFilter || false;
   window._locationFilter = false;
   const sorted=[...tabData].sort((a,b)=>b.date.localeCompare(a.date)||a.name.localeCompare(b.name));
-  const filtered = locationFilter ? sorted.filter(r=>{ const f=geoFlagForRecord(r); return f&&!f.ok; }) : sorted;
+  const filtered = (locationFilter ? sorted.filter(r=>{ const f=geoFlagForRecord(r); return f&&!f.ok; }) : sorted)
+    .filter(r=>!nameSearch || r.name.toLowerCase().includes(nameSearch));
   if(!filtered.length){document.getElementById('recordsTable').innerHTML='<tr><td><div class="empty-state">'+(locationFilter?'No location issues found.':'No records in this range.')+'</div></td></tr>';return;}
   const from=document.getElementById('fromDate').value, to=document.getElementById('toDate').value;
   const singleDay=from===to;
@@ -6028,11 +6043,12 @@ async function saveEditedRecordTime(name, date) {
 }
 
 function renderPeople() {
+  const nameSearch=(document.getElementById('missingNameSearch')?.value||'').trim().toLowerCase();
   const from=document.getElementById('fromDate').value, to=document.getElementById('toDate').value;
   const singleDay=from===to;
   const fn=document.getElementById('filterName').value.trim();
   if(singleDay){
-    const allPeople=getStaff().filter(s=>s.role!=='superadmin').map(s=>s.name).filter(n=>!fn||n.toLowerCase().includes(fn)).sort();
+    const allPeople=getStaff().filter(s=>s.role!=='superadmin').map(s=>s.name).filter(n=>(!fn||n.toLowerCase().includes(fn))&&(!nameSearch||n.toLowerCase().includes(nameSearch))).sort();
     const submittedMap={};
     for(const r of tabData) submittedMap[r.name]=r;
     const filterStatus = window._cardTapStatus || null;
@@ -6094,12 +6110,13 @@ function renderPeople() {
 }
 
 function renderBreaks() {
+  const nameSearch=(document.getElementById('missingNameSearch')?.value||'').trim().toLowerCase();
   const from=document.getElementById('fromDate').value, to=document.getElementById('toDate').value;
   const fn=document.getElementById('filterName').value.trim();
   const singleDay=from===to;
   const isViewingToday=singleDay&&from===today;
   const ongoingBreaks=getOngoingBreaks();
-  const brks=getBreaks().filter(b=>b.date>=from&&b.date<=to&&(!fn||b.name.toLowerCase().includes(fn)));
+  const brks=getBreaks().filter(b=>b.date>=from&&b.date<=to&&(!fn||b.name.toLowerCase().includes(fn))&&(!nameSearch||b.name.toLowerCase().includes(nameSearch)));
 
   // Group by date+name, keep individual segments
   const map={};
@@ -12103,15 +12120,12 @@ function downloadEOD(format) {
       table{width:100%;border-collapse:collapse;font-size:13px}
       th{background:#f3f4f6;padding:6px 8px;text-align:left;font-size:11px;font-weight:700}
       td{padding:6px 8px;border-bottom:1px solid #e5e7eb}
-      .tag{display:inline-block;background:#eff6ff;color:#1d4ed8;border-radius:4px;padding:1px 8px;font-size:12px;margin:2px}
       @media print{body{padding:0}}</style>
     </head><body>
       <h1>End of Day Report</h1>
       <p>${esc(name)} &nbsp;·&nbsp; ${fmtDate(date)} &nbsp;·&nbsp; Submitted ${esc(eod.submittedAt||'')}</p>
       <h2>Tasks</h2>
       <table><thead><tr><th>Task</th><th>Start</th><th>End</th><th>Notes</th></tr></thead><tbody>${tasks}</tbody></table>
-      <h2>Broker interaction</h2>
-      <div>${(eod.brokerInteraction||[]).map(b=>`<span class="tag">${esc(b)}</span>`).join(' ')||'—'}</div>
       <h2>Challenges</h2>
       <p style="margin:0">${esc(eod.challenges||'—')}${eod.challengeDetail?' — '+esc(eod.challengeDetail):''}</p>
       <h2>Support needed from TL</h2>
