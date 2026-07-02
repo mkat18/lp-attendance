@@ -4204,9 +4204,10 @@ function renderMissing() {
   const lateIn=schedStaff.filter(s=>{
     if(!s.startTime) return false;
     if(fn&&!s.name === fn) return false;
+    if(nameSearch && !s.name.toLowerCase().includes(nameSearch)) return false;
     const rec=dayRecs.find(r=>r.name===s.name);
     if(!rec||!rec.clockIn) return false;
-    const scheduledMs=new Date(date+'T'+s.startTime+':00').getTime();
+    const scheduledMs=new Date(date+'T'+s.startTime+':00+05:30').getTime();
     return rec.clockIn > scheduledMs + 15*60*1000;
   });
 
@@ -4214,9 +4215,10 @@ function renderMissing() {
   const earlyOut=schedStaff.filter(s=>{
     if(!s.endTime) return false;
     if(fn&&!s.name === fn) return false;
+    if(nameSearch && !s.name.toLowerCase().includes(nameSearch)) return false;
     const rec=dayRecs.find(r=>r.name===s.name);
     if(!rec||!rec.clockOut) return false;
-    const scheduledEndMs=new Date(date+'T'+s.endTime+':00').getTime();
+    const scheduledEndMs=new Date(date+'T'+s.endTime+':00+05:30').getTime();
     return rec.clockOut < scheduledEndMs - 15*60*1000;
   });
 
@@ -12094,7 +12096,7 @@ function downloadEOD(format) {
       `<tr><td>${esc(t.type||'')}</td><td>${esc(t.startTime||'')}</td><td>${esc(t.endTime||'')}</td><td>${esc(t.notes||'')}</td></tr>`
     ).join('') : '<tr><td colspan="4" style="color:#9ca3af">No tasks logged</td></tr>';
 
-    const html = `<!DOCTYPE html><html><head><title>EOD Report</title>
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>EOD Report</title>
       <style>body{font-family:system-ui,sans-serif;padding:2rem;color:#111;max-width:800px;margin:auto}
       h1{font-size:20px;margin-bottom:4px}p{color:#666;font-size:13px;margin:0 0 1rem}
       h2{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#9ca3af;margin:1.5rem 0 6px}
@@ -12120,16 +12122,18 @@ function downloadEOD(format) {
       <p style="margin:0">${esc(eod.notes||'—')}</p>
     </body></html>`;
 
-    const blob = new Blob([html], {type: 'text/html'});
+    const blob = new Blob([html], {type: 'text/html;charset=utf-8'});
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.target = '_blank';
-    a.rel = 'noopener';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 10000);
+    const w = window.open(url, '_blank');
+    if (w) {
+      w.addEventListener('load', () => { setTimeout(() => { w.focus(); w.print(); }, 300); });
+    } else {
+      // Fallback if popup blocked — direct download link
+      const a = document.createElement('a');
+      a.href = url; a.download = 'EOD_Report.html';
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    }
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
   }
 }
 
