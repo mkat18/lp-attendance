@@ -5964,6 +5964,7 @@ function fmtWorked(mins) {
 }
 
 function renderRecords() {
+  const nameSearch=(document.getElementById('missingNameSearch')?.value||'').trim().toLowerCase();
   const locationFilter = window._locationFilter || false;
   window._locationFilter = false;
   const sorted=[...tabData].sort((a,b)=>b.date.localeCompare(a.date)||a.name.localeCompare(b.name));
