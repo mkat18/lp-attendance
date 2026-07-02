@@ -846,6 +846,9 @@ tr.flagged-row:hover td { background: #FFEAEA; }
       </div>
       <div id="dpanel-missing" class="panel">
         <div id="missingDayPicker"></div>
+        <div style="padding:10px 0 6px">
+          <input type="text" id="missingNameSearch" placeholder="🔍 Search by name…" oninput="renderMissing()" style="width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-size:13px;background:var(--surface-2);color:var(--text);outline:none" onfocus="this.style.borderColor='var(--brand)'" onblur="this.style.borderColor='var(--border)'"/>
+        </div>
         <div class="tbl-card"><div class="tbl-wrap"><table id="missingTable"></table></div></div>
       </div>
       <div id="dpanel-breaks" class="panel">
@@ -3700,7 +3703,20 @@ function renderMetrics() {
   if (!multi) {
     const dayRecs  = allRecs.filter(r=>r.date===date);
     const submitted= new Set(dayRecs.map(r=>r.name));
-    missing = allPeople.filter(n=>!submitted.has(n));
+    const nowIST = new Date(new Date().toLocaleString('en-US', {timeZone:'Asia/Kolkata'}));
+    const nowMinsIST = nowIST.getHours()*60 + nowIST.getMinutes();
+    missing = allStaff.filter(s=>{
+      if(submitted.has(s.name)) return false;
+      if(isToday) {
+        if(s.flexibleSchedule) {
+          if(nowMinsIST < 10*60+30) return false;
+        } else if(s.startTime) {
+          const [sh, sm] = s.startTime.split(':').map(Number);
+          if(nowMinsIST < sh*60 + sm + 20) return false;
+        }
+      }
+      return true;
+    }).map(s=>s.name);
     missingLabel = missing.length>0 ? missing.slice(0,3).map(n=>shortName(n)).join(', ')+(missing.length>3?' +more':'') : 'all clear ✓';
   } else {
     // Count unique staff who submitted at least once in the range vs total working days
@@ -4153,6 +4169,7 @@ function renderTabDayPicker(containerEl) {
 function renderMissing() {
   const date=getTabDate();
   const fn=document.getElementById('filterName').value.trim();
+  const nameSearch=(document.getElementById('missingNameSearch')?.value||'').trim().toLowerCase();
   const allStaff=getStaff().filter(s=>s.role!=='superadmin');
   // For late/early calculations, exclude flexible schedule staff
   const schedStaff=allStaff.filter(s=>!s.flexibleSchedule);
@@ -4169,23 +4186,16 @@ function renderMissing() {
   document.getElementById('missingDayPicker').innerHTML = renderTabDayPicker();
 
   // Not submitted
+
   const nowIST = new Date(new Date().toLocaleString('en-US', {timeZone:'Asia/Kolkata'}));
   const nowMinsIST = nowIST.getHours()*60 + nowIST.getMinutes();
 
   const missing=allStaff.filter(s=>{
     if(submitted.has(s.name)) return false;
     if(fn&&!s.name === fn) return false;
+    if(nameSearch && !s.name.toLowerCase().includes(nameSearch)) return false;
     if(isWeekend && new Date(date).getDay()===6 && !s.worksSaturday) return false;
     if(isWeekend && new Date(date).getDay()===0) return false;
-    // Only show after start time + 20 mins; flex staff after 10:30 AM IST
-    if(isToday) {
-      if(s.flexibleSchedule) {
-        if(nowMinsIST < 10*60+30) return false;
-      } else if(s.startTime) {
-        const [sh, sm] = s.startTime.split(':').map(Number);
-        if(nowMinsIST < sh*60 + sm + 20) return false;
-      }
-    }
     return true;
   }).sort((a,b)=>{
   });
@@ -12017,7 +12027,7 @@ function renderEODScreen() {
 
   const personWrap = document.getElementById('eodDownloadPersonWrap');
   const personSel  = document.getElementById('eodDownloadPerson');
-  if ((isTeamLead() || isSuperAdmin() || isHRManager()) && personSel) {
+  if ((isTeamLead() || isSuperAdmin() || isManager()) && personSel) {
     personWrap.style.display = 'block';
     const eodStaff = getStaff().filter(s => roleHasEOD(s.role));
     if (isTeamLead()) {
@@ -12029,6 +12039,9 @@ function renderEODScreen() {
         + eodStaff.map(s=>`<option value="${esc(s.name)}">${esc(s.name)}</option>`).join('');
     }
     personSel.addEventListener('change', previewEODDownload);
+  } else {
+    // Analyst/trainee — hide person picker, always use own name
+    if (personWrap) personWrap.style.display = 'none';
   }
   previewEODDownload();
 }
@@ -12036,7 +12049,7 @@ function renderEODScreen() {
 function previewEODDownload() {
   const date = document.getElementById('eodDownloadDate')?.value || today;
   const personSel = document.getElementById('eodDownloadPerson');
-  const useSel = (isTeamLead() || isSuperAdmin() || isHRManager()) && personSel;
+  const useSel = (isTeamLead() || isSuperAdmin() || isManager()) && personSel;
   const name = useSel ? personSel.value : currentUser.name;
   const eod = name ? getEODReports().find(r => r.name === name && r.date === date) : null;
   const prev = document.getElementById('eodDownloadPreview');
@@ -12050,7 +12063,7 @@ function previewEODDownload() {
 function downloadEOD(format) {
   const date = document.getElementById('eodDownloadDate')?.value || today;
   const personSel = document.getElementById('eodDownloadPerson');
-  const useSel = (isTeamLead() || isSuperAdmin() || isHRManager()) && personSel;
+  const useSel = (isTeamLead() || isSuperAdmin() || isManager()) && personSel;
   const name = useSel ? personSel.value : currentUser.name;
   if (!name) { showToast('Select a person first.', 'err'); return; }
   const eod = getEODReports().find(r => r.name === name && r.date === date);
