@@ -1698,10 +1698,8 @@ function spToStaff(item) {
 // Convert HH:MM string to today's timestamp for internal use
 function hhmmToTs(hhmm, dateStr) {
   if (!hhmm) return null;
-  const [h, m] = hhmm.split(':').map(Number);
-  const d = new Date(dateStr || new Date().toISOString().split('T')[0]);
-  d.setHours(h, m, 0, 0);
-  return d.getTime();
+  const date = dateStr || new Date().toLocaleDateString('en-CA', {timeZone:'Asia/Kolkata'});
+  return new Date(`${date}T${hhmm}:00+05:30`).getTime();
 }
 
 // Map SharePoint item to record object
@@ -3079,10 +3077,19 @@ function openCamera() {
       _cameraStream = stream;
       video.srcObject = stream;
       document.getElementById('cameraErr').style.display = 'none';
+      // Delay selfie button by 1 second to ensure camera is ready
+      const selfieBtn = document.querySelector('#cameraModal button[onclick="capturePhoto()"]');
+      if (selfieBtn) {
+        selfieBtn.disabled = true;
+        selfieBtn.style.opacity = '0.5';
+        setTimeout(() => {
+          selfieBtn.disabled = false;
+          selfieBtn.style.opacity = '1';
+        }, 1000);
+      }
     })
     .catch(err => {
       console.warn('Camera unavailable:', err);
-      // Don't auto-submit — show modal with error, require explicit skip
       video.style.display = 'none';
       document.getElementById('cameraErr').style.display = 'block';
       document.getElementById('skipPhotoBtn').style.display = 'block';
@@ -3303,6 +3310,9 @@ function updateClockOutUI() {
     if (coutEl) coutEl.textContent='Clocked out: '+fmtTime(rec.clockOut)+' · Worked: '+(h>0?h+'h ':'')+m+'m';
     if (btn) btn.style.display='none';
     if (done) done.style.display='block';
+    // Hide break card — can't take breaks after clocking out
+    const breakCard = document.getElementById('breakCard');
+    if (breakCard) breakCard.style.display='none';
   } else {
     if (coutEl) coutEl.textContent='Not yet clocked out';
     if (btn) btn.style.display='block';
@@ -4159,16 +4169,25 @@ function renderMissing() {
   document.getElementById('missingDayPicker').innerHTML = renderTabDayPicker();
 
   // Not submitted
+  const nowIST = new Date(new Date().toLocaleString('en-US', {timeZone:'Asia/Kolkata'}));
+  const nowMinsIST = nowIST.getHours()*60 + nowIST.getMinutes();
+
   const missing=allStaff.filter(s=>{
     if(submitted.has(s.name)) return false;
     if(fn&&!s.name === fn) return false;
-    if(isWeekend && new Date(date).getDay()===6 && !s.worksSaturday) return false; // Saturday — skip staff not rostered
-    if(isWeekend && new Date(date).getDay()===0) return false; // Sunday — nobody expected
+    if(isWeekend && new Date(date).getDay()===6 && !s.worksSaturday) return false;
+    if(isWeekend && new Date(date).getDay()===0) return false;
+    // Only show after start time + 20 mins; flex staff after 10:30 AM IST
+    if(isToday) {
+      if(s.flexibleSchedule) {
+        if(nowMinsIST < 10*60+30) return false;
+      } else if(s.startTime) {
+        const [sh, sm] = s.startTime.split(':').map(Number);
+        if(nowMinsIST < sh*60 + sm + 20) return false;
+      }
+    }
     return true;
   }).sort((a,b)=>{
-    const aM=a.startTime?parseInt(a.startTime)*60+parseInt(a.startTime.split(':')[1]):999;
-    const bM=b.startTime?parseInt(b.startTime)*60+parseInt(b.startTime.split(':')[1]):999;
-    return aM-bM;
   });
 
   // Late clock in
@@ -12088,10 +12107,16 @@ function downloadEOD(format) {
       <p style="margin:0">${esc(eod.notes||'—')}</p>
     </body></html>`;
 
-    const w = window.open('', '_blank');
-    w.document.write(html);
-    w.document.close();
-    setTimeout(() => { w.focus(); w.print(); }, 400);
+    const blob = new Blob([html], {type: 'text/html'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.target = '_blank';
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
   }
 }
 
