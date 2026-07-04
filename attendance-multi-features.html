@@ -3279,7 +3279,7 @@ function clockOut() {
 }
 
 
-function completeClockOut(photoDataUrl) {
+async function completeClockOut(photoDataUrl) {
   _pendingClockOut = false;
   const recs=getRecords();
   const idx=recs.findIndex(r=>r.date===today&&r.name===currentUser.name);
@@ -3290,9 +3290,13 @@ function completeClockOut(photoDataUrl) {
     recs[idx].clockOutGeo=geo||null;
     recs[idx].clockOutPhoto=!!photoDataUrl;
     saveRecords(recs);
-    spSaveRecord(recs[idx]);
+    const saved = await spSaveRecord(recs[idx]);
+    if (!saved) {
+      showToast('⚠ Clock-out saved on this device but failed to sync — please try again or contact your manager.','err');
+    } else {
+      showToast('✓ Clocked out!','ok');
+    }
     if (photoDataUrl) uploadPhoto(photoDataUrl, {...recs[idx], name: recs[idx].name+'_clockout'});
-    showToast('✓ Clocked out!','ok');
     updateClockOutUI();
   });
 }
