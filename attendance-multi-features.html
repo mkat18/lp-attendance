@@ -1695,6 +1695,7 @@ function spToStaff(item) {
     ec2Name: item.EmergencyContact2Name||'',
     ec2Phone: item.EmergencyContact2Phone||'',
     ec2Relation: item.EmergencyContact2Relation||'',
+    inactive: item.Inactive === true || item.Inactive === 'true' || item.Inactive === 1,
   };
 }
 
@@ -1746,11 +1747,29 @@ function spToBreak(item) {
 }
 
 // ── Data access functions ─────────────────────────────────────────────────
-function getStaff()   { return _staff && _staff.length > 0 ? _staff : (LS.get('ci_staff') || BUILTIN_STAFF || []); }
+function getAllStaff()  { return _staff && _staff.length > 0 ? _staff : (LS.get('ci_staff') || BUILTIN_STAFF || []); }
+function getStaff()    { return getAllStaff().filter(s => !s.inactive); }
 function getRecords() { return _records || []; }
 function getBreaks()  { return _breaks !== null ? _breaks : []; }
 
 function saveStaff(s)  { _staff=s;   LS.set('ci_staff',s); }
+
+async function toggleStaffInactive(name) {
+  const staff = getAllStaff();
+  const i = staff.findIndex(s => s.name === name);
+  if (i < 0) return;
+  staff[i].inactive = !staff[i].inactive;
+  saveStaff(staff);
+  const ok = await spSaveStaffMember(staff[i]);
+  if (!ok) {
+    staff[i].inactive = !staff[i].inactive; // revert
+    saveStaff(staff);
+    showToast('⚠ Failed to save — please try again.', 'err');
+    return;
+  }
+  showToast(staff[i].inactive ? `${name.split(' ')[0]} marked inactive ✓` : `${name.split(' ')[0]} reactivated ✓`, 'ok');
+  renderAdmin();
+}
 function saveRecords(r){ _records=r; }
 function saveBreaks(b) { _breaks=b; }
 
@@ -6563,6 +6582,34 @@ function renderAdmin() {
 
   const staffListHtml = renderAllStaffCards(staff);
   document.getElementById('staffList').innerHTML = staffListHtml;
+
+  // Inactive staff section — SA only
+  if (sa) {
+    const inactiveStaff = getAllStaff().filter(s => s.inactive);
+    let inactiveEl = document.getElementById('inactiveStaffSection');
+    if (!inactiveEl) {
+      inactiveEl = document.createElement('div');
+      inactiveEl.id = 'inactiveStaffSection';
+      inactiveEl.style.marginTop = '1rem';
+      document.getElementById('staffList').parentElement.appendChild(inactiveEl);
+    }
+    if (inactiveStaff.length) {
+      inactiveEl.innerHTML = collapsibleCard('🔴 Inactive Staff (' + inactiveStaff.length + ')',
+        inactiveStaff.map(s => {
+          const sname = esc(s.name);
+          return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:0.5px solid var(--border)">
+            <div>
+              <div style="font-size:13px;font-weight:600;color:var(--text-2)">${sname}</div>
+              <div style="font-size:11px;color:var(--text-3)">${ROLE_LABEL[s.role]||s.role}</div>
+            </div>
+            <button class="btn-sm" onclick="toggleStaffInactive('${sname}')" style="background:#D1FAE5;color:#065F46;border-color:#6EE7B7">🟢 Reactivate</button>
+          </div>`;
+        }).join('')
+      , false);
+    } else {
+      inactiveEl.innerHTML = '';
+    }
+  }
 }
 
 function toggleStaffList() {
@@ -6637,7 +6684,8 @@ function renderAllStaffCards(staff) {
             ${canAssignBroker?`<button class="btn-sm" style="background:#FFF7ED;color:#C2410C;border-color:#FED7AA" onclick="openAssignBrokerModal('${sname}')">🎯 Assign broker</button>`:''}
             ${canEditScheduleThis?`<button class="btn-sm" onclick="editScheduleByName('${sname}')">Schedule & Office</button>`:''}
             ${sa?`<button class="btn-sm" onclick="toggleFlexibleSchedule('${sname}')" style="background:${s.flexibleSchedule?'var(--brand-light)':'var(--surface-2)'};color:${s.flexibleSchedule?'var(--brand)':'var(--text-2)'};border-color:${s.flexibleSchedule?'var(--brand)':'var(--border)'}">⚡ ${s.flexibleSchedule?'Flex ON':'Flex OFF'}</button>`:''}
-            ${sa?`<button class="btn-sm" onclick="toggleWorksSaturday('${sname}')" style="background:${s.worksSaturday?'var(--brand-light)':'var(--surface-2)'};color:${s.worksSaturday?'var(--brand)':'var(--text-2)'};border-color:${s.worksSaturday?'var(--brand)':'var(--border)'}">📅 ${s.worksSaturday?'Sat ON':'Sat OFF'}</button>`:''}            ${canDeleteThis?`<button class="btn-sm btn-danger" onclick="removePersonByName('${sname}')">Remove</button>`:''}
+            ${sa?`<button class="btn-sm" onclick="toggleWorksSaturday('${sname}')" style="background:${s.worksSaturday?'var(--brand-light)':'var(--surface-2)'};color:${s.worksSaturday?'var(--brand)':'var(--text-2)'};border-color:${s.worksSaturday?'var(--brand)':'var(--border)'}">📅 ${s.worksSaturday?'Sat ON':'Sat OFF'}</button>`:''}
+            ${sa?`<button class="btn-sm" onclick="toggleStaffInactive('${sname}')" style="background:#FEF2F2;color:#DC2626;border-color:#FECACA">🔴 Mark Inactive</button>`:''}            ${canDeleteThis?`<button class="btn-sm btn-danger" onclick="removePersonByName('${sname}')">Remove</button>`:''}
             ${canDeleteThis?`<button class="btn-sm btn-danger" onclick="removePersonByName('${sname}')">Remove</button>`:''}
             ${(sa||mgr)?`<button class="btn-sm" id="detbtn-${s.name}" onclick="toggleStaffDetails(\'${sname}\')" style="background:var(--brand-light);color:var(--brand);border-color:var(--brand)">👤 Details</button>`:''}
           </div>
@@ -7842,6 +7890,7 @@ async function spSaveStaffMember(s) {
     PersonalEmail: String(s.personalEmail||''),
     FlexibleSchedule: !!s.flexibleSchedule,
     WorksSaturday: !!s.worksSaturday,
+    Inactive: !!s.inactive,
   };
   // Address is Multiple lines of text — add separately only if set
   if (s.address) payload.Address = String(s.address);
