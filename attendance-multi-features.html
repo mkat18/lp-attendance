@@ -3620,7 +3620,7 @@ function tapCard(key, row) {
     rows = allRecs.filter(r => r.status!=='leave'&&!r.hasPhoto).map(r => personRow(r.name, 'No selfie', 'var(--danger)'));
     title = 'No selfie'; emptyMsg = 'All selfies captured ✓';
   } else if (key === 'noclockout') {
-    const dayRecs2 = getRecords().filter(r => r.date === today);
+    const dayRecs2 = getRecords().filter(r => r.date === date);
     rows = allStaff.filter(s => {
       const rec = dayRecs2.find(r => r.name === s.name);
       return rec && rec.clockIn && !rec.clockOut && rec.status !== 'leave';
@@ -3816,11 +3816,11 @@ function renderMetrics() {
   }) : [];
 
 
-  // Staff checked in today but not yet clocked out
-  const notClockedOut = isToday ? allStaff.filter(s => {
-    const rec = allRecs.find(r => r.name === s.name && r.date === today);
+  // Staff checked in on selected date but not clocked out
+  const notClockedOut = allStaff.filter(s => {
+    const rec = allRecs.find(r => r.name === s.name && r.date === date);
     return rec && rec.clockIn && !rec.clockOut && rec.status !== 'leave';
-  }) : [];
+  });
   const rangeLabel = multi ? ` <span style="font-size:10px;color:var(--text-3);font-weight:400">${fromDate} – ${toDate}</span>` : '';
 
   // ── Compute data needed for Row 3 ──────────────────────────────────────
