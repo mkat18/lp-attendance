@@ -1,10 +1,9 @@
-const CACHE = 'lp-v1';
-const ATTENDANCE = 'attendance-multi-features.html';
-const BROKER = 'broker.html';
+const CACHE = 'lp-v4';
+const ASSETS = ['index.html', 'attendance-multi-features.html', 'broker.html', 'logout.html'];
 
 self.addEventListener('install', e => {
   e.waitUntil(
-    caches.open(CACHE).then(c => c.addAll([ATTENDANCE, BROKER, 'index.html']))
+    caches.open(CACHE).then(c => c.addAll(ASSETS))
   );
   self.skipWaiting();
 });
@@ -17,8 +16,7 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
-  // Network first for HTML files (always get latest), cache fallback
-  if (e.request.url.endsWith('.html')) {
+  if (e.request.url.match(/\.(html)$/)) {
     e.respondWith(
       fetch(e.request).then(r => {
         const clone = r.clone();
@@ -26,5 +24,9 @@ self.addEventListener('fetch', e => {
         return r;
       }).catch(() => caches.match(e.request))
     );
+    return;
   }
+  e.respondWith(
+    caches.match(e.request).then(r => r || fetch(e.request))
+  );
 });
