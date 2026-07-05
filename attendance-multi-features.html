@@ -7610,7 +7610,8 @@ async function loadFromSharePoint() {
     }
     if (recRes && recRes.value && recRes.value.length > 0) {
       _records = recRes.value.map(spToRecord);
-      
+      // Refresh check-in UI now that records are loaded — shows correct clock-out/break state
+      if (currentUser) { updateClockOutUI(); updateBreakUI(); }
     }
     if (brkRes && brkRes.value && brkRes.value.length > 0) {
       _breaks = brkRes.value.map(spToBreak);
