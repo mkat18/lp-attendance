@@ -5095,7 +5095,7 @@ async function renderLeaveScreen() {
           <div style="font-size:11px;color:var(--text-3)">Unpaid: ${bal.unpaidUsed} · Broker: ${bal.brokerCount}</div>
         </div>
       </div>
-      ${(!onProb && !isSuperAdmin() && canDo('canApplyLeave')) ? `
+      ${(!isSuperAdmin() && canDo('canApplyLeave')) ? `
       <div class="section-label" style="margin-bottom:10px">Apply for leave</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
         <div class="field" style="margin:0">
