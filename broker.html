@@ -5895,11 +5895,13 @@ function saveFileEntries(arr) {
 }
 
 async function spSyncFileEntry(entry) {
-  if (!entry || !entry.id) return;
+  if (!entry || !entry.id) return false;
   _fileEntries = _fileEntries || {};
   const existing = _fileEntries[entry.id];
   const spId = await spSaveJsonItem('FileEntries', entry.owner || currentUser.name, entry, existing ? existing.spId : null, 'FileData');
+  if (!spId) return false;
   _fileEntries[entry.id] = { data: entry, spId };
+  return true;
 }
 
 async function spDeleteFileEntry(fileId) {
@@ -8169,7 +8171,11 @@ async function saveFileEntry() {
     files.push(entry);
   }
   saveFileEntries(files);
-  spSyncFileEntry(entry).catch(()=>{});
+  const saved = await spSyncFileEntry(entry).catch(()=>false);
+  if (!saved) {
+    showToast('⚠ File saved locally but failed to sync to SharePoint — please try saving again.','err');
+    return;
+  }
   closeFileModal();
   showToast('File saved ✓', 'ok');
   updateFileLogUI();
