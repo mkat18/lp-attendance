@@ -5694,8 +5694,7 @@ async function onMsLogin(account) {
     const email = msalAccount.username.toLowerCase();
     const staff = getStaff();
     const member = staff.find(s =>
-      (s.email && s.email.toLowerCase() === email) ||
-      (s.personalEmail && s.personalEmail.toLowerCase() === email)
+      s.email && s.email.toLowerCase() === email
     );
     if (member) { await loginAs(member); return; }
 
