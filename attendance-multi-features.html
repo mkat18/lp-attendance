@@ -3610,6 +3610,7 @@ function tapCard(key, row) {
       return personRow(s.name, 'Clocked in '+fmtTime(rec.clockIn)+' · not clocked out', 'var(--warn)');
     });
     title = 'Not clocked out'; emptyMsg = 'All staff have clocked out ✓';
+  } else if (key === 'eod') {
     const eodRpts   = getEODReports().filter(r => r.date === date && r.status === 'submitted');
     const submitted = new Set(eodRpts.map(r => r.name));
     const onLeave   = new Set(allRecs.filter(r => r.date===date && r.status==='leave').map(r => r.name));
