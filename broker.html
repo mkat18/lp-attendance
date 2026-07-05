@@ -2239,7 +2239,11 @@ function goTab(name, btn) {
   // Save last tab for session restore
   try { sessionStorage.setItem('lp_last_tab', name); } catch(e) {}
   showScreen(name);
-  if (name==='myteam')    renderMyTeam();
+  if (name==='myteam') {
+    // Reload EODs fresh from SP before rendering My Team to ensure latest data
+    loadEODFromSP().catch(()=>{}).finally(() => renderMyTeam());
+    return;
+  }
   if (name==='files')     renderFilesScreen();
   if (name==='myfiles')   renderMyFilesScreen();
   if (name==='brokermgmt') { renderBrokerMgmtScreen(); renderCoverageSection('coverSection-brokermgmt'); }
@@ -5829,9 +5833,16 @@ const SP_API = 'https://loanprocessorau.sharepoint.com/sites/lpattendance/_api/l
 async function spLoadJsonList(listName, dataCol) {
   dataCol = dataCol || 'Data';
   try {
-    const res = await spGet(SP_API + "('" + listName + "')/items?$select=Id,Title," + dataCol + "&$top=5000");
-    if (res && res.value) return res.value.map(item => ({ ...item, Data: item[dataCol] }));
-    return [];
+    let allItems = [];
+    let url = SP_API + "('" + listName + "')/items?$select=Id,Title," + dataCol + "&$top=1000&$orderby=Id desc";
+    while (url) {
+      const res = await spGet(url);
+      if (!res || !res.value) break;
+      allItems = allItems.concat(res.value.map(item => ({ ...item, Data: item[dataCol] })));
+      url = res['odata.nextLink'] || null;
+      if (allItems.length > 10000) break; // safety cap
+    }
+    return allItems;
   } catch(e) { console.warn('spLoadJsonList failed:', listName, e); return []; }
 }
 
@@ -9144,12 +9155,19 @@ async function confirmCoverFileAssign(absenteeName, assigneeName) {
 }
 
 async function claimFileBack(fileId) {
-  const files = getFileEntries();
-  const f = files.find(x=>x.id===fileId);
-  if (!f) return;
+  let files = getFileEntries();
+  let f = files.find(x => x.id === fileId);
+  if (!f) {
+    // File not in memory — reload from SP first
+    await loadFileEntriesFromSP().catch(()=>{});
+    files = getFileEntries();
+    f = files.find(x => x.id === fileId);
+  }
+  if (!f) { showToast('File not found — please refresh.','err'); return; }
   delete f.coverAssignee;
   delete f.coverOriginalOwner;
-  const fok = await spSyncFileEntry(f).catch(()=>false); if(!fok) showToast('⚠ File update failed to sync.','err');
+  const fok = await spSyncFileEntry(f).catch(()=>false);
+  if (!fok) { showToast('⚠ Failed to reclaim file — please try again.','err'); return; }
   saveFileEntries(files);
   showToast('File claimed back ✓','ok');
   renderMyFilesScreen();
@@ -10047,7 +10065,7 @@ function fileCard(f, showControls) {
   const stale = isStale(f);
   const urgent = f.priority === 'urgent';
   const hasExpiredSoon = f.attachments && f.attachments.some(a => a.expiresAt - Date.now() < 3 * 86400000 && a.expiresAt > Date.now());
-  const canEdit = showControls && (isTeamLead() || isSuperAdmin() || f.owner === currentUser.name);
+  const canEdit = showControls && (isTeamLead() || isSuperAdmin() || f.owner === currentUser.name || f.coverAssignee === currentUser.name);
   const isCovered = !!f.coverAssignee;
   const isCovering = f.coverAssignee === currentUser.name && f.coverOriginalOwner;
 
@@ -11378,14 +11396,23 @@ function renderMyTeamEOD(myTeamNames) {
       <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px">📋 EOD Reports</div>
       <button onclick="refreshMyTeamEOD()" style="font-size:11px;padding:3px 10px;border-radius:50px;border:1.5px solid var(--border);background:var(--surface);cursor:pointer;color:var(--text-2)">↺ Refresh</button>
     </div>
-    ${_myTeamEODPeriod==='custom'?`<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
+    <div style="display:flex;gap:6px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
+      ${periodBtns}
+    </div>
+    ${_myTeamEODPeriod==='custom'?`<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
       <input type="date" value="${_myTeamEODFromDt}" onchange="_myTeamEODFromDt=this.value;renderMyTeamEOD(window._myTeamNames)"
         style="font-size:13px;padding:5px 8px;border:1.5px solid var(--border);border-radius:var(--radius-sm)"/>
       <span style="font-size:12px;color:var(--text-3)">to</span>
       <input type="date" value="${_myTeamEODToDt}" onchange="_myTeamEODToDt=this.value;renderMyTeamEOD(window._myTeamNames)"
         style="font-size:13px;padding:5px 8px;border:1.5px solid var(--border);border-radius:var(--radius-sm)"/>
     </div>`:''}
-    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">${personBtns}</div>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
+      <select onchange="_myTeamEODPerson=this.value;renderMyTeamEOD(window._myTeamNames)"
+        style="flex:1;font-size:13px;padding:6px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface-2);color:var(--text);outline:none">
+        <option value="">All analysts</option>
+        ${myTeamNames.map(n=>`<option value="${esc(n)}" ${_myTeamEODPerson===n?'selected':''}>${esc(shortName(n))}</option>`).join('')}
+      </select>
+    </div>
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:4px">
       <div onclick="eodCardToggle('submitted')" style="background:${uniqueSubmitters.length===viewNames.length?'#D1FAE5':'#FEF3C7'};border-radius:var(--radius-sm);padding:8px 6px;text-align:center;cursor:pointer;border:1.5px solid ${_myTeamEODCard==='submitted'?'var(--brand)':'transparent'}">
         <div style="font-size:18px;font-weight:700;color:${uniqueSubmitters.length===viewNames.length?'#065F46':'#92400E'}">${uniqueSubmitters.length}/${viewNames.length}</div>
@@ -12085,7 +12112,9 @@ let _clvAnalyst='', _clvBroker='', _clvSearch='', _clvFrom='', _clvTo='', _clvPa
 const CLV_PER_PAGE = 10;
 
 function openChecklistViewer() {
-  _clvAnalyst=''; _clvBroker=''; _clvSearch=''; _clvFrom=''; _clvTo=''; _clvPage=0;
+  const d30 = new Date(); d30.setDate(d30.getDate()-30);
+  const d30str = d30.toLocaleDateString('en-CA', {timeZone:'Asia/Kolkata'});
+  _clvAnalyst=''; _clvBroker=''; _clvSearch=''; _clvFrom=d30str; _clvTo=''; _clvPage=0;
   const isTLOrAbove = isTeamLead()||isSuperAdmin()||isOpsManager();
   const modal = document.createElement('div');
   modal.id = 'clvModal';
@@ -12093,7 +12122,7 @@ function openChecklistViewer() {
   let analystSelect = '';
   if (isTLOrAbove) {
     const opts = getStaff().filter(s=>['analyst','trainee','teamlead'].includes(s.role))
-      .map(s=>'<option value="'+esc(s.name)+'">'+esc(s.name)+'</option>').join('');
+      .map(s=>'<option value="'+esc(s.name)+'">'+esc(shortName(s.name))+'</option>').join('');
     analystSelect = '<select onchange="_clvAnalyst=this.value;_clvPage=0;clvRender()" style="font-size:13px;padding:6px 8px;border:1.5px solid var(--border);border-radius:var(--radius-sm)"><option value="">All analysts</option>'+opts+'</select>';
   }
   modal.innerHTML =
@@ -12102,10 +12131,11 @@ function openChecklistViewer() {
     +'<div style="font-size:15px;font-weight:700">📋 Checklist responses</div>'
     +'<button onclick="document.getElementById(\'clvModal\').remove()" style="background:transparent;border:none;font-size:22px;cursor:pointer;color:var(--text-3)">\u00D7</button>'
     +'</div>'
-    +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">'
+    +'<div style="display:flex;gap:8px;align-items:center;margin-bottom:12px">'
     +analystSelect
-    +'<input type="text" placeholder="Search client..." oninput="_clvSearch=this.value;_clvPage=0;clvRender()" style="flex:1;min-width:120px;font-size:13px;padding:6px 8px;border:1.5px solid var(--border);border-radius:var(--radius-sm)"/>'
-    +'<input type="date" onchange="_clvFrom=this.value;_clvPage=0;clvRender()" style="font-size:13px;padding:6px 8px;border:1.5px solid var(--border);border-radius:var(--radius-sm)"/>'
+    +'<input type="text" placeholder="Search client..." oninput="_clvSearch=this.value;_clvPage=0;clvRender()" style="flex:1;min-width:100px;font-size:13px;padding:6px 8px;border:1.5px solid var(--border);border-radius:var(--radius-sm)"/>'
+    +'<input type="date" value="'+d30str+'" onchange="_clvFrom=this.value;_clvPage=0;clvRender()" style="font-size:13px;padding:6px 8px;border:1.5px solid var(--border);border-radius:var(--radius-sm)"/>'
+    +'<span style="font-size:12px;color:var(--text-3)">to</span>'
     +'<input type="date" onchange="_clvTo=this.value;_clvPage=0;clvRender()" style="font-size:13px;padding:6px 8px;border:1.5px solid var(--border);border-radius:var(--radius-sm)"/>'
     +'</div>'
     +'<div id="clvBody"></div>'
