@@ -2640,7 +2640,7 @@ function buildNav() {
   let tabs = [];
   const r = currentUser.role;
   if (r === 'superadmin') {
-    tabs = [['dashboard','Dashboard'],['eod','EOD'],['admin','Staff'],['profile','My Details']];
+    tabs = [['dashboard','Dashboard'],['leave','🌴 Leave'],['eod','EOD'],['admin','Staff'],['profile','My Details']];
   } else if (r === 'hrmanager') {
     tabs = [['checkin','Check in'],['leave','🌴 Leave'],['dashboard','Dashboard'],['admin','Staff'],['profile','My Details']];
     // hrmanager explicitly excluded from All Files tab
@@ -5101,7 +5101,7 @@ async function renderLeaveScreen() {
           <div style="font-size:11px;color:var(--text-3)">Unpaid: ${bal.unpaidUsed} · Broker: ${bal.brokerCount}</div>
         </div>
       </div>
-      ${(!onProb && (isSuperAdmin() || canDo('canApplyLeave'))) ? `
+      ${(!onProb && !isSuperAdmin() && canDo('canApplyLeave')) ? `
       <div class="section-label" style="margin-bottom:10px">Apply for leave</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
         <div class="field" style="margin:0">
