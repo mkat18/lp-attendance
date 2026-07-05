@@ -694,10 +694,10 @@ tr.flagged-row:hover td { background: #FFEAEA; }
           <label>Leave type <span style="color:var(--danger)">*</span></label>
           <select id="ciLeaveType" onchange="(function(){var f=document.getElementById('ciLeaveBrokerField');f.style.display=this.value==='Broker Holiday'?'block':'none'}).call(this)" style="font-size:14px;padding:8px 10px;width:100%;border:1.5px solid var(--border);border-radius:var(--radius-sm)">
             <option value="">— select —</option>
-            <option value="Annual Leave" ${isOnProbation()&&!isSuperAdmin()&&!isManager()?'disabled style="color:#ccc"':''}>Annual Leave</option>
-            <option value="Sick Leave" ${isOnProbation()&&!isSuperAdmin()&&!isManager()?'disabled style="color:#ccc"':''}>Sick Leave</option>
+            <option value="Annual Leave">Annual Leave</option>
+            <option value="Sick Leave">Sick Leave</option>
             <option value="Unpaid Leave">Unpaid Leave</option>
-            <option value="Broker Holiday" ${isOnProbation()&&!isSuperAdmin()&&!isManager()?'disabled style="color:#ccc"':''}>Broker Holiday</option>
+            <option value="Broker Holiday">Broker Holiday</option>
           </select>
         </div>
         <div id="ciLeaveBrokerField" style="display:none" class="field">
