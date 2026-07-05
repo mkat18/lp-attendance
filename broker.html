@@ -1407,12 +1407,12 @@ function spToBreak(item) {
 
 // ── Data access functions ─────────────────────────────────────────────────
 function getStaff()   { return _staff && _staff.length > 0 ? _staff : (LS.get('ci_staff') || BUILTIN_STAFF || []); }
-function getRecords() { return _records || LS.get('ci_records') || []; }
-function getBreaks()  { return _breaks !== null ? _breaks : (LS.get('ci_breaks') || []); }
+function getRecords() { return _records || []; }
+function getBreaks()  { return _breaks !== null ? _breaks : []; }
 
 function saveStaff(s)  { _staff=s;   LS.set('ci_staff',s); }
-function saveRecords(r){ _records=r; LS.set('ci_records',r); }
-function saveBreaks(b) { _breaks=b;  LS.set('ci_breaks',b); }
+function saveRecords(r){ _records=r; }
+function saveBreaks(b) { _breaks=b; }
 
 // Legacy Power Automate functions removed — using direct SP REST API
 
@@ -4619,8 +4619,8 @@ function renderOfficeManager() {
 function loadDashboard() {
   // Refresh live data from SP before rendering
   Promise.all([
-    spGet(SP_API + "('AttendanceRecords')/items?$top=5000").then(r => { if (r&&r.value) { _records=r.value.map(spToRecord); LS.set('ci_records',_records); } }),
-    spGet(SP_API + "('AttendanceBreaks')/items?$top=5000").then(r => { if (r&&r.value) { _breaks=r.value.map(spToBreak); LS.set('ci_breaks',_breaks); } }),
+    spGet(SP_API + "('AttendanceRecords')/items?$top=5000").then(r => { if (r&&r.value) { _records=r.value.map(spToRecord); } }),
+    spGet(SP_API + "('AttendanceBreaks')/items?$top=5000").then(r => { if (r&&r.value) { _breaks=r.value.map(spToBreak); } }),
   ]).catch(()=>{}).finally(() => {
     renderMetrics(); loadTabs(); renderNeedsAttention(); renderWeeklyWidgets();
   });
@@ -6086,8 +6086,8 @@ async function loadFromSharePoint() {
         spGet(SP_API + "('AttendanceBreaks')/items?$top=5000"),
       ]);
       if (staffRes?.value?.length) { _staff = staffRes.value.map(spToStaff); LS.set('ci_staff', _staff); }
-      if (recRes?.value?.length)   { _records = recRes.value.map(spToRecord); LS.set('ci_records', _records); }
-      if (brkRes?.value?.length)   { _breaks = brkRes.value.map(spToBreak); LS.set('ci_breaks', _breaks); }
+      if (recRes?.value?.length)   { _records = recRes.value.map(spToRecord); }
+      if (brkRes?.value?.length)   { _breaks = brkRes.value.map(spToBreak); }
       await Promise.all([
         loadObsNotesFromSP(),
         loadPermissions(),
