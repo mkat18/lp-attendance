@@ -5689,16 +5689,13 @@ async function onMsLogin(account) {
     } catch(e) {}
   }
 
-  // Auto-match by MS account email — skip login screen
+  // Auto-match by MS account email only — no name fallback
   if (msalAccount && msalAccount.username) {
     const email = msalAccount.username.toLowerCase();
-    const emailPrefix = email.split('@')[0].toLowerCase().replace(/[._-]/g,' ');
     const staff = getStaff();
     const member = staff.find(s =>
       (s.email && s.email.toLowerCase() === email) ||
-      (s.personalEmail && s.personalEmail.toLowerCase() === email) ||
-      s.name.toLowerCase() === emailPrefix ||
-      s.name.toLowerCase() === emailPrefix.replace(/[._-]/g,' ')
+      (s.personalEmail && s.personalEmail.toLowerCase() === email)
     );
     if (member) { await loginAs(member); return; }
 
@@ -7212,9 +7209,15 @@ function getCoverageForDate(date) {
 async function saveCoverageToSP(absenteeName, date, coverName, isNCR) {
   const existing = _coverageSP.find(r=>r.absenteeName===absenteeName&&r.date===date);
   const spCoverName = isNCR ? '_ncr' : coverName;
-  // Send date as ISO datetime for SP Date column type
   const spDate = date.length===10 ? date+'T00:00:00Z' : date;
-  const payload = {Title:absenteeName, Date:spDate, CoverName:spCoverName};
+  const payload = {
+    Title: absenteeName,
+    CoverDate: spDate,
+    CoverName: spCoverName,
+    IsNCR: isNCR ? 'true' : 'false',
+    AssignedBy: currentUser?.name||'',
+    AssignedAt: new Date().toISOString()
+  };
   try {
     if (existing) {
       await spPatch(SP_API+`('CoverageAssignments')/items(${existing.id})`, payload);
