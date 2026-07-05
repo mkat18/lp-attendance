@@ -3057,8 +3057,18 @@ function openCamera() {
     document.getElementById('skipPhotoBtn').style.display = 'block';
     return;
   }
+  // Timeout — if camera doesn't respond within 10s, show skip option
+  const cameraTimeout = setTimeout(() => {
+    if (!_cameraStream) {
+      video.style.display = 'none';
+      document.getElementById('cameraErr').style.display = 'block';
+      document.getElementById('skipPhotoBtn').style.display = 'block';
+    }
+  }, 10000);
+
   navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false })
     .then(stream => {
+      clearTimeout(cameraTimeout);
       _cameraStream = stream;
       video.srcObject = stream;
       document.getElementById('cameraErr').style.display = 'none';
@@ -3074,6 +3084,7 @@ function openCamera() {
       }
     })
     .catch(err => {
+      clearTimeout(cameraTimeout);
       console.warn('Camera unavailable:', err);
       video.style.display = 'none';
       document.getElementById('cameraErr').style.display = 'block';
