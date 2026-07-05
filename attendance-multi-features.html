@@ -8914,7 +8914,7 @@ async function loadCoverageFromSP() {
     const res = await spGet(SP_API+"('CoverageAssignments')/items?$select=Id,Title,CoverDate,CoverName,IsNCR,AssignedBy,AssignedAt&$top=500");
     if (res?.value) {
       _coverageSP = res.value.map(r=>({
-        id:r.Id, absenteeName:r.Title, date:r.CoverDate,
+        id:r.Id, absenteeName:r.Title, date:r.CoverDate?(r.CoverDate.split('T')[0]):r.CoverDate,
         coverName:r.CoverName||'', isNCR:r.IsNCR||false,
         assignedBy:r.AssignedBy||'', assignedAt:r.AssignedAt||''
       }));
@@ -8951,7 +8951,8 @@ async function saveCoverageSP(absenteeName, date, coverName) {
     saveCoverage(lsCov); return;
   }
   const existing = _coverageSP.find(r=>r.absenteeName===absenteeName&&r.date===date);
-  const payload = {Title:absenteeName, CoverDate:date, CoverName:coverName, AssignedBy:currentUser?.name||'', AssignedAt:new Date().toISOString()};
+  const spDate = date && date.length===10 ? date+'T00:00:00Z' : date;
+  const payload = {Title:absenteeName, CoverDate:spDate, CoverName:coverName, AssignedBy:currentUser?.name||'', AssignedAt:new Date().toISOString()};
   if (existing) {
     await spPatch(SP_API+`('CoverageAssignments')/items(${existing.id})`, payload);
     Object.assign(existing, {coverName, assignedBy:payload.AssignedBy, assignedAt:payload.AssignedAt});
