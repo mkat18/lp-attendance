@@ -11217,10 +11217,8 @@ function renderEODSummary(el, teamNames, date) {
 
 // ── Patch renderMyTeam to include EOD tab ─────────────────────────────────
 // ── My Team — single consolidated EOD section ─────────────────────────────
-let _myTeamEODPeriod  = 'today';
+let _myTeamEODDate    = '';
 let _myTeamEODPerson  = '';
-let _myTeamEODFromDt  = '';
-let _myTeamEODToDt    = '';
 const _myTeamExpanded = new Set();
 
 const _origRenderMyTeamFinal = window.renderMyTeam;
@@ -11291,27 +11289,14 @@ function renderMyTeamEOD(myTeamNames) {
   if (!el) return;
   const todayStr = new Date().toISOString().split('T')[0];
 
-  // Date range from period
-  let from = todayStr, to = todayStr;
-  if (_myTeamEODPeriod === 'yesterday') {
-    const y=new Date(); y.setDate(y.getDate()-1); from=to=y.toISOString().split('T')[0];
-  } else if (_myTeamEODPeriod === 'week') {
-    const w=new Date(); w.setDate(w.getDate()-w.getDay()+1); from=w.toISOString().split('T')[0];
-  } else if (_myTeamEODPeriod === 'month') {
-    from=todayStr.slice(0,7)+'-01';
-  } else if (_myTeamEODPeriod === '30d') {
-    const d=new Date(); d.setDate(d.getDate()-30); from=d.toISOString().split('T')[0];
-  } else if (_myTeamEODPeriod === '90d') {
-    const d=new Date(); d.setDate(d.getDate()-90); from=d.toISOString().split('T')[0];
-  } else if (_myTeamEODPeriod === 'custom') {
-    from=_myTeamEODFromDt||todayStr; to=_myTeamEODToDt||todayStr;
-  }
+  // Single date — default to today
+  const selectedDate = _myTeamEODDate || todayStr;
+  const from = selectedDate, to = selectedDate;
+  const isToday = selectedDate === todayStr;
 
-  const isToday = _myTeamEODPeriod === 'today';
   const allReports = getEODReports().filter(r=>{
     if(!myTeamNames.includes(r.name)) return false;
-    if(isToday) return r.date===from && (r.status==='submitted'||r.status==='draft');
-    return r.status==='submitted' && r.date>=from && r.date<=to;
+    return r.date===selectedDate && (r.status==='submitted'||r.status==='draft');
   });
   const viewNames = _myTeamEODPerson ? [_myTeamEODPerson] : myTeamNames;
   const reports = allReports.filter(r=>viewNames.includes(r.name));
@@ -11322,7 +11307,7 @@ function renderMyTeamEOD(myTeamNames) {
   const uniqueSubmitters = [...new Set(submittedReports.map(r=>r.name))];
   const uniqueDrafters   = [...new Set(draftReports.map(r=>r.name))].filter(n=>!uniqueSubmitters.includes(n));
   const supportCount = submittedReports.filter(r=>r.supportNeeded==='yes').length;
-  const notSubmitted = isToday ? viewNames.filter(n=>!reports.find(r=>r.name===n&&r.date===todayStr)) : [];
+  const notSubmitted = isToday ? viewNames.filter(n=>!reports.find(r=>r.name===n&&r.date===selectedDate)) : [];
 
   const periodBtns = [
     ['today','Today'],['yesterday','Yesterday'],['week','This week'],
@@ -11396,17 +11381,9 @@ function renderMyTeamEOD(myTeamNames) {
       <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px">📋 EOD Reports</div>
       <button onclick="refreshMyTeamEOD()" style="font-size:11px;padding:3px 10px;border-radius:50px;border:1.5px solid var(--border);background:var(--surface);cursor:pointer;color:var(--text-2)">↺ Refresh</button>
     </div>
-    <div style="display:flex;gap:6px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
-      ${periodBtns}
-    </div>
-    ${_myTeamEODPeriod==='custom'?`<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
-      <input type="date" value="${_myTeamEODFromDt}" onchange="_myTeamEODFromDt=this.value;renderMyTeamEOD(window._myTeamNames)"
-        style="font-size:13px;padding:5px 8px;border:1.5px solid var(--border);border-radius:var(--radius-sm)"/>
-      <span style="font-size:12px;color:var(--text-3)">to</span>
-      <input type="date" value="${_myTeamEODToDt}" onchange="_myTeamEODToDt=this.value;renderMyTeamEOD(window._myTeamNames)"
-        style="font-size:13px;padding:5px 8px;border:1.5px solid var(--border);border-radius:var(--radius-sm)"/>
-    </div>`:''}
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
+      <input type="date" value="${selectedDate}" onchange="_myTeamEODDate=this.value;renderMyTeamEOD(window._myTeamNames)"
+        style="font-size:13px;padding:6px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface-2);color:var(--text);outline:none"/>
       <select onchange="_myTeamEODPerson=this.value;renderMyTeamEOD(window._myTeamNames)"
         style="flex:1;font-size:13px;padding:6px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface-2);color:var(--text);outline:none">
         <option value="">All analysts</option>
