@@ -4856,6 +4856,12 @@ async function submitLeaveRequest() {
   const days = countLeaveDays(startDate, endDate, halfDay);
   if (days <= 0) { showToast('No working days in selected range.','err'); return; }
 
+  // Show confirmation with exact dates before submitting
+  const startFmt = new Date(startDate+'T12:00:00').toLocaleDateString('en-AU',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  const endFmt = startDate===endDate ? '' : ' → '+new Date(endDate+'T12:00:00').toLocaleDateString('en-AU',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  const confirmed = await showLeaveConfirmModal(`Confirm leave request:\n\n${leaveType}\n${startFmt}${endFmt}\n${halfDay?(halfDaySession+' half day'):days+' day'+(days!==1?'s':'')}\n\nReason: ${reason}`);
+  if (!confirmed) return;
+
   // Check balance — show in-app warning instead of confirm() which is blocked on mobile
   const bal = getLeaveBalance(currentUser.name);
   if (leaveType === 'Annual Leave' && days > bal.annualRemaining) {
@@ -4868,6 +4874,26 @@ async function submitLeaveRequest() {
   }
 
   await doSubmitLeave(leaveType, startDate, endDate, halfDay, halfDaySession, reason, brokerName, days);
+}
+
+function showLeaveConfirmModal(msg) {
+  return new Promise(resolve => {
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem';
+    const card = document.createElement('div');
+    card.style.cssText = 'background:var(--surface);border-radius:var(--radius);padding:1.5rem;max-width:360px;width:100%;box-shadow:0 8px 32px rgba(0,0,0,.18)';
+    card.innerHTML = `
+      <div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:12px">Confirm leave request</div>
+      <div style="font-size:13px;color:var(--text-2);white-space:pre-line;background:var(--surface-2);border-radius:var(--radius-sm);padding:12px;margin-bottom:16px">${msg.replace('Confirm leave request:\n\n','')}</div>
+      <div style="display:flex;gap:8px">
+        <button id="leaveCancelBtn" style="flex:1;padding:10px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:var(--surface-2);font-size:14px;font-weight:600;cursor:pointer;color:var(--text-2)">Cancel</button>
+        <button id="leaveConfirmBtn" style="flex:1;padding:10px;border-radius:var(--radius-sm);border:none;background:var(--brand);color:#fff;font-size:14px;font-weight:600;cursor:pointer">Confirm & Submit</button>
+      </div>`;
+    overlay.appendChild(card);
+    document.body.appendChild(overlay);
+    card.querySelector('#leaveConfirmBtn').onclick = () => { document.body.removeChild(overlay); resolve(true); };
+    card.querySelector('#leaveCancelBtn').onclick = () => { document.body.removeChild(overlay); resolve(false); };
+  });
 }
 
 function showLeaveWarningModal(msg, onConfirm) {
