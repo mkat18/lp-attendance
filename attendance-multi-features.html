@@ -7388,7 +7388,7 @@ async function loadFileEntriesFromSP() {
       _fileEntries[data.id || item.Title] = { data, spId: item.Id };
     } catch(e) {}
   }
-  LS.set('ci_files', Object.values(_fileEntries).map(e => e.data));
+  
 }
 
 function getFileEntries() {
@@ -7396,7 +7396,7 @@ function getFileEntries() {
   if (_fileEntries && Object.keys(_fileEntries).length > 0) return Object.values(_fileEntries).map(e => e.data);
   if (_fileEntries === null) return LS.get('ci_files') || []; // not loaded yet
   // SP returned empty — merge with localStorage to recover any unsynced files
-  const lsFiles = LS.get('ci_files') || [];
+  const lsFiles = [];
   if (lsFiles.length > 0) {
     // Sync these to SP so they're not lost next time
     lsFiles.forEach(f => { if (f.id) spSyncFileEntry(f).catch(()=>{}); });
@@ -7414,7 +7414,7 @@ function saveFileEntries(arr) {
   const newCache = {};
   for (const f of arr) { if (f.id) newCache[f.id] = _fileEntries[f.id] || { data: f, spId: null }; newCache[f.id].data = f; }
   _fileEntries = newCache;
-  LS.set('ci_files', arr);
+  
 }
 
 async function spSyncFileEntry(entry) {
@@ -7430,7 +7430,7 @@ async function spDeleteFileEntry(fileId) {
   const spId = _fileEntries[fileId].spId;
   if (spId) await spDeleteJsonItem('FileEntries', spId);
   delete _fileEntries[fileId];
-  LS.set('ci_files', getFileEntries());
+  
 }
 
 // ── EOD Reports ───────────────────────────────────────────────────────────
@@ -7444,13 +7444,12 @@ async function loadEODFromSP() {
       _eodReports[key] = { data, spId: item.Id };
     } catch(e) {}
   }
-  const arr = Object.values(_eodReports).map(e => e.data);
-  LS.set('ci_eod', arr);
 }
+
 
 function getEODReports() {
   if (_eodReports) return Object.values(_eodReports).map(e => e.data);
-  return LS.get('ci_eod') || [];
+  return [];
 }
 
 function saveEODReports(arr) {
@@ -7460,7 +7459,6 @@ function saveEODReports(arr) {
     if (!_eodReports[key]) _eodReports[key] = { data: r, spId: null };
     _eodReports[key].data = r;
   }
-  LS.set('ci_eod', arr);
 }
 
 async function spSyncEOD(report) {
@@ -7482,12 +7480,12 @@ async function loadBrokerFeedbackFromSP() {
       _brokerFeedback[data.id || item.Title] = { data, spId: item.Id };
     } catch(e) {}
   }
-  LS.set('ci_bfeedback', Object.values(_brokerFeedback).map(e => e.data));
+  
 }
 
 function getBrokerFeedback() {
   if (_brokerFeedback) return Object.values(_brokerFeedback).map(e => e.data);
-  return LS.get('ci_bfeedback') || [];
+  return [];
 }
 
 function saveBrokerFeedback_(arr) {
@@ -7495,7 +7493,7 @@ function saveBrokerFeedback_(arr) {
   for (const f of arr) {
     if (f.id) { if (!_brokerFeedback[f.id]) _brokerFeedback[f.id] = { data: f, spId: null }; _brokerFeedback[f.id].data = f; }
   }
-  LS.set('ci_bfeedback', arr);
+  
 }
 
 async function spSyncBrokerFeedback(entry) {
@@ -7511,7 +7509,7 @@ async function spDeleteBrokerFeedback(feedbackId) {
   const spId = _brokerFeedback[feedbackId].spId;
   if (spId) await spDeleteJsonItem('BrokerFeedback', spId);
   delete _brokerFeedback[feedbackId];
-  LS.set('ci_bfeedback', getBrokerFeedback());
+  
 }
 
 // ── Other Tasks ───────────────────────────────────────────────────────────
@@ -7524,12 +7522,12 @@ async function loadOtherTasksFromSP() {
       _otherTasks[data.id || item.Title] = { data, spId: item.Id };
     } catch(e) {}
   }
-  LS.set('ci_othertasks', Object.values(_otherTasks).map(e => e.data));
+  
 }
 
 function getOtherTasks() {
   if (_otherTasks) return Object.values(_otherTasks).map(e => e.data);
-  return LS.get('ci_othertasks') || [];
+  return [];
 }
 
 function saveOtherTasks(arr) {
@@ -7537,7 +7535,7 @@ function saveOtherTasks(arr) {
   for (const t of arr) {
     if (t.id) { if (!_otherTasks[t.id]) _otherTasks[t.id] = { data: t, spId: null }; _otherTasks[t.id].data = t; }
   }
-  LS.set('ci_othertasks', arr);
+  
 }
 
 async function spSyncOtherTask(task) {
@@ -7553,7 +7551,7 @@ async function spDeleteOtherTask(taskId) {
   const spId = _otherTasks[taskId].spId;
   if (spId) await spDeleteJsonItem('OtherTasks', spId);
   delete _otherTasks[taskId];
-  LS.set('ci_othertasks', getOtherTasks());
+  
 }
 
 // ── Team Assignments ──────────────────────────────────────────────────────
@@ -8672,8 +8670,8 @@ function renderAbsencePatternCard() {
 
 // ─── COVERAGE / REPLACEMENT ASSIGNMENT ───────────────────────────────────
 // Coverage data: { date_name: coverName }
-function getCoverage() { return LS.get('ci_coverage') || {}; }
-function saveCoverage(c) { LS.set('ci_coverage', c); }
+function getCoverage() { return _coverageCache || {}; }
+function saveCoverage(c) { _coverageCache = c; }
 
 // ── Broker list ───────────────────────────────────────────────────────────
 let _brokers = [];
@@ -9109,8 +9107,8 @@ function updateFloorUI() {
 }
 
 // ─── FILE LOG ─────────────────────────────────────────────────────────────
-function getFileLogs() { return LS.get('ci_filelogs') || []; }
-function saveFileLogs(l) { LS.set('ci_filelogs', l); }
+function getFileLogs() { return _fileLogs || []; }
+function saveFileLogs(l) { _fileLogs = l; }
 
 function addFileLog() {
   const input = document.getElementById('fileLogInput');
@@ -9160,8 +9158,8 @@ function updateFileLogUI() {
 // ─── OBSERVATION NOTES (Manager / TL) ────────────────────────────────────
 let _obsNotes = null; // in-memory cache
 
-function getObsNotes() { return _obsNotes || LS.get('ci_obsnotes') || []; }
-function saveObsNotes(n) { _obsNotes = n; LS.set('ci_obsnotes', n); }
+function getObsNotes() { return _obsNotes || []; }
+function saveObsNotes(n) { _obsNotes = n; }
 
 async function loadObsNotesFromSP() {
   try {
@@ -9182,7 +9180,7 @@ async function loadObsNotesFromSP() {
         note: item.NoteText || '',
         ts: item.NoteDate ? new Date(item.NoteDate).getTime() : 0
       }));
-      LS.set('ci_obsnotes', _obsNotes);
+      
     }
   } catch(e) { console.warn('ObsNotes SP load failed:', e); }
 }
