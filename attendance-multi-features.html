@@ -4686,13 +4686,7 @@ function leaveYearEnd(leaveYear) {
 }
 
 // ── Probation check ────────────────────────────────────────────────────────
-function isOnProbation(staff) {
-  if (!staff.joinDate) return false;
-  const join = new Date(staff.joinDate + 'T12:00:00');
-  const probEnd = new Date(join);
-  probEnd.setMonth(probEnd.getMonth() + 3);
-  return new Date() < probEnd;
-}
+// isOnProbation(staff) removed — use isOnProbation(name) instead
 
 function probationEndDate(staff) {
   if (!staff.joinDate) return null;
@@ -4705,7 +4699,7 @@ function probationEndDate(staff) {
 // ── Pro-rate leave entitlement ─────────────────────────────────────────────
 function calcEntitlement(staff, leaveYear) {
   if (!staff.joinDate) return { annual: ANNUAL_DAYS, sick: SICK_DAYS };
-  if (isOnProbation(staff)) return { annual: 0, sick: 0 };
+  if (isOnProbation(staff?.name)) return { annual: 0, sick: 0 };
 
   const yearStart = new Date(leaveYearStart(leaveYear) + 'T12:00:00');
   const yearEnd = new Date(leaveYearEnd(leaveYear) + 'T12:00:00');
@@ -5078,7 +5072,7 @@ async function renderLeaveScreen() {
     const staff = getStaff().find(s => s.name === currentUser.name);
     if (staff) await ensureLeaveEntitlement(staff);
     const bal = getLeaveBalance(currentUser.name);
-    const onProb = staff && isOnProbation(staff);
+    const onProb = isOnProbation(staff?.name);
     const probEnd = staff && probationEndDate(staff);
 
     html += `<div class="card">
@@ -5519,7 +5513,7 @@ function filterTeamLeaveBalances() {
   if (nameFilter) teamStaff = teamStaff.filter(s => s.name === nameFilter);
 
   const rows = teamStaff.map(s => {
-    const onProb = isOnProbation(s);
+    const onProb = isOnProbation(s?.name);
     let annualUsed, sickUsed, unpaid, broker, total, annualRem, sickRem;
 
     if (useDateRange) {
