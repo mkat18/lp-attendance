@@ -782,12 +782,12 @@ tr.flagged-row:hover td { background: #FFEAEA; }
       <p>Feedback received from brokers about your team</p>
     </div>
     <button onclick="openBrokerFeedbackModal(null)" class="btn-primary" style="margin-bottom:1rem">+ Log broker feedback</button>
-    <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;align-items:center">
-      <input type="text" id="bfSearch" placeholder="🔍 Search analyst, broker, note…" oninput="renderFeedbackScreen()" style="flex:1;min-width:180px;padding:8px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-size:13px;background:var(--surface-2);color:var(--text);outline:none"/>
+    <div style="display:flex;gap:8px;margin-bottom:8px;align-items:center">
+      <input type="text" id="bfSearch" placeholder="🔍 Search analyst, broker, note…" oninput="renderFeedbackScreen()" style="flex:1;min-width:140px;padding:8px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-size:13px;background:var(--surface-2);color:var(--text);outline:none"/>
       <input type="date" id="bfFrom" onchange="renderFeedbackScreen()" style="padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-size:13px;background:var(--surface-2);color:var(--text);outline:none"/>
-      <span style="font-size:12px;color:var(--text-3)">to</span>
+      <span style="font-size:12px;color:var(--text-3);white-space:nowrap">to</span>
       <input type="date" id="bfTo" onchange="renderFeedbackScreen()" style="padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-size:13px;background:var(--surface-2);color:var(--text);outline:none"/>
-      <button onclick="document.getElementById('bfSearch').value='';document.getElementById('bfFrom').value='';document.getElementById('bfTo').value='';renderFeedbackScreen()" style="padding:8px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-size:12px;background:var(--surface-2);color:var(--text-2);cursor:pointer">Clear</button>
+      <button onclick="document.getElementById('bfSearch').value='';document.getElementById('bfFrom').value='';document.getElementById('bfTo').value='';renderFeedbackScreen()" style="padding:8px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-size:12px;background:var(--surface-2);color:var(--text-2);cursor:pointer;white-space:nowrap">Clear</button>
     </div>
     <div style="display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap">
       <button class="tab active" id="bftab-all" onclick="switchFeedbackTab('all',this)">All</button>
