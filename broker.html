@@ -11312,12 +11312,12 @@ function renderMyTeamEOD(myTeamNames) {
   // Per-member rows
   const memberRows = viewNames.map(name => {
     const memberReports = reports.filter(r=>r.name===name);
-    const todayReport = memberReports.find(r=>r.date===todayStr);
+    const todayReport = memberReports.find(r=>r.date===selectedDate);
     const todaySubmitted = todayReport?.status==='submitted';
     const todayDraft     = todayReport?.status==='draft';
     const isExpanded = _myTeamExpanded.has(name);
     const allRecs = typeof getRecords==='function' ? getRecords() : [];
-    const todayRec = allRecs.find(r=>r.name===name&&r.date===todayStr);
+    const todayRec = allRecs.find(r=>r.name===name&&r.date===selectedDate);
     const checkedIn = todayRec && todayRec.status!=='leave';
     const eodBadge = !todayReport
       ? '<span style="font-size:11px;background:#FEE2E2;color:#991B1B;border-radius:4px;padding:2px 7px;font-weight:600">No EOD</span>'
@@ -11340,7 +11340,7 @@ function renderMyTeamEOD(myTeamNames) {
 
     const fmt = v=>{if(!v)return'—';const[h,m]=v.split(':');const ap=+h<12?'AM':'PM';return(+h%12||12)+':'+m+' '+ap;};
     const taskHTML = memberReports.length ? memberReports.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(r=>{
-      const isT = r.date===todayStr;
+      const isT = r.date===selectedDate;
       const isDraft = r.status==='draft';
       return `<div style="padding:6px 0;border-bottom:0.5px solid var(--border)">
         <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
