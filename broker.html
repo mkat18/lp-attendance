@@ -11309,15 +11309,6 @@ function renderMyTeamEOD(myTeamNames) {
   const supportCount = submittedReports.filter(r=>r.supportNeeded==='yes').length;
   const notSubmitted = isToday ? viewNames.filter(n=>!reports.find(r=>r.name===n&&r.date===selectedDate)) : [];
 
-  const periodBtns = [
-    ['today','Today'],['yesterday','Yesterday'],['week','This week'],
-    ['month','This month'],['30d','Last 30d'],['90d','Last 90d'],['custom','📅 Custom']
-  ].map(([v,l])=>`<button onclick="_myTeamEODPeriod='${v}';renderMyTeamEOD(window._myTeamNames)"
-    style="font-size:12px;padding:5px 10px;border-radius:50px;border:1.5px solid ${_myTeamEODPeriod===v?'var(--brand)':'var(--border)'};background:${_myTeamEODPeriod===v?'var(--brand-light)':'var(--surface)'};color:${_myTeamEODPeriod===v?'var(--brand)':'var(--text-2)'};cursor:pointer;font-weight:${_myTeamEODPeriod===v?'700':'400'};white-space:nowrap">${l}</button>`).join('');
-
-  const personBtns = ['', ...myTeamNames].map(n=>`<button onclick="_myTeamEODPerson='${n.replace(/'/g,"\\'")}';renderMyTeamEOD(window._myTeamNames)"
-    style="font-size:12px;padding:5px 10px;border-radius:50px;border:1.5px solid ${_myTeamEODPerson===n?'var(--brand)':'var(--border)'};background:${_myTeamEODPerson===n?'var(--brand-light)':'var(--surface)'};color:${_myTeamEODPerson===n?'var(--brand)':'var(--text-2)'};cursor:pointer;font-weight:${_myTeamEODPerson===n?'700':'400'};white-space:nowrap">${n?esc(shortName(n)):'All staff'}</button>`).join('');
-
   // Per-member rows
   const memberRows = viewNames.map(name => {
     const memberReports = reports.filter(r=>r.name===name);
