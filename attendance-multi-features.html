@@ -2707,17 +2707,17 @@ function logout() {
   localStorage.removeItem('lp_portal_token');
   currentUser = null;
   stopBreakTimer(false);
-  // Sign out of Microsoft — use popup to avoid redirect loop
   if (msalInstance) {
     const account = msalInstance.getAllAccounts()[0];
     if (account) {
-      msalInstance.logoutPopup({ account })
-        .then(() => { window.location.href = 'index.html'; })
-        .catch(() => { window.location.href = 'index.html'; });
+      msalInstance.logoutRedirect({
+        account,
+        postLogoutRedirectUri: window.location.origin + '/portal.loanprocessor.com.au/logout.html'
+      });
       return;
     }
   }
-  window.location.href = 'index.html';
+  window.location.href = 'logout.html';
 }
 
 // ── Login ─────────────────────────────────────────────────────────────────

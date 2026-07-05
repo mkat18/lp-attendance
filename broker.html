@@ -2245,50 +2245,18 @@ function goTab(name, btn) {
 function logout() {
   sessionStorage.removeItem('lp_session');
   localStorage.removeItem('lp_portal_token');
-  currentUser=null; 
-  stopBreakTimer(false); // preserve ongoing break across logout
-  buildNav(); window.location.href = 'index.html';
-  clearName();
-  document.getElementById('loginGreeting').textContent = getGreeting();
-  // Refresh staff from SharePoint so PIN resets are reflected immediately
-  (async () => {
-    try {
-      const token = await getToken();
-      if (token) {
-        const [staffRes, recRes, brkRes] = await Promise.all([
-          fetch(`${SP_API}('AttendanceStaff')/items?$select=Title,Role,Pin,TempPin,StartTime,EndTime,Office,Team,JoinDate,DOB,Phone,Email,Address,EmergencyContact1Name,EmergencyContact1Phone,EmergencyContact1Relation,EmergencyContact2Name,EmergencyContact2Phone,EmergencyContact2Relation&$top=500`,
-            { headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json;odata=nometadata' } }),
-          fetch(`${SP_API}('AttendanceRecords')/items?$top=5000`,
-            { headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json;odata=nometadata' } }),
-          fetch(`${SP_API}('AttendanceBreaks')/items?$top=5000`,
-            { headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json;odata=nometadata' } }),
-        ]);
-        if (staffRes.ok) {
-          const staffData = await staffRes.json();
-          if (staffData && staffData.value && staffData.value.length > 0) {
-            _staff = staffData.value.map(spToStaff);
-            LS.set('ci_staff', _staff);
-          }
-        }
-        if (recRes.ok) {
-          const recData = await recRes.json();
-          if (recData && recData.value && recData.value.length > 0) {
-            _records = recData.value.map(spToRecord);
-            LS.set('ci_records', _records);
-          }
-        }
-        if (brkRes.ok) {
-          const brkData = await brkRes.json();
-          if (brkData && brkData.value && brkData.value.length > 0) {
-            _breaks = brkData.value.map(spToBreak);
-            LS.set('ci_breaks', _breaks);
-          }
-        }
-      }
-    } catch(e) {
-      console.warn('Post-logout staff refresh failed — using cache:', e);
+  currentUser = null;
+  if (msalInstance) {
+    const account = msalInstance.getAllAccounts()[0];
+    if (account) {
+      msalInstance.logoutRedirect({
+        account,
+        postLogoutRedirectUri: window.location.origin + '/portal.loanprocessor.com.au/logout.html'
+      });
+      return;
     }
-  })();
+  }
+  window.location.href = 'logout.html';
 }
 
 // ── Login ─────────────────────────────────────────────────────────────────
