@@ -2876,6 +2876,15 @@ document.addEventListener('keydown', function(e) {
 async function loginAs(member) {
   currentUser={name:member.name, role:member.role};
   sessionStorage.setItem('lp_session', JSON.stringify({name:member.name, role:member.role}));
+
+  // Clear cached records/breaks from any previous session to prevent wrong-person data showing
+  const prevUser = LS.get('lp_last_logged_in_user');
+  if (prevUser && prevUser !== member.name) {
+    LS.set('ci_records', null);
+    LS.set('ci_breaks', null);
+  }
+  LS.set('lp_last_logged_in_user', member.name);
+
   buildNav();
 
   // Restore last tab the user was on, otherwise go to default
