@@ -2251,7 +2251,7 @@ function logout() {
     if (account) {
       msalInstance.logoutRedirect({
         account,
-        postLogoutRedirectUri: window.location.origin + '/portal.loanprocessor.com.au/logout.html'
+        postLogoutRedirectUri: window.location.origin + '/logout.html'
       });
       return;
     }
