@@ -5876,7 +5876,7 @@ function getFileEntries() {
   const lsFiles = [];
   if (lsFiles.length > 0) {
     // Sync these to SP so they're not lost next time
-    lsFiles.forEach(f => { if (f.id) spSyncFileEntry(f).catch(()=>{}); });
+    lsFiles.forEach(f => { if (f.id) spSyncFileEntry(f).then(ok=>{ if(!ok) console.warn('File sync failed:', f.id); }); });
     _fileEntries = {};
     lsFiles.forEach(f => { if (f.id) _fileEntries[f.id] = { data: f, spId: null }; });
     return lsFiles;
@@ -6603,7 +6603,7 @@ function removeFromTeamByIndex(idx) {
   const name = currentTeam[idx];
   teams[_managingTL] = currentTeam.filter((_, i) => i !== idx);
   saveTeams(teams);
-  spSyncTeams(teams).catch(()=>{});
+  spSyncTeams(teams).then(ok=>{ if(ok===false) showToast('⚠ Team assignment failed to save.','err'); });
   showToast(name.split(' ')[0] + ' removed from team.', 'ok');
   renderManageTeamModal();
 }
@@ -6622,7 +6622,7 @@ function addToTeam() {
   });
   teams[_managingTL].push(name);
   saveTeams(teams);
-  spSyncTeams(teams).catch(()=>{});
+  spSyncTeams(teams).then(ok=>{ if(ok===false) showToast('⚠ Team assignment failed to save.','err'); });
   showToast(name.split(' ')[0] + ' added to team.', 'ok');
   renderManageTeamModal();
 }
@@ -6633,7 +6633,7 @@ function removeFromTeam(name) {
   if (!teams[_managingTL]) return;
   teams[_managingTL] = teams[_managingTL].filter(n => n !== name);
   saveTeams(teams);
-  spSyncTeams(teams).catch(()=>{});
+  spSyncTeams(teams).then(ok=>{ if(ok===false) showToast('⚠ Team assignment failed to save.','err'); });
   showToast(name.split(' ')[0] + ' removed from team.', 'ok');
   renderManageTeamModal();
 }
@@ -7747,7 +7747,7 @@ async function deferChecklist(fileIdx) {
   files[fileIdx].checklistDeferred = true;
   files[fileIdx].checklistSubmitted = false;
   saveFileEntries(files);
-  spSyncFileEntry(files[fileIdx]).catch(()=>{});
+  spSyncFileEntry(files[fileIdx]).then(ok=>{ if(!ok) showToast('⚠ File update failed to sync to SharePoint.','err'); });
   document.getElementById('checklistModal')?.remove();
   showToast('Checklist deferred — reminder will show in your dashboard ✓', 'ok');
   renderMyFilesScreen();
@@ -7783,7 +7783,7 @@ async function submitChecklist(fileIdx) {
   files[fileIdx].checklistSubmitted = true;
   files[fileIdx].checklistDate = today;
   saveFileEntries(files);
-  spSyncFileEntry(files[fileIdx]).catch(()=>{});
+  spSyncFileEntry(files[fileIdx]).then(ok=>{ if(!ok) showToast('⚠ File update failed to sync to SharePoint.','err'); });
   modal.remove();
   showToast('Checklist saved ✓', 'ok');
   renderMyFilesScreen();
@@ -8229,7 +8229,7 @@ function deleteFileEntry(fileId) {
 
 async function confirmDeleteFile(fileId) {
   document.getElementById('deleteFileModal')?.remove();
-  await spDeleteFileEntry(fileId).catch(()=>{});
+  const dok = await spDeleteFileEntry(fileId).catch(()=>false); if(!dok) showToast('⚠ Delete failed to sync.','err');
   const updated = getFileEntries().filter(f => f.id !== fileId);
   saveFileEntries(updated);
   showToast('File deleted ✓', 'ok');
@@ -9126,7 +9126,7 @@ async function confirmCoverFileAssign(absenteeName, assigneeName) {
     if (!f) continue;
     f.coverAssignee = assigneeName;
     f.coverOriginalOwner = absenteeName;
-    await spSyncFileEntry(f).catch(()=>{});
+    const fok = await spSyncFileEntry(f).catch(()=>false); if(!fok) showToast('⚠ File update failed to sync.','err');
     updated++;
   }
   saveFileEntries(files);
@@ -9142,7 +9142,7 @@ async function claimFileBack(fileId) {
   if (!f) return;
   delete f.coverAssignee;
   delete f.coverOriginalOwner;
-  await spSyncFileEntry(f).catch(()=>{});
+  const fok = await spSyncFileEntry(f).catch(()=>false); if(!fok) showToast('⚠ File update failed to sync.','err');
   saveFileEntries(files);
   showToast('File claimed back ✓','ok');
   renderMyFilesScreen();
@@ -9708,7 +9708,7 @@ async function reopenChecklist(fileId) {
   if (idx<0) return;
   files[idx].checklistSubmitted = false;
   saveFileEntries(files);
-  spSyncFileEntry(files[idx]).catch(()=>{});
+  spSyncFileEntry(files[idx]).then(ok=>{ if(!ok) showToast('⚠ File update failed to sync to SharePoint.','err'); });
   showToast('Checklist re-opened — make your corrections and resubmit.','ok');
   renderMyFilesScreen();
   renderFilesScreen();
@@ -9906,7 +9906,7 @@ function quickStatusUpdate(fileId, newStatus) {
   if (newStatus === 'Settlement') { files[idx].active = false; files[idx].settledAt = today; }
 
   saveFileEntries(files);
-  spSyncFileEntry(files[idx]).catch(()=>{});
+  spSyncFileEntry(files[idx]).then(ok=>{ if(!ok) showToast('⚠ File update failed to sync to SharePoint.','err'); });
   showToast('Stage updated to ' + newStatus + ' ✓', 'ok');
 
   // Refresh whichever screen is active
@@ -10449,7 +10449,7 @@ function renderBFTags() {
   el.innerHTML = BF_FEEDBACK_TAGS.map(tag => {
     const sel = _selectedBFTags.has(tag);
     const sc = BF_TAG_COLORS[tag] || {bg:'#F3F4F6',color:'#374151'};
-    return `<button type="button" onclick="toggleBFTag('${tag.replace(/'/g,"\\'")}\")"
+    return `<button type="button" data-tag="${esc(tag)}" onclick="toggleBFTag(this.dataset.tag)"
       style="padding:5px 12px;border-radius:50px;border:1.5px solid ${sel?sc.color:'var(--border)'};
       background:${sel?sc.bg:'var(--surface)'};color:${sel?sc.color:'var(--text-2)'};
       font-size:12px;font-weight:${sel?'700':'400'};cursor:pointer;transition:all .15s">
@@ -10502,7 +10502,7 @@ function saveBrokerFeedback() {
   if (idx >= 0) all[idx] = entry;
   else all.push(entry);
   saveBrokerFeedback_(all);
-  spSyncBrokerFeedback(entry).catch(()=>{});
+  spSyncBrokerFeedback(entry).then(ok=>{ if(!ok) showToast('⚠ Feedback failed to sync to SharePoint — please try saving again.','err'); });
   closeBrokerFeedbackModal();
   showToast('Feedback saved ✓', 'ok');
   renderFeedbackScreen();
@@ -10510,7 +10510,7 @@ function saveBrokerFeedback() {
 
 function deleteBrokerFeedback(feedbackId) {
   if (!confirm('Delete this feedback entry?')) return;
-  spDeleteBrokerFeedback(feedbackId).catch(()=>{});
+  spDeleteBrokerFeedback(feedbackId).then(ok=>{ if(!ok) showToast('⚠ Delete failed to sync.','err'); });
   const all = getBrokerFeedback().filter(f => f.id !== feedbackId);
   saveBrokerFeedback_(all);
   renderFeedbackScreen();
@@ -11104,7 +11104,7 @@ function submitEOD(e) {
   const all = getEODReports().filter(r => !(r.name===currentUser.name && r.date===today));
   all.push(report);
   saveEODReports(all);
-  spSyncEOD(report).catch(()=>{});
+  spSyncEOD(report).then(ok=>{ if(!ok) showToast('⚠ EOD failed to sync to SharePoint — please try submitting again.','err'); });
 
   showToast('✓ EOD report submitted!', 'ok');
   updateEODPromptCard();
