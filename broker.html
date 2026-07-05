@@ -7165,13 +7165,13 @@ let _coverageLoaded = false;
 
 async function loadCoverageFromSP() {
   try {
-    const res = await spGet(SP_API+"('CoverageAssignments')/items?$select=Id,Title,Date,CoverName&$top=500");
+    const res = await spGet(SP_API+"('CoverageAssignments')/items?$select=Id,Title,CoverDate,CoverName,IsNCR,AssignedBy,AssignedAt&$top=500");
     if (res?.value) {
       _coverageSP = res.value.map(r=>({
         id:r.Id, absenteeName:r.Title,
-        date:(r.Date||'').slice(0,10), // trim datetime to date-only
+        date:(r.CoverDate||'').slice(0,10), // trim datetime to date-only
         coverName:r.CoverName||'', isNCR:r.CoverName==='_ncr',
-        assignedBy:'', assignedAt:''
+        assignedBy:r.AssignedBy||'', assignedAt:r.AssignedAt||''
       }));
       _coverageLoaded = true;
       
