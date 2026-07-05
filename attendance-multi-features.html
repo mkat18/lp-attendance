@@ -8945,23 +8945,24 @@ function updateCoverBanner() {
 }
 
 async function saveCoverageSP(absenteeName, date, coverName) {
-  if (coverName === '_ncr') { // No cover required — only localStorage
+  if (coverName === '_ncr') { // No cover required — only in-memory
     const lsCov = getCoverage();
     lsCov[date+'_'+absenteeName] = '_ncr';
-    saveCoverage(lsCov); return;
+    saveCoverage(lsCov); return true;
   }
   const existing = _coverageSP.find(r=>r.absenteeName===absenteeName&&r.date===date);
   const spDate = date && date.length===10 ? date+'T00:00:00Z' : date;
   const assignedAt = new Date().toLocaleString('en-AU', {timeZone:'Asia/Kolkata'});
   const payload = {Title:absenteeName, CoverDate:spDate, CoverName:coverName, AssignedBy:currentUser?.name||'', AssignedAt:assignedAt};
   if (existing) {
-    await spPatch(SP_API+`('CoverageAssignments')/items(${existing.id})`, payload);
-    Object.assign(existing, {coverName, assignedBy:payload.AssignedBy, assignedAt:payload.AssignedAt});
+    const ok = await spPatch(SP_API+`('CoverageAssignments')/items(${existing.id})`, payload);
+    if (ok) Object.assign(existing, {coverName, assignedBy:payload.AssignedBy, assignedAt:payload.AssignedAt});
+    return ok;
   } else {
     const res = await spPost(SP_API+"('CoverageAssignments')/items", payload);
-    if (res) _coverageSP.push({id:res.d?.Id||res.ID, absenteeName, date, coverName, assignedBy:payload.AssignedBy, assignedAt:payload.AssignedAt});
+    if (res) _coverageSP.push({id:res.Id||res.ID||res.d?.Id, absenteeName, date, coverName, assignedBy:payload.AssignedBy, assignedAt:payload.AssignedAt});
+    return !!res;
   }
-  LS.set('ci_coverage_sp', _coverageSP);
 }
 
 function renderCRMSkillChips(container, staffName) {
