@@ -1360,6 +1360,7 @@ function spToStaff(item) {
     ec2Name: item.EmergencyContact2Name||'',
     ec2Phone: item.EmergencyContact2Phone||'',
     ec2Relation: item.EmergencyContact2Relation||'',
+    inactive: item.Inactive === true || item.Inactive === 'true' || item.Inactive === 1,
   };
 }
 
@@ -1413,7 +1414,8 @@ function spToBreak(item) {
 }
 
 // ── Data access functions ─────────────────────────────────────────────────
-function getStaff()   { return _staff && _staff.length > 0 ? _staff : (LS.get('ci_staff') || BUILTIN_STAFF || []); }
+function getAllStaff()  { return _staff && _staff.length > 0 ? _staff : (LS.get('ci_staff') || BUILTIN_STAFF || []); }
+function getStaff()    { return getAllStaff().filter(s => !s.inactive); }
 function getRecords() { return _records || []; }
 function getBreaks()  { return _breaks !== null ? _breaks : []; }
 
