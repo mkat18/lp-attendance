@@ -5043,7 +5043,9 @@ async function autoMarkLeaveAttendance(req, requestId) {
 // ── Render leave screen ────────────────────────────────────────────────────
 function filterMyLeaveHistory() {
   const from = document.getElementById('leaveHistFrom')?.value||'';
-  const to = document.getElementById('leaveHistTo')?.value||today;
+  const d = new Date(); d.setFullYear(d.getFullYear()+1);
+  const futureDate = d.toLocaleDateString('en-CA',{timeZone:'Asia/Kolkata'});
+  const to = document.getElementById('leaveHistTo')?.value||futureDate;
   const el = document.getElementById('myLeaveHistoryTable');
   if (!el) return;
   const reqs = _leaveRequests.filter(r => {
@@ -5180,7 +5182,7 @@ async function renderLeaveScreen() {
           <input type="date" id="leaveHistFrom" value="${defaultFrom}" onchange="filterMyLeaveHistory()" style="font-size:13px;padding:5px 8px;border-radius:var(--radius-sm);border:1.5px solid var(--border)"/>
           <span style="font-size:12px;color:var(--text-3)">to</span>
           <input type="date" id="leaveHistTo" value="${today}" onchange="filterMyLeaveHistory()" style="font-size:13px;padding:5px 8px;border-radius:var(--radius-sm);border:1.5px solid var(--border)"/>
-          <button onclick="document.getElementById('leaveHistFrom').value='2020-01-01';filterMyLeaveHistory()" style="font-size:12px;padding:4px 10px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:transparent;cursor:pointer">All time</button>
+          <button onclick="(function(){const d=new Date();d.setFullYear(d.getFullYear()+1);document.getElementById('leaveHistFrom').value='2020-01-01';document.getElementById('leaveHistTo').value=d.toLocaleDateString('en-CA',{timeZone:'Asia/Kolkata'});filterMyLeaveHistory();})()" style="font-size:12px;padding:4px 10px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:transparent;cursor:pointer">All time</button>
         </div>
         <div id="myLeaveHistoryTable"><div style="font-size:13px;color:var(--text-3)">No leave requests found.</div></div>
       </div>
@@ -5227,9 +5229,8 @@ async function renderLeaveScreen() {
     }
     html += '</div>';
 
-    // All leave requests with filter
-    html += `<div class="card"><div class="section-label">All leave requests</div>
-      <div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
+    // All leave requests with filter — collapsible, collapsed by default
+    const allLeaveInner = `<div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
         <select id="leaveFilterStatus" onchange="filterLeaveRequests()" style="font-size:12px;padding:4px 6px;border-radius:var(--radius-sm);border:1.5px solid var(--border)">
           <option value="">All statuses</option>
           <option value="Pending">Pending</option>
@@ -5265,16 +5266,15 @@ async function renderLeaveScreen() {
         <input type="date" id="leaveFilterTo" onchange="filterLeaveRequests();clearLeavePresetBtns()" style="font-size:12px;padding:4px 7px;border-radius:var(--radius-sm);border:1.5px solid var(--border)"/>
       </div>
       <div id="leaveRequestsList"></div>
-    </div>`;
+    \``;
+    html += collapsibleCard('All leave requests', allLeaveInner, false);
   }
 
   // ── Team leave balances for manager/TL ────────────────────────────────────
   if (canApprove && (isSuperAdmin() || canDo('canSeeTeamLeaveBalances') !== false)) {
     const curYear = getCurrentLeaveYear();
     const prevYear = (() => { const [s,e] = curYear.split('-'); return `${parseInt(s)-1}-${parseInt(e)-1}`; })();
-    html += `<div class="card">
-      <div class="section-label">Team leave balances</div>
-      <div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
+    const teamBalInner = `<div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
         <select id="leaveBalYearSel" onchange="filterTeamLeaveBalances();clearLeaveBalPresetBtns()" style="font-size:12px;padding:4px 6px;border-radius:var(--radius-sm);border:1.5px solid var(--border)">
           <option value="${curYear}">${curYear} (current)</option>
           <option value="${prevYear}">${prevYear}</option>
@@ -5300,7 +5300,8 @@ async function renderLeaveScreen() {
         <input type="date" id="leaveBalTo" onchange="filterTeamLeaveBalances();clearLeaveBalPresetBtns()" style="font-size:12px;padding:4px 7px;border-radius:var(--radius-sm);border:1.5px solid var(--border)"/>
       </div>
       <div id="teamLeaveBalTable"></div>
-    </div>`;
+    \``;
+    html += collapsibleCard('Team leave balances', teamBalInner, false);
   }
 
   el.innerHTML = html;
