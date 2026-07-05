@@ -5081,6 +5081,18 @@ function filterMyLeaveHistory() {
   </tbody></table>`;
 }
 
+function collapsibleCard(title, content, startOpen=false) {
+  const icon = startOpen ? '▴' : '▾';
+  const display = startOpen ? 'block' : 'none';
+  return `<div class="card" style="margin-bottom:1rem">
+    <div onclick="var b=this.nextElementSibling;b.style.display=b.style.display==='none'?'block':'none';this.querySelector('span').textContent=b.style.display==='none'?'▾':'▴'" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer">
+      <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px">${title}</div>
+      <span style="font-size:13px;color:var(--text-3)">${icon}</span>
+    </div>
+    <div style="display:${display};margin-top:10px">${content}</div>
+  </div>`;
+}
+
 async function renderLeaveScreen() {
   const el = document.getElementById('leaveScreenContent');
   if (!el) return;
@@ -9179,6 +9191,8 @@ function updateFileLogUI() {
 }
 
 // ─── OBSERVATION NOTES (Manager / TL) ────────────────────────────────────
+let _coverageCache = null;
+let _fileLogs = null;
 let _obsNotes = null; // in-memory cache
 
 function getObsNotes() { return _obsNotes || []; }
