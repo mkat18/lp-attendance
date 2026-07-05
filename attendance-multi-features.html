@@ -8952,7 +8952,8 @@ async function saveCoverageSP(absenteeName, date, coverName) {
   }
   const existing = _coverageSP.find(r=>r.absenteeName===absenteeName&&r.date===date);
   const spDate = date && date.length===10 ? date+'T00:00:00Z' : date;
-  const payload = {Title:absenteeName, CoverDate:spDate, CoverName:coverName, AssignedBy:currentUser?.name||'', AssignedAt:new Date().toISOString()};
+  const assignedAt = new Date().toLocaleString('en-AU', {timeZone:'Asia/Kolkata'});
+  const payload = {Title:absenteeName, CoverDate:spDate, CoverName:coverName, AssignedBy:currentUser?.name||'', AssignedAt:assignedAt};
   if (existing) {
     await spPatch(SP_API+`('CoverageAssignments')/items(${existing.id})`, payload);
     Object.assign(existing, {coverName, assignedBy:payload.AssignedBy, assignedAt:payload.AssignedAt});
