@@ -4636,8 +4636,8 @@ function renderOfficeManager() {
 function loadDashboard() {
   // Refresh live data from SP before rendering
   Promise.all([
-    spGet(SP_API + "('AttendanceRecords')/items?$top=5000").then(r => { if (r&&r.value) { _records=r.value.map(spToRecord); } }),
-    spGet(SP_API + "('AttendanceBreaks')/items?$top=5000").then(r => { if (r&&r.value) { _breaks=r.value.map(spToBreak); } }),
+    spGetAll(SP_API + "('AttendanceRecords')/items?$orderby=Id desc").then(r => { if (r&&r.value) { _records=r.value.map(spToRecord); } }),
+    spGetAll(SP_API + "('AttendanceBreaks')/items?$orderby=Id desc").then(r => { if (r&&r.value) { _breaks=r.value.map(spToBreak); } }),
   ]).catch(()=>{}).finally(() => {
     renderMetrics(); loadTabs(); renderNeedsAttention(); renderWeeklyWidgets();
   });
@@ -5771,6 +5771,21 @@ async function spGet(url) {
   return await r.json();
 }
 
+async function spGetAll(url) {
+  const token = await getToken();
+  let allItems = [];
+  let nextUrl = url;
+  while (nextUrl) {
+    const r = await fetch(nextUrl, { headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json;odata=nometadata' } });
+    if (!r.ok) break;
+    const data = await r.json();
+    if (data?.value) allItems = allItems.concat(data.value);
+    nextUrl = data?.['odata.nextLink'] || null;
+    if (allItems.length > 50000) break;
+  }
+  return { value: allItems };
+}
+
 async function spPostDirect(url, body) {
   const token = await getToken();
   const r = await fetch(url, {
@@ -6091,8 +6106,8 @@ async function loadFromSharePoint() {
     const load = async () => {
       const [staffRes, recRes, brkRes] = await Promise.all([
         spGet(SP_API + "('AttendanceStaff')/items?$top=500"),
-        spGet(SP_API + "('AttendanceRecords')/items?$top=5000"),
-        spGet(SP_API + "('AttendanceBreaks')/items?$top=5000"),
+        spGetAll(SP_API + "('AttendanceRecords')/items?$orderby=Id desc"),
+        spGetAll(SP_API + "('AttendanceBreaks')/items?$orderby=Id desc"),
       ]);
       if (staffRes?.value?.length) { _staff = staffRes.value.map(spToStaff); LS.set('ci_staff', _staff); }
       if (recRes?.value?.length)   { _records = recRes.value.map(spToRecord); }

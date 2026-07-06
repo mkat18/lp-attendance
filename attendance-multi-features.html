@@ -6002,8 +6002,8 @@ function loadDashboard() {
   populateFilterNameDropdown();
   // Refresh live data from SP before rendering
   Promise.all([
-    spGet(SP_API + "('AttendanceRecords')/items?$top=5000").then(r => { if (r&&r.value) { _records=r.value.map(spToRecord); } }),
-    spGet(SP_API + "('AttendanceBreaks')/items?$top=5000").then(r => { if (r&&r.value) { _breaks=r.value.map(spToBreak); } }),
+    spGetAll(SP_API + "('AttendanceRecords')/items?$orderby=Id desc").then(r => { if (r&&r.value) { _records=r.value.map(spToRecord); } }),
+    spGetAll(SP_API + "('AttendanceBreaks')/items?$orderby=Id desc").then(r => { if (r&&r.value) { _breaks=r.value.map(spToBreak); } }),
     loadCoverageFromSP(),
     loadBrokerAssignments(),
     loadPermissions(),
@@ -7331,6 +7331,22 @@ async function spGet(url) {
   return await r.json();
 }
 
+async function spGetAll(url) {
+  // Paginates through all SP pages — use for large lists like AttendanceRecords
+  const token = await getToken();
+  let allItems = [];
+  let nextUrl = url;
+  while (nextUrl) {
+    const r = await fetch(nextUrl, { headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json;odata=nometadata' } });
+    if (!r.ok) break;
+    const data = await r.json();
+    if (data?.value) allItems = allItems.concat(data.value);
+    nextUrl = data?.['odata.nextLink'] || null;
+    if (allItems.length > 50000) break; // safety cap
+  }
+  return { value: allItems };
+}
+
 let _sessionExpiredShown = false;
 function showSessionExpiredOnce() {
   if (_sessionExpiredShown) return;
@@ -7669,8 +7685,8 @@ async function loadFromSharePoint() {
   try {
     const [staffRes, recRes, brkRes] = await Promise.all([
       spGet(SP_API + "('AttendanceStaff')/items?$top=500"),
-      spGet(SP_API + "('AttendanceRecords')/items?$top=5000"),
-      spGet(SP_API + "('AttendanceBreaks')/items?$top=5000"),
+      spGetAll(SP_API + "('AttendanceRecords')/items?$orderby=Id desc"),
+      spGetAll(SP_API + "('AttendanceBreaks')/items?$orderby=Id desc"),
     ]);
     if (staffRes && staffRes.value && staffRes.value.length > 0) {
       _staff = staffRes.value.map(spToStaff);
