@@ -11693,7 +11693,7 @@ function renderPerformanceScreen() {
 
   const chartsRow=`<div style="display:flex;gap:10px;margin-bottom:16px">
     <div style="flex:1;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:12px;min-width:0">
-      <div style="font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Time distribution</div>
+      <div style="font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Avg time per working day</div>
       <div style="display:flex;gap:12px;align-items:center">
         <div style="flex:1;min-height:180px;position:relative">
           <canvas id="perf-pie"></canvas>
@@ -11732,7 +11732,7 @@ function renderPerformanceScreen() {
   const viewContainer=`<div id="perf-view-container"></div>`;
   el.innerHTML=summaryRow+alertBar+viewToggle+viewContainer+chartsRow;
   el._metrics=m; el._names=names;
-  setTimeout(()=>{ perfDrawPie(m.dist); perfDrawTrend(m.trend); perfRenderView(names,from,to,m); },50);
+  setTimeout(()=>{ perfDrawPie(m.dist, m.wdays); perfDrawTrend(m.trend); perfRenderView(names,from,to,m); },50);
 }
 
 
@@ -11894,23 +11894,25 @@ function perfDetailHTML(names,from,to) {
 }
 
 
-function perfDrawPie(dist) {
+function perfDrawPie(dist, wdays) {
   const canvas=document.getElementById('perf-pie');
   if(!canvas) return;
   if(_perfCharts.pie) try{_perfCharts.pie.destroy();}catch(e){}
   const data=dist.filter(d=>d.mins>0);
-  const total=data.reduce((s,d)=>s+d.mins,0);
+  const wd = wdays || 1;
+  // Use average per working day instead of total
+  const avgData = data.map(d=>({...d, avgMins: Math.round((d.mins/wd)*10)/10}));
   _perfCharts.pie=new Chart(canvas,{
     type:'doughnut',
     data:{
-      labels:data.map(d=>d.label),
-      datasets:[{data:data.map(d=>Math.round(d.mins)),backgroundColor:TASK_COLORS.slice(0,data.length),borderWidth:2,borderColor:'var(--surface)'}]
+      labels:avgData.map(d=>d.label),
+      datasets:[{data:avgData.map(d=>d.avgMins),backgroundColor:TASK_COLORS.slice(0,avgData.length),borderWidth:2,borderColor:'var(--surface)'}]
     },
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>' '+ctx.label+': '+perfFmtMins(ctx.raw)}}},cutout:'65%',animation:{duration:400}}
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>' '+ctx.label+': '+perfFmtMins(ctx.raw)+'/day'}}},cutout:'65%',animation:{duration:400}}
   });
-  // Build compact legend with duration instead of percentage
+  // Legend showing avg per day
   const leg=document.getElementById('perf-pie-legend');
-  if(leg) leg.innerHTML=data.map((d,i)=>`<div style="display:flex;align-items:center;gap:5px;margin-bottom:3px"><span style="width:9px;height:9px;border-radius:2px;background:${TASK_COLORS[i]};flex-shrink:0;display:inline-block"></span><span style="font-size:11px;color:var(--text-2)">${d.label}</span><span style="font-size:11px;color:var(--text-3);margin-left:auto">${perfFmtMins(d.mins)}</span></div>`).join('');
+  if(leg) leg.innerHTML=avgData.map((d,i)=>`<div style="display:flex;align-items:center;gap:5px;margin-bottom:3px"><span style="width:9px;height:9px;border-radius:2px;background:${TASK_COLORS[i]};flex-shrink:0;display:inline-block"></span><span style="font-size:11px;color:var(--text-2)">${d.label}</span><span style="font-size:11px;color:var(--text-3);margin-left:auto">${perfFmtMins(d.avgMins)}/day</span></div>`).join('');
 }
 
 function perfDrawTrend(trend) {
