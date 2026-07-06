@@ -1150,13 +1150,17 @@ const EOD_TASK_TYPES = {
   'Professional Development':[]
 };
 const EOD_BENCHMARKS = {
-  'CRM App':   {'Single':120,'Multiple':240},
-  'AOL App':   {'Single':30,'Complex':60},
-  'Valuation': {'Single':10,'Multiple':20},
-  'Pricing':   {'Simple':10,'Complex':20},
-  'Servicing': {'Simple':20,'Complex':40},
-  'Calls':     {'Broker':60,'Customer':30,'Lender':60,'Others':20},
-  'Emails':    {'Broker':30,'Customer':60,'Lender':30,'Others':20},
+  'CRM App':             {'Single':120,'Multiple':240},
+  'AOL App':             {'Single':30,'Complex':60},
+  'Valuation':           {'Single':10,'Multiple':20},
+  'Pricing':             {'Simple':10,'Complex':20},
+  'Servicing':           {'Simple':20,'Complex':40},
+  'Calls':               {'Broker':60,'Customer':30,'Lender':60,'Others':20},
+  'Emails':              {'Broker':30,'Customer':60,'Lender':30,'Others':20},
+  'Notes Preparation':   {'':20},
+  'Form Filling':        {'':20},
+  'Workshop Scenario':   {'':20},
+  'Other tasks':         {'':20},
 };
 // ════════════════════════════════════════════════════════════════════════════
 // CONFIG — edit this block to customise the app without touching anything else
@@ -11902,11 +11906,11 @@ function perfDrawPie(dist) {
       labels:data.map(d=>d.label),
       datasets:[{data:data.map(d=>Math.round(d.mins)),backgroundColor:TASK_COLORS.slice(0,data.length),borderWidth:2,borderColor:'var(--surface)'}]
     },
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>' '+ctx.label+': '+perfFmtMins(ctx.raw)+' ('+Math.round(ctx.raw/total*100)+'%)'}}},cutout:'65%',animation:{duration:400}}
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>' '+ctx.label+': '+perfFmtMins(ctx.raw)}}},cutout:'65%',animation:{duration:400}}
   });
-  // Build compact legend
+  // Build compact legend with duration instead of percentage
   const leg=document.getElementById('perf-pie-legend');
-  if(leg) leg.innerHTML=data.map((d,i)=>`<div style="display:flex;align-items:center;gap:5px;margin-bottom:3px"><span style="width:9px;height:9px;border-radius:2px;background:${TASK_COLORS[i]};flex-shrink:0;display:inline-block"></span><span style="font-size:11px;color:var(--text-2)">${d.label}</span><span style="font-size:11px;color:var(--text-3);margin-left:auto">${Math.round(d.mins/total*100)}%</span></div>`).join('');
+  if(leg) leg.innerHTML=data.map((d,i)=>`<div style="display:flex;align-items:center;gap:5px;margin-bottom:3px"><span style="width:9px;height:9px;border-radius:2px;background:${TASK_COLORS[i]};flex-shrink:0;display:inline-block"></span><span style="font-size:11px;color:var(--text-2)">${d.label}</span><span style="font-size:11px;color:var(--text-3);margin-left:auto">${perfFmtMins(d.mins)}</span></div>`).join('');
 }
 
 function perfDrawTrend(trend) {
