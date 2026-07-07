@@ -1831,6 +1831,23 @@ function fmtDate(d) {
 const today = new Date().toLocaleDateString('en-CA', {timeZone:'Asia/Kolkata'}); // YYYY-MM-DD in AU time
 let currentUser = null;
 let selectedStatus = null;
+// ── Version check — forces update if outdated ─────────────────────────────
+const APP_VERSION = 5;
+(async function checkVersion() {
+  try {
+    const res = await fetch('version.json?t=' + Date.now());
+    const data = await res.json();
+    if (data.version && data.version > APP_VERSION) {
+      // Force hard reload bypassing service worker cache
+      if ('serviceWorker' in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(regs.map(r => r.unregister()));
+      }
+      window.location.reload(true);
+    }
+  } catch(e) {} // silent — don't break app if version check fails
+})();
+
 let dashData = []; let tabData = []; let chartInst = null;
 let breakOngoing=false; let breakStart=null; let breakInterval=null;
 

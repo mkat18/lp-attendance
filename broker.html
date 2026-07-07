@@ -1316,6 +1316,22 @@ const FLOW = {
 };
 
 // ── In-memory cache (loaded once on startup) ──────────────────────────────
+// ── Version check — forces update if outdated ─────────────────────────────
+const APP_VERSION = 5;
+(async function checkVersion() {
+  try {
+    const res = await fetch('version.json?t=' + Date.now());
+    const data = await res.json();
+    if (data.version && data.version > APP_VERSION) {
+      if ('serviceWorker' in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(regs.map(r => r.unregister()));
+      }
+      window.location.reload(true);
+    }
+  } catch(e) {}
+})();
+
 let _staff = null;
 let _records = null;
 let _breaks = null;
