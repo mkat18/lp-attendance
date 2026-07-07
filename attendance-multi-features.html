@@ -12809,7 +12809,27 @@ window.renderMyTeam = async function() {
   renderPerformancePulse(myteamEl, myTeamNames);
 };
 
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').then(reg => {
+      // Check for updates every 60 seconds
+      setInterval(() => reg.update(), 60000);
+      // When a new service worker is waiting, reload automatically
+      reg.addEventListener('updatefound', () => {
+        const newWorker = reg.installing;
+        newWorker.addEventListener('statechange', () => {
+          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+            // New version available — reload to activate
+            showToast('🔄 Updating to latest version…', 'ok');
+            setTimeout(() => window.location.reload(), 1500);
+          }
+        });
+      });
+    });
+    // If controller changes (new SW took over), reload
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      window.location.reload();
+    });
+  }
 </script>
 </body>
 </html>
