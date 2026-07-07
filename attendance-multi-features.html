@@ -7223,14 +7223,21 @@ async function onMsLogin(account) {
   await loadFromSharePoint().catch(()=>{});
   // Note: email is managed manually in SP, not auto-saved on login
 
-  // 1. Try session restore
+  // 1. Try session restore — but verify email still matches MS account
   const saved = sessionStorage.getItem('lp_session');
   if (saved) {
     try {
       const sess = JSON.parse(saved);
       if (sess && sess.name) {
         const member = getStaff().find(s => s.name === sess.name);
-        if (member) { await loginAs(member); return; }
+        const msEmail = account?.username?.toLowerCase();
+        // Only restore if email matches — prevents stale wrong-person sessions
+        if (member && msEmail && member.email && member.email.toLowerCase() === msEmail) {
+          await loginAs(member); return;
+        } else {
+          // Clear stale/mismatched session
+          sessionStorage.removeItem('lp_session');
+        }
       }
     } catch(e) {}
   }
@@ -7895,7 +7902,7 @@ async function spSaveStaffMember(s) {
     Team: String(s.team||''),
     JoinDate: String(s.joinDate||''),
     Phone: String(s.phone||''),
-    Email: String(s.email||''),
+    // Email managed manually in SP — never overwritten by app
     DOB: String(s.dob||''),
     EmergencyContact1Name: String(s.ec1Name||''),
     EmergencyContact1Phone: String(s.ec1Phone||''),

@@ -5671,7 +5671,13 @@ async function onMsLogin(account) {
       const sess = JSON.parse(saved);
       if (sess && sess.name) {
         const member = getStaff().find(s => s.name === sess.name);
-        if (member) { await loginAs(member); return; }
+        const msEmail = msalAccount?.username?.toLowerCase();
+        // Only restore if email matches — prevents stale wrong-person sessions
+        if (member && msEmail && member.email && member.email.toLowerCase() === msEmail) {
+          await loginAs(member); return;
+        } else if (!fromPortal) {
+          sessionStorage.removeItem('lp_session');
+        }
       }
     } catch(e) {}
   }
@@ -6309,7 +6315,7 @@ async function spSaveStaffMember(s) {
     JoinDate: String(s.joinDate||''),
     DOB: String(s.dob||''),
     Phone: String(s.phone||''),
-    Email: String(s.email||''),
+    // Email managed manually in SP — never overwritten by app
     EmergencyContact1Name: String(s.ec1Name||''),
     EmergencyContact1Phone: String(s.ec1Phone||''),
     EmergencyContact1Relation: String(s.ec1Relation||''),
