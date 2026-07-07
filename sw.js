@@ -1,10 +1,8 @@
-const CACHE = 'lp-v4';
+const CACHE = 'lp-v5';
 const ASSETS = ['index.html', 'attendance-multi-features.html', 'broker.html', 'logout.html'];
 
 self.addEventListener('install', e => {
-  e.waitUntil(
-    caches.open(CACHE).then(c => c.addAll(ASSETS))
-  );
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
   self.skipWaiting();
 });
 
