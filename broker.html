@@ -6818,7 +6818,7 @@ function renderMyTeam() {
         <div style="width:38px;height:38px;border-radius:50%;background:${m.statusBg};color:${m.statusColor};font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">${esc(initials(m.name))}</div>
         <div style="min-width:0">
           <div style="font-size:14px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(m.name)}</div>
-          <div style="font-size:11px;color:var(--text-3)">${m.schedule}${m.clockInStr?' · in '+m.clockInStr:''}</div>
+          <div style="font-size:11px;color:var(--text-3)">${m.schedule}${m.clockInStr?' · in '+m.clockInStr:''}${m.rec&&m.rec.clockOut?' · out '+fmtTime(m.rec.clockOut):''}</div>
         </div>
       </div>
       <div style="background:${m.statusBg};color:${m.statusColor};border-radius:50px;padding:4px 10px;font-size:12px;font-weight:600;white-space:nowrap;flex-shrink:0">${m.statusIcon} ${m.statusLabel}</div>
