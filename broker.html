@@ -6688,12 +6688,19 @@ function removeFromTeam(name) {
 // ── My Team screen (shown to Team Lead after check-in) ───────────────────
 function renderMyTeam() {
   const el = document.getElementById('myteamContent');
-  const date = today;
+  const date = _myTeamDate || today;
   const tlName = currentUser.name;
   const teamNames = getTeamForTL(tlName);
 
-  document.getElementById('myteamSubtitle').textContent =
-    new Date().toLocaleDateString('en-AU', {weekday:'long', day:'numeric', month:'long'});
+  // Date picker in subtitle
+  const subtitleEl = document.getElementById('myteamSubtitle');
+  if (subtitleEl) subtitleEl.innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <input type="date" value="${date}" max="${today}" onchange="_myTeamDate=this.value;renderMyTeam()"
+        style="font-size:13px;padding:5px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface-2);color:var(--text);outline:none"/>
+      ${date !== today ? `<button onclick="_myTeamDate='';renderMyTeam()" style="font-size:12px;padding:4px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface-2);color:var(--text-2);cursor:pointer">Today</button>` : ''}
+      <span style="font-size:13px;color:var(--text-3)">${new Date(date+'T12:00:00').toLocaleDateString('en-AU',{weekday:'long',day:'numeric',month:'long'})}</span>
+    </div>`;
 
   if (teamNames.length === 0) {
     el.innerHTML = `<div class="card" style="text-align:center;padding:2rem">
@@ -8227,8 +8234,8 @@ async function saveFileEntry() {
   showToast('File saved ✓', 'ok');
   updateFileLogUI();
 
-  // Show checklist if new status is Ready to Submit and no checklist yet
-  if (newStatus === 'Ready to Submit' && !entry.checklistSubmitted) {
+  // Show checklist if new status is Ready to Submit and checklist has never been submitted
+  if (newStatus === 'Ready to Submit' && !entry.checklistSubmitted && !entry.checklistDeferred) {
     const savedFiles = getFileEntries();
     const savedIdx = savedFiles.findIndex(f => f.id === entry.id);
     if (savedIdx >= 0) setTimeout(() => showChecklistModal(savedIdx), 400);
@@ -11246,6 +11253,7 @@ function renderEODSummary(el, teamNames, date) {
 
 // ── Patch renderMyTeam to include EOD tab ─────────────────────────────────
 // ── My Team — single consolidated EOD section ─────────────────────────────
+let _myTeamDate       = ''; // empty = today
 let _myTeamEODDate    = '';
 let _myTeamEODPerson  = '';
 const _myTeamExpanded = new Set();
