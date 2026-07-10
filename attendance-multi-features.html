@@ -4929,7 +4929,7 @@ async function submitLeaveRequest() {
   const halfDay = document.getElementById('leaveHalfDay').checked;
   const halfDaySession = document.getElementById('leaveHalfDaySession').value;
   const reason = document.getElementById('leaveReason2').value.trim();
-  const brokerName = document.getElementById('ciLeaveBrokerName')?.value.trim()||'';
+  const brokerName = document.getElementById('leaveBrokerName')?.value.trim()||'';
 
   if (!leaveType) { showToast('Select a leave type.','err'); return; }
   if (!startDate) { showToast('Select a start date.','err'); return; }
