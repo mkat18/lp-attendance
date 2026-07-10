@@ -1689,6 +1689,7 @@ function spToStaff(item) {
     address: item.Address||'',
     flexibleSchedule: item.FlexibleSchedule === 'true' || item.FlexibleSchedule === true,
     worksSaturday: item.WorksSaturday === 'true' || item.WorksSaturday === true,
+    nightShift: item.NightShift === 'true' || item.NightShift === true,
     ec1Name: item.EmergencyContact1Name||'',
     ec1Phone: item.EmergencyContact1Phone||'',
     ec1Relation: item.EmergencyContact1Relation||'',
@@ -2055,6 +2056,23 @@ async function toggleFlexibleSchedule(name) {
   }
   saveStaff(staff);
   showToast(name.split(' ')[0] + (newVal ? ' set to flexible schedule ✓' : ' set to fixed schedule ✓'), 'ok');
+  renderAdmin();
+}
+
+async function toggleNightShift(name) {
+  const staff = getAllStaff();
+  const idx = staff.findIndex(s => s.name === name);
+  if (idx < 0) return;
+  const newVal = !staff[idx].nightShift;
+  staff[idx].nightShift = newVal;
+  const res = await spSaveStaffMember(staff[idx]);
+  if (!res) {
+    staff[idx].nightShift = !newVal;
+    showToast('Failed to save — please try again.', 'err');
+    renderAdmin(); return;
+  }
+  saveStaff(staff);
+  showToast(name.split(' ')[0] + (newVal ? ' set to night shift ✓' : ' removed from night shift ✓'), 'ok');
   renderAdmin();
 }
 
@@ -2968,6 +2986,30 @@ function initCheckin() {
     banner.style.display = 'none';
   }
   const existing = getRecords().find(r=>r.date===today&&r.name===currentUser.name);
+
+  // Night shift: if no record today, check for open shift from yesterday
+  if (!existing && currentUser.nightShift) {
+    const yest2 = new Date(d); yest2.setDate(d.getDate()-1);
+    const yest2Str = yest2.toLocaleDateString('en-CA',{timeZone:'Asia/Kolkata'});
+    const openShift = getRecords().find(r=>r.name===currentUser.name&&r.date===yest2Str&&r.clockIn&&!r.clockOut);
+    if (openShift) {
+      // Normal night shift continuation — show clock-out for yesterday's shift
+      window._nightShiftRecord = openShift;
+      const btn=document.querySelector(`.status-btn[data-val="${openShift.status}"]`);
+      if (btn) btn.classList.add('active');
+      selectedStatus=openShift.status;
+      lockCheckin();
+      document.getElementById('breakCard').style.display='block';
+      updateClockOutUI();
+      return;
+    }
+    // Check for stale open record (2+ days old) — alert SA, let Aniket check in normally
+    const stale = getRecords().find(r=>r.name===currentUser.name&&r.date<yest2Str&&r.clockIn&&!r.clockOut);
+    if (stale) {
+      showToast(`⚠ You have an unclosed shift from ${fmtDate(stale.date)} — your manager has been notified.`,'err');
+      writeAuditLog('Unclosed Night Shift', currentUser.name, `Open shift from ${stale.date} was not closed`);
+    }
+  }
   if (existing) {
     const btn=document.querySelector(`.status-btn[data-val="${existing.status}"]`);
     if (btn) btn.classList.add('active');
@@ -3318,8 +3360,13 @@ function clockOut() {
 async function completeClockOut(photoDataUrl) {
   _pendingClockOut = false;
   const recs=getRecords();
-  const idx=recs.findIndex(r=>r.date===today&&r.name===currentUser.name);
+  // Night shift: use open shift record from yesterday if applicable
+  const activeRec = window._nightShiftRecord || null;
+  const idx = activeRec
+    ? recs.findIndex(r=>r.id===activeRec.id)
+    : recs.findIndex(r=>r.date===today&&r.name===currentUser.name);
   if (idx<0) return;
+  window._nightShiftRecord = null;
   showToast('Getting your location…','ok');
   captureGeoAndSubmit(async function(geo) {
     recs[idx].clockOut=Date.now();
@@ -5553,7 +5600,7 @@ async function submitUndoLeave() {
   }
   const btn = document.getElementById('undoLeaveSubmitBtn');
   if (btn) { btn.disabled = true; btn.textContent = 'Reverting…'; }
-  const ok = await spPatch(`LeaveRequests(${_undoLeaveId})`, {
+  const ok = await spPatch(SP_API + `('LeaveRequests')/items(${_undoLeaveId})`, {
     Status: 'Pending', ApprovedBy: '', ApprovalNote: reason
   });
   closeUndoLeaveModal();
@@ -6702,6 +6749,7 @@ function renderAllStaffCards(staff) {
             ${canEditScheduleThis?`<button class="btn-sm" onclick="editScheduleByName('${sname}')">Schedule & Office</button>`:''}
             ${sa?`<button class="btn-sm" onclick="toggleFlexibleSchedule('${sname}')" style="background:${s.flexibleSchedule?'var(--brand-light)':'var(--surface-2)'};color:${s.flexibleSchedule?'var(--brand)':'var(--text-2)'};border-color:${s.flexibleSchedule?'var(--brand)':'var(--border)'}">⚡ ${s.flexibleSchedule?'Flex ON':'Flex OFF'}</button>`:''}
             ${sa?`<button class="btn-sm" onclick="toggleWorksSaturday('${sname}')" style="background:${s.worksSaturday?'var(--brand-light)':'var(--surface-2)'};color:${s.worksSaturday?'var(--brand)':'var(--text-2)'};border-color:${s.worksSaturday?'var(--brand)':'var(--border)'}">📅 ${s.worksSaturday?'Sat ON':'Sat OFF'}</button>`:''}
+            ${sa?`<button class="btn-sm" onclick="toggleNightShift('${sname}')" style="background:${s.nightShift?'#1E1B4B':'var(--surface-2)'};color:${s.nightShift?'#A5B4FC':'var(--text-2)'};border-color:${s.nightShift?'#4F46E5':'var(--border)'}">🌙 ${s.nightShift?'Night ON':'Night OFF'}</button>`:''}
             ${sa?`<button class="btn-sm" onclick="toggleStaffInactive('${sname}')" style="background:#FEF2F2;color:#DC2626;border-color:#FECACA">🔴 Mark Inactive</button>`:''}            ${canDeleteThis?`<button class="btn-sm btn-danger" onclick="removePersonByName('${sname}')">Remove</button>`:''}
             ${canDeleteThis?`<button class="btn-sm btn-danger" onclick="removePersonByName('${sname}')">Remove</button>`:''}
             ${(sa||mgr)?`<button class="btn-sm" id="detbtn-${s.name}" onclick="toggleStaffDetails(\'${sname}\')" style="background:var(--brand-light);color:var(--brand);border-color:var(--brand)">👤 Details</button>`:''}
@@ -7570,12 +7618,14 @@ function saveEODReports(arr) {
 }
 
 async function spSyncEOD(report) {
-  if (!report) return;
+  if (!report) return false;
   _eodReports = _eodReports || {};
   const key = (report.name||'') + '_' + (report.date||'');
   const existing = _eodReports[key];
   const spId = await spSaveJsonItem('EODReports', key, report, existing ? existing.spId : null);
+  if (!spId) return false;
   _eodReports[key] = { data: report, spId };
+  return true;
 }
 
 // ── Broker Feedback ───────────────────────────────────────────────────────
@@ -7930,6 +7980,7 @@ async function spSaveStaffMember(s) {
     PersonalEmail: String(s.personalEmail||''),
     FlexibleSchedule: !!s.flexibleSchedule,
     WorksSaturday: !!s.worksSaturday,
+    NightShift: !!s.nightShift,
     Inactive: !!s.inactive,
   };
   // Address is Multiple lines of text — add separately only if set
@@ -12726,7 +12777,7 @@ function buildEODReport(status) {
   };
 }
 
-function submitEOD(e) {
+async function submitEOD(e) {
   e.preventDefault();
   const errEl = document.getElementById('eodSubmitErr');
   const om = isOpsManager();
@@ -12751,7 +12802,11 @@ function submitEOD(e) {
   const all = getEODReports().filter(r => !(r.name===currentUser.name && r.date===today));
   all.push(report);
   saveEODReports(all);
-  spSyncEOD(report).catch(()=>{});
+  const saved = await spSyncEOD(report);
+  if (!saved) {
+    showToast('⚠ EOD failed to sync to SharePoint — please try submitting again.', 'err');
+    return;
+  }
 
   _eodTasks = [];
   window._eodTasksLoaded = false;
