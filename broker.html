@@ -6701,7 +6701,7 @@ function renderDayPlanBadge(rec) {
   if (rec.dayPlan && rec.dayPlan.trim()) {
     return '<div style="font-size:11px;color:var(--text-2);margin-top:3px;background:var(--surface-2);padding:4px 8px;border-radius:var(--radius-sm);border-left:3px solid var(--brand)">📋 ' + esc(rec.dayPlan) + '</div>';
   }
-  if (!rec.clockOut) {
+  if (!rec.clockOut && getBrokersForStaff(rec.name).length > 0) {
     return '<div style="font-size:11px;color:#92400E;margin-top:3px">📋 No plan entered</div>';
   }
   return '';
@@ -6816,7 +6816,7 @@ function renderMyTeam() {
     </div>
     ${(()=>{
       const nco = memberData.filter(m => m.rec && m.rec.clockIn && !m.rec.clockOut && m.rec.status !== 'leave');
-      const np = memberData.filter(m => m.rec && m.rec.clockIn && !m.rec.clockOut && !m.rec.dayPlan?.trim() && m.rec.status !== 'leave' && getStaff().find(s=>s.name===m.name)?.brokerAssigned);
+      const np = memberData.filter(m => m.rec && m.rec.clockIn && !m.rec.clockOut && !m.rec.dayPlan?.trim() && m.rec.status !== 'leave' && getBrokersForStaff(m.name).length > 0);
       let html = '';
       if (nco.length) {
         html += `<div style="border:1.5px solid #FDE68A;border-radius:var(--radius-sm);margin-bottom:1rem;overflow:hidden">

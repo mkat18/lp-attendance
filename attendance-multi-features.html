@@ -3719,7 +3719,7 @@ function tapCard(key, row) {
   } else if (key === 'noplan') {
     const dayRecs3 = getRecords().filter(r => r.date === today);
     rows = allStaff.filter(s => {
-      if (!s.brokerAssigned) return false;
+      if (!getBrokersForStaff(s.name).length) return false;
       const rec = dayRecs3.find(r => r.name === s.name);
       return rec && rec.clockIn && !rec.dayPlan?.trim() && rec.status !== 'leave';
     }).map(s => personRow(s.name, 'No day plan entered', 'var(--warn)'));
@@ -3929,7 +3929,7 @@ function renderMetrics() {
 
   // Staff with broker assigned but no day plan entered yet (today only, smart timing)
   const noPlan = isToday ? allStaff.filter(s => {
-    if (!s.brokerAssigned) return false;
+    if (!getBrokersForStaff(s.name).length) return false;
     const rec = allRecs.find(r => r.name === s.name && r.date === today);
     if (!rec || !rec.clockIn || rec.status === 'leave') return false;
     if (!rec.dayPlan || !rec.dayPlan.trim()) {
