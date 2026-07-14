@@ -2737,10 +2737,17 @@ function goTab(name, btn) {
           spGetAll(SP_API + "('AttendanceBreaks')/items?$orderby=Id desc").then(r => { if (r&&r.value) _breaks=r.value.map(spToBreak); })
         ]).catch(()=>{}).finally(() => { updateClockOutUI(); updateBreakUI(); });
       }
-    }, 60000);
+    }, 10000);
   }
   if (name==='myteam')    renderMyTeam();
-  if (name==='eod')        renderEODScreen();
+  if (name==='eod') {
+    renderEODScreen();
+    if (!window._eodRefreshTimer) window._eodRefreshTimer = setInterval(() => {
+      if (document.getElementById('screen-eod')?.classList.contains('active') && currentUser) {
+        loadEODFromSP().catch(()=>{}).finally(() => renderEODScreen());
+      }
+    }, 10000);
+  }
   if (name==='admin')      renderAdmin();
   if (name==='leave')      renderLeaveScreen();
   if (name==='profile') {
