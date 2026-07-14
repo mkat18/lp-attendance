@@ -714,8 +714,8 @@ tr.flagged-row:hover td { background: #FFEAEA; }
     </div>
 
     <div class="card" id="dayPlanCard" style="display:none">
-      <div class="card-label">📋 Today's plan</div>
-      <textarea id="dayPlanInput" placeholder="What are you working on today? (optional)" rows="3"
+      <div class="card-label">📋 My workflow</div>
+      <textarea id="dayPlanInput" placeholder="Enter and update your workflow here" rows="3"
         style="width:100%;font-size:13px;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface-2);color:var(--text);resize:vertical;font-family:inherit;box-sizing:border-box"
         oninput="clearTimeout(window._dayPlanTimer);window._dayPlanTimer=setTimeout(saveDayPlan,1500)"></textarea>
       <div id="dayPlanSaveStatus" style="font-size:11px;color:var(--text-3);margin-top:4px;text-align:right"></div>
