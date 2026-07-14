@@ -3685,9 +3685,9 @@ function tapCard(key, row) {
     const eodRpts   = getEODReports().filter(r => r.date === date && r.status === 'submitted');
     const submitted = new Set(eodRpts.map(r => r.name));
     const onLeave   = new Set(allRecs.filter(r => r.date===date && r.status==='leave').map(r => r.name));
-    const eligible  = allStaff.filter(s => roleHasEOD(s.role) && !onLeave.has(s.name));
-    rows = eligible.map(s => personRow(s.name, submitted.has(s.name)?'✓ Submitted':'Not yet', submitted.has(s.name)?'var(--success)':'var(--danger)'));
-    title = 'EOD reports'; emptyMsg = 'No eligible staff';
+    const eligible  = allStaff.filter(s => roleHasEOD(s.role) && !onLeave.has(s.name) && !submitted.has(s.name));
+    rows = eligible.map(s => personRow(s.name, 'Not yet submitted', 'var(--danger)'));
+    title = 'EOD not submitted'; emptyMsg = 'All EODs submitted ✓';
   } else if (key === 'absence') {
     const patterns = detectAbsencePatterns();
     rows = patterns.map(p => personRow(p.name||p.label, p.detail||p.label, '#B45309'));
