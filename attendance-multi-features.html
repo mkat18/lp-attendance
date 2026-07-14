@@ -3718,10 +3718,16 @@ function tapCard(key, row) {
     title = 'No selfie'; emptyMsg = 'All selfies captured ✓';
   } else if (key === 'noplan') {
     const dayRecs3 = getRecords().filter(r => r.date === today);
+    const nowIST3 = new Date(new Date().toLocaleString('en-US',{timeZone:'Asia/Kolkata'}));
+    const nowMins3 = nowIST3.getHours()*60 + nowIST3.getMinutes();
     rows = allStaff.filter(s => {
       if (!getBrokersForStaff(s.name).length) return false;
       const rec = dayRecs3.find(r => r.name === s.name);
-      return rec && rec.clockIn && !rec.dayPlan?.trim() && rec.status !== 'leave';
+      if (!rec || !rec.clockIn || rec.status === 'leave') return false;
+      if (rec.dayPlan && rec.dayPlan.trim()) return false;
+      if (s.flexibleSchedule) { if (nowMins3 < 10*60+30) return false; }
+      else if (s.startTime) { const [sh,sm]=s.startTime.split(':').map(Number); if(nowMins3 < sh*60+sm+20) return false; }
+      return true;
     }).map(s => personRow(s.name, 'No workflow entered', 'var(--warn)'));
     title = 'No workflow'; emptyMsg = 'All workflows entered ✓';
   } else if (key === 'noclockout') {
@@ -3933,7 +3939,6 @@ function renderMetrics() {
     const rec = allRecs.find(r => r.name === s.name && r.date === today);
     if (!rec || !rec.clockIn || rec.status === 'leave') return false;
     if (!rec.dayPlan || !rec.dayPlan.trim()) {
-      // Smart timing — only flag past start time + 20 mins
       const nowMinsIST = new Date(new Date().toLocaleString('en-US',{timeZone:'Asia/Kolkata'}));
       const nowMins = nowMinsIST.getHours()*60 + nowMinsIST.getMinutes();
       if (s.flexibleSchedule) { if (nowMins < 10*60+30) return false; }
