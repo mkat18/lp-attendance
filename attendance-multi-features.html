@@ -1810,7 +1810,7 @@ const today = new Date().toLocaleDateString('en-CA', {timeZone:'Asia/Kolkata'});
 let currentUser = null;
 let selectedStatus = null;
 // ── Version check — forces update if outdated ─────────────────────────────
-const APP_VERSION = 5;
+const APP_VERSION = 6;
 (async function checkVersion() {
   try {
     const res = await fetch('version.json?t=' + Date.now());
@@ -2728,8 +2728,25 @@ function goTab(name, btn) {
   showScreen(name);
   if (name==='checkin')   initCheckin();
   if (name==='dashboard') { loadDashboard(); if (!window._dashRefreshTimer) window._dashRefreshTimer = setInterval(() => { if (document.getElementById('screen-dashboard')?.classList.contains('active')) loadDashboard(); }, 120000); }
+  if (name==='checkin') {
+    if (!window._checkinRefreshTimer) window._checkinRefreshTimer = setInterval(() => {
+      if (document.getElementById('screen-checkin')?.classList.contains('active') && currentUser) {
+        Promise.all([
+          spGetAll(SP_API + "('AttendanceRecords')/items?$orderby=Id desc").then(r => { if (r&&r.value) _records=r.value.map(spToRecord); }),
+          spGetAll(SP_API + "('AttendanceBreaks')/items?$orderby=Id desc").then(r => { if (r&&r.value) _breaks=r.value.map(spToBreak); })
+        ]).catch(()=>{}).finally(() => { updateClockOutUI(); updateBreakUI(); });
+      }
+    }, 60000);
+  }
   if (name==='myteam')    renderMyTeam();
-  if (name==='eod')        renderEODScreen();
+  if (name==='eod') {
+    renderEODScreen();
+    if (!window._eodRefreshTimer) window._eodRefreshTimer = setInterval(() => {
+      if (document.getElementById('screen-eod')?.classList.contains('active') && currentUser) {
+        loadEODFromSP().catch(()=>{}).finally(() => renderEODScreen());
+      }
+    }, 10000);
+  }
   if (name==='admin')      renderAdmin();
   if (name==='leave')      renderLeaveScreen();
   if (name==='profile') {
@@ -3223,7 +3240,7 @@ async function closeCameraAndSubmit(photoDataUrl) {
     saveRecords(recs2);
     const saved = await spSaveRecord(newRec);
     if (!saved) {
-      showToast('⚠ Check-in saved on this device but failed to sync — please try again or contact your manager.','err');
+      showToast('⚠ Connection issue — check-in not synced. Please try again in a moment.','err');
     } else {
       showToast('✓ Leave submitted!','ok');
     }
@@ -3259,7 +3276,7 @@ async function closeCameraAndSubmit(photoDataUrl) {
     saveRecords(recs2);
     const saved = await spSaveRecord(newRec);
     if (!saved) {
-      showToast('⚠ Check-in saved on this device but failed to sync — please try again or contact your manager.','err');
+      showToast('⚠ Connection issue — check-in not synced. Please try again in a moment.','err');
     } else {
       showToast('✓ Submitted!','ok');
     }
@@ -3352,7 +3369,7 @@ async function completeClockOut(photoDataUrl) {
     saveRecords(recs);
     const saved = await spSaveRecord(recs[idx]);
     if (!saved) {
-      showToast('⚠ Clock-out saved on this device but failed to sync — please try again or contact your manager.','err');
+      showToast('⚠ Connection issue — clock-out not synced. Please try again in a moment.','err');
     } else {
       showToast('✓ Clocked out!','ok');
     }
@@ -3438,7 +3455,7 @@ async function toggleBreak() {
     if (spId) {
       LS.set('ci_breakSpId_'+currentUser.name, spId);
     } else {
-      showToast('⚠ Break started but failed to sync — your manager may not see this. Try ending and restarting the break.','err');
+      showToast('⚠ Connection issue — please wait a moment and try starting the break again.','err');
     }
   } else {
     // Ending a break
@@ -3456,7 +3473,7 @@ async function toggleBreak() {
     const ended = await spEndBreak(spId, newBreak);
     updateBreakUI();
     if (!ended) {
-      showToast('⚠ Break ended locally but failed to sync — please notify your manager.','err');
+      showToast('⚠ Connection issue — please wait a moment and try ending the break again.','err');
     } else {
       showToast('Break logged.','ok');
     }
