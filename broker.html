@@ -978,6 +978,7 @@ tr.flagged-row:hover td { background: #FFEAEA; }
         <option value="Conditionally Approved">Conditionally Approved</option>
         <option value="Unconditionally Approved">Unconditionally Approved</option>
         <option value="Loan Documents">Loan Documents</option>
+        <option value="Settlement Booked">Settlement Booked</option>
         <option value="Settlement">Settlement</option>
         <option value="Withdrawn">Withdrawn</option>
         <option value="Declined">Declined</option>
@@ -7926,7 +7927,7 @@ function renderSubmittedCard(files, containerId) {
 
 const FILE_STATUSES = ['Data Collection','Pre-Qualification','Application Start',
   'Pending Info','Ready to Submit','Submitted to Lender','MIR','Conditionally Approved',
-  'Unconditionally Approved','Loan Documents','Settlement','Withdrawn','Declined'];
+  'Unconditionally Approved','Loan Documents','Settlement Booked','Settlement','Withdrawn','Declined'];
 const AUTO_ARCHIVE_STATUSES = ['Withdrawn','Declined'];
 const READY_TO_SUBMIT_IDX = FILE_STATUSES.indexOf('Ready to Submit');
 const STAGES_AFTER_READY = FILE_STATUSES.slice(READY_TO_SUBMIT_IDX + 1);
@@ -7941,6 +7942,7 @@ const FILE_STATUS_COLORS = {
   'Conditionally Approved': {bg:'#CFFAFE',color:'#164E63'},
   'Unconditionally Approved':{bg:'#A7F3D0',color:'#064E3B'},
   'Loan Documents':         {bg:'#FEF9C3',color:'#713F12'},
+  'Settlement Booked':      {bg:'#D1FAE5',color:'#065F46'},
   'Settlement':             {bg:'#BBF7D0',color:'#14532D'},
   'Withdrawn':              {bg:'#F3F4F6',color:'#6B7280'},
   'Declined':               {bg:'#FFE4E6',color:'#9F1239'},
@@ -9429,7 +9431,7 @@ function toggleLoanAmountField() {
   const sel = document.getElementById('fm_status');
   const field = document.getElementById('fm_loanAmountField');
   if (!sel || !field) return;
-  const showStages = ['Unconditionally Approved','Loan Documents','Settlement'];
+  const showStages = ['Unconditionally Approved','Loan Documents','Settlement Booked','Settlement'];
 
 }
 
@@ -9929,7 +9931,7 @@ window.openFileModal = function(fileId) {
 
 // ── Helper: is a file truly active? (not settled, not closed) ─────────────
 function isActiveFile(f) {
-  return f.active !== false && f.status !== 'Settlement';
+  return f.active !== false && f.status !== 'Settlement' && f.status !== 'Settlement Booked';
 }
 
 // ── Toggle settle date field ───────────────────────────────────────────────
