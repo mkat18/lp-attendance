@@ -6696,6 +6696,17 @@ function removeFromTeam(name) {
 }
 
 // ── My Team screen (shown to Team Lead after check-in) ───────────────────
+function renderDayPlanBadge(rec) {
+  if (!rec || !rec.clockIn) return '';
+  if (rec.dayPlan && rec.dayPlan.trim()) {
+    return '<div style="font-size:11px;color:var(--text-2);margin-top:3px;background:var(--surface-2);padding:4px 8px;border-radius:var(--radius-sm);border-left:3px solid var(--brand)">📋 ' + esc(rec.dayPlan) + '</div>';
+  }
+  if (!rec.clockOut) {
+    return '<div style="font-size:11px;color:#92400E;margin-top:3px">📋 No plan entered</div>';
+  }
+  return '';
+}
+
 function renderMyTeam() {
   const el = document.getElementById('myteamContent');
   const date = _myTeamDate || today;
@@ -6805,22 +6816,32 @@ function renderMyTeam() {
     </div>
     ${(()=>{
       const nco = memberData.filter(m => m.rec && m.rec.clockIn && !m.rec.clockOut && m.rec.status !== 'leave');
-      if (!nco.length) return '';
-      const ncoId = 'myteam_nco_list';
-      return `<div style="border:1.5px solid #FDE68A;border-radius:var(--radius-sm);margin-bottom:1rem;overflow:hidden">
-        <div onclick="(function(){var el=document.getElementById('${ncoId}');el.style.display=el.style.display==='none'?'block':'none'})()" style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#FFFBEB;cursor:pointer">
-          <span style="font-size:13px;font-weight:600;color:#92400E">🔓 Not clocked out (${nco.length})</span>
-          <span style="font-size:11px;color:#92400E">${nco.slice(0,2).map(m=>shortName(m.name)).join(', ')}${nco.length>2?' +more':''}</span>
-        </div>
-        <div id="${ncoId}" style="display:none;padding:8px 14px">
-          ${nco.map(m=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px">
-            <span style="font-weight:600">${esc(m.name)}</span>
-            <span style="color:#92400E">In ${m.clockInStr} · not clocked out</span>
-          </div>`).join('')}
-        </div>
-      </div>`;
+      const np = memberData.filter(m => m.rec && m.rec.clockIn && !m.rec.clockOut && !m.rec.dayPlan?.trim() && m.rec.status !== 'leave' && getStaff().find(s=>s.name===m.name)?.brokerAssigned);
+      let html = '';
+      if (nco.length) {
+        html += `<div style="border:1.5px solid #FDE68A;border-radius:var(--radius-sm);margin-bottom:1rem;overflow:hidden">
+          <div onclick="(function(){var el=document.getElementById('myteam_nco');el.style.display=el.style.display==='none'?'block':'none'})()" style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#FFFBEB;cursor:pointer">
+            <span style="font-size:13px;font-weight:600;color:#92400E">🔓 Not clocked out (${nco.length})</span>
+            <span style="font-size:11px;color:#92400E">${nco.slice(0,2).map(m=>shortName(m.name)).join(', ')}${nco.length>2?' +more':''}</span>
+          </div>
+          <div id="myteam_nco" style="display:none;padding:8px 14px">
+            ${nco.map(m=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px"><span style="font-weight:600">${esc(m.name)}</span><span style="color:#92400E">In ${m.clockInStr} · not clocked out</span></div>`).join('')}
+          </div>
+        </div>`;
+      }
+      if (np.length) {
+        html += `<div style="border:1.5px solid #FDE68A;border-radius:var(--radius-sm);margin-bottom:1rem;overflow:hidden">
+          <div onclick="(function(){var el=document.getElementById('myteam_np');el.style.display=el.style.display==='none'?'block':'none'})()" style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#FFFBEB;cursor:pointer">
+            <span style="font-size:13px;font-weight:600;color:#92400E">📋 No day plan (${np.length})</span>
+            <span style="font-size:11px;color:#92400E">${np.slice(0,2).map(m=>shortName(m.name)).join(', ')}${np.length>2?' +more':''}</span>
+          </div>
+          <div id="myteam_np" style="display:none;padding:8px 14px">
+            ${np.map(m=>`<div style="padding:6px 0;border-bottom:1px solid var(--border);font-size:13px;font-weight:600">${esc(m.name)}</div>`).join('')}
+          </div>
+        </div>`;
+      }
+      return html;
     })()}`;
-
   // Member cards
   const cardsHTML = memberData.map(m => `
     <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:var(--surface);border:1.5px solid ${m.status==='notsubmitted'?'#FECACA':'var(--border)'};border-radius:var(--radius-sm);margin-bottom:8px;gap:10px">
@@ -6829,7 +6850,7 @@ function renderMyTeam() {
         <div style="min-width:0">
           <div style="font-size:14px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(m.name)}</div>
           <div style="font-size:11px;color:var(--text-3)">${m.schedule}${m.clockInStr?' · in '+m.clockInStr:''}${m.rec&&m.rec.clockOut?' · out '+fmtTime(m.rec.clockOut):''}</div>
-          ${m.rec&&m.rec.dayPlan?`<div style="font-size:11px;color:var(--text-2);margin-top:3px;background:var(--surface-2);padding:4px 8px;border-radius:var(--radius-sm);border-left:3px solid var(--brand)">📋 ${esc(m.rec.dayPlan)}</div>`:(m.rec&&m.rec.clockIn&&!m.rec.clockOut?`<div style="font-size:11px;color:#92400E;margin-top:3px">📋 No plan entered</div>`:'')}
+          ${renderDayPlanBadge(m.rec)}
 
         </div>
       </div>

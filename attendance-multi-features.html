@@ -3724,6 +3724,7 @@ function tapCard(key, row) {
       return rec && rec.clockIn && !rec.dayPlan?.trim() && rec.status !== 'leave';
     }).map(s => personRow(s.name, 'No day plan entered', 'var(--warn)'));
     title = 'No day plan'; emptyMsg = 'All plans entered ✓';
+  } else if (key === 'noclockout') {
     const dayRecs2 = getRecords().filter(r => r.date === date);
     rows = allStaff.filter(s => {
       const rec = dayRecs2.find(r => r.name === s.name);
