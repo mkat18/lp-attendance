@@ -2983,7 +2983,7 @@ function renderMetrics() {
     if (!s.startTime) return false;
     return allRecs.some(r=>{
       if (r.name!==s.name||!r.clockIn) return false;
-      const scheduledMs=new Date(r.date+'T'+s.startTime+':00').getTime();
+      const scheduledMs=new Date(r.date+'T'+s.startTime+':00+05:30').getTime();
       return r.clockIn > scheduledMs + 15*60*1000;
     });
   });
@@ -2993,7 +2993,7 @@ function renderMetrics() {
     if (!s.endTime) return false;
     return allRecs.some(r=>{
       if (r.name!==s.name||!r.clockOut) return false;
-      const scheduledEndMs=new Date(r.date+'T'+s.endTime+':00').getTime();
+      const scheduledEndMs=new Date(r.date+'T'+s.endTime+':00+05:30').getTime();
       return r.clockOut < scheduledEndMs - 15*60*1000;
     });
   });
@@ -3279,7 +3279,7 @@ function renderMissing() {
     if(fn&&!s.name.toLowerCase().includes(fn)) return false;
     const rec=dayRecs.find(r=>r.name===s.name);
     if(!rec||!rec.clockIn) return false;
-    const scheduledMs=new Date(date+'T'+s.startTime+':00').getTime();
+    const scheduledMs=new Date(date+'T'+s.startTime+':00+05:30').getTime();
     return rec.clockIn > scheduledMs + 15*60*1000;
   });
 
@@ -3289,7 +3289,7 @@ function renderMissing() {
     if(fn&&!s.name.toLowerCase().includes(fn)) return false;
     const rec=dayRecs.find(r=>r.name===s.name);
     if(!rec||!rec.clockOut) return false;
-    const scheduledEndMs=new Date(date+'T'+s.endTime+':00').getTime();
+    const scheduledEndMs=new Date(date+'T'+s.endTime+':00+05:30').getTime();
     return rec.clockOut < scheduledEndMs - 15*60*1000;
   });
 
@@ -3327,7 +3327,7 @@ function renderMissing() {
       html+=sectionHeader('Late clock in — '+lateIn.length+' staff','var(--danger)');
       for(const s of lateIn){
         const rec=dayRecs.find(r=>r.name===s.name);
-        const scheduledMs=new Date(date+'T'+s.startTime+':00').getTime();
+        const scheduledMs=new Date(date+'T'+s.startTime+':00+05:30').getTime();
         const minsLate=Math.round((rec.clockIn-scheduledMs)/60000);
         html+=`<tr class="flagged-row">
           <td style="font-weight:600">${esc(s.name)}</td>
@@ -3346,7 +3346,7 @@ function renderMissing() {
       html+=sectionHeader('Early clock out — '+earlyOut.length+' staff','var(--danger)');
       for(const s of earlyOut){
         const rec=dayRecs.find(r=>r.name===s.name);
-        const scheduledEndMs=new Date(date+'T'+s.endTime+':00').getTime();
+        const scheduledEndMs=new Date(date+'T'+s.endTime+':00+05:30').getTime();
         const minsEarly=Math.round((scheduledEndMs-rec.clockOut)/60000);
         html+=`<tr class="flagged-row">
           <td style="font-weight:600">${esc(s.name)}</td>
@@ -3377,7 +3377,7 @@ function renderLateTab() {
     if (fn && !s.name.toLowerCase().includes(fn)) continue;
     const recs = allRecs.filter(r=>r.name===s.name&&r.clockIn);
     for (const r of recs) {
-      const scheduledMs = new Date(r.date+'T'+s.startTime+':00').getTime();
+      const scheduledMs = new Date(r.date+'T'+s.startTime+':00+05:30').getTime();
       const diffMs = r.clockIn - scheduledMs;
       if (diffMs > 15*60*1000) {
         const mins = Math.round(diffMs/60000);
@@ -3424,7 +3424,7 @@ function renderEarlyTab() {
     if (fn && !s.name.toLowerCase().includes(fn)) continue;
     const recs = allRecs.filter(r=>r.name===s.name&&r.clockOut);
     for (const r of recs) {
-      const scheduledEndMs = new Date(r.date+'T'+s.endTime+':00').getTime();
+      const scheduledEndMs = new Date(r.date+'T'+s.endTime+':00+05:30').getTime();
       const diffMs = scheduledEndMs - r.clockOut;
       if (diffMs > 15*60*1000) {
         const mins = Math.round(diffMs/60000);
