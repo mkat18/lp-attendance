@@ -713,6 +713,13 @@ tr.flagged-row:hover td { background: #FFEAEA; }
       <div id="submittedMsg" style="display:none;text-align:center;padding:10px 0 2px;font-size:13px;color:var(--success);font-weight:600">✓ Submitted for today</div>
     </div>
 
+    <div class="card" id="dayPlanCard" style="display:none">
+      <div class="card-label">📋 Today's plan</div>
+      <textarea id="dayPlanInput" placeholder="What are you working on today? (optional)" rows="3"
+        style="width:100%;font-size:13px;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface-2);color:var(--text);resize:vertical;font-family:inherit;box-sizing:border-box"
+        oninput="clearTimeout(window._dayPlanTimer);window._dayPlanTimer=setTimeout(saveDayPlan,1500)"></textarea>
+      <div id="dayPlanSaveStatus" style="font-size:11px;color:var(--text-3);margin-top:4px;text-align:right"></div>
+    </div>
     <div class="card" id="breakCard" style="display:none">
       <div class="card-label">Breaks</div>
       <div class="break-box">
@@ -1701,6 +1708,7 @@ function spToRecord(item) {
     submittedBy: item.SubmittedBy||null,
     msAccount: item.MsAccount||null,
     hasPhoto: item.HasPhoto === 'true' || item.HasPhoto === true,
+    dayPlan: item.DayPlan||'',
     ts: hhmmToTs(item.ClockIn, dateStr)||Date.now(),
   };
 }
@@ -3385,6 +3393,21 @@ async function completeClockOut(photoDataUrl) {
   });
 }
 
+async function saveDayPlan() {
+  const input = document.getElementById('dayPlanInput');
+  const status = document.getElementById('dayPlanSaveStatus');
+  if (!input || !currentUser) return;
+  const recs = getRecords();
+  const idx = recs.findIndex(r => r.date===today && r.name===currentUser.name);
+  if (idx < 0) return;
+  recs[idx].dayPlan = input.value.trim();
+  saveRecords(recs);
+  if (status) status.textContent = 'Saving…';
+  const ok = await spSaveRecord(recs[idx]);
+  if (status) status.textContent = ok ? '✓ Saved' : '⚠ Failed to save';
+  setTimeout(() => { if (status) status.textContent = ''; }, 3000);
+}
+
 function updateClockOutUI() {
   const rec=getRecords().find(r=>r.date===today&&r.name===currentUser.name);
   if (!rec||rec.status==='leave') return;
@@ -3392,6 +3415,8 @@ function updateClockOutUI() {
   const coutEl=document.getElementById('clockOutDisplay');
   const btn=document.getElementById('clockOutBtn');
   const done=document.getElementById('clockOutDone');
+  const dayPlanCard=document.getElementById('dayPlanCard');
+  const dayPlanInput=document.getElementById('dayPlanInput');
   if (cinEl) cinEl.textContent='Clocked in: '+(rec.clockIn?fmtTime(rec.clockIn):'—');
   if (rec.clockOut) {
     const totalBreakMs=getBreaks().filter(b=>b.name===currentUser.name&&b.date===today).reduce((s,b)=>s+b.durationMs,0);
@@ -3401,13 +3426,18 @@ function updateClockOutUI() {
     if (coutEl) coutEl.textContent='Clocked out: '+fmtTime(rec.clockOut)+' · Worked: '+(h>0?h+'h ':'')+m+'m';
     if (btn) btn.style.display='none';
     if (done) done.style.display='block';
-    // Hide break card — can't take breaks after clocking out
     const breakCard = document.getElementById('breakCard');
     if (breakCard) breakCard.style.display='none';
+    if (dayPlanCard) dayPlanCard.style.display='none';
   } else {
     if (coutEl) coutEl.textContent='Not yet clocked out';
     if (btn) btn.style.display='block';
     if (done) done.style.display='none';
+    // Show day plan card and populate with existing plan
+    if (dayPlanCard) dayPlanCard.style.display='block';
+    if (dayPlanInput && rec.dayPlan !== undefined && dayPlanInput.value === '') {
+      dayPlanInput.value = rec.dayPlan||'';
+    }
   }
 }
 
@@ -3686,7 +3716,14 @@ function tapCard(key, row) {
   } else if (key === 'noselfie') {
     rows = allRecs.filter(r => r.status!=='leave'&&!r.hasPhoto).map(r => personRow(r.name, 'No selfie', 'var(--danger)'));
     title = 'No selfie'; emptyMsg = 'All selfies captured ✓';
-  } else if (key === 'noclockout') {
+  } else if (key === 'noplan') {
+    const dayRecs3 = getRecords().filter(r => r.date === today);
+    rows = allStaff.filter(s => {
+      if (!s.brokerAssigned) return false;
+      const rec = dayRecs3.find(r => r.name === s.name);
+      return rec && rec.clockIn && !rec.dayPlan?.trim() && rec.status !== 'leave';
+    }).map(s => personRow(s.name, 'No day plan entered', 'var(--warn)'));
+    title = 'No day plan'; emptyMsg = 'All plans entered ✓';
     const dayRecs2 = getRecords().filter(r => r.date === date);
     rows = allStaff.filter(s => {
       const rec = dayRecs2.find(r => r.name === s.name);
@@ -3888,6 +3925,22 @@ function renderMetrics() {
     const rec = allRecs.find(r => r.name === s.name && r.date === date);
     return rec && rec.clockIn && !rec.clockOut && rec.status !== 'leave';
   });
+
+  // Staff with broker assigned but no day plan entered yet (today only, smart timing)
+  const noPlan = isToday ? allStaff.filter(s => {
+    if (!s.brokerAssigned) return false;
+    const rec = allRecs.find(r => r.name === s.name && r.date === today);
+    if (!rec || !rec.clockIn || rec.status === 'leave') return false;
+    if (!rec.dayPlan || !rec.dayPlan.trim()) {
+      // Smart timing — only flag past start time + 20 mins
+      const nowMinsIST = new Date(new Date().toLocaleString('en-US',{timeZone:'Asia/Kolkata'}));
+      const nowMins = nowMinsIST.getHours()*60 + nowMinsIST.getMinutes();
+      if (s.flexibleSchedule) { if (nowMins < 10*60+30) return false; }
+      else if (s.startTime) { const [sh,sm]=s.startTime.split(':').map(Number); if(nowMins < sh*60+sm+20) return false; }
+      return true;
+    }
+    return false;
+  }) : [];
   const rangeLabel = multi ? ` <span style="font-size:10px;color:var(--text-3);font-weight:400">${fromDate} – ${toDate}</span>` : '';
 
   // ── Compute data needed for Row 3 ──────────────────────────────────────
@@ -3959,6 +4012,10 @@ function renderMetrics() {
     notClockedOut.length?'var(--warn)':'var(--success)',
     notClockedOut.length>0?notClockedOut.slice(0,2).map(s=>shortName(s.name)).join(', ')+(notClockedOut.length>2?' +more':''):'all clocked out ✓',
     notClockedOut.length?'border-color:#FDE68A;':'');
+  r2 += isToday ? metCard('noplan', 2, '📋 No day plan', noPlan.length,
+    noPlan.length?'var(--warn)':'var(--success)',
+    noPlan.length>0?noPlan.slice(0,2).map(s=>shortName(s.name)).join(', ')+(noPlan.length>2?' +more':''):'all plans entered ✓',
+    noPlan.length?'border-color:#FDE68A;':'') : '';
   r2 += rowExpandHTML(2);
 
   // Row 3: Insights (manager/SA)
@@ -7847,7 +7904,8 @@ async function spSaveRecord(rec) {
     DistanceKm: String(distKm||''),
     SubmittedBy: String(rec.submittedBy||rec.name||''),
     MsAccount: String(rec.msAccount||''),
-    HasPhoto: rec.hasPhoto ? 'true' : 'false'
+    HasPhoto: rec.hasPhoto ? 'true' : 'false',
+    DayPlan: rec.dayPlan||''
   };
   if (rec.id) {
     return await spPatch(SP_API + "('AttendanceRecords')/items(" + rec.id + ")", payload);

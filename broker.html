@@ -1416,6 +1416,7 @@ function spToRecord(item) {
     submittedBy: item.SubmittedBy||null,
     msAccount: item.MsAccount||null,
     hasPhoto: item.HasPhoto === 'true' || item.HasPhoto === true,
+    dayPlan: item.DayPlan||'',
     ts: hhmmToTs(item.ClockIn, dateStr)||Date.now(),
   };
 }
@@ -6828,6 +6829,8 @@ function renderMyTeam() {
         <div style="min-width:0">
           <div style="font-size:14px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(m.name)}</div>
           <div style="font-size:11px;color:var(--text-3)">${m.schedule}${m.clockInStr?' · in '+m.clockInStr:''}${m.rec&&m.rec.clockOut?' · out '+fmtTime(m.rec.clockOut):''}</div>
+          ${m.rec&&m.rec.dayPlan?`<div style="font-size:11px;color:var(--text-2);margin-top:3px;background:var(--surface-2);padding:4px 8px;border-radius:var(--radius-sm);border-left:3px solid var(--brand)">📋 ${esc(m.rec.dayPlan)}</div>`:(m.rec&&m.rec.clockIn&&!m.rec.clockOut?`<div style="font-size:11px;color:#92400E;margin-top:3px">📋 No plan entered</div>`:'')}
+
         </div>
       </div>
       <div style="background:${m.statusBg};color:${m.statusColor};border-radius:50px;padding:4px 10px;font-size:12px;font-weight:600;white-space:nowrap;flex-shrink:0">${m.statusIcon} ${m.statusLabel}</div>
