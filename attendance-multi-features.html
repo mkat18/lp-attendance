@@ -3642,7 +3642,9 @@ function tapCard(key, row) {
     title = 'Half day'; emptyMsg = 'Nobody on half day today';
   } else if (key === 'onbreak') {
     const on = allBreaks.filter(b => b.date===today && b.isOpen===true);
-    rows = on.map(b => personRow(b.name, b.start?'Since '+fmtTime(b.start):'On break', 'var(--warn)'));
+    const seen = new Set();
+    const unique = on.filter(b => { if (seen.has(b.name)) return false; seen.add(b.name); return true; });
+    rows = unique.map(b => personRow(b.name, b.start?'Since '+fmtTime(b.start):'On break', 'var(--warn)'));
     title = 'On break now'; emptyMsg = 'Nobody on break right now';
   } else if (key === 'available') {
     const onBrk = new Set(allBreaks.filter(b => b.date===today && b.isOpen).map(b => b.name));
@@ -3818,7 +3820,7 @@ function renderMetrics() {
   // Break status (today only) — use SP breaks data (IsOpen='true') not local cache
   const allBreaks = getBreaks();
   const onBreakNames = isToday
-    ? allBreaks.filter(b => b.date === today && b.isOpen === true).map(b => b.name)
+    ? [...new Set(allBreaks.filter(b => b.date === today && b.isOpen === true).map(b => b.name))]
     : [];
   const todayRecs      = allRecs.filter(r=>r.date===today);
   const workingToday   = todayRecs.filter(r=>r.status==='office'||r.status==='wfh').map(r=>r.name);
