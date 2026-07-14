@@ -1317,12 +1317,18 @@ const FLOW = {
 
 // ── In-memory cache (loaded once on startup) ──────────────────────────────
 // ── Version check — forces update if outdated ─────────────────────────────
-const APP_VERSION = 5;
+const APP_VERSION = 9;
 (async function checkVersion() {
+  if (sessionStorage.getItem('lp_reloaded') === '1') return;
   try {
     const res = await fetch('version.json?t=' + Date.now());
     const data = await res.json();
     if (data.version && data.version > APP_VERSION) {
+      if ('serviceWorker' in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(regs.map(r => r.unregister()));
+      }
+      sessionStorage.setItem('lp_reloaded', '1');
       if ('serviceWorker' in navigator) {
         const regs = await navigator.serviceWorker.getRegistrations();
         await Promise.all(regs.map(r => r.unregister()));
@@ -2262,8 +2268,11 @@ function goTab(name, btn) {
   try { sessionStorage.setItem('lp_last_tab', name); } catch(e) {}
   showScreen(name);
   if (name==='myteam') {
-    // Reload EODs fresh from SP before rendering My Team to ensure latest data
-    loadEODFromSP().catch(()=>{}).finally(() => renderMyTeam());
+    // Reload EODs and records fresh from SP before rendering My Team
+    Promise.all([
+      loadEODFromSP().catch(()=>{}),
+      spGetAll(SP_API + "('AttendanceRecords')/items?$orderby=Id desc").then(r => { if (r&&r.value) _records=r.value.map(spToRecord); }).catch(()=>{})
+    ]).finally(() => renderMyTeam());
     return;
   }
   if (name==='files')     renderFilesScreen();
@@ -7038,7 +7047,11 @@ function refreshObsNotes() {
 // ── Auto-refresh My Team every 60s when on that screen ───────────────────
 setInterval(() => {
   if (document.getElementById('screen-myteam')?.classList.contains('active')) {
-    renderMyTeam();
+    // Reload fresh data from SP before re-rendering
+    Promise.all([
+      loadEODFromSP().catch(()=>{}),
+      spGetAll(SP_API + "('AttendanceRecords')/items?$orderby=Id desc").then(r => { if (r&&r.value) _records=r.value.map(spToRecord); }).catch(()=>{})
+    ]).finally(() => renderMyTeam());
   }
 }, 60000);
 

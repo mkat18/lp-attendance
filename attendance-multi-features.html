@@ -1810,20 +1810,21 @@ const today = new Date().toLocaleDateString('en-CA', {timeZone:'Asia/Kolkata'});
 let currentUser = null;
 let selectedStatus = null;
 // ── Version check — forces update if outdated ─────────────────────────────
-const APP_VERSION = 6;
+const APP_VERSION = 9;
 (async function checkVersion() {
+  if (sessionStorage.getItem('lp_reloaded') === '1') return; // prevent loop
   try {
     const res = await fetch('version.json?t=' + Date.now());
     const data = await res.json();
     if (data.version && data.version > APP_VERSION) {
-      // Force hard reload bypassing service worker cache
+      sessionStorage.setItem('lp_reloaded', '1');
       if ('serviceWorker' in navigator) {
         const regs = await navigator.serviceWorker.getRegistrations();
         await Promise.all(regs.map(r => r.unregister()));
       }
       window.location.reload(true);
     }
-  } catch(e) {} // silent — don't break app if version check fails
+  } catch(e) {}
 })();
 
 let dashData = []; let tabData = []; let chartInst = null;
@@ -12884,10 +12885,7 @@ window.renderMyTeam = async function() {
         });
       });
     });
-    // If controller changes (new SW took over), reload
-    navigator.serviceWorker.addEventListener('controllerchange', () => {
-      window.location.reload();
-    });
+
   }
 </script>
 </body>
