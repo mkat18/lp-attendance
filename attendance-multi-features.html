@@ -2744,9 +2744,15 @@ function goTab(name, btn) {
     renderEODScreen();
     if (!window._eodRefreshTimer) window._eodRefreshTimer = setInterval(() => {
       if (document.getElementById('screen-eod')?.classList.contains('active') && currentUser) {
-        loadEODFromSP().catch(()=>{}).finally(() => renderEODScreen());
+        // Don't refresh if user is actively editing — check if any input/textarea is focused
+        const active = document.activeElement;
+        const isEditing = active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.tagName === 'SELECT');
+        const taskPanelOpen = document.getElementById('eodTasksPanel')?.style.display !== 'none';
+        if (!isEditing && !taskPanelOpen) {
+          loadEODFromSP().catch(()=>{}).finally(() => renderEODScreen());
+        }
       }
-    }, 10000);
+    }, 300000);
   }
   if (name==='admin')      renderAdmin();
   if (name==='leave')      renderLeaveScreen();
