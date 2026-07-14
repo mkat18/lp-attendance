@@ -4906,6 +4906,24 @@ async function submitLeaveRequest() {
     showToast('You do not have permission to submit leave.', 'err');
     return;
   }
+
+  // Check for duplicate early — same person, same dates, same type already pending/approved
+  const _lt = document.getElementById('leaveTypeSelect').value;
+  const _sd = document.getElementById('leaveStartDate').value;
+  const _ed = document.getElementById('leaveEndDate').value || _sd;
+  if (_lt && _sd) {
+    const existing = getLeaveRequests().find(r =>
+      r.Title === currentUser.name &&
+      r.LeaveType === _lt &&
+      r.StartDate === _sd &&
+      r.EndDate === _ed &&
+      (r.Status === 'Pending' || r.Status === 'Approved')
+    );
+    if (existing) {
+      showToast(`You already have a ${_lt} request for these dates (${existing.Status}).`, 'err');
+      return;
+    }
+  }
   const leaveType = document.getElementById('leaveTypeSelect').value;
   // Probation check — only Unpaid Leave allowed within first 90 days
   if (isOnProbation() && !isSuperAdmin() && !isManager() && leaveType && leaveType !== 'Unpaid Leave') {
@@ -5249,7 +5267,7 @@ async function renderLeaveScreen() {
         <label>Reason</label>
         <textarea id="leaveReason2" rows="2" placeholder="Brief reason for leave…" style="width:100%;font-size:13px;padding:8px;border-radius:var(--radius-sm);border:1.5px solid var(--border);resize:vertical"></textarea>
       </div>
-      <button class="btn-primary" onclick="submitLeaveRequest()">Submit leave request</button>` : ''}
+      <button class="btn-primary" id="submitLeaveBtn" onclick="this.disabled=true;this.textContent='Submitting…';submitLeaveRequest().finally(()=>{this.disabled=false;this.textContent='Submit leave request';})">Submit leave request</button>` : ''}
     </div>`;
 
     // My leave history — collapsible
