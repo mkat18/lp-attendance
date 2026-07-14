@@ -3722,8 +3722,8 @@ function tapCard(key, row) {
       if (!getBrokersForStaff(s.name).length) return false;
       const rec = dayRecs3.find(r => r.name === s.name);
       return rec && rec.clockIn && !rec.dayPlan?.trim() && rec.status !== 'leave';
-    }).map(s => personRow(s.name, 'No day plan entered', 'var(--warn)'));
-    title = 'No day plan'; emptyMsg = 'All plans entered ✓';
+    }).map(s => personRow(s.name, 'No workflow entered', 'var(--warn)'));
+    title = 'No workflow'; emptyMsg = 'All workflows entered ✓';
   } else if (key === 'noclockout') {
     const dayRecs2 = getRecords().filter(r => r.date === date);
     rows = allStaff.filter(s => {
@@ -4013,9 +4013,9 @@ function renderMetrics() {
     notClockedOut.length?'var(--warn)':'var(--success)',
     notClockedOut.length>0?notClockedOut.slice(0,2).map(s=>shortName(s.name)).join(', ')+(notClockedOut.length>2?' +more':''):'all clocked out ✓',
     notClockedOut.length?'border-color:#FDE68A;':'');
-  r2 += isToday ? metCard('noplan', 2, '📋 No day plan', noPlan.length,
+  r2 += isToday ? metCard('noplan', 2, '📋 No workflow', noPlan.length,
     noPlan.length?'var(--warn)':'var(--success)',
-    noPlan.length>0?noPlan.slice(0,2).map(s=>shortName(s.name)).join(', ')+(noPlan.length>2?' +more':''):'all plans entered ✓',
+    noPlan.length>0?noPlan.slice(0,2).map(s=>shortName(s.name)).join(', ')+(noPlan.length>2?' +more':''):'all workflows entered ✓',
     noPlan.length?'border-color:#FDE68A;':'') : '';
   r2 += rowExpandHTML(2);
 
