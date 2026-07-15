@@ -3654,6 +3654,14 @@ function tapCard(key, row) {
       <div style="font-size:13px;font-weight:600;flex:1">${esc(name)}</div>
       <div style="font-size:12px;color:${color||'var(--text-3)'}">${esc(detail)}</div>
     </div>`;
+  const personRowWorkflow = (name, detail, color, workflow) =>
+    `<div style="padding:7px 0;border-bottom:1px solid var(--border)">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="font-size:13px;font-weight:600;flex:1">${esc(name)}</div>
+        <div style="font-size:12px;color:${color||'var(--text-3)'}">${esc(detail)}</div>
+      </div>
+      ${workflow?`<div style="font-size:11px;color:var(--text-2);margin-top:3px;padding:3px 8px;background:var(--surface-2);border-radius:var(--radius-sm);border-left:2px solid var(--brand)">📋 ${esc(workflow)}</div>`:''}
+    </div>`;
 
   let title = '', rows = [], emptyMsg = '';
 
@@ -3672,10 +3680,10 @@ function tapCard(key, row) {
     }).map(s => personRow(s.name, 'Not submitted', 'var(--danger)'));
     title = 'Not submitted'; emptyMsg = 'All staff have submitted ✓';
   } else if (key === 'office') {
-    rows = allRecs.filter(r => r.status==='office').map(r => personRow(r.name, r.clockIn?'In '+fmtTime(r.clockIn)+(r.clockOut?' · Out '+fmtTime(r.clockOut):''):'—', 'var(--brand)'));
+    rows = allRecs.filter(r => r.status==='office').map(r => personRowWorkflow(r.name, r.clockIn?'In '+fmtTime(r.clockIn)+(r.clockOut?' · Out '+fmtTime(r.clockOut):''):'—', 'var(--brand)', r.dayPlan||''));
     title = 'In office'; emptyMsg = 'Nobody in office';
   } else if (key === 'wfh') {
-    rows = allRecs.filter(r => r.status==='wfh').map(r => personRow(r.name, r.clockIn?'In '+fmtTime(r.clockIn):'—', 'var(--success)'));
+    rows = allRecs.filter(r => r.status==='wfh').map(r => personRowWorkflow(r.name, r.clockIn?'In '+fmtTime(r.clockIn):'—', 'var(--success)', r.dayPlan||''));
     title = 'WFH'; emptyMsg = 'Nobody WFH today';
   } else if (key === 'leave') {
     rows = allRecs.filter(r => r.status==='leave').map(r => personRow(r.name, r.reason||'On leave', 'var(--warn)'));
@@ -4990,7 +4998,7 @@ async function submitLeaveRequest() {
   const _sd = document.getElementById('leaveStartDate').value;
   const _ed = document.getElementById('leaveEndDate').value || _sd;
   if (_lt && _sd) {
-    const existing = getLeaveRequests().find(r =>
+    const existing = _leaveRequests.find(r =>
       r.Title === currentUser.name &&
       r.LeaveType === _lt &&
       r.StartDate === _sd &&
@@ -6271,7 +6279,7 @@ function renderPeople() {
     window._cardTapStatus = null;
     const STATUS_LABEL = {office:'In office', wfh:'WFH', leave:'On leave', halfday:'Half day', missing:'Not submitted'};
     if (!allPeople.length) { document.getElementById('peopleTable').innerHTML='<tr><td><div class="empty-state">No staff found.</div></td></tr>'; return; }
-    let html = '<thead><tr><th>Name</th><th>Status</th><th>Clock in</th><th>Clock out</th><th>Worked</th><th>Reason</th></tr></thead><tbody>';
+    let html = '<thead><tr><th>Name</th><th>Status</th><th>Clock in</th><th>Clock out</th><th>Worked</th><th>Reason</th><th>Workflow</th></tr></thead><tbody>';
     let shownCount = 0;
     for (const name of allPeople) {
       const rec = submittedMap[name];
@@ -6289,6 +6297,7 @@ function renderPeople() {
         <td style="font-size:12px;color:var(--text-2)">${isLeave?'—':rec?.clockOut?fmtTime(rec.clockOut):'not yet'}</td>
         <td style="font-size:12px;font-weight:600">${isLeave?'—':fmtWorked(workedMins)}</td>
         <td style="color:var(--text-2);font-size:12px">${rec?.reason?esc(rec.reason):'—'}</td>
+        <td style="color:var(--text-2);font-size:12px">${rec?.dayPlan?esc(rec.dayPlan):'—'}</td>
       </tr>`;
     }
     if (filterStatus && shownCount === 0) html += '<tr><td colspan="6"><div class="empty-state">Nobody is ' + (STATUS_LABEL[filterStatus]||filterStatus).toLowerCase() + ' today.</div></td></tr>';
