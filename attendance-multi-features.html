@@ -3459,6 +3459,7 @@ function updateBreakUI() {
   if (!currentUser) return;
   const btn=document.getElementById('breakBtn');
   if (!btn) return;
+  btn.disabled = false; // re-enable after SP operation completes
   if (breakOngoing) {
     btn.textContent='End break'; btn.className='break-btn end';
     document.getElementById('breakStatus').textContent='On a break…';
@@ -3475,44 +3476,53 @@ function setOngoingBreak(name, active) {
 }
 
 async function toggleBreak() {
+  const btn = document.getElementById('breakBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '…'; }
+
   if (!breakOngoing) {
-    // Starting a break
+    // Starting a break — update UI immediately
     breakOngoing=true; breakStart=Date.now();
     LS.set('ci_breakStart_'+currentUser.name, breakStart);
-    LS.set('ci_breakSpId_'+currentUser.name, null); // will be set after SP write
+    LS.set('ci_breakSpId_'+currentUser.name, null);
     setOngoingBreak(currentUser.name, true);
     breakInterval=setInterval(()=>{
       const el=document.getElementById('breakTimer');
       if(el){ el.textContent=fmtMs(Date.now()-breakStart); el.className='break-time running'; }
     },1000);
     updateBreakUI();
-    // Write open break to SharePoint — store returned ID for patching on end
+    // Silent retry until SP confirms
     const brk={name:currentUser.name, date:today, startTime:breakStart};
-    const spId = await spStartBreak(brk);
+    let spId = null;
+    for (let attempt = 0; attempt < 5 && !spId; attempt++) {
+      if (attempt > 0) await new Promise(r => setTimeout(r, 2000));
+      spId = await spStartBreak(brk);
+    }
     if (spId) {
       LS.set('ci_breakSpId_'+currentUser.name, spId);
-    } else {
-      showToast('⚠ Connection issue — please wait a moment and try starting the break again.','err');
     }
   } else {
-    // Ending a break
+    // Ending a break — update UI immediately
     const durationMs=Date.now()-breakStart;
-    const spId = LS.get('ci_breakSpId_'+currentUser.name);
+    let spId = LS.get('ci_breakSpId_'+currentUser.name);
+    // If no SP ID in localStorage (different device), find open break from SP data
+    if (!spId) {
+      const openBreak = getBreaks().find(b => b.name===currentUser.name && b.date===today && b.isOpen);
+      if (openBreak) spId = openBreak.id;
+    }
     stopBreakTimer(true);
-    LS.set('ci_breakStart_'+currentUser.name, null);
-    LS.set('ci_breakSpId_'+currentUser.name, null);
     setOngoingBreak(currentUser.name, false);
     const newBreak={name:currentUser.name, date:today, durationMs, startTime:breakStart, endTime:Date.now(), ts:Date.now()};
     const brks=getBreaks();
     brks.push(newBreak);
     saveBreaks(brks);
-    // Patch the open SP record with end time
-    const ended = await spEndBreak(spId, newBreak);
+    LS.set('ci_breakStart_'+currentUser.name, null);
+    LS.set('ci_breakSpId_'+currentUser.name, null);
     updateBreakUI();
-    if (!ended) {
-      showToast('⚠ Connection issue — please wait a moment and try ending the break again.','err');
-    } else {
-      showToast('Break logged.','ok');
+    // Silent retry until SP confirms
+    let ended = false;
+    for (let attempt = 0; attempt < 5 && !ended; attempt++) {
+      if (attempt > 0) await new Promise(r => setTimeout(r, 2000));
+      ended = await spEndBreak(spId, newBreak);
     }
   }
 }
@@ -7958,12 +7968,14 @@ async function spStartBreak(brk) {
 // Called when break ENDS — patches existing SP record with end time
 async function spEndBreak(spId, brk) {
   try {
-    const durMins = brk.durationMs ? Math.round(brk.durationMs/60000) + ' mins' : '';
+    const payload = {
+      EndTime: toHHMM(brk.endTime)||'',
+      IsOpen: 'false',
+      DurationMs: String(brk.durationMs||0)
+    };
     if (spId) {
-      return await spPatch(SP_API + "('AttendanceBreaks')/items(" + spId + ")", {
-        EndTime: toHHMM(brk.endTime)||'',
-        IsOpen: 'false'
-      });
+      const res = await spPatch(SP_API + "('AttendanceBreaks')/items(" + spId + ")", payload);
+      return res !== null && res !== undefined;
     } else {
       // No SP ID (break started offline) — create full record
       const res = await spPostDirect(SP_API + "('AttendanceBreaks')/items", {
@@ -7971,7 +7983,8 @@ async function spEndBreak(spId, brk) {
         BreakDate: brk.date + 'T00:00:00Z',
         StartTime: toHHMM(brk.startTime)||'',
         EndTime: toHHMM(brk.endTime)||'',
-        IsOpen: 'false'
+        IsOpen: 'false',
+        DurationMs: String(brk.durationMs||0)
       });
       return !!res;
     }
