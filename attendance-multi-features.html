@@ -3734,6 +3734,20 @@ function tapCard(key, row) {
   } else if (key === 'noselfie') {
     rows = allRecs.filter(r => r.status!=='leave'&&!r.hasPhoto).map(r => personRow(r.name, 'No selfie', 'var(--danger)'));
     title = 'No selfie'; emptyMsg = 'All selfies captured ✓';
+  } else if (key === 'nobreak') {
+    const dayRecs4 = getRecords().filter(r => r.date === today);
+    rows = allStaff.filter(s => {
+      const rec = dayRecs4.find(r => r.name === s.name);
+      if (!rec || !rec.clockIn || rec.status === 'leave') return false;
+      const workedMins = calcWorkedMins(rec);
+      if (!workedMins || workedMins < 360) return false;
+      return !getBreaks().some(b => b.name===s.name && b.date===today && !b.isOpen && b.durationMs > 0);
+    }).map(s => {
+      const rec = dayRecs4.find(r => r.name === s.name);
+      const workedMins = calcWorkedMins(rec);
+      return personRow(s.name, fmtWorked(workedMins)+' · no break', '#B45309');
+    });
+    title = 'No break logged'; emptyMsg = 'All breaks logged ✓';
   } else if (key === 'noplan') {
     const dayRecs3 = getRecords().filter(r => r.date === today);
     const nowIST3 = new Date(new Date().toLocaleString('en-US',{timeZone:'Asia/Kolkata'}));
@@ -3967,6 +3981,16 @@ function renderMetrics() {
   }) : [];
   const rangeLabel = multi ? ` <span style="font-size:10px;color:var(--text-3);font-weight:400">${fromDate} – ${toDate}</span>` : '';
 
+  // Staff who worked 6+ hours with no break logged
+  const noBreak = isToday ? allStaff.filter(s => {
+    const rec = allRecs.find(r => r.name===s.name && r.date===today);
+    if (!rec || !rec.clockIn || rec.status==='leave') return false;
+    const workedMins = calcWorkedMins(rec);
+    if (!workedMins || workedMins < 360) return false; // less than 6 hours
+    const hasBreak = getBreaks().some(b => b.name===s.name && b.date===today && !b.isOpen && b.durationMs > 0);
+    return !hasBreak;
+  }) : [];
+
   // ── Compute data needed for Row 3 ──────────────────────────────────────
   const patterns     = isManager()||isSuperAdmin() ? detectAbsencePatterns() : [];
   const eodRpts      = isManager()||isSuperAdmin() ? getEODReports().filter(r=>r.date===date&&r.status==='submitted') : [];
@@ -4040,6 +4064,10 @@ function renderMetrics() {
     noPlan.length?'var(--warn)':'var(--success)',
     noPlan.length>0?noPlan.slice(0,2).map(s=>shortName(s.name)).join(', ')+(noPlan.length>2?' +more':''):'all workflows entered ✓',
     noPlan.length?'border-color:#FDE68A;':'') : '';
+  r2 += isToday ? metCard('nobreak', 2, '☕ No break logged', noBreak.length,
+    noBreak.length?'#B45309':'var(--success)',
+    noBreak.length>0?noBreak.slice(0,2).map(s=>shortName(s.name)).join(', ')+(noBreak.length>2?' +more':''):'all breaks logged ✓',
+    noBreak.length?'border-color:#FCD34D;':'') : '';
   r2 += rowExpandHTML(2);
 
   // Row 3: Insights (manager/SA)

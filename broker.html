@@ -6697,13 +6697,31 @@ function removeFromTeam(name) {
 }
 
 // ── My Team screen (shown to Team Lead after check-in) ───────────────────
+function renderBreaksBadge(name, date) {
+  const brks = getBreaks().filter(b => b.name===name && b.date===date && !b.isOpen && b.durationMs > 0);
+  if (!brks.length) return '';
+  const totalMs = brks.reduce((s,b) => s+b.durationMs, 0);
+  const totalMins = Math.round(totalMs/60000);
+  const h = Math.floor(totalMins/60), m = totalMins%60;
+  const totalStr = h>0 ? h+'h '+m+'m' : m+'m';
+  const uid = 'brk_'+name.replace(/\s/g,'_')+'_'+date;
+  const rows = brks.map((b,i) => {
+    const dur = Math.round(b.durationMs/60000);
+    return `<div style="font-size:11px;color:var(--text-2);padding:2px 0">Break ${i+1}: ${fmtTime(b.startTime)} → ${b.endTime?fmtTime(b.endTime):'ongoing'} (${dur}m)</div>`;
+  }).join('');
+  return `<div style="margin-top:3px">
+    <div onclick="(function(){var el=document.getElementById('${uid}');el.style.display=el.style.display==='none'?'block':'none'})()" style="font-size:11px;color:var(--text-3);cursor:pointer">☕ ${brks.length} break${brks.length>1?'s':''} · ${totalStr} ▾</div>
+    <div id="${uid}" style="display:none;padding:4px 8px;background:var(--surface-2);border-radius:var(--radius-sm);margin-top:2px">${rows}</div>
+  </div>`;
+}
+
 function renderDayPlanBadge(rec) {
   if (!rec || !rec.clockIn) return '';
   if (rec.dayPlan && rec.dayPlan.trim()) {
     return '<div style="font-size:11px;color:var(--text-2);margin-top:3px;background:var(--surface-2);padding:4px 8px;border-radius:var(--radius-sm);border-left:3px solid var(--brand)">📋 ' + esc(rec.dayPlan) + '</div>';
   }
   if (!rec.clockOut && getBrokersForStaff(rec.name).length > 0) {
-    return '<div style="font-size:11px;color:#92400E;margin-top:3px">📋 No plan entered</div>';
+    return '<div style="font-size:11px;color:#92400E;margin-top:3px">📋 No workflow entered</div>';
   }
   return '';
 }
@@ -6833,7 +6851,7 @@ function renderMyTeam() {
       if (np.length) {
         html += `<div style="border:1.5px solid #FDE68A;border-radius:var(--radius-sm);margin-bottom:1rem;overflow:hidden">
           <div onclick="(function(){var el=document.getElementById('myteam_np');el.style.display=el.style.display==='none'?'block':'none'})()" style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#FFFBEB;cursor:pointer">
-            <span style="font-size:13px;font-weight:600;color:#92400E">📋 No day plan (${np.length})</span>
+            <span style="font-size:13px;font-weight:600;color:#92400E">📋 No workflow (${np.length})</span>
             <span style="font-size:11px;color:#92400E">${np.slice(0,2).map(m=>shortName(m.name)).join(', ')}${np.length>2?' +more':''}</span>
           </div>
           <div id="myteam_np" style="display:none;padding:8px 14px">
@@ -6852,6 +6870,7 @@ function renderMyTeam() {
           <div style="font-size:14px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(m.name)}</div>
           <div style="font-size:11px;color:var(--text-3)">${m.schedule}${m.clockInStr?' · in '+m.clockInStr:''}${m.rec&&m.rec.clockOut?' · out '+fmtTime(m.rec.clockOut):''}</div>
           ${renderDayPlanBadge(m.rec)}
+          ${renderBreaksBadge(m.name, date)}
 
         </div>
       </div>
