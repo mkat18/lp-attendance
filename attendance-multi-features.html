@@ -2743,7 +2743,16 @@ function goTab(name, btn) {
         Promise.all([
           spGetAll(SP_API + "('AttendanceRecords')/items?$orderby=Id desc").then(r => { if (r&&r.value) _records=r.value.map(spToRecord); }),
           spGetAll(SP_API + "('AttendanceBreaks')/items?$orderby=Id desc").then(r => { if (r&&r.value) _breaks=r.value.map(spToBreak); })
-        ]).catch(()=>{}).finally(() => { updateClockOutUI(); updateBreakUI(); });
+        ]).catch(()=>{}).finally(() => {
+          updateClockOutUI(); updateBreakUI();
+          // Sweep: if break shows as ended locally but SP still has it open, close it
+          if (!breakOngoing && currentUser) {
+            const phantom = getBreaks().find(b => b.name===currentUser.name && b.date===today && b.isOpen);
+            if (phantom) {
+              spEndBreak(phantom.id, {name:phantom.name, date:phantom.date, durationMs:0, startTime:phantom.startTime, endTime:Date.now()}).catch(()=>{});
+            }
+          }
+        });
       }
     }, 10000);
   }
@@ -2945,6 +2954,16 @@ document.addEventListener('keydown', function(e) {
 async function loginAs(member) {
   currentUser={name:member.name, role:member.role};
   sessionStorage.setItem('lp_session', JSON.stringify({name:member.name, role:member.role}));
+
+  // Clear stale breakStart from previous days to prevent massive break durations
+  const lsBreakStart = LS.get('ci_breakStart_' + member.name);
+  if (lsBreakStart) {
+    const breakDate = new Date(lsBreakStart).toLocaleDateString('en-CA',{timeZone:'Asia/Kolkata'});
+    if (breakDate !== today) {
+      LS.set('ci_breakStart_' + member.name, null);
+      LS.set('ci_breakSpId_' + member.name, null);
+    }
+  }
 
   buildNav();
 
@@ -3376,6 +3395,16 @@ async function completeClockOut(photoDataUrl) {
     : recs.findIndex(r=>r.date===today&&r.name===currentUser.name);
   if (idx<0) return;
   window._nightShiftRecord = null;
+
+  // Auto-close any open breaks before clocking out
+  const openBreaks = getBreaks().filter(b => b.name===currentUser.name && b.date===today && b.isOpen);
+  for (const ob of openBreaks) {
+    await spEndBreak(ob.id, {name:ob.name, date:ob.date, durationMs:0, startTime:ob.startTime, endTime:Date.now()}).catch(()=>{});
+  }
+  if (openBreaks.length > 0) {
+    breakOngoing = false;
+    stopBreakTimer(true);
+  }
   showToast('Getting your location…','ok');
   captureGeoAndSubmit(async function(geo) {
     recs[idx].clockOut=Date.now();
@@ -3480,7 +3509,12 @@ async function toggleBreak() {
   if (btn) { btn.disabled = true; btn.textContent = '…'; }
 
   if (!breakOngoing) {
-    // Starting a break — update UI immediately
+    // Starting a break — first close any phantom open breaks in SP from today
+    const phantomBreaks = getBreaks().filter(b => b.name===currentUser.name && b.date===today && b.isOpen);
+    for (const phantom of phantomBreaks) {
+      await spEndBreak(phantom.id, {...phantom, endTime: Date.now(), durationMs: 0, isOpen: false}).catch(()=>{});
+    }
+    // Now start the new break
     breakOngoing=true; breakStart=Date.now();
     LS.set('ci_breakStart_'+currentUser.name, breakStart);
     LS.set('ci_breakSpId_'+currentUser.name, null);
@@ -3518,12 +3552,13 @@ async function toggleBreak() {
     LS.set('ci_breakStart_'+currentUser.name, null);
     LS.set('ci_breakSpId_'+currentUser.name, null);
     updateBreakUI();
-    // Silent retry until SP confirms
+    // Silent retry until SP confirms — show confirmation only after SP success
     let ended = false;
     for (let attempt = 0; attempt < 5 && !ended; attempt++) {
       if (attempt > 0) await new Promise(r => setTimeout(r, 2000));
       ended = await spEndBreak(spId, newBreak);
     }
+    if (ended) showToast('✓ Break logged in the system', 'ok');
   }
 }
 function stopBreakTimer(clearOngoing=true) {
@@ -8003,7 +8038,11 @@ async function spEndBreak(spId, brk) {
     };
     if (spId) {
       const res = await spPatch(SP_API + "('AttendanceBreaks')/items(" + spId + ")", payload);
-      return res !== null && res !== undefined;
+      if (res === null || res === undefined) return false;
+      // Verify SP actually closed the break — don't trust the response alone
+      const verify = await spGet(SP_API + "('AttendanceBreaks')/items(" + spId + ")?$select=IsOpen");
+      if (verify && verify.IsOpen === 'true') return false; // SP says still open — caller will retry
+      return true;
     } else {
       // No SP ID (break started offline) — create full record
       const res = await spPostDirect(SP_API + "('AttendanceBreaks')/items", {
@@ -8067,9 +8106,10 @@ async function checkOpenBreak(userName) {
         console.warn('Open break from', dateStr, 'auto-closed for', userName);
         return;
       }
-      // Restore break state — use LS timestamp if available (more precise than HHMM)
+      // Restore break state — use LS timestamp if available and from today (more precise than HHMM)
       const lsStart = LS.get('ci_breakStart_' + userName);
-      const startTs = lsStart || (item.StartTime ? new Date(today + 'T' + item.StartTime + ':00+05:30').getTime() : Date.now());
+      const lsStartIsToday = lsStart && new Date(lsStart).toLocaleDateString('en-CA',{timeZone:'Asia/Kolkata'}) === today;
+      const startTs = (lsStartIsToday ? lsStart : null) || (item.StartTime ? new Date(today + 'T' + item.StartTime + ':00+05:30').getTime() : Date.now());
       breakOngoing = true;
       breakStart = startTs;
       LS.set('ci_breakSpId_' + userName, item.Id);
