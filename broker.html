@@ -9768,8 +9768,8 @@ function renderMyFilesScreen() {
   } else if (isTeamLead()) {
     const myTeam = getTeamForTL(currentUser.name);
     const sel = document.getElementById('mfLookupOwner');
-    const picked = sel ? sel.value : currentUser.name;
-    ownerPool = picked ? [picked] : [...myTeam, currentUser.name];
+    const picked = sel ? sel.value : '';
+    ownerPool = picked ? [picked] : [currentUser.name]; // default to own files only
   } else {
     ownerPool = [currentUser.name]; // analyst sees own files only
   }
