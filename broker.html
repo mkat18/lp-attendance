@@ -7891,7 +7891,14 @@ async function submitChecklist(fileIdx) {
   files[fileIdx].checklistSubmitted = true;
   files[fileIdx].checklistDate = today;
   saveFileEntries(files);
-  spSyncFileEntry(files[fileIdx]).then(ok=>{ if(!ok) showToast('⚠ File update failed to sync to SharePoint.','err'); });
+  const saved = await spSyncFileEntry(files[fileIdx]);
+  if (!saved) {
+    showToast('⚠ Checklist failed to save — please try again.', 'err');
+    // Revert local state so it doesn't show as submitted
+    files[fileIdx].checklistSubmitted = false;
+    saveFileEntries(files);
+    return;
+  }
   modal.remove();
   showToast('Checklist saved ✓', 'ok');
   renderMyFilesScreen();
