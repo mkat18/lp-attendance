@@ -1393,11 +1393,8 @@ function spToStaff(item) {
 
 // Convert HH:MM string to today's timestamp for internal use
 function hhmmToTs(hhmm, dateStr) {
-  if (!hhmm) return null;
-  const [h, m] = hhmm.split(':').map(Number);
-  const d = new Date(dateStr || new Date().toISOString().split('T')[0]);
-  d.setHours(h, m, 0, 0);
-  return d.getTime();
+  if (!hhmm || !dateStr) return null;
+  return new Date(`${dateStr}T${hhmm}:00+05:30`).getTime();
 }
 
 // Map SharePoint item to record object
@@ -6788,7 +6785,7 @@ function renderMyTeam() {
 
     const schedule = (member && member.startTime && member.endTime)
       ? fmt12(member.startTime) + ' – ' + fmt12(member.endTime) : '';
-    const clockInStr = rec && rec.clockIn ? new Date(rec.clockIn).toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit',hour12:true}) : '';
+    const clockInStr = rec && rec.clockIn ? new Date(rec.clockIn).toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit',hour12:true,timeZone:'Asia/Kolkata'}) : '';
 
     return { name, status, statusLabel, statusColor, statusBg, statusIcon, schedule, clockInStr, rec, member };
   });
