@@ -4954,13 +4954,17 @@ function calcEntitlement(staff, leaveYear) {
 // ── Count leave days (excluding weekends and public holidays) ──────────────
 function countLeaveDays(startDate, endDate, halfDay) {
   if (halfDay) return 0.5;
+  const staff = getStaff().find(s => s.name === currentUser?.name);
+  const worksSat = staff?.worksSaturday;
   const start = new Date(startDate + 'T12:00:00');
   const end = new Date(endDate + 'T12:00:00');
   let count = 0;
   for (let d = new Date(start); d <= end; d.setDate(d.getDate()+1)) {
     const dow = d.getDay();
     const ds = d.toISOString().split('T')[0];
-    if (dow !== 0 && dow !== 6 && !isPublicHoliday(ds)) count++;
+    if (dow === 0) continue; // always skip Sunday
+    if (dow === 6 && !worksSat) continue; // skip Saturday unless they work Saturdays
+    if (!isPublicHoliday(ds)) count++;
   }
   return count;
 }
