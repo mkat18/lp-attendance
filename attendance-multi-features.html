@@ -5244,22 +5244,26 @@ async function processLeaveRequest(id, action, notes) {
   LS.set('ci_leaveReq', _leaveRequests);
 
   if (action === 'approve') {
-    // Deduct from balance
-    const ly = req.LeaveYear || getLeaveYear(req.StartDate);
-    const days = parseFloat(req.DaysRequested||0);
-    const ent = getLeaveEntitlement(req.Title, ly);
-    if (req.LeaveType === 'Annual Leave' || req.LeaveType === 'Forced Leave') {
-      const used = parseFloat(ent?.AnnualUsed||0) + days;
-      await updateLeaveEntitlement(req.Title, ly, { AnnualUsed: String(used) });
-    } else if (req.LeaveType === 'Sick Leave') {
-      const used = parseFloat(ent?.SickUsed||0) + days;
-      await updateLeaveEntitlement(req.Title, ly, { SickUsed: String(used) });
-    } else if (req.LeaveType === 'Unpaid Leave') {
-      const used = parseFloat(ent?.UnpaidUsed||0) + days;
-      await updateLeaveEntitlement(req.Title, ly, { UnpaidUsed: String(used) });
-    } else if (req.LeaveType === 'Broker Holiday') {
-      const used = parseFloat(ent?.BrokerHolidayCount||0) + days;
-      await updateLeaveEntitlement(req.Title, ly, { BrokerHolidayCount: String(used) });
+    // Only deduct if not already deducted (on-behalf submissions auto-deduct at submission time)
+    const alreadyDeducted = req.ApprovalNotes && req.ApprovalNotes.includes('Submitted on behalf');
+    if (!alreadyDeducted) {
+      // Deduct from balance
+      const ly = req.LeaveYear || getLeaveYear(req.StartDate);
+      const days = parseFloat(req.DaysRequested||0);
+      const ent = getLeaveEntitlement(req.Title, ly);
+      if (req.LeaveType === 'Annual Leave' || req.LeaveType === 'Forced Leave') {
+        const used = parseFloat(ent?.AnnualUsed||0) + days;
+        await updateLeaveEntitlement(req.Title, ly, { AnnualUsed: String(used) });
+      } else if (req.LeaveType === 'Sick Leave') {
+        const used = parseFloat(ent?.SickUsed||0) + days;
+        await updateLeaveEntitlement(req.Title, ly, { SickUsed: String(used) });
+      } else if (req.LeaveType === 'Unpaid Leave') {
+        const used = parseFloat(ent?.UnpaidUsed||0) + days;
+        await updateLeaveEntitlement(req.Title, ly, { UnpaidUsed: String(used) });
+      } else if (req.LeaveType === 'Broker Holiday') {
+        const used = parseFloat(ent?.BrokerHolidayCount||0) + days;
+        await updateLeaveEntitlement(req.Title, ly, { BrokerHolidayCount: String(used) });
+      }
     }
     // Auto-mark attendance records for each leave day
     await autoMarkLeaveAttendance(req, id);
