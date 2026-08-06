@@ -2673,7 +2673,7 @@ function closeCameraAndSubmit(photoDataUrl) {
   const clockIn = (selectedStatus==='leave') ? null : Date.now();
   showToast('Getting your location…', 'ok');
 
-  captureGeoAndSubmit(function(geo) {
+  captureGeoAndSubmit(async function(geo) {
     if (!geo) {
       showToast('Location required to check in. Please allow location access and try again.', 'err');
       // Try requesting geo again
@@ -2688,7 +2688,8 @@ function closeCameraAndSubmit(photoDataUrl) {
     const newRec={name:currentUser.name,date:today,status:selectedStatus,reason,clockIn,clockOut:null,geo:geo||null,submittedBy:currentUser.name,msAccount:msalAccount?msalAccount.username:'',hasPhoto:!!photoDataUrl,ts:Date.now()};
     recs2.push(newRec);
     saveRecords(recs2);
-    spSaveRecord(newRec);
+    const ciOk = await spSaveRecord(newRec);
+    if (!ciOk) { showToast('⚠ Check-in failed to save — please try again.','err'); return; }
     // Upload photo to SharePoint in background
     if (photoDataUrl) uploadPhoto(photoDataUrl, newRec);
     showToast('✓ Submitted!','ok');
@@ -2721,7 +2722,7 @@ async function uploadPhoto(dataUrl, rec) {
     if (uploadRes.ok) {
       // Mark hasPhoto on the record in SharePoint now that upload succeeded
       rec.hasPhoto = true;
-      if (rec.id) spSaveRecord(rec);
+      if (rec.id) await spSaveRecord(rec);
       // Also update local cache
       const recs = getRecords();
       const idx = recs.findIndex(r => r.id === rec.id || (r.name === rec.name && r.date === rec.date));
@@ -2766,12 +2767,13 @@ function completeClockOut(photoDataUrl) {
   const idx=recs.findIndex(r=>r.date===today&&r.name===currentUser.name);
   if (idx<0) return;
   showToast('Getting your location…','ok');
-  captureGeoAndSubmit(function(geo) {
+  captureGeoAndSubmit(async function(geo) {
     recs[idx].clockOut=Date.now();
     recs[idx].clockOutGeo=geo||null;
     recs[idx].clockOutPhoto=!!photoDataUrl;
     saveRecords(recs);
-    spSaveRecord(recs[idx]);
+    const coOk = await spSaveRecord(recs[idx]);
+    if (!coOk) { showToast('⚠ Clock-out failed to save — please try again.','err'); return; }
     if (photoDataUrl) uploadPhoto(photoDataUrl, {...recs[idx], name: recs[idx].name+'_clockout'});
     showToast('✓ Clocked out!','ok');
     updateClockOutUI();
@@ -5265,7 +5267,7 @@ async function writeAuditLog(action, targetName, detail) {
   }
 }
 
-function changeRole(i, newRole) {
+async function changeRole(i, newRole) {
   if (!canChangeRole()) { showToast('Only Super Admins can change roles.','err'); return; }
   const staff=getStaff();
   const name=staff[i].name;
@@ -5276,7 +5278,8 @@ function changeRole(i, newRole) {
   staff[i].roleChangedAt=new Date().toLocaleString('en-AU');
   staff[i].roleChangedFrom=oldRole;
   saveStaff(staff);
-  spSaveStaffMember(staff[i]);
+  const rcOk = await spSaveStaffMember(staff[i]);
+  if (!rcOk) { showToast('Failed to save role — please try again.','err'); return; }
   writeAuditLog('Role Change', name, `Changed from ${ROLE_LABEL[oldRole]} to ${ROLE_LABEL[newRole]}`);
   renderAdmin();
   showToast(`${name.split(' ')[0]} is now ${ROLE_LABEL[newRole]}.`,'ok');
@@ -5390,7 +5393,7 @@ async function addPersonUnified() {
   showTempPin(name, tempPin);
 }
 
-function addPerson(role) {
+async function addPerson(role) {
   if (!canAddStaff()) { showToast('Permission denied.','err'); return; }
   const name = document.getElementById('newName').value.trim();
   const ec1Name = document.getElementById('newEC1Name').value.trim();
@@ -5420,13 +5423,14 @@ function addPerson(role) {
   ['newName','newPhone','newEmail','newAddress','newDOB','newJoinDate',
    'newEC1Name','newEC1Phone','newEC1Relation','newEC2Name','newEC2Phone','newEC2Relation'
   ].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
-  spSaveStaffMember(newMember);
+  const apOk = await spSaveStaffMember(newMember);
+  if (!apOk) { showToast('Failed to save to SharePoint — please try again.','err'); return; }
   writeAuditLog('Staff Added', name, `Added as Staff by ${currentUser.name}`);
   renderAdmin(); populateNameDropdown();
   showTempPin(name, tempPin);
 }
 
-function addPrivilegedPerson() {
+async function addPrivilegedPerson() {
   if (!isSuperAdmin() && !isManager()) { showToast('Permission denied.','err'); return; }
   const name = document.getElementById('newManagerName').value.trim();
   const role = document.getElementById('newManagerRole').value;
@@ -5456,7 +5460,8 @@ function addPrivilegedPerson() {
   ['newManagerName','newManagerPhone','newManagerEmail','newManagerAddress','newManagerDOB','newManagerJoinDate',
    'newManagerEC1Name','newManagerEC1Phone','newManagerEC1Relation','newManagerEC2Name','newManagerEC2Phone','newManagerEC2Relation'
   ].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
-  spSaveStaffMember(newMember);
+  const appOk = await spSaveStaffMember(newMember);
+  if (!appOk) { showToast('Failed to save to SharePoint — please try again.','err'); return; }
   writeAuditLog('Account Added', name, `Added as ${ROLE_LABEL[role]} by ${currentUser.name}`);
   renderAdmin(); populateNameDropdown();
   showTempPin(name, tempPin);
@@ -5542,7 +5547,7 @@ function closeScheduleModal() {
   _editScheduleIdx = null;
 }
 
-function saveSchedule() {
+async function saveSchedule() {
   const i = _editScheduleIdx;
   if (i === null) return;
   const sh = document.getElementById('scheduleStartH').value;
@@ -5557,7 +5562,8 @@ function saveSchedule() {
   staff[i].endTime = end;
   staff[i].office = office;
   saveStaff(staff);
-  spSaveStaffMember(staff[i]);
+  const ssOk = await spSaveStaffMember(staff[i]);
+  if (!ssOk) { showToast('Failed to save schedule — please try again.','err'); return; }
   writeAuditLog('Schedule Updated', staff[i].name, `Updated by ${currentUser.name}: ${start}–${end}, ${office}`);
   closeScheduleModal();
   renderAdmin();
@@ -7461,14 +7467,14 @@ function updateCoverBanner() {
 }
 
 // ─── FLOOR CONFIRMATION ───────────────────────────────────────────────────
-function confirmFloor() {
+async function confirmFloor() {
   const recs = getRecords();
   const idx = recs.findIndex(r => r.date === today && r.name === currentUser.name);
   if (idx < 0) { showToast('Submit attendance first.', 'err'); return; }
   recs[idx].floorConfirmed = true;
   recs[idx].floorConfirmedAt = Date.now();
   saveRecords(recs);
-  spSaveRecord(recs[idx]);
+  await spSaveRecord(recs[idx]);
   document.getElementById('floorBtn').style.display = 'none';
   document.getElementById('floorConfirmed').style.display = 'block';
   showToast('✓ Presence confirmed!', 'ok');
@@ -10803,7 +10809,7 @@ function closeAssignBrokerModal() {
   _assignBrokerTarget = null;
 }
 
-function saveAssignBroker() {
+async function saveAssignBroker() {
   const brokerName = document.getElementById('assignBrokerName').value.trim();
   const targetName = document.getElementById('assignBrokerTarget').value;
   if (!brokerName) { showToast('Enter a broker name.', 'err'); return; }
@@ -10826,7 +10832,8 @@ function saveAssignBroker() {
   }
 
   saveStaff(staff);
-  spSaveStaffMember(staff[idx]);
+  const saOk = await spSaveStaffMember(staff[idx]);
+  if (!saOk) { showToast('Failed to save broker assignment — please try again.','err'); return; }
   writeAuditLog('Broker Assigned', targetName,
     `Broker "${brokerName}" assigned by ${currentUser.name}. Role upgraded from ${ROLE_LABEL[oldRole]||oldRole} to Analyst.`);
 

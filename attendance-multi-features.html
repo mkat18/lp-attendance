@@ -5033,12 +5033,13 @@ async function ensureLeaveEntitlement(staff) {
 
 async function updateLeaveEntitlement(name, leaveYear, updates) {
   const ent = _leaveEntitlements.find(e => e.Title === name && e.LeaveYear === leaveYear);
-  if (!ent || !ent.Id) return;
+  if (!ent || !ent.Id) return false;
   const payload = {};
   for (const [k,v] of Object.entries(updates)) payload[k] = String(v);
-  await spPatch(SP_API + "('LeaveEntitlements')/items(" + ent.Id + ")", payload);
-  Object.assign(ent, payload);
-  LS.set('ci_leaveEnt', _leaveEntitlements);
+  const ok = await spPatch(SP_API + "('LeaveEntitlements')/items(" + ent.Id + ")", payload);
+  if (!ok) return false;
+  Object.assign(ent, payload); // only update local state after SP confirms
+  return true;
 }
 
 // ── Leave balance calculation ──────────────────────────────────────────────
@@ -5290,13 +5291,16 @@ async function processLeaveRequest(id, action, notes) {
 }
 
 async function autoMarkLeaveAttendance(req, requestId) {
+  const staff = getStaff().find(s => s.name === req.Title);
+  const worksSat = staff?.worksSaturday;
   const start = new Date(req.StartDate + 'T12:00:00');
   const end = new Date(req.EndDate + 'T12:00:00');
   for (let d = new Date(start); d <= end; d.setDate(d.getDate()+1)) {
     const dow = d.getDay();
     const ds = d.toISOString().split('T')[0];
-    if (dow === 0 || dow === 6 || isPublicHoliday(ds)) continue;
-    // Check if record already exists
+    if (dow === 0) continue; // always skip Sunday
+    if (dow === 6 && !worksSat) continue; // skip Saturday unless they work Saturdays
+    if (isPublicHoliday(ds)) continue;
     const existing = getRecords().find(r => r.name === req.Title && r.date === ds);
     if (existing) continue;
     const newRec = {
@@ -5306,10 +5310,13 @@ async function autoMarkLeaveAttendance(req, requestId) {
       submittedBy: currentUser.name, leaveRequestId: String(requestId),
       ts: Date.now()
     };
-    const recs = getRecords();
-    recs.push(newRec);
-    saveRecords(recs);
-    await spSaveRecord(newRec);
+    // Save to SP first, then update local memory
+    const ok = await spSaveRecord(newRec);
+    if (ok) {
+      const recs = getRecords();
+      recs.push(newRec);
+      saveRecords(recs);
+    }
   }
 }
 
@@ -5925,6 +5932,10 @@ function filterLeaveRequests() {  const status = document.getElementById('leaveF
       const undoBtn = canUndo && r.Status && r.Status!=='Pending'
         ? `<button onclick="undoLeave(${r.Id})" style="font-size:11px;padding:2px 8px;border-radius:4px;border:1px solid var(--border);background:var(--surface-2);cursor:pointer;color:var(--text-2)">↩ Undo</button>`
         : '';
+      const canEdit = isSuperAdmin() || isManager();
+      const editBtn = canEdit
+        ? `<button onclick="openEditLeaveModal(${r.Id})" style="font-size:11px;padding:2px 8px;border-radius:4px;border:1px solid var(--border);background:var(--surface-2);cursor:pointer;color:var(--text-2);margin-right:4px">✏ Edit</button>`
+        : '';
       return `<tr style="border-bottom:0.5px solid var(--border)">
         <td style="padding:7px 0;font-weight:500">${esc(r.Title||'')}</td>
         <td style="padding:7px 0;color:var(--text-2)">${esc(r.LeaveType||'')}</td>
@@ -5932,10 +5943,168 @@ function filterLeaveRequests() {  const status = document.getElementById('leaveF
         <td style="padding:7px 0">${r.DaysRequested||'?'}</td>
         <td style="padding:7px 0;color:${sc};font-weight:600">${r.Status||'Pending'}</td>
         <td style="padding:7px 0;font-size:12px;color:var(--text-3)">${esc(r.ApprovedBy||'—')}</td>
-        <td style="padding:7px 0">${undoBtn}</td>
+        <td style="padding:7px 0">${editBtn}${undoBtn}</td>
       </tr>`;
     }).join('')}
   </tbody></table>`;
+}
+
+async function openEditLeaveModal(leaveId) {
+  document.getElementById('editLeaveOverlay')?.remove(); // close any existing modal
+  const req = _leaveRequests.find(r => r.Id === leaveId);
+  if (!req) return;
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
+  overlay.id = 'editLeaveOverlay';
+  overlay.innerHTML = `
+    <div style="background:var(--surface);border-radius:var(--radius);padding:20px;width:100%;max-width:420px;max-height:90vh;overflow-y:auto">
+      <div style="font-size:16px;font-weight:700;margin-bottom:4px">✏ Edit Leave Request</div>
+      <div style="font-size:12px;color:var(--text-3);margin-bottom:16px">${esc(req.Title)} — currently ${req.Status}</div>
+      <div class="field"><label>Leave Type</label>
+        <select id="elType" style="width:100%;padding:8px;border-radius:var(--radius-sm);border:1.5px solid var(--border);font-size:13px">
+          ${['Annual Leave','Sick Leave','Unpaid Leave','Broker Holiday','Forced Leave'].map(t=>`<option value="${t}"${req.LeaveType===t?' selected':''}>${t}</option>`).join('')}
+        </select>
+      </div>
+      <div class="field"><label>Start Date</label>
+        <input type="date" id="elStart" value="${req.StartDate||''}" style="width:100%;padding:8px;border-radius:var(--radius-sm);border:1.5px solid var(--border);font-size:13px"/>
+      </div>
+      <div class="field"><label>End Date</label>
+        <input type="date" id="elEnd" value="${req.EndDate||req.StartDate||''}" style="width:100%;padding:8px;border-radius:var(--radius-sm);border:1.5px solid var(--border);font-size:13px"/>
+      </div>
+      <div class="field" style="display:flex;align-items:center;gap:8px">
+        <input type="checkbox" id="elHalfDay" ${req.HalfDay==='true'?'checked':''} style="width:16px;height:16px"/>
+        <label for="elHalfDay" style="margin:0">Half day</label>
+      </div>
+      <div class="field"><label>Reason</label>
+        <input type="text" id="elReason" value="${esc(req.Reason||'')}" style="width:100%;padding:8px;border-radius:var(--radius-sm);border:1.5px solid var(--border);font-size:13px"/>
+      </div>
+      <div class="field"><label>Edit notes (required)</label>
+        <input type="text" id="elNotes" placeholder="Reason for editing…" style="width:100%;padding:8px;border-radius:var(--radius-sm);border:1.5px solid var(--border);font-size:13px"/>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:16px">
+        <button id="editLeaveSaveBtn" onclick="this.disabled=true;this.textContent='Saving…';saveEditedLeave(${leaveId}).catch(()=>{}).finally(()=>{const b=document.getElementById('editLeaveSaveBtn');if(b){b.disabled=false;b.textContent='Save changes';}})" class="btn-primary" style="flex:1">Save changes</button>
+        <button onclick="document.getElementById('editLeaveOverlay').remove()" style="flex:1;padding:10px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:var(--surface-2);cursor:pointer">Cancel</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+}
+
+async function saveEditedLeave(leaveId) {
+  const req = _leaveRequests.find(r => r.Id === leaveId);
+  if (!req) return;
+  const notes = document.getElementById('elNotes')?.value.trim();
+  if (!notes) { showToast('Please enter a reason for editing.', 'err'); return; }
+
+  const newType    = document.getElementById('elType')?.value;
+  const newStart   = document.getElementById('elStart')?.value;
+  const newEnd     = document.getElementById('elEnd')?.value || newStart;
+  const newHalfDay = document.getElementById('elHalfDay')?.checked ? 'true' : 'false';
+  const newReason  = document.getElementById('elReason')?.value.trim();
+
+  if (!newType) { showToast('Please select a leave type.', 'err'); return; }
+  if (!newStart) { showToast('Please enter a start date.', 'err'); return; }
+
+  const staff = getStaff().find(s => s.name === req.Title);
+  const newDays = countLeaveDaysForStaff(newStart, newEnd, newHalfDay==='true', staff);
+  if (!newDays) { showToast('No working days in selected range.', 'err'); return; }
+
+  const ly = req.LeaveYear || getLeaveYear(newStart);
+
+  // Refund old balance and deduct new — only if leave was Approved
+  if (req.Status === 'Approved') {
+    const ent = getLeaveEntitlement(req.Title, ly);
+    const oldDays = parseFloat(req.DaysRequested||0);
+    let refundOk = true;
+    if (req.LeaveType === 'Annual Leave' || req.LeaveType === 'Forced Leave') {
+      refundOk = await updateLeaveEntitlement(req.Title, ly, { AnnualUsed: String(Math.max(0, parseFloat(ent?.AnnualUsed||0) - oldDays)) });
+    } else if (req.LeaveType === 'Sick Leave') {
+      refundOk = await updateLeaveEntitlement(req.Title, ly, { SickUsed: String(Math.max(0, parseFloat(ent?.SickUsed||0) - oldDays)) });
+    } else if (req.LeaveType === 'Unpaid Leave') {
+      refundOk = await updateLeaveEntitlement(req.Title, ly, { UnpaidUsed: String(Math.max(0, parseFloat(ent?.UnpaidUsed||0) - oldDays)) });
+    } else if (req.LeaveType === 'Broker Holiday') {
+      refundOk = await updateLeaveEntitlement(req.Title, ly, { BrokerHolidayCount: String(Math.max(0, parseFloat(ent?.BrokerHolidayCount||0) - oldDays)) });
+    }
+    if (!refundOk) { showToast('⚠ Failed to update leave balance — please try again.', 'err'); return; }
+    // Deduct new balance
+    const freshEnt = getLeaveEntitlement(req.Title, ly);
+    let deductOk = true;
+    if (newType === 'Annual Leave' || newType === 'Forced Leave') {
+      deductOk = await updateLeaveEntitlement(req.Title, ly, { AnnualUsed: String(parseFloat(freshEnt?.AnnualUsed||0) + newDays) });
+    } else if (newType === 'Sick Leave') {
+      deductOk = await updateLeaveEntitlement(req.Title, ly, { SickUsed: String(parseFloat(freshEnt?.SickUsed||0) + newDays) });
+    } else if (newType === 'Unpaid Leave') {
+      deductOk = await updateLeaveEntitlement(req.Title, ly, { UnpaidUsed: String(parseFloat(freshEnt?.UnpaidUsed||0) + newDays) });
+    } else if (newType === 'Broker Holiday') {
+      deductOk = await updateLeaveEntitlement(req.Title, ly, { BrokerHolidayCount: String(parseFloat(freshEnt?.BrokerHolidayCount||0) + newDays) });
+    }
+    if (!deductOk) { showToast('⚠ Failed to update leave balance — please try again.', 'err'); return; }
+    // Revert old attendance records and mark new ones in SP
+    await revertLeaveAttendance(req);
+    await autoMarkLeaveAttendance({...req, LeaveType: newType, StartDate: newStart, EndDate: newEnd, HalfDay: newHalfDay}, leaveId);
+  }
+
+  // Build audit trail entry
+  const changes = [];
+  if (req.LeaveType !== newType) changes.push(`Leave type: ${req.LeaveType} → ${newType}`);
+  if (req.StartDate !== newStart) changes.push(`Start: ${fmtDate(req.StartDate)} → ${fmtDate(newStart)}`);
+  if ((req.EndDate||req.StartDate) !== newEnd) changes.push(`End: ${fmtDate(req.EndDate||req.StartDate)} → ${fmtDate(newEnd)}`);
+  if (req.HalfDay !== newHalfDay) changes.push(`Half day: ${req.HalfDay==='true'?'Yes':'No'} → ${newHalfDay==='true'?'Yes':'No'}`);
+  if (req.DaysRequested !== String(newDays)) changes.push(`Days: ${req.DaysRequested} → ${newDays}`);
+  const timestamp = new Date().toLocaleString('en-AU',{timeZone:'Asia/Kolkata',day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:true});
+  const editEntry = `[${timestamp}] Edited by ${currentUser.name}: ${changes.length?changes.join(', '):'no field changes'}. Note: ${notes}`;
+  const newHistory = [(req.EditHistory||''), editEntry].filter(Boolean).join('\n');
+
+  // Save to SP
+  const payload = {
+    LeaveType: newType,
+    StartDate: newStart,
+    EndDate: newEnd,
+    HalfDay: newHalfDay,
+    Reason: newReason,
+    DaysRequested: String(newDays),
+    EditHistory: newHistory,
+  };
+  const ok = await spPatch(SP_API + `('LeaveRequests')/items(${leaveId})`, payload);
+  if (!ok) { showToast('⚠ Failed to save — please try again.', 'err'); return; }
+
+  document.getElementById('editLeaveOverlay')?.remove();
+  showToast('Leave updated ✓', 'ok');
+  // Reload from SP — single source of truth
+  await loadLeaveData();
+  renderLeaveScreen();
+}
+
+function countLeaveDaysForStaff(startDate, endDate, halfDay, staff) {
+  if (halfDay) return 0.5;
+  const worksSat = staff?.worksSaturday;
+  const start = new Date(startDate + 'T12:00:00');
+  const end = new Date(endDate + 'T12:00:00');
+  let count = 0;
+  for (let d = new Date(start); d <= end; d.setDate(d.getDate()+1)) {
+    const dow = d.getDay();
+    const ds = d.toISOString().split('T')[0];
+    if (dow === 0) continue;
+    if (dow === 6 && !worksSat) continue;
+    if (!isPublicHoliday(ds)) count++;
+  }
+  return count;
+}
+
+async function revertLeaveAttendance(req) {
+  const start = new Date(req.StartDate + 'T12:00:00');
+  const end = new Date((req.EndDate||req.StartDate) + 'T12:00:00');
+  for (let d = new Date(start); d <= end; d.setDate(d.getDate()+1)) {
+    const ds = d.toISOString().split('T')[0];
+    const rec = getRecords().find(r => r.name===req.Title && r.date===ds && r.status==='leave');
+    if (rec && rec.id) {
+      const deleted = await spDelete(SP_API + `('AttendanceRecords')/items(${rec.id})`).catch(()=>false);
+      if (deleted !== false) {
+        // Only remove from memory after SP confirms
+        const newRecs = getRecords().filter(r => !(r.name===req.Title && r.date===ds && r.status==='leave'));
+        saveRecords(newRecs);
+      }
+    }
+  }
 }
 
 async function markEncashed(name, leaveYear) {
@@ -7044,7 +7213,7 @@ async function writeAuditLog(action, targetName, detail) {
   }
 }
 
-function changeRole(i, newRole) {
+async function changeRole(i, newRole) {
   if (!canChangeRole()) { showToast('Only Super Admins can change roles.','err'); return; }
   if (newRole === 'superadmin') { showToast('Super Admin cannot be assigned through the UI.','err'); return; }
   const staff=getStaff();
@@ -7058,9 +7227,8 @@ function changeRole(i, newRole) {
   saveStaff(staff);
   // Lightweight patch — only update Role field to avoid 400 from column mismatches
   if (staff[i].id) {
-    spPatch(SP_API + "('AttendanceStaff')/items(" + staff[i].id + ")", { Role: newRole })
-      .then(ok => { if (!ok) showToast('Role saved locally but SP sync failed — try again.','err'); })
-      .catch(() => showToast('SP sync failed — role saved locally.','err'));
+    const roleOk = await spPatch(SP_API + "('AttendanceStaff')/items(" + staff[i].id + ")", { Role: newRole });
+    if (!roleOk) { showToast('Failed to update role in SharePoint — please try again.','err'); return; }
   }
   writeAuditLog('Role Change', name, `Changed from ${ROLE_LABEL[oldRole]||oldRole} to ${ROLE_LABEL[newRole]||newRole}`);
   renderAdmin();
@@ -7175,7 +7343,7 @@ async function addPersonUnified() {
   showTempPin(name, tempPin);
 }
 
-function addPerson(role) {
+async function addPerson(role) {
   if (!canAddStaff()) { showToast('Permission denied.','err'); return; }
   const name = document.getElementById('newName').value.trim();
   const ec1Name = document.getElementById('newEC1Name').value.trim();
@@ -7205,13 +7373,14 @@ function addPerson(role) {
   ['newName','newPhone','newEmail','newAddress','newDOB','newJoinDate',
    'newEC1Name','newEC1Phone','newEC1Relation','newEC2Name','newEC2Phone','newEC2Relation'
   ].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
-  spSaveStaffMember(newMember);
+  const addOk1 = await spSaveStaffMember(newMember);
+  if (!addOk1) { showToast('Failed to save to SharePoint — please try again.','err'); return; }
   writeAuditLog('Staff Added', name, `Added as Staff by ${currentUser.name}`);
   renderAdmin(); populateNameDropdown();
   showTempPin(name, tempPin);
 }
 
-function addPrivilegedPerson() {
+async function addPrivilegedPerson() {
   if (!isSuperAdmin() && !isManager()) { showToast('Permission denied.','err'); return; }
   const name = document.getElementById('newManagerName').value.trim();
   const role = document.getElementById('newManagerRole').value;
@@ -7240,7 +7409,8 @@ function addPrivilegedPerson() {
   ['newManagerName','newManagerPhone','newManagerEmail','newManagerAddress','newManagerDOB','newManagerJoinDate',
    'newManagerEC1Name','newManagerEC1Phone','newManagerEC1Relation','newManagerEC2Name','newManagerEC2Phone','newManagerEC2Relation'
   ].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
-  spSaveStaffMember(newMember);
+  const addOk2 = await spSaveStaffMember(newMember);
+  if (!addOk2) { showToast('Failed to save to SharePoint — please try again.','err'); return; }
   writeAuditLog('Account Added', name, `Added as ${ROLE_LABEL[role]} by ${currentUser.name}`);
   renderAdmin(); populateNameDropdown();
   showTempPin(name, tempPin);
@@ -7340,7 +7510,7 @@ function closeScheduleModal() {
   _editScheduleIdx = null;
 }
 
-function saveSchedule() {
+async function saveSchedule() {
   const i = _editScheduleIdx;
   if (i === null) return;
   const sh = document.getElementById('scheduleStartH').value;
@@ -7355,7 +7525,8 @@ function saveSchedule() {
   staff[i].endTime = end;
   staff[i].office = office;
   saveStaff(staff);
-  spSaveStaffMember(staff[i]);
+  const schedOk = await spSaveStaffMember(staff[i]);
+  if (!schedOk) { showToast('Failed to save schedule to SharePoint — please try again.','err'); return; }
   writeAuditLog('Schedule Updated', staff[i].name, `Updated by ${currentUser.name}: ${start}–${end}, ${office}`);
   closeScheduleModal();
   renderAdmin();
@@ -8124,7 +8295,7 @@ async function checkOpenBreak(userName) {
           recs[recIdx].breakNotEnded = true;
           recs[recIdx].needsReview = true;
           saveRecords(recs);
-          spSaveRecord(recs[recIdx]);
+          await spSaveRecord(recs[recIdx]);
         }
         // Log to error log
         logError('Break auto-closed: ' + userName + ' on ' + dateStr, 'AUTO-CLOSE', 'Open break from previous day auto-closed at scheduled end time', 'warning');
@@ -9442,14 +9613,14 @@ function renderCoverageCard(date) {
 }
 
 // ─── FLOOR CONFIRMATION ───────────────────────────────────────────────────
-function confirmFloor() {
+async function confirmFloor() {
   const recs = getRecords();
   const idx = recs.findIndex(r => r.date === today && r.name === currentUser.name);
   if (idx < 0) { showToast('Submit attendance first.', 'err'); return; }
   recs[idx].floorConfirmed = true;
   recs[idx].floorConfirmedAt = Date.now();
   saveRecords(recs);
-  spSaveRecord(recs[idx]);
+  await spSaveRecord(recs[idx]);
   document.getElementById('floorBtn').style.display = 'none';
   document.getElementById('floorConfirmed').style.display = 'block';
   showToast('✓ Presence confirmed!', 'ok');
@@ -10149,7 +10320,8 @@ async function saveFileEntry() {
     files.push(entry);
   }
   saveFileEntries(files);
-  spSyncFileEntry(entry).catch(()=>{});
+  const fileSaveOk = await spSyncFileEntry(entry);
+  if (!fileSaveOk) { showToast('⚠ File failed to save to SharePoint — please try again.','err'); return; }
   closeFileModal();
   showToast('File saved ✓', 'ok');
   updateFileLogUI();
@@ -10963,7 +11135,7 @@ function isStale(f) {
 // priority: 'urgent' | 'normal' — already saved in saveFileEntry
 
 // ── 3. QUICK STATUS UPDATE (inline on card) ────────────────────────────────
-function quickStatusUpdate(fileId, newStatus) {
+async function quickStatusUpdate(fileId, newStatus) {
   const files = getFileEntries();
   const idx = files.findIndex(f => f.id === fileId);
   if (idx < 0) return;
@@ -11014,7 +11186,8 @@ function quickStatusUpdate(fileId, newStatus) {
   if (newStatus === 'Settlement') { files[idx].active = false; files[idx].settledAt = today; }
 
   saveFileEntries(files);
-  spSyncFileEntry(files[idx]).catch(()=>{});
+  const stageOk = await spSyncFileEntry(files[idx]);
+  if (!stageOk) { showToast('⚠ Stage update failed to save — please try again.','err'); return; }
   showToast('Stage updated to ' + newStatus + ' ✓', 'ok');
 
   // Refresh whichever screen is active
@@ -11253,7 +11426,7 @@ function renderExistingAttachments(entry) {
     </div>`).join('');
 }
 
-function removeAttachmentByIndex(idx) {
+async function removeAttachmentByIndex(idx) {
   const attachments = window._pendingAttachments || [];
   attachments.splice(idx, 1);
   window._pendingAttachments = attachments;
@@ -11730,7 +11903,7 @@ function closeAssignBrokerModal() {
   _assignBrokerTarget = null;
 }
 
-function saveAssignBroker() {
+async function saveAssignBroker() {
   const brokerName = document.getElementById('assignBrokerName').value.trim();
   const targetName = document.getElementById('assignBrokerTarget').value;
   if (!brokerName) { showToast('Enter a broker name.', 'err'); return; }
@@ -11753,7 +11926,8 @@ function saveAssignBroker() {
   }
 
   saveStaff(staff);
-  spSaveStaffMember(staff[idx]);
+  const brokerOk = await spSaveStaffMember(staff[idx]);
+  if (!brokerOk) { showToast('Failed to save broker assignment to SharePoint — please try again.','err'); return; }
   writeAuditLog('Broker Assigned', targetName,
     `Broker "${brokerName}" assigned by ${currentUser.name}. Role upgraded from ${ROLE_LABEL[oldRole]||oldRole} to Analyst.`);
 
@@ -13064,7 +13238,7 @@ window.renderEODSummary = function(el, teamNames, date) {
   `;
 };
 
-function setPerfDays(days, btn) {
+async function setPerfDays(days, btn) {
   _perfDays = days;
   renderPerformanceScreen();
 }
