@@ -1705,6 +1705,7 @@ function spToRecord(item) {
     clockIn: hhmmToTs(item.ClockIn, dateStr),
     clockOut: hhmmToTs(item.ClockOut, dateStr),
     geo: (item.GeoLat && item.GeoLng) ? {lat:parseFloat(item.GeoLat),lng:parseFloat(item.GeoLng),accuracy:parseFloat(item.GeoAccuracy||0)} : null,
+    clockOutGeo: (item.ClockOutGeoLat && item.ClockOutGeoLng) ? {lat:parseFloat(item.ClockOutGeoLat),lng:parseFloat(item.ClockOutGeoLng),accuracy:parseFloat(item.ClockOutGeoAccuracy||0)} : null,
     submittedBy: item.SubmittedBy||null,
     msAccount: item.MsAccount||null,
     hasPhoto: item.HasPhoto === 'true' || item.HasPhoto === true,
@@ -8190,6 +8191,10 @@ async function spSaveRecord(rec) {
     GeoLng: rec.geo ? String(rec.geo.lng) : '',
     GeoAccuracy: rec.geo ? String(rec.geo.accuracy)+'m' : '',
     DistanceKm: String(distKm||''),
+    ClockOutGeoLat: rec.clockOutGeo ? String(rec.clockOutGeo.lat) : '',
+    ClockOutGeoLng: rec.clockOutGeo ? String(rec.clockOutGeo.lng) : '',
+    ClockOutGeoAccuracy: rec.clockOutGeo ? String(rec.clockOutGeo.accuracy)+'m' : '',
+    ClockOutDistanceKm: rec.clockOutGeo ? String(Math.round(calcGeoDistance(rec.clockOutGeo, getOfficeForRecord(rec)) * 10) / 10) : '',
     SubmittedBy: String(rec.submittedBy||rec.name||''),
     MsAccount: String(rec.msAccount||''),
     HasPhoto: rec.hasPhoto ? 'true' : 'false',
@@ -8388,6 +8393,27 @@ function getOfficeCoords(officeName) {
   return CONFIG.offices[officeName] || null;
 }
 
+function getOfficeForRecord(rec) {
+  const staff = getStaff().find(s => s.name === rec.name);
+  if (!staff || !staff.office) return null;
+  return getOfficeCoords(staff.office);
+}
+
+function calcGeoDistance(geo, office) {
+  if (!geo || !office) return '';
+  return haversineKm(geo.lat, geo.lng, office.lat, office.lng);
+}
+
+function geoFlagForClockOut(rec) {
+  if (!rec.clockOutGeo) return null;
+  const staff = getStaff().find(s => s.name === rec.name);
+  if (!staff || !staff.office || staff.office === 'WFH') return null;
+  const office = getOfficeCoords(staff.office);
+  if (!office) return null;
+  const dist = haversineKm(rec.clockOutGeo.lat, rec.clockOutGeo.lng, office.lat, office.lng);
+  return { dist: Math.round(dist * 10) / 10, ok: dist <= CONFIG.geoThresholdKm };
+}
+
 function geoFlagForRecord(rec) {
   if (!rec.geo) return null;
   const staff = getStaff().find(s => s.name === rec.name);
@@ -8400,17 +8426,29 @@ function geoFlagForRecord(rec) {
 
 function geoTag(rec) {
   if (!rec) return '';
-  if (!rec.geo) return '<span style="font-size:11px;color:var(--text-3)">📍 —</span>';
-  // Only show distance flag for office and halfday (expected at office)
-  if (rec.status === 'office' || rec.status === 'halfday') {
+  let inTag = '';
+  let outTag = '';
+  if (!rec.geo) {
+    inTag = '<span style="font-size:11px;color:var(--text-3)">📍 —</span>';
+  } else if (rec.status === 'office' || rec.status === 'halfday') {
     const flag = geoFlagForRecord(rec);
     if (flag) {
-      if (flag.ok) return `<span style="font-size:11px;color:var(--success)">📍 ${flag.dist}km ✓</span>`;
-      return `<span style="font-size:11px;color:var(--danger);font-weight:600">📍 ${flag.dist}km ⚠</span>`;
+      inTag = flag.ok
+        ? `<span style="font-size:11px;color:var(--success)">📍 in ${flag.dist}km ✓</span>`
+        : `<span style="font-size:11px;color:var(--danger);font-weight:600">📍 in ${flag.dist}km ⚠</span>`;
+    }
+  } else {
+    inTag = '<span style="font-size:11px;color:var(--text-3)">📍 recorded</span>';
+  }
+  if (rec.clockOutGeo && (rec.status === 'office' || rec.status === 'halfday')) {
+    const outFlag = geoFlagForClockOut(rec);
+    if (outFlag) {
+      outTag = outFlag.ok
+        ? `<span style="font-size:11px;color:var(--success)"> · out ${outFlag.dist}km ✓</span>`
+        : `<span style="font-size:11px;color:var(--danger);font-weight:600"> · out ${outFlag.dist}km ⚠</span>`;
     }
   }
-  // WFH / leave — just show recorded
-  return `<span style="font-size:11px;color:var(--text-3)">📍 recorded</span>`;
+  return inTag + outTag;
 }
 
 function requestGeo() {
