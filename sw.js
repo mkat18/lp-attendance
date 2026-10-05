@@ -1,4 +1,4 @@
-const CACHE = 'lp-v6';
+const CACHE = 'lp-v7';
 const ASSETS = ['index.html', 'attendance-multi-features.html', 'broker.html', 'logout.html'];
 
 const PASSTHROUGH = [
@@ -22,10 +22,10 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
-  const url = e.request.url;
+  const url = new URL(e.request.url);
 
   // Always pass SP/Microsoft calls directly to network — never cache
-  if (PASSTHROUGH.some(domain => url.includes(domain))) {
+  if (PASSTHROUGH.some(domain => url.hostname.includes(domain))) {
     e.respondWith(
       fetch(e.request).catch(err => {
         console.warn('SP fetch failed:', err);
@@ -38,17 +38,21 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  // HTML files - network first, fall back to cache
-  if (url.match(/\.(html)$/) || url.includes('version.json')) {
+  // HTML files - try cache first using pathname only (ignores query params)
+  if (url.pathname.match(/\.(html)$/) || url.pathname.includes('version.json')) {
+    // Try to match cache by pathname only (strip query params)
+    const cacheKey = new Request(url.origin + url.pathname);
     e.respondWith(
-      fetch(e.request).then(r => {
-        // Only cache successful responses
-        if (r.ok) {
-          const clone = r.clone();
-          caches.open(CACHE).then(c => c.put(e.request, clone));
-        }
-        return r;
-      }).catch(() => caches.match(e.request))
+      caches.match(cacheKey).then(cached => {
+        // Always fetch fresh from network too
+        const networkFetch = fetch(e.request).then(r => {
+          if (r.ok) {
+            caches.open(CACHE).then(c => c.put(cacheKey, r.clone()));
+          }
+          return r;
+        }).catch(() => cached);
+        return cached || networkFetch;
+      })
     );
     return;
   }
