@@ -2441,7 +2441,7 @@ document.addEventListener('keydown', function(e) {
 
   const loginActive  = document.getElementById('screen-login').classList.contains('active');
   const profileActive= document.getElementById('screen-profile').classList.contains('active');
-  const pinVisible   = document.getElementById('pinSection').style.display!=='none';
+  const pinVisible   = document.getElementById('pinSection')?.style.display!=='none';
 
   if (loginActive && pinVisible) {
     if (e.key>='0'&&e.key<='9') { e.preventDefault(); keyPress(e.key); }
