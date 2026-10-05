@@ -1,5 +1,4 @@
-const CACHE = 'lp-v7';
-const ASSETS = ['index.html', 'attendance-multi-features.html', 'broker.html', 'logout.html'];
+const CACHE = 'lp-v8';
 
 const PASSTHROUGH = [
   'sharepoint.com',
@@ -10,7 +9,7 @@ const PASSTHROUGH = [
 ];
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
+  // Don't pre-cache anything — let files cache on first use
   self.skipWaiting();
 });
 
@@ -27,38 +26,40 @@ self.addEventListener('fetch', e => {
   // Always pass SP/Microsoft calls directly to network — never cache
   if (PASSTHROUGH.some(domain => url.hostname.includes(domain))) {
     e.respondWith(
-      fetch(e.request).catch(err => {
-        console.warn('SP fetch failed:', err);
-        return new Response(JSON.stringify({error: 'network'}), {
-          status: 503,
-          headers: {'Content-Type': 'application/json'}
-        });
-      })
+      fetch(e.request).catch(() => new Response(JSON.stringify({error: 'network'}), {
+        status: 503,
+        headers: {'Content-Type': 'application/json'}
+      }))
     );
     return;
   }
 
-  // HTML files - try cache first using pathname only (ignores query params)
+  // HTML files — network first, cache on success, fall back to cache
   if (url.pathname.match(/\.(html)$/) || url.pathname.includes('version.json')) {
-    // Try to match cache by pathname only (strip query params)
     const cacheKey = new Request(url.origin + url.pathname);
     e.respondWith(
-      caches.match(cacheKey).then(cached => {
-        // Always fetch fresh from network too
-        const networkFetch = fetch(e.request).then(r => {
+      fetch(e.request)
+        .then(r => {
           if (r.ok) {
             caches.open(CACHE).then(c => c.put(cacheKey, r.clone()));
           }
           return r;
-        }).catch(() => cached);
-        return cached || networkFetch;
-      })
+        })
+        .catch(() => caches.match(cacheKey))
     );
     return;
   }
 
-  // Everything else - cache first, fall back to network
+  // Everything else — network first, fall back to cache
   e.respondWith(
-    caches.match(e.request).then(r => r || fetch(e.request))
+    fetch(e.request)
+      .then(r => {
+        if (r.ok) {
+          const clone = r.clone();
+          caches.open(CACHE).then(c => c.put(e.request, clone));
+        }
+        return r;
+      })
+      .catch(() => caches.match(e.request))
   );
 });
