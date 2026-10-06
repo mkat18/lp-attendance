@@ -6137,15 +6137,17 @@ async function spSyncTeams(teamsObj) {
 }
 
 async function loadFromSharePoint() {
-  const timeout = new Promise(resolve => setTimeout(resolve, 20000)); // 20s max
+  const timeout = new Promise(resolve => setTimeout(resolve, 60000)); // 60s max
   try {
     const load = async () => {
-      const [staffRes, recRes, brkRes] = await Promise.all([
-        spGet(SP_API + "('AttendanceStaff')/items?$top=500"),
+      // Load staff FIRST — critical for login matching
+      const staffRes = await spGet(SP_API + "('AttendanceStaff')/items?$top=500");
+      if (staffRes?.value?.length) { _staff = staffRes.value.map(spToStaff); LS.set('ci_staff', _staff); }
+      // Then load heavy data in parallel
+      const [recRes, brkRes] = await Promise.all([
         spGetAll(SP_API + "('AttendanceRecords')/items?$orderby=Id desc"),
         spGetAll(SP_API + "('AttendanceBreaks')/items?$orderby=Id desc"),
       ]);
-      if (staffRes?.value?.length) { _staff = staffRes.value.map(spToStaff); LS.set('ci_staff', _staff); }
       if (recRes?.value?.length)   { _records = recRes.value.map(spToRecord); }
       if (brkRes?.value?.length)   { _breaks = brkRes.value.map(spToBreak); }
       await Promise.all([
