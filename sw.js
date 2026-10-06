@@ -1,4 +1,4 @@
-const CACHE = 'lp-v8';
+const CACHE = 'lp-v9';
 
 const PASSTHROUGH = [
   'sharepoint.com',
@@ -9,7 +9,6 @@ const PASSTHROUGH = [
 ];
 
 self.addEventListener('install', e => {
-  // Don't pre-cache anything — let files cache on first use
   self.skipWaiting();
 });
 
@@ -22,6 +21,7 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
+  const method = e.request.method;
 
   // Always pass SP/Microsoft calls directly to network — never cache
   if (PASSTHROUGH.some(domain => url.hostname.includes(domain))) {
@@ -34,6 +34,12 @@ self.addEventListener('fetch', e => {
     return;
   }
 
+  // Only cache GET requests
+  if (method !== 'GET') {
+    e.respondWith(fetch(e.request));
+    return;
+  }
+
   // HTML files — network first, cache on success, fall back to cache
   if (url.pathname.match(/\.(html)$/) || url.pathname.includes('version.json')) {
     const cacheKey = new Request(url.origin + url.pathname);
@@ -41,7 +47,8 @@ self.addEventListener('fetch', e => {
       fetch(e.request)
         .then(r => {
           if (r.ok) {
-            caches.open(CACHE).then(c => c.put(cacheKey, r.clone()));
+            const clone = r.clone();
+            caches.open(CACHE).then(c => c.put(cacheKey, clone));
           }
           return r;
         })
@@ -50,7 +57,7 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  // Everything else — network first, fall back to cache
+  // Everything else GET — network first, fall back to cache
   e.respondWith(
     fetch(e.request)
       .then(r => {
