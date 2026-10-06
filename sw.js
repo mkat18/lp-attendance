@@ -1,12 +1,4 @@
-const CACHE = 'lp-v9';
-
-const PASSTHROUGH = [
-  'sharepoint.com',
-  'microsoft.com',
-  'microsoftonline.com',
-  'office.com',
-  'graph.microsoft.com',
-];
+const CACHE = 'lp-v10';
 
 self.addEventListener('install', e => {
   self.skipWaiting();
@@ -14,7 +6,7 @@ self.addEventListener('install', e => {
 
 self.addEventListener('activate', e => {
   e.waitUntil(caches.keys().then(keys =>
-    Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
+    Promise.all(keys.map(k => caches.delete(k)))
   ));
   self.clients.claim();
 });
@@ -23,25 +15,20 @@ self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
   const method = e.request.method;
 
-  // Always pass SP/Microsoft calls directly to network — never cache
-  if (PASSTHROUGH.some(domain => url.hostname.includes(domain))) {
-    e.respondWith(
-      fetch(e.request).catch(() => new Response(JSON.stringify({error: 'network'}), {
-        status: 503,
-        headers: {'Content-Type': 'application/json'}
-      }))
-    );
-    return;
-  }
-
-  // Only cache GET requests
+  // Never cache non-GET requests
   if (method !== 'GET') {
     e.respondWith(fetch(e.request));
     return;
   }
 
-  // HTML files — network first, cache on success, fall back to cache
-  if (url.pathname.match(/\.(html)$/) || url.pathname.includes('version.json')) {
+  // Never cache anything except our own HTML/JS/CSS files
+  if (url.origin !== self.location.origin) {
+    e.respondWith(fetch(e.request));
+    return;
+  }
+
+  // Our own HTML files — network first, fall back to cache
+  if (url.pathname.match(/\.(html|js|json|css)$/)) {
     const cacheKey = new Request(url.origin + url.pathname);
     e.respondWith(
       fetch(e.request)
@@ -57,16 +44,6 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  // Everything else GET — network first, fall back to cache
-  e.respondWith(
-    fetch(e.request)
-      .then(r => {
-        if (r.ok) {
-          const clone = r.clone();
-          caches.open(CACHE).then(c => c.put(e.request, clone));
-        }
-        return r;
-      })
-      .catch(() => caches.match(e.request))
-  );
+  // Everything else — straight to network
+  e.respondWith(fetch(e.request));
 });
