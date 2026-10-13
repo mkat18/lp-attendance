@@ -2741,10 +2741,10 @@ function goTab(name, btn) {
   if (name==='checkin') {
     if (!window._checkinRefreshTimer) window._checkinRefreshTimer = setInterval(() => {
       if (document.getElementById('screen-checkin')?.classList.contains('active') && currentUser) {
-        // Only refresh today's records — fast, preserves historical data already in memory
+        // Refresh most recent records — $top keeps it fast; preserves older data already in memory
         Promise.all([
-          spGetAll(SP_API + `('AttendanceRecords')/items?$filter=RecordDate ge datetime'${today}T00:00:00Z' and RecordDate lt datetime'${today}T23:59:59Z'&$orderby=Id desc`).then(r => { if (r&&r.value) { const fresh=r.value.map(spToRecord); _records=[...fresh,...(_records||[]).filter(x=>x.date!==today)]; } }),
-          spGetAll(SP_API + `('AttendanceBreaks')/items?$filter=BreakDate ge datetime'${today}T00:00:00Z' and BreakDate lt datetime'${today}T23:59:59Z'&$orderby=Id desc`).then(r => { if (r&&r.value) { const fresh=r.value.map(spToBreak); _breaks=[...fresh,...(_breaks||[]).filter(x=>x.date!==today)]; } })
+          spGetAll(SP_API + "('AttendanceRecords')/items?$orderby=Id desc&$top=500").then(r => { if (r&&r.value) { const fresh=r.value.map(spToRecord); const minFresh=Math.min(...r.value.map(x=>x.Id||x.ID||Infinity)); _records=[...fresh,...(_records||[]).filter(x=>(x.id||Infinity)<minFresh)]; } }),
+          spGetAll(SP_API + "('AttendanceBreaks')/items?$orderby=Id desc&$top=500").then(r =>  { if (r&&r.value) { const fresh=r.value.map(spToBreak);  const minFresh=Math.min(...r.value.map(x=>x.Id||x.ID||Infinity)); _breaks=[...fresh,...(_breaks||[]).filter(x=>(x.id||Infinity)<minFresh)];  } })
         ]).catch(()=>{}).finally(() => {
           updateClockOutUI(); updateBreakUI();
           // Sweep: if break shows as ended locally but SP still has it open, close it
@@ -6429,11 +6429,10 @@ function populateFilterNameDropdown() {
 
 function loadDashboard() {
   populateFilterNameDropdown();
-  // Refresh live data from SP before rendering — last 30 days only (fast)
-  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  // Refresh recent records — $top+Id ordering avoids SP list-threshold issues with unindexed columns
   Promise.all([
-    spGetAll(SP_API + `('AttendanceRecords')/items?$filter=RecordDate ge datetime'${thirtyDaysAgo}T00:00:00Z'&$orderby=Id desc`).then(r => { if (r&&r.value) { const fresh=r.value.map(spToRecord); _records=[...fresh,...(_records||[]).filter(x=>x.date<thirtyDaysAgo)]; } }),
-    spGetAll(SP_API + `('AttendanceBreaks')/items?$filter=BreakDate ge datetime'${thirtyDaysAgo}T00:00:00Z'&$orderby=Id desc`).then(r => { if (r&&r.value) { const fresh=r.value.map(spToBreak); _breaks=[...fresh,...(_breaks||[]).filter(x=>x.date<thirtyDaysAgo)]; } }),
+    spGetAll(SP_API + "('AttendanceRecords')/items?$orderby=Id desc&$top=4000").then(r => { if (r&&r.value) { _records=r.value.map(spToRecord); if (r.value.length) _minRecordId=Math.min(...r.value.map(x=>x.Id||x.ID||Infinity)); } }),
+    spGetAll(SP_API + "('AttendanceBreaks')/items?$orderby=Id desc&$top=6000").then(r =>  { if (r&&r.value) { _breaks=r.value.map(spToBreak);   if (r.value.length) _minBreakId=Math.min(...r.value.map(x=>x.Id||x.ID||Infinity));  } }),
     loadCoverageFromSP(),
     loadBrokerAssignments(),
     loadPermissions(),
@@ -8124,16 +8123,17 @@ async function spSyncTeams(teamsObj) {
   }
 }
 
-// Loads records older than 30 days in background after login — called once after user sees the app
+// Loads records older than initial $top batch in background — uses Id (always indexed) not RecordDate
 let _olderDataLoading = false;
+let _minRecordId = null; // lowest Id in the initial load — used to fetch older records
+let _minBreakId  = null;
 async function loadOlderRecordsInBackground() {
   if (_olderDataLoading) return;
   _olderDataLoading = true;
   try {
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     const [recRes, brkRes] = await Promise.all([
-      spGetAll(SP_API + `('AttendanceRecords')/items?$filter=RecordDate lt datetime'${thirtyDaysAgo}T00:00:00Z'&$orderby=Id desc`),
-      spGetAll(SP_API + `('AttendanceBreaks')/items?$filter=BreakDate lt datetime'${thirtyDaysAgo}T00:00:00Z'&$orderby=Id desc`),
+      _minRecordId ? spGetAll(SP_API + `('AttendanceRecords')/items?$filter=Id lt ${_minRecordId}&$orderby=Id desc`) : Promise.resolve({value:[]}),
+      _minBreakId  ? spGetAll(SP_API + `('AttendanceBreaks')/items?$filter=Id lt ${_minBreakId}&$orderby=Id desc`)  : Promise.resolve({value:[]}),
     ]);
     if (recRes?.value?.length) { _records = [...(_records||[]), ...recRes.value.map(spToRecord)]; }
     if (brkRes?.value?.length) { _breaks  = [...(_breaks||[]),  ...brkRes.value.map(spToBreak)];  }
@@ -8149,19 +8149,21 @@ async function loadFromSharePoint() {
       _staff = staffRes.value.map(spToStaff);
       LS.set('ci_staff', _staff);
     }
-    // Load only last 30 days of records/breaks — fast login
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    // $top=4000 newest records ordered by Id (Id is always indexed — safe on large lists)
+    // Date filters fail on unindexed columns in large SP lists, so we avoid them here
     const [recRes, brkRes] = await Promise.all([
-      spGetAll(SP_API + `('AttendanceRecords')/items?$filter=RecordDate ge datetime'${thirtyDaysAgo}T00:00:00Z'&$orderby=Id desc`),
-      spGetAll(SP_API + `('AttendanceBreaks')/items?$filter=BreakDate ge datetime'${thirtyDaysAgo}T00:00:00Z'&$orderby=Id desc`),
+      spGetAll(SP_API + "('AttendanceRecords')/items?$orderby=Id desc&$top=4000"),
+      spGetAll(SP_API + "('AttendanceBreaks')/items?$orderby=Id desc&$top=6000"),
     ]);
     if (recRes && recRes.value && recRes.value.length > 0) {
       _records = recRes.value.map(spToRecord);
+      _minRecordId = Math.min(...recRes.value.map(r => r.Id || r.ID || Infinity));
       // Refresh check-in UI now that records are loaded — shows correct clock-out/break state
       if (currentUser) { updateClockOutUI(); updateBreakUI(); }
     }
     if (brkRes && brkRes.value && brkRes.value.length > 0) {
       _breaks = brkRes.value.map(spToBreak);
+      _minBreakId = Math.min(...brkRes.value.map(b => b.Id || b.ID || Infinity));
     }
     // Load all other data from SP in parallel
     await Promise.all([

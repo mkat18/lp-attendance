@@ -2267,11 +2267,10 @@ function goTab(name, btn) {
   try { sessionStorage.setItem('lp_last_tab', name); } catch(e) {}
   showScreen(name);
   if (name==='myteam') {
-    // Reload EODs and recent records fresh from SP before rendering My Team (30 days)
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    // Reload EODs and recent records fresh from SP before rendering My Team
     Promise.all([
       loadEODFromSP().catch(()=>{}),
-      spGetAll(SP_API + `('AttendanceRecords')/items?$filter=RecordDate ge datetime'${thirtyDaysAgo}T00:00:00Z'&$orderby=Id desc`).then(r => { if (r&&r.value) { const fresh=r.value.map(spToRecord); _records=[...fresh,...(_records||[]).filter(x=>x.date<thirtyDaysAgo)]; } }).catch(()=>{})
+      spGetAll(SP_API + "('AttendanceRecords')/items?$orderby=Id desc&$top=4000").then(r => { if (r&&r.value) { _records=r.value.map(spToRecord); if (r.value.length) _minRecordId=Math.min(...r.value.map(x=>x.Id||x.ID||Infinity)); } }).catch(()=>{})
     ]).finally(() => renderMyTeam());
     return;
   }
@@ -4661,11 +4660,10 @@ function renderOfficeManager() {
 }
 
 function loadDashboard() {
-  // Refresh live data from SP before rendering — last 30 days only (fast)
-  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  // Refresh recent records — $top+Id ordering avoids SP list-threshold issues with unindexed columns
   Promise.all([
-    spGetAll(SP_API + `('AttendanceRecords')/items?$filter=RecordDate ge datetime'${thirtyDaysAgo}T00:00:00Z'&$orderby=Id desc`).then(r => { if (r&&r.value) { const fresh=r.value.map(spToRecord); _records=[...fresh,...(_records||[]).filter(x=>x.date<thirtyDaysAgo)]; } }),
-    spGetAll(SP_API + `('AttendanceBreaks')/items?$filter=BreakDate ge datetime'${thirtyDaysAgo}T00:00:00Z'&$orderby=Id desc`).then(r => { if (r&&r.value) { const fresh=r.value.map(spToBreak); _breaks=[...fresh,...(_breaks||[]).filter(x=>x.date<thirtyDaysAgo)]; } }),
+    spGetAll(SP_API + "('AttendanceRecords')/items?$orderby=Id desc&$top=4000").then(r => { if (r&&r.value) { _records=r.value.map(spToRecord); if (r.value.length) _minRecordId=Math.min(...r.value.map(x=>x.Id||x.ID||Infinity)); } }),
+    spGetAll(SP_API + "('AttendanceBreaks')/items?$orderby=Id desc&$top=6000").then(r =>  { if (r&&r.value) { _breaks=r.value.map(spToBreak);   if (r.value.length) _minBreakId=Math.min(...r.value.map(x=>x.Id||x.ID||Infinity));  } }),
   ]).catch(()=>{}).finally(() => {
     renderMetrics(); loadTabs(); renderNeedsAttention(); renderWeeklyWidgets();
   });
@@ -6138,16 +6136,17 @@ async function spSyncTeams(teamsObj) {
   }
 }
 
-// Loads records older than 30 days in background after login — called once after user sees the app
+// Loads records older than initial $top batch in background — uses Id (always indexed) not RecordDate
 let _olderDataLoading = false;
+let _minRecordId = null; // lowest Id in the initial load — used to fetch older records
+let _minBreakId  = null;
 async function loadOlderRecordsInBackground() {
   if (_olderDataLoading) return;
   _olderDataLoading = true;
   try {
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     const [recRes, brkRes] = await Promise.all([
-      spGetAll(SP_API + `('AttendanceRecords')/items?$filter=RecordDate lt datetime'${thirtyDaysAgo}T00:00:00Z'&$orderby=Id desc`),
-      spGetAll(SP_API + `('AttendanceBreaks')/items?$filter=BreakDate lt datetime'${thirtyDaysAgo}T00:00:00Z'&$orderby=Id desc`),
+      _minRecordId ? spGetAll(SP_API + `('AttendanceRecords')/items?$filter=Id lt ${_minRecordId}&$orderby=Id desc`) : Promise.resolve({value:[]}),
+      _minBreakId  ? spGetAll(SP_API + `('AttendanceBreaks')/items?$filter=Id lt ${_minBreakId}&$orderby=Id desc`)  : Promise.resolve({value:[]}),
     ]);
     if (recRes?.value?.length) { _records = [...(_records||[]), ...recRes.value.map(spToRecord)]; }
     if (brkRes?.value?.length) { _breaks  = [...(_breaks||[]),  ...brkRes.value.map(spToBreak)];  }
@@ -6162,14 +6161,20 @@ async function loadFromSharePoint() {
       // Load staff FIRST — critical for login matching
       const staffRes = await spGet(SP_API + "('AttendanceStaff')/items?$top=500");
       if (staffRes?.value?.length) { _staff = staffRes.value.map(spToStaff); LS.set('ci_staff', _staff); }
-      // Load only last 30 days of records/breaks — fast (2-3 SP pages instead of 20+)
-      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      // $top=4000 newest records ordered by Id (Id is always indexed — safe on large lists)
+      // Date filters fail on unindexed columns in large SP lists, so we avoid them here
       const [recRes, brkRes] = await Promise.all([
-        spGetAll(SP_API + `('AttendanceRecords')/items?$filter=RecordDate ge datetime'${thirtyDaysAgo}T00:00:00Z'&$orderby=Id desc`),
-        spGetAll(SP_API + `('AttendanceBreaks')/items?$filter=BreakDate ge datetime'${thirtyDaysAgo}T00:00:00Z'&$orderby=Id desc`),
+        spGetAll(SP_API + "('AttendanceRecords')/items?$orderby=Id desc&$top=4000"),
+        spGetAll(SP_API + "('AttendanceBreaks')/items?$orderby=Id desc&$top=6000"),
       ]);
-      if (recRes?.value?.length)   { _records = recRes.value.map(spToRecord); }
-      if (brkRes?.value?.length)   { _breaks = brkRes.value.map(spToBreak); }
+      if (recRes?.value?.length) {
+        _records = recRes.value.map(spToRecord);
+        _minRecordId = Math.min(...recRes.value.map(r => r.Id || r.ID || Infinity));
+      }
+      if (brkRes?.value?.length) {
+        _breaks = brkRes.value.map(spToBreak);
+        _minBreakId = Math.min(...brkRes.value.map(b => b.Id || b.ID || Infinity));
+      }
       await Promise.all([
         loadObsNotesFromSP(),
         loadPermissions(),
@@ -7118,11 +7123,9 @@ function refreshObsNotes() {
 // ── Auto-refresh My Team every 60s when on that screen ───────────────────
 setInterval(() => {
   if (document.getElementById('screen-myteam')?.classList.contains('active')) {
-    // Reload fresh recent data from SP before re-rendering (30 days — fast)
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     Promise.all([
       loadEODFromSP().catch(()=>{}),
-      spGetAll(SP_API + `('AttendanceRecords')/items?$filter=RecordDate ge datetime'${thirtyDaysAgo}T00:00:00Z'&$orderby=Id desc`).then(r => { if (r&&r.value) { const fresh=r.value.map(spToRecord); _records=[...fresh,...(_records||[]).filter(x=>x.date<thirtyDaysAgo)]; } }).catch(()=>{})
+      spGetAll(SP_API + "('AttendanceRecords')/items?$orderby=Id desc&$top=4000").then(r => { if (r&&r.value) { _records=r.value.map(spToRecord); if (r.value.length) _minRecordId=Math.min(...r.value.map(x=>x.Id||x.ID||Infinity)); } }).catch(()=>{})
     ]).finally(() => renderMyTeam());
   }
 }, 60000);
