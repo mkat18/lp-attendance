@@ -2270,7 +2270,7 @@ function goTab(name, btn) {
     // Reload EODs and recent records fresh from SP before rendering My Team
     Promise.all([
       loadEODFromSP().catch(()=>{}),
-      spGetAll(SP_API + "('AttendanceRecords')/items?$orderby=Id desc&$top=4000").then(r => { if (r&&r.value) { _records=r.value.map(spToRecord); if (r.value.length) _minRecordId=Math.min(...r.value.map(x=>x.Id||x.ID||Infinity)); } }).catch(()=>{})
+      refreshNewest(HIST_RECENT_ROWS, ['rec'])
     ]).finally(() => renderMyTeam());
     return;
   }
@@ -4662,8 +4662,7 @@ function renderOfficeManager() {
 function loadDashboard() {
   // Refresh recent records — $top+Id ordering avoids SP list-threshold issues with unindexed columns
   Promise.all([
-    spGetAll(SP_API + "('AttendanceRecords')/items?$orderby=Id desc&$top=4000").then(r => { if (r&&r.value) { _records=r.value.map(spToRecord); if (r.value.length) _minRecordId=Math.min(...r.value.map(x=>x.Id||x.ID||Infinity)); } }),
-    spGetAll(SP_API + "('AttendanceBreaks')/items?$orderby=Id desc&$top=6000").then(r =>  { if (r&&r.value) { _breaks=r.value.map(spToBreak);   if (r.value.length) _minBreakId=Math.min(...r.value.map(x=>x.Id||x.ID||Infinity));  } }),
+    refreshNewest(HIST_RECENT_ROWS),
   ]).catch(()=>{}).finally(() => {
     renderMetrics(); loadTabs(); renderNeedsAttention(); renderWeeklyWidgets();
   });
@@ -6136,22 +6135,147 @@ async function spSyncTeams(teamsObj) {
   }
 }
 
-// Loads records older than initial $top batch in background — uses Id (always indexed) not RecordDate
-let _olderDataLoading = false;
-let _minRecordId = null; // lowest Id in the initial load — used to fetch older records
-let _minBreakId  = null;
-async function loadOlderRecordsInBackground() {
-  if (_olderDataLoading) return;
-  _olderDataLoading = true;
+// ══ Attendance history loader ═════════════════════════════════════════════
+// Login cost is fixed no matter how large the lists grow:
+//   1. Login / refreshes fetch only the newest rows, in ONE request per list.
+//   2. After login, older rows are filled in behind the scenes, back to a fixed
+//      number of days — never the whole list.
+//   3. Anything older is fetched only when a screen asks for that date range
+//      (ensureHistory).
+// All paging is by Id, which SharePoint always indexes, so it keeps working at
+// any list size. RecordDate / BreakDate are text columns and are never filtered.
+const HIST_RECENT_ROWS = 1000;  // login + dashboard refresh (one request)
+const HIST_POLL_ROWS   = 300;   // 10s / 60s refreshes (one request)
+const HIST_PAGE_ROWS   = 5000;  // older-history page size (SharePoint maximum)
+const HIST_KEEP_DAYS   = 120;   // days of history kept ready after login
+const HIST_LEAD_DAYS   = 45;    // allowance for rows created ahead of their date (leave booked in advance)
+const _hist = {
+  rec: { list: 'AttendanceRecords', minId: null, boundary: null, atStart: false, chain: null, gen: 0 },
+  brk: { list: 'AttendanceBreaks',  minId: null, boundary: null, atStart: false, chain: null, gen: 0 },
+};
+function _histGet(k)    { return (k === 'rec' ? _records : _breaks) || []; }
+function _histSet(k, a) { if (k === 'rec') _records = a; else _breaks = a; }
+function _histMap(k, items) { return items.map(k === 'rec' ? spToRecord : spToBreak); }
+function _histDateMinus(dateStr, days) {
+  const d = new Date(dateStr + 'T12:00:00Z');
+  if (isNaN(d)) return '0000-00-00';
+  d.setUTCDate(d.getUTCDate() - days);
+  return d.toISOString().split('T')[0];
+}
+// Typical date of the oldest rows in a page (rows arrive newest-first). The
+// median ignores the odd back-dated or future-dated row.
+function _histBoundary(mapped) {
+  const dates = mapped.slice(-200).map(x => x.date).filter(Boolean).sort();
+  return dates.length ? dates[Math.floor(dates.length / 2)] : null;
+}
+function _histMinId(mapped) {
+  let m = null;
+  for (const x of mapped) { const n = Number(x.id); if (isFinite(n) && n > 0 && (m === null || n < m)) m = n; }
+  return m;
+}
+// One SharePoint request — never follows next-page links.
+async function spGetPage(url) {
   try {
-    const [recRes, brkRes] = await Promise.all([
-      _minRecordId ? spGetAll(SP_API + `('AttendanceRecords')/items?$filter=Id lt ${_minRecordId}&$orderby=Id desc`) : Promise.resolve({value:[]}),
-      _minBreakId  ? spGetAll(SP_API + `('AttendanceBreaks')/items?$filter=Id lt ${_minBreakId}&$orderby=Id desc`)  : Promise.resolve({value:[]}),
-    ]);
-    if (recRes?.value?.length) { _records = [...(_records||[]), ...recRes.value.map(spToRecord)]; }
-    if (brkRes?.value?.length) { _breaks  = [...(_breaks||[]),  ...brkRes.value.map(spToBreak)];  }
-    console.log('[BG] Older records loaded:', recRes?.value?.length, 'records,', brkRes?.value?.length, 'breaks');
-  } catch(e) { console.warn('[BG] Older records load failed:', e); }
+    const token = await getToken();
+    const r = await fetch(url, { headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json;odata=nometadata' } });
+    if (!r.ok) { console.warn('[HIST] request failed', r.status, url); return { ok: false, value: [] }; }
+    const data = await r.json();
+    return { ok: true, value: (data && data.value) || [] };
+  } catch (e) { console.warn('[HIST] request error', e); return { ok: false, value: [] }; }
+}
+// Fetch the newest `rows` rows of a list and merge them over what is in memory.
+// Rows older than the fetched window are kept exactly as they are.
+async function _histRefreshKind(k, rows) {
+  const st = _hist[k];
+  const res = await spGetPage(SP_API + "('" + st.list + "')/items?$orderby=Id desc&$top=" + rows);
+  if (!res.ok) return false;
+  if (!res.value.length) { st.atStart = true; return true; }
+  const fresh = _histMap(k, res.value);
+  const minFresh = _histMinId(fresh);
+  if (minFresh === null) return false;
+  const existing = _histGet(k).filter(x => Number(x.id) > 0);
+  if (!existing.length && st.minId !== null) { st.minId = null; st.boundary = null; st.atStart = false; st.gen++; } // memory was cleared — start again
+  let existingMax = null;
+  for (const x of existing) { const n = Number(x.id); if (existingMax === null || n > existingMax) existingMax = n; }
+  _histSet(k, [...fresh, ...existing.filter(x => Number(x.id) < minFresh)]);
+  if (st.minId === null || minFresh < st.minId) { st.minId = minFresh; st.boundary = _histBoundary(fresh); }
+  if (res.value.length < rows) st.atStart = true;
+  // If this screen sat idle long enough that more than `rows` new rows were added,
+  // fetch the rows in between so there is no hole in the middle.
+  if (existingMax !== null && existingMax < minFresh - 1) {
+    let hi = minFresh;
+    for (let guard = 0; guard < 20; guard++) {
+      const gap = await spGetPage(SP_API + "('" + st.list + "')/items?$filter=Id lt " + hi + " and Id gt " + existingMax + "&$orderby=Id desc&$top=" + HIST_PAGE_ROWS);
+      if (!gap.ok || !gap.value.length) break;
+      const mapped = _histMap(k, gap.value);
+      const have = new Set(_histGet(k).map(x => Number(x.id)));
+      _histSet(k, [..._histGet(k), ...mapped.filter(x => !have.has(Number(x.id)))].sort((a, b) => (Number(b.id) || Infinity) - (Number(a.id) || Infinity)));
+      if (gap.value.length < HIST_PAGE_ROWS) break;
+      hi = _histMinId(mapped);
+      if (hi === null) break;
+    }
+  }
+  return true;
+}
+// Refresh the newest rows of records and/or breaks. Never throws.
+async function refreshNewest(rows, kinds) {
+  try {
+    const out = await Promise.all((kinds || ['rec', 'brk']).map(k => _histRefreshKind(k, rows)));
+    return out.every(Boolean);
+  } catch (e) { console.warn('[HIST] refresh failed', e); return false; }
+}
+// Load the next page of older rows for one list. Returns false if nothing more could be loaded.
+function _histLoadOlder(k, fromDate) {
+  const st = _hist[k];
+  const run = async () => {
+    if (st.atStart) return false;
+    if (fromDate && _histCoversKind(k, fromDate)) return true; // an earlier request already loaded it
+    if (st.minId === null) return await _histRefreshKind(k, HIST_RECENT_ROWS) && st.minId !== null;
+    const gen = st.gen;
+    const res = await spGetPage(SP_API + "('" + st.list + "')/items?$filter=Id lt " + st.minId + "&$orderby=Id desc&$top=" + HIST_PAGE_ROWS);
+    if (!res.ok || gen !== st.gen) return false;
+    if (res.value.length < HIST_PAGE_ROWS) st.atStart = true;
+    if (!res.value.length) return true;
+    const mapped = _histMap(k, res.value);
+    const have = new Set(_histGet(k).map(x => Number(x.id)));
+    _histSet(k, [..._histGet(k), ...mapped.filter(x => !have.has(Number(x.id)))]);
+    const m = _histMinId(mapped);
+    if (m !== null && m < st.minId) { st.minId = m; st.boundary = _histBoundary(mapped) || st.boundary; }
+    return true;
+  };
+  st.chain = (st.chain || Promise.resolve()).then(run, run);
+  return st.chain;
+}
+function _histCoversKind(k, fromDate) {
+  const st = _hist[k];
+  if (st.atStart) return true;
+  return !!st.boundary && st.boundary < _histDateMinus(fromDate, HIST_LEAD_DAYS);
+}
+// True when everything dated on or after `fromDate` is already in memory.
+function histCovers(fromDate) {
+  if (!fromDate) return true;
+  return _histCoversKind('rec', fromDate) && _histCoversKind('brk', fromDate);
+}
+// Make sure everything dated on or after `fromDate` is in memory, loading older
+// pages if needed. Resolves true if anything new was loaded. Never throws.
+async function ensureHistory(fromDate) {
+  if (!fromDate || histCovers(fromDate)) return false;
+  const before = _histGet('rec').length + _histGet('brk').length;
+  try {
+    await Promise.all(['rec', 'brk'].map(async k => {
+      for (let guard = 0; guard < 60 && !_histCoversKind(k, fromDate); guard++) {
+        if (!(await _histLoadOlder(k, fromDate))) break;
+      }
+    }));
+  } catch (e) { console.warn('[HIST] ensureHistory failed', e); }
+  return (_histGet('rec').length + _histGet('brk').length) !== before;
+}
+// After login: fill history back to the standard window, without blocking the user.
+function histBackgroundFill() {
+  ensureHistory(_histDateMinus(today, HIST_KEEP_DAYS)).then(changed => {
+    if (!changed) return;
+    try { if (typeof currentUser !== 'undefined' && currentUser && typeof updateClockOutUI === 'function') { updateClockOutUI(); updateBreakUI(); } } catch (e) {}
+  });
 }
 
 async function loadFromSharePoint() {
@@ -6161,20 +6285,8 @@ async function loadFromSharePoint() {
       // Load staff FIRST — critical for login matching
       const staffRes = await spGet(SP_API + "('AttendanceStaff')/items?$top=500");
       if (staffRes?.value?.length) { _staff = staffRes.value.map(spToStaff); LS.set('ci_staff', _staff); }
-      // $top=4000 newest records ordered by Id (Id is always indexed — safe on large lists)
-      // Date filters fail on unindexed columns in large SP lists, so we avoid them here
-      const [recRes, brkRes] = await Promise.all([
-        spGetAll(SP_API + "('AttendanceRecords')/items?$orderby=Id desc&$top=4000"),
-        spGetAll(SP_API + "('AttendanceBreaks')/items?$orderby=Id desc&$top=6000"),
-      ]);
-      if (recRes?.value?.length) {
-        _records = recRes.value.map(spToRecord);
-        _minRecordId = Math.min(...recRes.value.map(r => r.Id || r.ID || Infinity));
-      }
-      if (brkRes?.value?.length) {
-        _breaks = brkRes.value.map(spToBreak);
-        _minBreakId = Math.min(...brkRes.value.map(b => b.Id || b.ID || Infinity));
-      }
+      // Newest rows only — one request per list, same cost however large the lists grow
+      await refreshNewest(HIST_RECENT_ROWS);
       await Promise.all([
         loadObsNotesFromSP(),
         loadPermissions(),
@@ -6194,8 +6306,8 @@ async function loadFromSharePoint() {
       if (_roles.length) EDITABLE_ROLES = _roles.map(r => r.title).filter(r => r !== 'superadmin');
     };
     await Promise.race([load(), timeout]);
-    // Kick off background load of older data (>30 days) — non-blocking, user is already in
-    setTimeout(() => loadOlderRecordsInBackground(), 4000);
+    // Fill in older history behind the scenes — the user is already in
+    histBackgroundFill();
   } catch(e) {
     console.error('SharePoint load error:', e);
   }
@@ -7125,7 +7237,7 @@ setInterval(() => {
   if (document.getElementById('screen-myteam')?.classList.contains('active')) {
     Promise.all([
       loadEODFromSP().catch(()=>{}),
-      spGetAll(SP_API + "('AttendanceRecords')/items?$orderby=Id desc&$top=4000").then(r => { if (r&&r.value) { _records=r.value.map(spToRecord); if (r.value.length) _minRecordId=Math.min(...r.value.map(x=>x.Id||x.ID||Infinity)); } }).catch(()=>{})
+      refreshNewest(HIST_POLL_ROWS, ['rec'])
     ]).finally(() => renderMyTeam());
   }
 }, 60000);
@@ -12391,6 +12503,63 @@ function clvRender() {
       window.location.reload();
     });
   }
+
+// ══ History guards ════════════════════════════════════════════════════════
+// Screens that look at a date range call through these wrappers. If the range
+// reaches further back than what is in memory, the older rows are loaded and
+// the screen is drawn again with the complete data.
+(function () {
+  function val(id) { const el = document.getElementById(id); return el ? el.value : ''; }
+  // Redraw wrapper: draw now, and once more when older rows arrive.
+  function redrawWhenLoaded(name, getFrom, redraw) {
+    const orig = window[name];
+    if (typeof orig !== 'function') return;
+    let calls = 0;
+    window[name] = function () {
+      const args = arguments, self = this, mine = ++calls;
+      let from = '';
+      try { from = getFrom.apply(null, args) || ''; } catch (e) {}
+      if (from && !histCovers(from)) {
+        ensureHistory(from).then(changed => {
+          if (!changed || mine !== calls) return;
+          try { redraw ? redraw(orig, args) : orig.apply(self, args); } catch (e) { console.warn('[HIST] redraw failed: ' + name, e); }
+        });
+      }
+      return orig.apply(this, args);
+    };
+  }
+  // Wait wrapper: load older rows first, then run (used where acting on partial data would be wrong).
+  function waitThenRun(name, getFrom, message) {
+    const orig = window[name];
+    if (typeof orig !== 'function') return;
+    window[name] = async function () {
+      let from = '';
+      try { from = getFrom.apply(null, arguments) || ''; } catch (e) {}
+      if (from && !histCovers(from)) {
+        if (message) { try { showToast(message, 'ok'); } catch (e) {} }
+        await ensureHistory(from);
+      }
+      return orig.apply(this, arguments);
+    };
+  }
+  // Dashboard and its tabs
+  redrawWhenLoaded('renderMetrics', () => getSelectedDate());
+  redrawWhenLoaded('loadTabs', () => val('fromDate') || today);
+  // Needs-attention list with a custom date range
+  redrawWhenLoaded('filterAttention', period => period === 'custom' ? val('attFromDate') : '', (orig, args) => {
+    Promise.resolve(typeof renderNeedsAttention === 'function' ? renderNeedsAttention() : null).then(() => orig.apply(null, args));
+  });
+  // EOD summary for a chosen date (uses that day's check-ins)
+  redrawWhenLoaded('renderEODSummary', (el, teamNames, date) => date || today, (orig, args) => {
+    if (args[0] && args[0].isConnected) orig.apply(null, args);
+  });
+  // Export and anything that creates or removes records for a date range
+  waitThenRun('exportCSV', () => val('fromDate'), 'Loading older records…');
+  waitThenRun('autoMarkLeaveAttendance', req => req && req.StartDate);
+  waitThenRun('revertLeaveAttendance', req => req && req.StartDate);
+  waitThenRun('_obSubmit', () => val('_ob_startDate'));
+  waitThenRun('confirmOnBehalf', () => getSelectedDate());
+})();
 </script>
 </body>
 </html>
