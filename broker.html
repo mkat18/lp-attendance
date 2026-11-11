@@ -5973,17 +5973,7 @@ async function spDeleteFileEntry(fileId) {
 }
 
 // ── EOD Reports ───────────────────────────────────────────────────────────
-async function loadEODFromSP() {
-  const items = await spLoadJsonList('EODReports');
-  _eodReports = {};
-  for (const item of items) {
-    try {
-      const data = JSON.parse(item.Data || '{}');
-      const key = item.Title;
-      _eodReports[key] = { data, spId: item.Id };
-    } catch(e) {}
-  }
-}
+// loadEODFromSP is defined with the EOD reports loader further down
 
 function getEODReports() {
   if (_eodReports) return Object.values(_eodReports).map(e => e.data);
@@ -6276,6 +6266,123 @@ function histBackgroundFill() {
     if (!changed) return;
     try { if (typeof currentUser !== 'undefined' && currentUser && typeof updateClockOutUI === 'function') { updateClockOutUI(); updateBreakUI(); } } catch (e) {}
   });
+  ensureEODHistory(_histDateMinus(today, EOD_KEEP_DAYS));
+}
+
+// ══ EOD reports loader ════════════════════════════════════════════════════
+// Same fixed-size loading as attendance: newest rows first (one request),
+// a fixed window filled in after login, older days fetched when a screen asks.
+// The old loader took the FIRST 5,000 rows, so once the list passed 5,000 the
+// newest EODs were never loaded and every save created a duplicate row.
+const EOD_RECENT_ROWS = 600;   // login + refreshes (one request)
+const EOD_KEEP_DAYS   = 45;    // days of EODs kept ready after login
+const EOD_LEAD_DAYS   = 3;
+const _eodHist = { minId: null, maxId: null, boundary: null, atStart: false, chain: null };
+const _EOD_URL = () => SP_API + "('EODReports')/items?$select=Id,Title,Data";
+function _eodRows(items) {
+  const rows = [];
+  for (const item of items) {
+    const id = Number(item.Id || item.ID);
+    if (!(id > 0)) continue;
+    let data = null;
+    try { data = JSON.parse(item.Data || '{}'); } catch (e) {}
+    rows.push({ id, key: item.Title, data });
+  }
+  return rows;
+}
+// Put rows into memory. Where SharePoint holds several rows for the same person
+// and day, a submitted report beats a draft, otherwise the newest row wins.
+function _eodMerge(rows) {
+  _eodReports = _eodReports || {};
+  for (const row of rows) {
+    if (!row.data || !row.key) continue;
+    const cur = _eodReports[row.key];
+    let take = !cur || cur.spId == null || Number(cur.spId) === row.id;
+    if (!take) {
+      const rs = row.data.status === 'submitted', cs = !!cur.data && cur.data.status === 'submitted';
+      take = rs !== cs ? rs : row.id > Number(cur.spId);
+    }
+    if (take) _eodReports[row.key] = { data: row.data, spId: row.id };
+  }
+}
+function _eodBoundary(rows) {
+  const dates = rows.slice(-200).map(r => r.data && r.data.date).filter(Boolean).sort();
+  return dates.length ? dates[Math.floor(dates.length / 2)] : null;
+}
+function _eodNote(rows) {
+  const st = _eodHist;
+  const ids = rows.map(r => r.id);
+  const lo = Math.min(...ids), hi = Math.max(...ids);
+  if (st.maxId === null || hi > st.maxId) st.maxId = hi;
+  if (st.minId === null || lo < st.minId) { st.minId = lo; st.boundary = _eodBoundary(rows) || st.boundary; }
+}
+async function _eodRefresh(rows) {
+  const st = _eodHist;
+  const res = await spGetPage(_EOD_URL() + "&$orderby=Id desc&$top=" + rows);
+  if (!res.ok) return false;
+  _eodReports = _eodReports || {};
+  if (res.value.length < rows) st.atStart = true;
+  const fresh = _eodRows(res.value);
+  if (!fresh.length) return true;
+  const prevMax = st.maxId, minFresh = Math.min(...fresh.map(r => r.id));
+  _eodMerge(fresh);
+  _eodNote(fresh);
+  // Screen sat idle while more than `rows` EODs were added — fetch the ones in between
+  if (prevMax !== null && prevMax < minFresh - 1) {
+    let hi = minFresh;
+    for (let guard = 0; guard < 20; guard++) {
+      const gap = await spGetPage(_EOD_URL() + "&$filter=Id lt " + hi + " and Id gt " + prevMax + "&$orderby=Id desc&$top=" + HIST_PAGE_ROWS);
+      if (!gap.ok || !gap.value.length) break;
+      const g = _eodRows(gap.value);
+      _eodMerge(g);
+      if (gap.value.length < HIST_PAGE_ROWS || !g.length) break;
+      hi = Math.min(...g.map(r => r.id));
+    }
+  }
+  return true;
+}
+function _eodLoadOlder(fromDate) {
+  const st = _eodHist;
+  const run = async () => {
+    if (st.atStart) return false;
+    if (fromDate && eodCovers(fromDate)) return true;
+    if (st.minId === null) return await _eodRefresh(EOD_RECENT_ROWS) && st.minId !== null;
+    const res = await spGetPage(_EOD_URL() + "&$filter=Id lt " + st.minId + "&$orderby=Id desc&$top=" + HIST_PAGE_ROWS);
+    if (!res.ok) return false;
+    if (res.value.length < HIST_PAGE_ROWS) st.atStart = true;
+    const older = _eodRows(res.value);
+    if (!older.length) return true;
+    _eodMerge(older);
+    _eodNote(older);
+    return true;
+  };
+  st.chain = (st.chain || Promise.resolve()).then(run, run);
+  return st.chain;
+}
+function eodCovers(fromDate) {
+  if (!fromDate || _eodHist.atStart) return true;
+  return !!_eodHist.boundary && _eodHist.boundary < _histDateMinus(fromDate, EOD_LEAD_DAYS);
+}
+async function ensureEODHistory(fromDate) {
+  if (eodCovers(fromDate)) return false;
+  const before = Object.keys(_eodReports || {}).length;
+  try {
+    for (let guard = 0; guard < 60 && !eodCovers(fromDate); guard++) {
+      if (!(await _eodLoadOlder(fromDate))) break;
+    }
+  } catch (e) { console.warn('[HIST] ensureEODHistory failed', e); }
+  return Object.keys(_eodReports || {}).length !== before;
+}
+// Used by the screen guards: attendance + breaks + EODs together.
+function allHistoryCovers(fromDate) { return histCovers(fromDate) && eodCovers(fromDate); }
+async function ensureAllHistory(fromDate) {
+  const out = await Promise.all([ensureHistory(fromDate), ensureEODHistory(fromDate)]);
+  return out.some(Boolean);
+}
+// Refresh the newest EODs. Never throws; keeps what is in memory if SharePoint fails.
+async function loadEODFromSP() {
+  _eodReports = _eodReports || {};
+  try { await _eodRefresh(EOD_RECENT_ROWS); } catch (e) { console.warn('[HIST] EOD refresh failed', e); }
 }
 
 async function loadFromSharePoint() {
@@ -12519,8 +12626,8 @@ function clvRender() {
       const args = arguments, self = this, mine = ++calls;
       let from = '';
       try { from = getFrom.apply(null, args) || ''; } catch (e) {}
-      if (from && !histCovers(from)) {
-        ensureHistory(from).then(changed => {
+      if (from && !allHistoryCovers(from)) {
+        ensureAllHistory(from).then(changed => {
           if (!changed || mine !== calls) return;
           try { redraw ? redraw(orig, args) : orig.apply(self, args); } catch (e) { console.warn('[HIST] redraw failed: ' + name, e); }
         });
@@ -12535,9 +12642,9 @@ function clvRender() {
     window[name] = async function () {
       let from = '';
       try { from = getFrom.apply(null, arguments) || ''; } catch (e) {}
-      if (from && !histCovers(from)) {
+      if (from && !allHistoryCovers(from)) {
         if (message) { try { showToast(message, 'ok'); } catch (e) {} }
-        await ensureHistory(from);
+        await ensureAllHistory(from);
       }
       return orig.apply(this, arguments);
     };
@@ -12553,6 +12660,15 @@ function clvRender() {
   redrawWhenLoaded('renderEODSummary', (el, teamNames, date) => date || today, (orig, args) => {
     if (args[0] && args[0].isConnected) orig.apply(null, args);
   });
+  // EOD and performance screens
+  const eodView = () => (typeof _eodViewDate !== 'undefined' && _eodViewDate) || today;
+  redrawWhenLoaded('renderEODScreen', eodView);
+  redrawWhenLoaded('renderSAEODScreen', eodView);
+  redrawWhenLoaded('saEodDrawPie', () => saEodPieDates().from);
+  redrawWhenLoaded('previewEODDownload', () => val('eodDownloadDate') || today);
+  waitThenRun('downloadEOD', () => val('eodDownloadDate') || today, 'Loading older EODs…');
+  redrawWhenLoaded('renderMyTeamEOD', () => (typeof _myTeamEODDate !== 'undefined' && _myTeamEODDate) || today);
+  redrawWhenLoaded('renderPerformanceScreen', () => perfGetDates().from);
   // Export and anything that creates or removes records for a date range
   waitThenRun('exportCSV', () => val('fromDate'), 'Loading older records…');
   waitThenRun('autoMarkLeaveAttendance', req => req && req.StartDate);
