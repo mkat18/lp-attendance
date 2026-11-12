@@ -2104,7 +2104,7 @@ function canDeleteStaff(){ return isSuperAdmin() || canDo('canDeleteStaff'); }
 function canChangeRole(){ return isSuperAdmin(); }
 function canResetPins()  { return isSuperAdmin() || canDo('canResetPins'); }
 function canAddObs()     { return isSuperAdmin() || isMgr() || isTL() || canDo('canAddObsNotes'); }
-function canEditRecords(){ return isSuperAdmin() || canDo('canEditRecords'); }
+function canEditRecords(){ if (isSuperAdmin() && !_previewRole) return true; const p = getPerms(); return !!(p && p.features && p.features.canEditRecords === true); }
 
 
 // ── Role preview for superadmin ───────────────────────────────────────────
@@ -2193,55 +2193,55 @@ function previewPersonSearch(q) {
 const DEFAULT_PERMISSIONS = {
   administrator: {
     tabs: { checkin:true, leave:true, dashboard:true, admin:false, files:false, myfiles:false, myteam:false, eod:false, performance:false, othertasks:false, feedback:false, profile:true },
-    features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canApproveLeave:false, canSeeLeaveBalance:true, canSeeTeamLeaveBalances:false, canSeeAllFiles:false, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:false }
+    features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canApproveLeave:false, canSeeLeaveBalance:true, canSeeTeamLeaveBalances:false, canSeeAllFiles:false, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:false, canEditRecords:false }
   },
   hrmanager: {
     tabs: { checkin:true, leave:true, dashboard:true, admin:true, files:false, myfiles:false, myteam:false, eod:false, performance:false, othertasks:false, feedback:false, profile:true },
-    features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canApproveLeave:true, canSeeLeaveBalance:true, canSeeTeamLeaveBalances:true, canSeeAllFiles:false, canAddStaff:true, canResetPins:true, canChangeRoles:false, canDeleteStaff:false, canExportData:true, canAddObsNotes:true }
+    features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canApproveLeave:true, canSeeLeaveBalance:true, canSeeTeamLeaveBalances:true, canSeeAllFiles:false, canAddStaff:true, canResetPins:true, canChangeRoles:false, canDeleteStaff:false, canExportData:true, canAddObsNotes:true, canEditRecords:true }
   },
   teamlead: {
     tabs: { checkin:true, leave:true, dashboard:true, admin:false, files:false, myfiles:false, myteam:false, eod:true, performance:false, othertasks:false, feedback:false, profile:true },
-    features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canSeeLeaveBalance:false, canApproveLeave:true, canSeeTeamLeaveBalances:true, canSeeAllFiles:true, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:true }
+    features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canSeeLeaveBalance:false, canApproveLeave:true, canSeeTeamLeaveBalances:true, canSeeAllFiles:true, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:true, canEditRecords:false }
   },
   analyst: {
     tabs: { checkin:true, leave:true, dashboard:false, admin:false, files:false, myfiles:false, myteam:false, eod:true, performance:false, othertasks:false, feedback:false, profile:true },
-    features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canSeeLeaveBalance:false, canApproveLeave:false, canSeeTeamLeaveBalances:false, canSeeAllFiles:true, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:false }
+    features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canSeeLeaveBalance:false, canApproveLeave:false, canSeeTeamLeaveBalances:false, canSeeAllFiles:true, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:false, canEditRecords:false }
   },
   trainee: {
     tabs: { checkin:true, leave:true, dashboard:false, admin:false, files:false, myfiles:false, myteam:false, eod:false, performance:false, othertasks:false, feedback:false, profile:true },
-    features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canSeeLeaveBalance:false, canApproveLeave:false, canSeeTeamLeaveBalances:false, canSeeAllFiles:false, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:false }
+    features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canSeeLeaveBalance:false, canApproveLeave:false, canSeeTeamLeaveBalances:false, canSeeAllFiles:false, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:false, canEditRecords:false }
   },
   staff: {
     tabs: { checkin:true, leave:true, dashboard:false, admin:false, files:false, myfiles:false, myteam:false, eod:false, performance:false, othertasks:false, feedback:false, profile:true },
-    features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canSeeLeaveBalance:false, canApproveLeave:false, canSeeTeamLeaveBalances:false, canSeeAllFiles:false, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:false }
+    features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canSeeLeaveBalance:false, canApproveLeave:false, canSeeTeamLeaveBalances:false, canSeeAllFiles:false, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:false, canEditRecords:false }
   },
   hr: {
     tabs: { checkin:true, leave:true, dashboard:true, admin:false, files:false, myfiles:false, myteam:false, eod:false, performance:false, othertasks:false, feedback:false, profile:true },
-    features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canSeeLeaveBalance:false, canApproveLeave:false, canSeeTeamLeaveBalances:false, canSeeAllFiles:false, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:false }
+    features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canSeeLeaveBalance:false, canApproveLeave:false, canSeeTeamLeaveBalances:false, canSeeAllFiles:false, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:false, canEditRecords:false }
   },
   assistant: {
     tabs: { checkin:true, leave:true, dashboard:false, admin:false, files:false, myfiles:false, myteam:false, eod:false, performance:false, othertasks:false, feedback:false, profile:true },
-    features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canSeeLeaveBalance:false, canApproveLeave:false, canSeeTeamLeaveBalances:false, canSeeAllFiles:false, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:false }
+    features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canSeeLeaveBalance:false, canApproveLeave:false, canSeeTeamLeaveBalances:false, canSeeAllFiles:false, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:false, canEditRecords:false }
   },
   sales: {
     tabs: { checkin:true, leave:true, dashboard:false, admin:false, files:false, myfiles:false, myteam:false, eod:false, performance:false, othertasks:false, feedback:false, profile:true },
-    features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canSeeLeaveBalance:false, canApproveLeave:false, canSeeTeamLeaveBalances:false, canSeeAllFiles:false, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:false }
+    features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canSeeLeaveBalance:false, canApproveLeave:false, canSeeTeamLeaveBalances:false, canSeeAllFiles:false, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:false, canEditRecords:false }
   },
   customerservice: {
     tabs: { checkin:true, leave:true, dashboard:false, admin:false, files:false, myfiles:false, myteam:false, eod:false, performance:false, othertasks:false, feedback:false, profile:true },
-    features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canSeeLeaveBalance:false, canApproveLeave:false, canSeeTeamLeaveBalances:false, canSeeAllFiles:false, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:false }
+    features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canSeeLeaveBalance:false, canApproveLeave:false, canSeeTeamLeaveBalances:false, canSeeAllFiles:false, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:false, canEditRecords:false }
   },
   socialmedia: {
     tabs: { checkin:true, leave:true, dashboard:false, admin:false, files:false, myfiles:false, myteam:false, eod:false, performance:false, othertasks:false, feedback:false, profile:true },
-    features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canApproveLeave:false, canSeeLeaveBalance:false, canSeeTeamLeaveBalances:false, canSeeAllFiles:false, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:false }
+    features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canApproveLeave:false, canSeeLeaveBalance:false, canSeeTeamLeaveBalances:false, canSeeAllFiles:false, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:false, canEditRecords:false }
   },
   accountant: {
     tabs: { checkin:true, leave:true, dashboard:false, admin:false, files:false, myfiles:false, myteam:false, eod:false, performance:false, othertasks:false, feedback:false, profile:true },
-    features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canApproveLeave:false, canSeeLeaveBalance:false, canSeeTeamLeaveBalances:false, canSeeAllFiles:false, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:false }
+    features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canApproveLeave:false, canSeeLeaveBalance:false, canSeeTeamLeaveBalances:false, canSeeAllFiles:false, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:false, canEditRecords:false }
   },
   opsmanager: {
     tabs: { checkin:true, leave:true, eod:true, dashboard:false, admin:false, files:false, myfiles:false, myteam:false, performance:false, othertasks:false, feedback:false, profile:true },
-    features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canApproveLeave:false, canSeeLeaveBalance:false, canSeeTeamLeaveBalances:false, canSeeAllFiles:false, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:false }
+    features: { canBreak:true, canClockOut:true, requiresSelfie:true, requiresLocation:true, canApplyLeave:true, canApproveLeave:false, canSeeLeaveBalance:false, canSeeTeamLeaveBalances:false, canSeeAllFiles:false, canAddStaff:false, canResetPins:false, canChangeRoles:false, canDeleteStaff:false, canExportData:false, canAddObsNotes:false, canEditRecords:false }
   },
 };
 
@@ -2368,6 +2368,7 @@ const DANGEROUS_FEATURES = {
   canDeleteStaff: { label: 'Can delete staff', warning: 'Allows permanent deletion of staff records. This cannot be undone.' },
   canExportData: { label: 'Can export all data', warning: 'Exposes complete attendance data for all staff as a downloadable CSV.' },
   canAddStaff: { label: 'Can add staff', warning: 'Allows creating new accounts in the system.' },
+  canEditRecords: { label: 'Can edit attendance records', warning: 'Allows changing clock in and clock out times for any staff member.' },
   canResetPins: { label: 'Can reset PINs', warning: 'Allows resetting another person\'s PIN — could be used for unauthorised access.' },
 };
 
@@ -2394,6 +2395,7 @@ const FEATURE_LABELS = {
   canDeleteStaff: 'Can delete staff',
   canExportData: 'Can export all data as CSV',
   canAddObsNotes: 'Can add observation notes',
+  canEditRecords: 'Can edit attendance records (clock in / clock out times)',
 };
 
 let EDITABLE_ROLES = ['hrmanager','opsmanager','teamlead','analyst','trainee','staff','hr','assistant','sales','customerservice','socialmedia','accountant'];
@@ -2420,6 +2422,9 @@ function renderPermissionsEditor() {
   }
 
   const perms = JSON.parse(JSON.stringify(_permissions[_editingRole] || DEFAULT_PERMISSIONS[_editingRole] || DEFAULT_PERMISSIONS.staff));
+  { const _def = DEFAULT_PERMISSIONS[_editingRole] || DEFAULT_PERMISSIONS.staff;
+    perms.tabs = { ...(_def.tabs||{}), ...(perms.tabs||{}) };
+    perms.features = { ...(_def.features||{}), ...(perms.features||{}) }; }
   _pendingPermissions = perms;
 
   const tabsHtml = Object.entries(TAB_LABELS).map(([key, label]) => `
@@ -6467,7 +6472,7 @@ function renderRecords() {
   if(!filtered.length){document.getElementById('recordsTable').innerHTML='<tr><td><div class="empty-state">'+(locationFilter?'No location issues found.':'No records in this range.')+'</div></td></tr>';return;}
   const from=document.getElementById('fromDate').value, to=document.getElementById('toDate').value;
   const singleDay=from===to;
-  let html='<thead><tr>'+(singleDay?'':'<th>Date</th>')+'<th>Name</th><th>Status</th><th>Clock in</th><th>Clock out</th><th>Worked</th><th>Location</th><th>Reason</th>'+(isSuperAdmin()?'<th></th>':'')+'</tr></thead><tbody>';
+  let html='<thead><tr>'+(singleDay?'':'<th>Date</th>')+'<th>Name</th><th>Status</th><th>Clock in</th><th>Clock out</th><th>Worked</th><th>Location</th><th>Reason</th>'+(canEditRecords()?'<th></th>':'')+'</tr></thead><tbody>';
   let lastDate='';
   for(const r of filtered){
     if(!singleDay&&r.date!==lastDate){
@@ -6487,9 +6492,9 @@ function renderRecords() {
       <td style="font-size:12px;font-weight:600;color:${workedMins!==null?'var(--text)':'var(--text-3)'}">${isLeave?'—':fmtWorked(workedMins)}</td>
       <td>${geoTag(r)}</td>
       <td style="color:var(--text-2);font-size:12px">${r.reason?esc(r.reason):'—'}</td>
-      ${isSuperAdmin()&&!isLeave?`<td><button class="btn-sm" onclick="toggleEditRecordTime('${esc(r.name)}','${r.date}')" style="padding:3px 10px;font-size:11px">Edit</button></td>`:(isSuperAdmin()?'<td></td>':'')}
+      ${canEditRecords()&&!isLeave?`<td><button class="btn-sm" onclick="toggleEditRecordTime('${esc(r.name)}','${r.date}')" style="padding:3px 10px;font-size:11px">Edit</button></td>`:(canEditRecords()?'<td></td>':'')}
     </tr>`;
-    if (isSuperAdmin() && !isLeave) {
+    if (canEditRecords() && !isLeave) {
       html+=`<tr id="editrow_${rowId}" style="display:none"><td colspan="9" style="background:var(--surface-2);padding:10px 14px">
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
           <label style="font-size:12px;color:var(--text-3)">Clock in</label>
@@ -6512,6 +6517,7 @@ function toggleEditRecordTime(name, date) {
 }
 
 async function saveEditedRecordTime(name, date) {
+  if (!canEditRecords()) { showToast('You do not have permission to edit attendance records.','err'); return; }
   const rowId = (name+'_'+date).replace(/[^a-z0-9]/gi,'_');
   const ciVal = document.getElementById('editci_'+rowId)?.value;
   const coVal = document.getElementById('editco_'+rowId)?.value;
