@@ -5183,10 +5183,10 @@ async function autoApproveTodayLeave(staffName, date) {
   await processLeaveRequest(req.Id, 'approve', 'Auto-approved via check-in');
 }
 
-async function doSubmitLeave(leaveType, startDate, endDate, halfDay, halfDaySession, reason, brokerName, days) {
+async function doSubmitLeave(leaveType, startDate, endDate, halfDay, halfDaySession, reason, brokerName, days, forName) {
   const ly = getLeaveYear(startDate);
   const payload = {
-    Title: currentUser.name,
+    Title: forName || currentUser.name,
     LeaveType: leaveType,
     StartDate: startDate,
     EndDate: endDate,
@@ -5215,6 +5215,61 @@ async function doSubmitLeave(leaveType, startDate, endDate, halfDay, halfDaySess
   } catch(e) {
     showToast('Error submitting leave: ' + (e.message||'unknown error'), 'err');
   }
+}
+
+// ── Leave on behalf of a staff member ──────────────────────────────────────
+// HR manager and superadmin only. Creates a normal Pending request in the staff
+// member's name, so approval, balances and attendance marking work as usual.
+function canSubmitLeaveOnBehalf() {
+  return !!currentUser && (isSuperAdmin() || isManager());
+}
+
+async function submitLeaveOnBehalf() {
+  if (!canSubmitLeaveOnBehalf()) { showToast('You do not have permission to submit leave for others.', 'err'); return; }
+  const v = id => document.getElementById(id)?.value || '';
+  const staffName = v('obLeaveStaff');
+  const leaveType = v('obLeaveType');
+  const startDate = v('obLeaveStart');
+  const endDate   = v('obLeaveEnd') || startDate;
+  const halfDay   = !!document.getElementById('obLeaveHalfDay')?.checked;
+  const halfDaySession = v('obLeaveHalfDaySession');
+  const reason     = v('obLeaveReason').trim();
+  const brokerName = v('obLeaveBroker').trim();
+
+  const staff = getStaff().find(s => s.name === staffName);
+  if (!staff) { showToast('Select a staff member.', 'err'); return; }
+  if (!isSuperAdmin() && staff.role === 'superadmin') { showToast('You cannot submit leave for this person.', 'err'); return; }
+  if (!leaveType) { showToast('Select a leave type.', 'err'); return; }
+  if (!startDate) { showToast('Select a start date.', 'err'); return; }
+  if (endDate < startDate) { showToast('End date is before the start date.', 'err'); return; }
+  if (halfDay && endDate !== startDate) { showToast('A half day must start and end on the same date.', 'err'); return; }
+  if (!reason) { showToast('Enter a reason.', 'err'); return; }
+  if (leaveType === 'Broker Holiday' && !brokerName) { showToast('Enter the broker name.', 'err'); return; }
+
+  const dup = _leaveRequests.find(r =>
+    r.Title === staffName && r.LeaveType === leaveType && r.StartDate === startDate && r.EndDate === endDate &&
+    (r.Status === 'Pending' || r.Status === 'Approved'));
+  if (dup) { showToast(`${staffName} already has a ${leaveType} request for these dates (${dup.Status}).`, 'err'); return; }
+
+  const days = countLeaveDaysForStaff(startDate, endDate, halfDay, staff);
+  if (days <= 0) { showToast('No working days in selected range.', 'err'); return; }
+
+  const fmt = d => new Date(d + 'T12:00:00').toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  const confirmed = await showLeaveConfirmModal(`Confirm leave request:\n\nFor: ${staffName}\n${leaveType}\n${fmt(startDate)}${startDate === endDate ? '' : ' → ' + fmt(endDate)}\n${halfDay ? (halfDaySession + ' half day') : days + ' day' + (days !== 1 ? 's' : '')}\n\nReason: ${reason}`);
+  if (!confirmed) return;
+
+  const fullReason = reason + ' (Submitted by ' + currentUser.name + ' on behalf)';
+  const go = () => doSubmitLeave(leaveType, startDate, endDate, halfDay, halfDaySession, fullReason, brokerName, days, staffName);
+  const bal = getLeaveBalance(staffName);
+  if (leaveType === 'Annual Leave' && days > bal.annualRemaining) {
+    showLeaveWarningModal(`${staffName} only has ${bal.annualRemaining} annual leave day(s) remaining. The excess will be treated as unpaid leave.`, go);
+    return;
+  }
+  if (leaveType === 'Sick Leave' && days > bal.sickRemaining) {
+    showLeaveWarningModal(`${staffName} only has ${bal.sickRemaining} sick leave day(s) remaining. The excess will be treated as unpaid leave.`, go);
+    return;
+  }
+  await go();
 }
 
 // ── Approve/Reject leave request ───────────────────────────────────────────
@@ -5488,6 +5543,60 @@ async function renderLeaveScreen() {
         </div>
         <div id="myLeaveHistoryTable"><div style="font-size:13px;color:var(--text-3)">No leave requests found.</div></div>
       </div>
+    </div>`;
+  }
+
+  // ── Apply leave on behalf of a staff member (HR manager / superadmin) ─────
+  if (canSubmitLeaveOnBehalf()) {
+    const obStaff = getStaff()
+      .filter(s => s.name !== currentUser.name && (isSuperAdmin() || s.role !== 'superadmin'))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    html += `<div class="card">
+      <div class="section-label" style="margin-bottom:10px">Apply for leave on behalf of staff</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+        <div class="field" style="margin:0">
+          <label>Staff member</label>
+          <select id="obLeaveStaff">
+            <option value="">— Select —</option>
+            ${obStaff.map(s => `<option value="${esc(s.name)}">${esc(s.name)}</option>`).join('')}
+          </select>
+        </div>
+        <div class="field" style="margin:0">
+          <label>Leave type</label>
+          <select id="obLeaveType" onchange="document.getElementById('obLeaveBrokerField').style.display=this.value==='Broker Holiday'?'block':'none'">
+            <option value="">— Select —</option>
+            <option value="Annual Leave">Annual Leave</option>
+            <option value="Sick Leave">Sick Leave</option>
+            <option value="Unpaid Leave">Unpaid Leave</option>
+            <option value="Broker Holiday">Broker Holiday</option>
+          </select>
+        </div>
+        <div class="field" style="margin:0">
+          <label>Start date</label>
+          <input type="date" id="obLeaveStart"/>
+        </div>
+        <div class="field" style="margin:0">
+          <label>End date</label>
+          <input type="date" id="obLeaveEnd"/>
+        </div>
+        <div class="field" style="margin:0;display:none" id="obLeaveBrokerField">
+          <label>Broker name</label>
+          <input type="text" id="obLeaveBroker" placeholder="e.g. John Smith Brokers"/>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+        <input type="checkbox" id="obLeaveHalfDay" onchange="document.getElementById('obLeaveHalfDaySession').style.display=this.checked?'inline-block':'none'"/>
+        <label for="obLeaveHalfDay" style="font-size:13px;margin:0">Half day</label>
+        <select id="obLeaveHalfDaySession" style="display:none;font-size:13px;width:auto">
+          <option value="Morning">Morning</option>
+          <option value="Afternoon">Afternoon</option>
+        </select>
+      </div>
+      <div class="field" style="margin-bottom:10px">
+        <label>Reason</label>
+        <textarea id="obLeaveReason" rows="2" placeholder="Brief reason for leave…" style="width:100%;font-size:13px;padding:8px;border-radius:var(--radius-sm);border:1.5px solid var(--border);resize:vertical"></textarea>
+      </div>
+      <button class="btn-primary" onclick="const b=this;b.disabled=true;b.textContent='Submitting…';submitLeaveOnBehalf().finally(()=>{b.disabled=false;b.textContent='Submit leave for staff member';})">Submit leave for staff member</button>
     </div>`;
   }
 
